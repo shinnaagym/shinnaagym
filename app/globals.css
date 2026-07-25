@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --color-ink: #16241f;
+  --color-paper: #f6f1e7;
+  --color-coral: #e2734f;
+  --color-sage: #7fa694;
+  --color-bone: #f3ecdd;
+  --color-line: #d9cfb8;
+}
+
+@theme inline {
+  --color-ink: var(--color-ink);
+  --color-paper: var(--color-paper);
+  --color-coral: var(--color-coral);
+  --color-sage: var(--color-sage);
+  --color-bone: var(--color-bone);
+  --color-line: var(--color-line);
+  --font-display: var(--font-gowun-batang);
+  --font-body: var(--font-ibm-plex-kr);
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body), "Apple SD Gothic Neo", sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), "Noto Serif KR", serif;
+}
+
+@keyframes draw-pulse {
+  from {
+    stroke-dashoffset: 620;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.pulse-path {
+  stroke-dasharray: 620;
+  stroke-dashoffset: 620;
+  animation: draw-pulse 2.4s ease-out 0.2s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
