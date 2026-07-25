@@ -108,7 +108,7 @@ export default async function Home() {
         <div className="mx-auto max-w-5xl px-6 py-12 text-sm text-ink/60 flex flex-col gap-2">
           <p className="font-display text-base text-ink">신나아짐</p>
           <p>전 직원 물리치료사 면허 보유 · 프리미엄 PT 스튜디오</p>
-          <p>문의 · 010-6856-6114</p>
+          <p>문의 · 010-6859-6114</p>
           <p>정확한 위치와 오픈일은 사전예약해주신 분들께 가장 먼저 안내드릴게요.</p>
         </div>
       </footer>
