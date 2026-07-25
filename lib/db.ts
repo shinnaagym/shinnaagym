@@ -1,9 +1,22 @@
 import { Pool, type QueryResultRow } from "pg";
 
-const connectionString =
-  process.env.POSTGRES_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL_NON_POOLING;
+// Vercel Storage(Neon) 연동은 스토리지 이름이 접두사로 붙은 환경변수
+// (예: `내프로젝트명_POSTGRES_URL`)를 만들기도 해서, 표준 이름이 없으면
+// "*_POSTGRES_URL" / "*_DATABASE_URL" 패턴의 변수도 찾아본다.
+function resolveConnectionString(): string | undefined {
+  const direct =
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL_NON_POOLING;
+  if (direct) return direct;
+
+  const prefixedKey = Object.keys(process.env).find((key) =>
+    /(^|_)POSTGRES_URL$/.test(key) || /(^|_)DATABASE_URL$/.test(key),
+  );
+  return prefixedKey ? process.env[prefixedKey] : undefined;
+}
+
+const connectionString = resolveConnectionString();
 
 let pool: Pool | undefined;
 
