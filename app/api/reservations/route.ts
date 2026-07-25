@@ -5,8 +5,9 @@ import {
   BUSINESS_END_HOUR,
   PURPOSE_OPTIONS,
 } from "@/lib/constants";
-import { isWithinBookingWindow } from "@/lib/date";
+import { isWithinBookingWindow, koreaCurrentHour, koreaTodayKey } from "@/lib/date";
 import { getTakenSlots } from "@/lib/reservations";
+import { notifyNewReservation } from "@/lib/notify";
 
 const PURPOSE_VALUES = new Set(PURPOSE_OPTIONS.map((option) => option.value));
 const PHONE_PATTERN = /^[0-9-+ ]{9,20}$/;
@@ -81,6 +82,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "예약 시간을 올바르게 선택해주세요." }, { status: 400 });
   }
 
+  if (date === koreaTodayKey() && hourNum <= koreaCurrentHour()) {
+    return NextResponse.json({ error: "이미 지난 시간은 예약할 수 없어요." }, { status: 400 });
+  }
+
   try {
     const result = await query<ReservationRow>(
       `INSERT INTO reservations
@@ -90,6 +95,15 @@ export async function POST(req: NextRequest) {
       [name.trim(), ageNum, phone.trim(), purposes, purposeNote.trim(), date, hourNum],
     );
     const row = result.rows[0];
+    await notifyNewReservation({
+      name: name.trim(),
+      age: ageNum,
+      phone: phone.trim(),
+      purposes,
+      purposeNote: purposeNote.trim(),
+      date: row.reservation_date,
+      hour: row.reservation_hour,
+    });
     return NextResponse.json(
       { ok: true, id: row.id, date: row.reservation_date, hour: row.reservation_hour },
       { status: 201 },

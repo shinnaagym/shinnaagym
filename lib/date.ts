@@ -34,6 +34,13 @@ export function isValidDateKey(key: string): boolean {
   );
 }
 
+/** Current hour of day (0-23) in KST. */
+export function koreaCurrentHour(): number {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.getUTCHours();
+}
+
 /** Whether `key` falls within [today, today + BOOKING_WINDOW_DAYS] in KST. */
 export function isWithinBookingWindow(key: string): boolean {
   if (!isValidDateKey(key)) return false;
