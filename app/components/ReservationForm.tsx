@@ -172,7 +172,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
           <button
             type="button"
             onClick={goPrevMonth}
-            className="px-3 py-1 rounded-full border border-line hover:bg-bone transition"
+            className="px-3 py-1 rounded-full border border-line transition-all duration-200 hover:bg-bone hover:scale-105 active:scale-95"
             aria-label="이전 달"
           >
             ‹
@@ -181,7 +181,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
           <button
             type="button"
             onClick={goNextMonth}
-            className="px-3 py-1 rounded-full border border-line hover:bg-bone transition"
+            className="px-3 py-1 rounded-full border border-line transition-all duration-200 hover:bg-bone hover:scale-105 active:scale-95"
             aria-label="다음 달"
           >
             ›
@@ -205,11 +205,11 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
                 disabled={!selectable}
                 onClick={() => selectDate(cell.key)}
                 className={[
-                  "aspect-square rounded-xl text-sm transition flex items-center justify-center",
+                  "aspect-square rounded-xl text-sm transition-all duration-200 flex items-center justify-center",
                   isSelected
                     ? "bg-ink text-bone font-semibold"
                     : selectable
-                      ? "hover:bg-sage/25 border border-line"
+                      ? "hover:bg-sage/25 hover:scale-105 active:scale-95 border border-line"
                       : "text-ink/25 border border-transparent cursor-not-allowed",
                   isToday && !isSelected ? "ring-1 ring-coral" : "",
                 ].join(" ")}
@@ -237,12 +237,12 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
                     disabled={isTaken}
                     onClick={() => setSelectedHour(h)}
                     className={[
-                      "py-2 rounded-lg text-sm border transition",
+                      "py-2 rounded-lg text-sm border transition-all duration-200",
                       isTaken
                         ? "border-line text-ink/30 line-through cursor-not-allowed"
                         : isSelected
-                          ? "bg-coral text-bone border-coral"
-                          : "border-line hover:border-coral",
+                          ? "bg-coral text-bone border-coral shadow-md shadow-coral/25"
+                          : "border-line hover:border-coral hover:scale-105 active:scale-95",
                     ].join(" ")}
                   >
                     {h}:00
@@ -304,10 +304,11 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
                   onClick={() => togglePurpose(opt.value)}
                   aria-pressed={checked}
                   className={[
-                    "px-3.5 py-2 rounded-full text-sm border transition",
+                    "px-3.5 py-2 rounded-full text-sm border transition-all duration-200",
                     checked
                       ? "bg-sage/30 border-sage text-ink"
-                      : "border-line text-ink/70 hover:border-sage",
+                      : "border-line text-ink/70 hover:border-sage hover:scale-105",
+                    "active:scale-95",
                   ].join(" ")}
                 >
                   {checked ? "✓ " : ""}
@@ -353,7 +354,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-full bg-ink text-bone py-3.5 font-medium tracking-wide hover:bg-coral transition disabled:opacity-50"
+          className="w-full rounded-full bg-ink text-bone py-3.5 font-medium tracking-wide transition-all duration-200 hover:bg-coral hover:-translate-y-0.5 hover:shadow-lg hover:shadow-coral/25 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
         >
           {submitting ? "예약 처리 중..." : "사전예약 신청하기"}
         </button>
