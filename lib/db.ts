@@ -16,7 +16,25 @@ function resolveConnectionString(): string | undefined {
   return prefixedKey ? process.env[prefixedKey] : undefined;
 }
 
-const connectionString = resolveConnectionString();
+const rawConnectionString = resolveConnectionString();
+
+// 연결 문자열에 sslmode=require 등이 포함되어 있으면 최신 pg가 이를
+// verify-full(인증서 완전 검증)로 취급해 아래의 명시적 ssl 옵션을 무시하고
+// "self-signed certificate in certificate chain" 에러를 낸다. sslmode를
+// 제거해서 아래 ssl 옵션만 적용되도록 한다.
+function stripSslMode(raw: string): string {
+  try {
+    const url = new URL(raw);
+    url.searchParams.delete("sslmode");
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
+const connectionString = rawConnectionString
+  ? stripSslMode(rawConnectionString)
+  : undefined;
 
 let pool: Pool | undefined;
 
