@@ -7,11 +7,13 @@ Next.js(App Router) + Postgres로 만들어졌고, Vercel에 배포하는 것을
 
 - 소개 페이지: 브랜드 소개, 신뢰 포인트, 사전예약 안내
 - 예약 폼: 성함 / 나이 / 연락처 / 운동 목적(재활·체형교정·다이어트·근력 증진·키성장 다중 선택) + 한 줄 설명
-- 예약 달력: 오늘부터 90일 이내, 매일 09:00~22:00을 1시간 단위로 예약. 이미 예약된 시간은
-  DB의 `UNIQUE(reservation_date, reservation_hour)` 제약으로 동시에 두 명이 같은 시간을
-  예약할 수 없도록 막습니다.
+- 예약 달력: 오늘부터 90일 이내, 매일 09:00~22:00을 1시간 단위로 예약. 이미 예약된 시간과
+  오늘 날짜의 지난 시간은 자동으로 마감 처리되어 선택할 수 없습니다. 동시에 두 명이 같은
+  시간을 예약하는 것은 DB의 `UNIQUE(reservation_date, reservation_hour)` 제약으로 막습니다.
 - 관리자 페이지(`/admin`): 비밀번호로 로그인 후 전체 예약 목록 확인 및 취소(삭제) 가능.
   기본 비밀번호는 `951105`이며, `ADMIN_PASSWORD` 환경변수로 바꿀 수 있습니다.
+- 예약 알림: `FORMSPREE_ENDPOINT`를 설정하면 새 예약이 접수될 때마다 Formspree를 통해
+  연결된 Gmail로 알림 메일이 발송됩니다.
 
 ## 로컬 개발
 
@@ -34,6 +36,8 @@ npm run dev
    - `ADMIN_PASSWORD` — 관리자 비밀번호 (기본값 `951105`. 다른 값으로 바꾸고 싶다면 설정)
    - `ADMIN_SESSION_SECRET` — 임의의 긴 무작위 문자열(32자 이상 추천). 관리자 로그인
      세션 쿠키에 서명할 때 사용합니다. 예: `openssl rand -hex 32` 로 생성 가능.
+   - `FORMSPREE_ENDPOINT` — (선택) 예약 알림 메일을 받고 싶다면 설정. 아래 "예약 알림 메일
+     설정하기" 참고.
 4. Deploy를 누르면 끝입니다. 이후 `main`(또는 배포 브랜치)에 푸시할 때마다 자동 배포됩니다.
 
 ## 환경변수
@@ -43,6 +47,21 @@ npm run dev
 | `POSTGRES_URL` | 예 | Postgres 연결 문자열. Vercel Storage에서 Postgres를 연결하면 자동으로 설정됩니다. 로컬 개발 시 직접 채워주세요. |
 | `ADMIN_PASSWORD` | 아니오 | 관리자 로그인 비밀번호. 기본값은 `951105`입니다. |
 | `ADMIN_SESSION_SECRET` | 배포 시 권장 | 관리자 세션 쿠키 서명용 비밀 키. 설정하지 않으면 개발용 기본값이 쓰이므로, 운영 배포 전에는 꼭 설정해주세요. |
+| `FORMSPREE_ENDPOINT` | 아니오 | Formspree 폼 엔드포인트(`https://formspree.io/f/xxxxxxxx`). 설정하면 새 예약마다 이메일 알림을 보냅니다. |
+
+## 예약 알림 메일 설정하기
+
+새 예약이 들어올 때마다 Gmail로 알림을 받고 싶다면:
+
+1. [formspree.io](https://formspree.io) 에서 Gmail 계정으로 가입/로그인합니다.
+2. **New Form**으로 새 폼을 만들고, 알림 받을 이메일이 본인 Gmail인지 확인합니다.
+3. 폼 설정 화면에 나오는 **Endpoint** 주소(`https://formspree.io/f/xxxxxxxx` 형태)를 복사합니다.
+4. Vercel 프로젝트 **Settings → Environment Variables**에 `FORMSPREE_ENDPOINT` 이름으로
+   위 주소를 추가하고 Production에 적용한 뒤 Redeploy 합니다.
+5. 이후 예약이 접수될 때마다 해당 Gmail로 알림 메일이 도착합니다.
+
+(예약 목록 자체는 이미 `/admin` 관리자 페이지에서 언제든 확인할 수 있습니다. Formspree는
+"새 예약이 들어왔다"는 실시간 이메일 알림용입니다.)
 
 ## 소개 문구 속 정보 수정하기
 
@@ -71,6 +90,7 @@ lib/
   db.ts                        # Postgres 연결 + 스키마 자동 생성
   auth.ts                      # 관리자 세션 쿠키 서명/검증
   reservations.ts               # 예약 가능 여부 조회 헬퍼
+  notify.ts                     # Formspree 예약 알림 메일 전송
   constants.ts                  # 영업시간, 운동 목적 옵션 등
-  date.ts                      # KST 기준 날짜 유틸
+  date.ts                      # KST 기준 날짜 유틸 (오늘 날짜/현재 시각)
 ```

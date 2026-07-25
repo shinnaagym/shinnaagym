@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { PURPOSE_OPTIONS, businessHours, BOOKING_WINDOW_DAYS } from "@/lib/constants";
-import { addDaysToKey, koreaTodayKey } from "@/lib/date";
+import { addDaysToKey, koreaCurrentHour, koreaTodayKey } from "@/lib/date";
 
 type TakenSlot = { date: string; hour: number };
 
@@ -32,6 +32,7 @@ function buildMonthCells(year: number, month: number) {
 
 export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] }) {
   const todayKey = koreaTodayKey();
+  const currentHour = koreaCurrentHour();
   const maxKey = addDaysToKey(todayKey, BOOKING_WINDOW_DAYS);
   const [todayY, todayM] = todayKey.split("-").map(Number);
 
@@ -228,7 +229,8 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
             <p className="text-sm text-ink/70 mb-2">{selectedDate} 예약 가능 시간</p>
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
               {hours.map((h) => {
-                const isTaken = taken.has(`${selectedDate}-${h}`);
+                const isPast = selectedDate === todayKey && h <= currentHour;
+                const isTaken = taken.has(`${selectedDate}-${h}`) || isPast;
                 const isSelected = selectedHour === h;
                 return (
                   <button
