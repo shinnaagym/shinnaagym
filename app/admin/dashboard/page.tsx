@@ -1,24 +1,299 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { query, type ReservationRow } from "@/lib/db";
+import { addMonthsToKey, isValidMonthKey, koreaCurrentMonthKey } from "@/lib/date";
+import {
+  getCoachMonthlyReports,
+  getDashboardOverview,
+  getMonthlyTrend,
+  listNewRegistrations,
+  listPackagePurchases,
+} from "@/lib/schedule";
 import { AdminNav } from "../admin-nav";
-import { ReservationTable } from "./reservation-table";
 
-export default async function AdminDashboardPage() {
+const TREND_MONTHS = 6;
+
+function formatWon(n: number): string {
+  return `₩${n.toLocaleString("ko-KR")}`;
+}
+
+function formatMonthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split("-");
+  return `${y}년 ${Number(m)}월`;
+}
+
+function formatMonthShort(monthKey: string): string {
+  const [, m] = monthKey.split("-");
+  return `${Number(m)}월`;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function formatRate(rate: number | null): string {
+  return rate === null ? "-" : `${Math.round(rate * 100)}%`;
+}
+
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
   if (!(await isAdminAuthed())) {
     redirect("/admin");
   }
 
-  const result = await query<ReservationRow>(
-    `SELECT * FROM reservations ORDER BY reservation_date ASC, reservation_hour ASC`,
-  );
+  const { month } = await searchParams;
+  const monthKey = month && isValidMonthKey(month) ? month : koreaCurrentMonthKey();
+
+  const [overview, coachReports, trend, newRegs, purchases] = await Promise.all([
+    getDashboardOverview(monthKey),
+    getCoachMonthlyReports(monthKey),
+    getMonthlyTrend(monthKey, TREND_MONTHS),
+    listNewRegistrations(monthKey),
+    listPackagePurchases(monthKey),
+  ]);
+
+  const maxRevenue = Math.max(1, ...trend.map((t) => t.revenue));
+  const maxSessions = Math.max(1, ...trend.map((t) => t.completedSessions));
+
+  const newRegByCoach = new Map<string, string[]>();
+  for (const r of newRegs) {
+    const names = newRegByCoach.get(r.coachName) ?? [];
+    names.push(r.memberName);
+    newRegByCoach.set(r.coachName, names);
+  }
+
+  const kpiCards: Array<{ label: string; value: string; accent?: boolean }> = [
+    { label: "활성 회원", value: `${overview.activeMemberCount}명` },
+    { label: "이번 달 완료 세션", value: `${overview.monthlyCompletedSessions}회` },
+    { label: "이번 달 매출", value: formatWon(overview.monthlyRevenue), accent: true },
+    { label: "이번 달 신규 등록", value: `${overview.monthlyNewMemberCount}명` },
+    { label: "이번 달 재등록", value: `${overview.monthlyReRegisteredMemberCount}명` },
+    { label: "노쇼율", value: formatRate(overview.noShowRate) },
+  ];
 
   return (
     <>
       <AdminNav />
       <main className="flex-1 bg-[#f7f8fa]">
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <ReservationTable initialReservations={result.rows} />
+        <div className="mx-auto max-w-6xl px-6 py-8">
+          {/* 월 네비게이션 */}
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/admin/dashboard?month=${addMonthsToKey(monthKey, -1)}`}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
+              >
+                ‹ 이전 달
+              </Link>
+              <Link
+                href="/admin/dashboard"
+                className="rounded-full bg-ink text-white px-4 py-1.5 text-sm hover:bg-coral transition"
+              >
+                이번 달
+              </Link>
+              <Link
+                href={`/admin/dashboard?month=${addMonthsToKey(monthKey, 1)}`}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
+              >
+                다음 달 ›
+              </Link>
+            </div>
+            <p className="font-display text-lg">{formatMonthLabel(monthKey)}</p>
+          </div>
+
+          {/* KPI 카드 */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+            {kpiCards.map((card) => (
+              <div
+                key={card.label}
+                className="rounded-2xl bg-white border border-line/60 shadow-sm px-4 sm:px-5 py-4"
+              >
+                <p className="text-xs text-ink/50 mb-2">{card.label}</p>
+                <p
+                  className={`text-lg sm:text-2xl font-semibold ${card.accent ? "text-gold" : "text-ink"}`}
+                >
+                  {card.value}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* 월별 추이 차트 */}
+          <div className="grid sm:grid-cols-2 gap-4 mb-6">
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+              <p className="text-sm font-medium mb-4">
+                월별 결제액 <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
+              </p>
+              <div className="flex items-end gap-2 h-36">
+                {trend.map((t) => (
+                  <div key={t.month} className="flex-1 flex flex-col items-center gap-1.5">
+                    <p className="text-[10px] text-ink/50 h-3">
+                      {t.revenue > 0 ? `${Math.round(t.revenue / 10000)}만` : ""}
+                    </p>
+                    <div
+                      className={`w-full rounded-t-md transition-all ${
+                        t.month === monthKey ? "bg-gold" : "bg-gold/30"
+                      }`}
+                      style={{ height: `${Math.max(4, (t.revenue / maxRevenue) * 100)}px` }}
+                    />
+                    <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+              <p className="text-sm font-medium mb-4">
+                월별 완료 세션{" "}
+                <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
+              </p>
+              <div className="flex items-end gap-2 h-36">
+                {trend.map((t) => (
+                  <div key={t.month} className="flex-1 flex flex-col items-center gap-1.5">
+                    <p className="text-[10px] text-ink/50 h-3">
+                      {t.completedSessions > 0 ? t.completedSessions : ""}
+                    </p>
+                    <div
+                      className={`w-full rounded-t-md transition-all ${
+                        t.month === monthKey ? "bg-sage" : "bg-sage/40"
+                      }`}
+                      style={{ height: `${Math.max(4, (t.completedSessions / maxSessions) * 100)}px` }}
+                    />
+                    <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 트레이너별 성과 — 모바일 카드 */}
+          <div className="grid gap-3 sm:hidden mb-6">
+            {coachReports.map((r) => (
+              <div
+                key={r.coachId}
+                className="rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3.5"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium">{r.coachName}</span>
+                  <span className="text-gold font-semibold">{formatWon(r.revenue)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 text-xs text-ink/60">
+                  <span>담당 {r.memberCount}명</span>
+                  <span>완료 {r.completedSessions}회</span>
+                  <span>노쇼 {r.noShowCount}회</span>
+                  <span>재등록율 {formatRate(r.reRegistrationRate)}</span>
+                </div>
+              </div>
+            ))}
+            {coachReports.length === 0 && (
+              <p className="text-center text-ink/40 py-6">코치가 없어요.</p>
+            )}
+          </div>
+
+          {/* 트레이너별 성과 — 데스크톱 표 */}
+          <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-6">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="text-left text-ink/50 text-xs border-b border-line/60">
+                  <th className="px-5 py-3 font-medium">코치</th>
+                  <th className="px-5 py-3 font-medium">담당 회원</th>
+                  <th className="px-5 py-3 font-medium">완료 세션</th>
+                  <th className="px-5 py-3 font-medium">노쇼</th>
+                  <th className="px-5 py-3 font-medium">매출</th>
+                  <th className="px-5 py-3 font-medium">재등록율</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coachReports.map((r) => (
+                  <tr key={r.coachId} className="border-b border-line/40 last:border-0">
+                    <td className="px-5 py-3 font-medium">{r.coachName}</td>
+                    <td className="px-5 py-3 text-ink/70">{r.memberCount}명</td>
+                    <td className="px-5 py-3 text-ink/70">{r.completedSessions}회</td>
+                    <td className="px-5 py-3 text-ink/70">{r.noShowCount}회</td>
+                    <td className="px-5 py-3 text-gold font-medium">{formatWon(r.revenue)}</td>
+                    <td className="px-5 py-3 text-ink/70">{formatRate(r.reRegistrationRate)}</td>
+                  </tr>
+                ))}
+                {coachReports.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-10 text-center text-ink/40">
+                      코치가 없어요.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-4">
+            {/* 이번 달 신규 PT 등록 */}
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+              <p className="text-sm font-medium mb-3">이번 달 신규 PT 등록</p>
+              {newRegs.length === 0 ? (
+                <p className="text-sm text-ink/40">이번 달 신규 등록이 없어요.</p>
+              ) : (
+                <ul className="space-y-2.5 text-sm">
+                  {[...newRegByCoach.entries()].map(([coachName, names]) => (
+                    <li key={coachName} className="flex items-start justify-between gap-3">
+                      <span className="text-ink/70 shrink-0">{coachName}</span>
+                      <span className="text-right">
+                        <span className="font-medium">{names.length}명</span>
+                        <span className="block text-xs text-ink/40">{names.join(", ")}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* PT 결제 내역 */}
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+              <p className="text-sm font-medium mb-3">PT 결제 내역</p>
+              {purchases.length === 0 ? (
+                <p className="text-sm text-ink/40">이번 달 결제 내역이 없어요.</p>
+              ) : (
+                <div className="max-h-72 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {purchases.map((p) => (
+                        <tr key={p.id} className="border-b border-line/30 last:border-0">
+                          <td className="py-2 pr-2 text-ink/40 whitespace-nowrap">
+                            {formatDate(p.purchasedAt)}
+                          </td>
+                          <td className="py-2 pr-2 whitespace-nowrap">{p.memberName}</td>
+                          <td className="py-2 pr-2 text-ink/50 whitespace-nowrap">
+                            {p.totalSessions}회
+                          </td>
+                          <td className="py-2 pr-2 text-gold font-medium whitespace-nowrap">
+                            {formatWon(p.price)}
+                          </td>
+                          <td className="py-2 whitespace-nowrap">
+                            <span
+                              className={[
+                                "text-[10px] rounded-full px-1.5 py-0.5",
+                                p.isFirst ? "bg-coral/10 text-coral" : "bg-sage/20 text-sage",
+                              ].join(" ")}
+                            >
+                              {p.isFirst ? "신규" : "재등록"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <p className="text-xs text-ink/40 mt-4 leading-relaxed">
+            매출은 그 달에 결제된 패키지 금액 합계이고, 완료 세션은 세션 상태가 &apos;완료&apos;인
+            건수예요. 신규 등록은 첫 패키지를 이번 달에 구매한 회원, 재등록은 이미 패키지가 있던
+            회원이 이번 달에 추가로 구매한 경우예요.
+          </p>
         </div>
       </main>
     </>

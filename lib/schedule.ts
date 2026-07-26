@@ -9,7 +9,7 @@ import type {
   PackageRow,
   SessionStatus,
 } from "./db";
-import { addDaysToKey } from "./date";
+import { addDaysToKey, addMonthsToKey } from "./date";
 import { scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
@@ -426,6 +426,7 @@ export interface CoachMonthlyReport {
   coachName: string;
   memberCount: number;
   completedSessions: number;
+  noShowCount: number;
   revenue: number;
   reRegisteredCount: number;
   churnedCount: number;
@@ -446,10 +447,12 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
        GROUP BY m.coach_id`,
       [yearMonth],
     ),
-    query<{ coach_id: number; completed: string }>(
-      `SELECT coach_id, COUNT(*) as completed
+    query<{ coach_id: number; completed: string; no_show: string }>(
+      `SELECT coach_id,
+         COUNT(*) FILTER (WHERE status IN ('completed', 'no_show')) as completed,
+         COUNT(*) FILTER (WHERE status = 'no_show') as no_show
        FROM class_sessions
-       WHERE status IN ('completed', 'no_show') AND entry_type = 'session'
+       WHERE entry_type = 'session'
          AND session_date >= $1 AND session_date < to_char((to_date($1, 'YYYY-MM-DD') + interval '1 month'), 'YYYY-MM-DD')
        GROUP BY coach_id`,
       [monthStart],
@@ -477,6 +480,7 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
   const sessionsMap = new Map(
     sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed ?? 0)]),
   );
+  const noShowMap = new Map(sessionsResult.rows.map((r) => [r.coach_id, Number(r.no_show ?? 0)]));
   const memberStatsMap = new Map(memberStatsResult.rows.map((r) => [r.coach_id, r]));
 
   return coachesResult.rows.map((coach) => {
@@ -489,12 +493,194 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
       coachName: coach.name,
       memberCount: Number(stats?.member_count ?? 0),
       completedSessions: sessionsMap.get(coach.id) ?? 0,
+      noShowCount: noShowMap.get(coach.id) ?? 0,
       revenue: revenueMap.get(coach.id) ?? 0,
       reRegisteredCount: reRegistered,
       churnedCount: churned,
       reRegistrationRate: denom > 0 ? reRegistered / denom : null,
     };
   });
+}
+
+// ---- 관리자 대시보드 개요 ----
+
+export interface DashboardOverview {
+  activeMemberCount: number;
+  monthlyRevenue: number;
+  monthlyCompletedSessions: number;
+  monthlyNoShowCount: number;
+  noShowRate: number | null;
+  monthlyNewMemberCount: number;
+  monthlyReRegisteredMemberCount: number;
+}
+
+/** yearMonth: "YYYY-MM" */
+export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
+  const [activeMembers, revenue, sessionStats, newMembers, reRegistered] = await Promise.all([
+    query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
+    query<{ revenue: string }>(
+      `SELECT COALESCE(SUM(price), 0) as revenue FROM packages
+       WHERE to_char(purchased_at, 'YYYY-MM') = $1`,
+      [yearMonth],
+    ),
+    query<{ completed: string; no_show: string }>(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'completed') as completed,
+         COUNT(*) FILTER (WHERE status = 'no_show') as no_show
+       FROM class_sessions
+       WHERE entry_type = 'session' AND LEFT(session_date, 7) = $1`,
+      [yearMonth],
+    ),
+    query<{ count: string }>(
+      `SELECT COUNT(*) as count FROM (
+         SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id
+       ) f WHERE to_char(f.first_at, 'YYYY-MM') = $1`,
+      [yearMonth],
+    ),
+    query<{ count: string }>(
+      `SELECT COUNT(DISTINCT p.member_id) as count FROM packages p
+       WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+         AND p.purchased_at <> (
+           SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+         )`,
+      [yearMonth],
+    ),
+  ]);
+
+  const completed = Number(sessionStats.rows[0]?.completed ?? 0);
+  const noShow = Number(sessionStats.rows[0]?.no_show ?? 0);
+  const denom = completed + noShow;
+
+  return {
+    activeMemberCount: Number(activeMembers.rows[0]?.count ?? 0),
+    monthlyRevenue: Number(revenue.rows[0]?.revenue ?? 0),
+    monthlyCompletedSessions: completed,
+    monthlyNoShowCount: noShow,
+    noShowRate: denom > 0 ? noShow / denom : null,
+    monthlyNewMemberCount: Number(newMembers.rows[0]?.count ?? 0),
+    monthlyReRegisteredMemberCount: Number(reRegistered.rows[0]?.count ?? 0),
+  };
+}
+
+export interface MonthlyTrendPoint {
+  month: string; // YYYY-MM
+  revenue: number;
+  completedSessions: number;
+}
+
+/** endYearMonth 기준 최근 `months`개월 치 매출·완료세션 추이 (차트용). */
+export async function getMonthlyTrend(
+  endYearMonth: string,
+  months: number,
+): Promise<MonthlyTrendPoint[]> {
+  const monthKeys: string[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    monthKeys.push(addMonthsToKey(endYearMonth, -i));
+  }
+
+  const [revenueResult, sessionResult] = await Promise.all([
+    query<{ month: string; revenue: string }>(
+      `SELECT to_char(purchased_at, 'YYYY-MM') as month, SUM(price) as revenue
+       FROM packages
+       WHERE to_char(purchased_at, 'YYYY-MM') = ANY($1)
+       GROUP BY month`,
+      [monthKeys],
+    ),
+    query<{ month: string; completed: string }>(
+      `SELECT LEFT(session_date, 7) as month, COUNT(*) as completed
+       FROM class_sessions
+       WHERE entry_type = 'session' AND status IN ('completed', 'no_show')
+         AND LEFT(session_date, 7) = ANY($1)
+       GROUP BY month`,
+      [monthKeys],
+    ),
+  ]);
+
+  const revenueMap = new Map(revenueResult.rows.map((r) => [r.month, Number(r.revenue ?? 0)]));
+  const sessionMap = new Map(sessionResult.rows.map((r) => [r.month, Number(r.completed ?? 0)]));
+
+  return monthKeys.map((month) => ({
+    month,
+    revenue: revenueMap.get(month) ?? 0,
+    completedSessions: sessionMap.get(month) ?? 0,
+  }));
+}
+
+export interface NewRegistration {
+  memberId: number;
+  memberName: string;
+  coachName: string;
+  firstPurchasedAt: string;
+}
+
+/** 이번 달에 첫 패키지를 구매한(=신규 등록) 회원 목록. */
+export async function listNewRegistrations(yearMonth: string): Promise<NewRegistration[]> {
+  const result = await query<{
+    member_id: number;
+    member_name: string;
+    coach_name: string | null;
+    first_at: string;
+  }>(
+    `SELECT f.member_id, m.name as member_name, c.name as coach_name, f.first_at
+     FROM (
+       SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id
+     ) f
+     JOIN members m ON m.id = f.member_id
+     LEFT JOIN coaches c ON c.id = m.coach_id
+     WHERE to_char(f.first_at, 'YYYY-MM') = $1
+     ORDER BY f.first_at ASC`,
+    [yearMonth],
+  );
+  return result.rows.map((r) => ({
+    memberId: r.member_id,
+    memberName: r.member_name,
+    coachName: r.coach_name ?? "미배정",
+    firstPurchasedAt: r.first_at,
+  }));
+}
+
+export interface PackagePurchaseEntry {
+  id: number;
+  purchasedAt: string;
+  memberName: string;
+  coachName: string | null;
+  totalSessions: number;
+  price: number;
+  isFirst: boolean;
+}
+
+/** 이번 달 패키지 결제 내역 (신규/재등록 여부 포함). */
+export async function listPackagePurchases(yearMonth: string): Promise<PackagePurchaseEntry[]> {
+  const result = await query<{
+    id: number;
+    purchased_at: string;
+    member_name: string;
+    coach_name: string | null;
+    total_sessions: number;
+    price: number;
+    is_first: boolean;
+  }>(
+    `SELECT p.id, p.purchased_at, m.name as member_name, c.name as coach_name,
+       p.total_sessions, p.price,
+       (p.purchased_at = (
+         SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+       )) as is_first
+     FROM packages p
+     JOIN members m ON m.id = p.member_id
+     LEFT JOIN coaches c ON c.id = m.coach_id
+     WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+     ORDER BY p.purchased_at DESC`,
+    [yearMonth],
+  );
+  return result.rows.map((r) => ({
+    id: r.id,
+    purchasedAt: r.purchased_at,
+    memberName: r.member_name,
+    coachName: r.coach_name,
+    totalSessions: Number(r.total_sessions),
+    price: Number(r.price),
+    isFirst: r.is_first,
+  }));
 }
 
 /** 회원 화면용: 담당 코치의 향후 N일 가능/마감 시간대 (다른 회원 이름은 노출하지 않음). */

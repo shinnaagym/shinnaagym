@@ -5,10 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 const TABS = [
+  { href: "/admin/dashboard", label: "대시보드" },
   { href: "/admin/schedule", label: "스케줄" },
   { href: "/admin/members", label: "회원 관리" },
   { href: "/admin/reports", label: "매출" },
-  { href: "/admin/dashboard", label: "사전예약" },
+  { href: "/admin/reservations", label: "사전예약" },
   { href: "/admin/settings", label: "설정" },
 ];
 
@@ -25,7 +26,7 @@ export function AdminNav() {
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-white/90 backdrop-blur">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 sm:h-16 flex flex-wrap items-center justify-between gap-y-3 gap-x-4 sm:flex-nowrap">
-        <Link href="/admin/schedule" className="flex items-center gap-2 shrink-0">
+        <Link href="/admin/dashboard" className="flex items-center gap-2 shrink-0">
           <Image src="/logo.png" alt="신나아짐" width={271} height={341} className="h-7 w-auto" />
           <span className="font-display text-base text-ink hidden sm:inline">신나아짐</span>
           <span className="text-xs text-ink/40 hidden sm:inline">관리자</span>
