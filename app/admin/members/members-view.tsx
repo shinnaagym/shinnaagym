@@ -9,7 +9,42 @@ type SessionSummary = {
   session_date: string;
   session_hour: number;
   status: string;
+  ordinal: number | null;
+  total_sessions: number | null;
 };
+
+type MemberDetail = {
+  id: number;
+  name: string;
+  phone: string;
+  coach_id: number | null;
+  notes: string;
+  referrer: string;
+  available_times: string;
+  token: string;
+  status: MemberStatus;
+};
+
+function formatWon(n: number): string {
+  return `₩${n.toLocaleString("ko-KR")}`;
+}
+
+function packageRate(pkg: { price: number; total_sessions: number }): number {
+  return pkg.total_sessions > 0 ? Math.round(pkg.price / pkg.total_sessions) : 0;
+}
+
+function TypeBadge({ isFirst }: { isFirst: boolean }) {
+  return (
+    <span
+      className={[
+        "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+        isFirst ? "bg-coral/10 text-coral" : "bg-sage/20 text-sage",
+      ].join(" ")}
+    >
+      {isFirst ? "초" : "재"}
+    </span>
+  );
+}
 
 export function MembersView({
   initialMembers,
@@ -22,6 +57,7 @@ export function MembersView({
   const activeCoaches = useMemo(() => coaches.filter((c) => c.active), [coaches]);
   const [search, setSearch] = useState("");
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<MemberStatus | "all">("active");
   const [showCreate, setShowCreate] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
 
@@ -29,16 +65,13 @@ export function MembersView({
     return members.filter((m) => {
       if (search && !m.name.includes(search)) return false;
       if (coachFilter !== "all" && m.coach_id !== coachFilter) return false;
+      if (statusFilter !== "all" && m.status !== statusFilter) return false;
       return true;
     });
-  }, [members, search, coachFilter]);
+  }, [members, search, coachFilter, statusFilter]);
 
   async function refresh() {
-    const res = await fetch("/api/admin/members");
-    if (res.ok) {
-      // 목록 API는 progress를 포함하지 않으므로 페이지 새로고침으로 최신화한다.
-      window.location.reload();
-    }
+    window.location.reload();
   }
 
   return (
@@ -65,6 +98,15 @@ export function MembersView({
               </option>
             ))}
           </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as MemberStatus | "all")}
+            className="rounded-full border border-line bg-white px-4 py-2 text-sm outline-none"
+          >
+            <option value="active">활성</option>
+            <option value="inactive">비활성</option>
+            <option value="all">전체</option>
+          </select>
           <span className="text-sm text-ink/50">{filtered.length}명</span>
         </div>
         <button
@@ -90,14 +132,22 @@ export function MembersView({
                   ? Math.min(100, Math.round((m.done_count / m.total_sessions) * 100))
                   : 0;
               const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
+              const expired = m.total_sessions > 0 && remaining <= 0;
+              const low = !expired && remaining > 0 && remaining <= 3;
+              const rate = m.latest_price != null && m.latest_total_sessions
+                ? packageRate({ price: m.latest_price, total_sessions: m.latest_total_sessions })
+                : null;
               return (
                 <button
                   key={m.id}
                   onClick={() => setDetailId(m.id)}
                   className="text-left rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3.5 active:bg-bone/40 transition"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium">{m.name}</span>
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="font-medium flex items-center gap-1.5">
+                      {m.name}
+                      {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
+                    </span>
                     <span
                       className={[
                         "rounded-full px-2.5 py-0.5 text-xs shrink-0",
@@ -111,7 +161,13 @@ export function MembersView({
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex-1 h-1.5 rounded-full bg-line/60 overflow-hidden">
-                      <div className="h-full bg-coral rounded-full" style={{ width: `${pct}%` }} />
+                      <div
+                        className={[
+                          "h-full rounded-full",
+                          expired ? "bg-red-400" : low ? "bg-amber-400" : "bg-coral",
+                        ].join(" ")}
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
                     <span className="text-xs text-ink/50 whitespace-nowrap">
                       {m.done_count}/{m.total_sessions}
@@ -119,9 +175,16 @@ export function MembersView({
                   </div>
                   <div className="flex items-center justify-between text-xs text-ink/60">
                     <span>담당 {coachName}</span>
-                    <span className={remaining <= 3 ? "text-coral font-medium" : ""}>
-                      잔여 {remaining}회
-                    </span>
+                    <span>{rate !== null ? `회당 ${formatWon(rate)}` : ""}</span>
+                    {expired ? (
+                      <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 font-medium">
+                        만료
+                      </span>
+                    ) : (
+                      <span className={low ? "text-amber-600 font-medium" : ""}>
+                        {low && "⚠ "}잔여 {remaining}회
+                      </span>
+                    )}
                   </div>
                 </button>
               );
@@ -130,13 +193,15 @@ export function MembersView({
 
           {/* 데스크톱: 표 */}
           <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="text-left text-ink/50 text-xs border-b border-line/60">
                   <th className="px-5 py-3 font-medium">이름</th>
                   <th className="px-5 py-3 font-medium">담당</th>
                   <th className="px-5 py-3 font-medium">진행</th>
                   <th className="px-5 py-3 font-medium">잔여</th>
+                  <th className="px-5 py-3 font-medium">회당 가격</th>
+                  <th className="px-5 py-3 font-medium">초/재</th>
                   <th className="px-5 py-3 font-medium">상태</th>
                 </tr>
               </thead>
@@ -148,6 +213,11 @@ export function MembersView({
                       ? Math.min(100, Math.round((m.done_count / m.total_sessions) * 100))
                       : 0;
                   const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
+                  const expired = m.total_sessions > 0 && remaining <= 0;
+                  const low = !expired && remaining > 0 && remaining <= 3;
+                  const rate = m.latest_price != null && m.latest_total_sessions
+                    ? packageRate({ price: m.latest_price, total_sessions: m.latest_total_sessions })
+                    : null;
                   return (
                     <tr
                       key={m.id}
@@ -160,7 +230,10 @@ export function MembersView({
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 rounded-full bg-line/60 overflow-hidden">
                             <div
-                              className="h-full bg-coral rounded-full"
+                              className={[
+                                "h-full rounded-full",
+                                expired ? "bg-red-400" : low ? "bg-amber-400" : "bg-coral",
+                              ].join(" ")}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
@@ -170,13 +243,22 @@ export function MembersView({
                         </div>
                       </td>
                       <td className="px-5 py-3">
-                        <span
-                          className={
-                            remaining <= 3 ? "text-coral font-medium" : "text-ink/70"
-                          }
-                        >
-                          {remaining}회
-                        </span>
+                        {expired ? (
+                          <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium">
+                            만료
+                          </span>
+                        ) : (
+                          <span className={low ? "text-amber-600 font-medium" : "text-ink/70"}>
+                            {low && "⚠ "}
+                            {remaining}회
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 text-ink/70">
+                        {rate !== null ? formatWon(rate) : "-"}
+                      </td>
+                      <td className="px-5 py-3">
+                        {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
                       </td>
                       <td className="px-5 py-3">
                         <span
@@ -235,6 +317,8 @@ function CreateMemberModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [coachId, setCoachId] = useState<number | "">(coaches[0]?.id ?? "");
+  const [referrer, setReferrer] = useState("");
+  const [availableTimes, setAvailableTimes] = useState("");
   const [notes, setNotes] = useState("");
   const [totalSessions, setTotalSessions] = useState("");
   const [price, setPrice] = useState("");
@@ -261,6 +345,8 @@ function CreateMemberModal({
           phone,
           coachId: coachId === "" ? null : coachId,
           notes,
+          referrer,
+          availableTimes,
           totalSessions: Number(totalSessions),
           price: Number(price || 0),
         }),
@@ -296,19 +382,37 @@ function CreateMemberModal({
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
           />
         </Field>
-        <Field label="담당 코치">
-          <select
-            value={coachId}
-            onChange={(e) => setCoachId(e.target.value ? Number(e.target.value) : "")}
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none"
-          >
-            <option value="">미지정</option>
-            {coaches.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="담당 코치">
+            <select
+              value={coachId}
+              onChange={(e) => setCoachId(e.target.value ? Number(e.target.value) : "")}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none"
+            >
+              <option value="">미지정</option>
+              {coaches.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="소개해주신 분">
+            <input
+              value={referrer}
+              onChange={(e) => setReferrer(e.target.value)}
+              placeholder="선택 입력"
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+        </div>
+        <Field label="가능한 요일·시간">
+          <input
+            value={availableTimes}
+            onChange={(e) => setAvailableTimes(e.target.value)}
+            placeholder="예: 화·목 오전 10시"
+            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="등록 횟수 *">
@@ -330,7 +434,7 @@ function CreateMemberModal({
             />
           </Field>
         </div>
-        <Field label="메모">
+        <Field label="운동 목적 / 특이사항">
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -365,7 +469,7 @@ function MemberDetailModal({
   onChanged: () => void;
 }) {
   const [data, setData] = useState<{
-    member: { id: number; name: string; phone: string; coach_id: number | null; token: string; status: MemberStatus };
+    member: MemberDetail;
     progress: { totalSessions: number; doneCount: number; remaining: number };
     packages: PackageRow[];
     sessions: SessionSummary[];
@@ -373,13 +477,40 @@ function MemberDetailModal({
   const [copied, setCopied] = useState(false);
   const [addSessions, setAddSessions] = useState("");
   const [addPrice, setAddPrice] = useState("");
-  const [coachSaving, setCoachSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // 편집 폼 상태
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [coachId, setCoachId] = useState<number | "">("");
+  const [status, setStatus] = useState<MemberStatus>("active");
+  const [referrer, setReferrer] = useState("");
+  const [availableTimes, setAvailableTimes] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [editingPkgId, setEditingPkgId] = useState<number | null>(null);
+  const [editTotal, setEditTotal] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editNote, setEditNote] = useState("");
+
+  function loadFrom(member: MemberDetail) {
+    setName(member.name);
+    setPhone(member.phone);
+    setCoachId(member.coach_id ?? "");
+    setStatus(member.status);
+    setReferrer(member.referrer);
+    setAvailableTimes(member.available_times);
+    setNotes(member.notes);
+  }
 
   useEffect(() => {
     fetch(`/api/admin/members/${memberId}`)
       .then((res) => res.json())
-      .then(setData);
+      .then((d) => {
+        setData(d);
+        loadFrom(d.member);
+      });
   }, [memberId]);
 
   if (!data) {
@@ -397,6 +528,57 @@ function MemberDetailModal({
     await navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleSave() {
+    if (!name.trim()) {
+      setError("이름을 입력해주세요.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          phone,
+          coachId: coachId === "" ? null : coachId,
+          status,
+          referrer,
+          availableTimes,
+          notes,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? "저장에 실패했습니다.");
+        return;
+      }
+      onChanged();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteMember() {
+    if (data!.packages.length > 0) return;
+    if (!confirm(`${data!.member.name} 회원을 완전히 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? "삭제에 실패했습니다.");
+        return;
+      }
+      onChanged();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAddPackage() {
@@ -420,72 +602,58 @@ function MemberDetailModal({
     onClose();
   }
 
-  async function handleCoachChange(newCoachId: number | null) {
-    setCoachSaving(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/members/${memberId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ coachId: newCoachId }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        setError(d.error ?? "담당 코치 변경에 실패했습니다.");
-        return;
-      }
-      setData((prev) => (prev ? { ...prev, member: { ...prev.member, coach_id: newCoachId } } : prev));
-      onChanged();
-    } finally {
-      setCoachSaving(false);
-    }
+  function startEditPkg(pkg: PackageRow) {
+    setEditingPkgId(pkg.id);
+    setEditTotal(String(pkg.total_sessions));
+    setEditPrice(String(pkg.price));
+    setEditNote(pkg.note);
   }
 
-  async function handleStatusToggle() {
-    const nextStatus = data!.member.status === "active" ? "inactive" : "active";
-    await fetch(`/api/admin/members/${memberId}`, {
+  async function saveEditPkg(pkgId: number) {
+    const totalSessions = Number(editTotal);
+    const price = Number(editPrice);
+    if (!Number.isInteger(totalSessions) || totalSessions < 1) {
+      setError("횟수를 올바르게 입력해주세요.");
+      return;
+    }
+    const res = await fetch(`/api/admin/members/${memberId}/packages/${pkgId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: nextStatus }),
+      body: JSON.stringify({ totalSessions, price, note: editNote }),
     });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setError(d.error ?? "수정에 실패했습니다.");
+      return;
+    }
+    setEditingPkgId(null);
+    const refreshed = await fetch(`/api/admin/members/${memberId}`).then((r) => r.json());
+    setData(refreshed);
     onChanged();
-    onClose();
   }
+
+  async function deletePkg(pkgId: number) {
+    if (!confirm("이 결제 기록을 삭제할까요?")) return;
+    const res = await fetch(`/api/admin/members/${memberId}/packages/${pkgId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      setError("삭제에 실패했습니다.");
+      return;
+    }
+    const refreshed = await fetch(`/api/admin/members/${memberId}`).then((r) => r.json());
+    setData(refreshed);
+    onChanged();
+  }
+
+  const firstPackageId = data.packages[0]?.id;
 
   return (
     <ModalShell title={`${data.member.name} — 회원 정보`} onClose={onClose}>
       <div className="space-y-5">
-        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm space-y-2">
-          <p>
-            진행 {data.progress.doneCount} / {data.progress.totalSessions} · 잔여{" "}
-            {data.progress.remaining}회
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-ink/50 shrink-0">담당 코치</span>
-            <select
-              value={data.member.coach_id ?? ""}
-              disabled={coachSaving}
-              onChange={(e) =>
-                handleCoachChange(e.target.value ? Number(e.target.value) : null)
-              }
-              className="flex-1 min-w-0 rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm outline-none focus:border-coral disabled:opacity-50"
-            >
-              <option value="">미지정</option>
-              {activeCoaches.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-              {/* 이미 퇴사한 코치가 배정돼 있다면 목록에 없어도 현재 값은 보여준다 */}
-              {data.member.coach_id &&
-                !activeCoaches.some((c) => c.id === data.member.coach_id) && (
-                  <option value={data.member.coach_id}>
-                    {coaches.find((c) => c.id === data.member.coach_id)?.name ?? "알 수 없음"}
-                    (퇴사)
-                  </option>
-                )}
-            </select>
-          </div>
+        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm">
+          진행 {data.progress.doneCount} / {data.progress.totalSessions} (잔여{" "}
+          {data.progress.remaining}회)
         </div>
 
         <div>
@@ -508,8 +676,163 @@ function MemberDetailModal({
           </p>
         </div>
 
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="이름 *">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="연락처">
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="담당 코치">
+              <select
+                value={coachId}
+                onChange={(e) => setCoachId(e.target.value ? Number(e.target.value) : "")}
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+              >
+                <option value="">미지정</option>
+                {activeCoaches.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                {data.member.coach_id &&
+                  !activeCoaches.some((c) => c.id === data.member.coach_id) && (
+                    <option value={data.member.coach_id}>
+                      {coaches.find((c) => c.id === data.member.coach_id)?.name ?? "알 수 없음"}
+                      (퇴사)
+                    </option>
+                  )}
+              </select>
+            </Field>
+            <Field label="상태">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as MemberStatus)}
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+              >
+                <option value="active">활성</option>
+                <option value="inactive">비활성</option>
+              </select>
+            </Field>
+          </div>
+          <Field label="소개해주신 분">
+            <input
+              value={referrer}
+              onChange={(e) => setReferrer(e.target.value)}
+              placeholder="선택 입력"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
+          </Field>
+          <Field label="가능한 요일·시간">
+            <input
+              value={availableTimes}
+              onChange={(e) => setAvailableTimes(e.target.value)}
+              placeholder="예: 화·목 오전 10시"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
+          </Field>
+          <Field label="운동 목적 / 특이사항">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
+            />
+          </Field>
+        </div>
+
         <div>
-          <p className="text-sm font-medium mb-2">패키지 추가</p>
+          <p className="text-sm font-medium mb-2">결제·패키지 이력</p>
+          <div className="rounded-xl border border-line/60 divide-y divide-line/40 overflow-hidden mb-2">
+            {data.packages.map((pkg) => (
+              <div key={pkg.id} className="px-3 py-2 text-xs">
+                {editingPkgId === pkg.id ? (
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input
+                        type="number"
+                        value={editTotal}
+                        onChange={(e) => setEditTotal(e.target.value)}
+                        placeholder="횟수"
+                        className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                      />
+                      <input
+                        type="number"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        placeholder="금액"
+                        className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                      />
+                    </div>
+                    <input
+                      value={editNote}
+                      onChange={(e) => setEditNote(e.target.value)}
+                      placeholder="메모"
+                      className="w-full rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                    />
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => saveEditPkg(pkg.id)}
+                        className="flex-1 rounded-full bg-ink text-white py-1.5 text-xs font-medium hover:bg-coral transition"
+                      >
+                        저장
+                      </button>
+                      <button
+                        onClick={() => setEditingPkgId(null)}
+                        className="flex-1 rounded-full border border-line py-1.5 text-xs hover:bg-bone transition"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1.5">
+                        <span className="text-ink/40 whitespace-nowrap">
+                          {new Date(pkg.purchased_at).toLocaleDateString("ko-KR")}
+                        </span>
+                        <TypeBadge isFirst={pkg.id === firstPackageId} />
+                      </p>
+                      <p className="text-ink/60 truncate">
+                        {pkg.total_sessions}회 · 회당 {formatWon(packageRate(pkg))} ·{" "}
+                        {formatWon(pkg.price)}
+                        {pkg.note && ` · ${pkg.note}`}
+                      </p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => startEditPkg(pkg)}
+                        className="rounded-full border border-line px-2 py-1 hover:bg-bone transition"
+                      >
+                        수정
+                      </button>
+                      <button
+                        onClick={() => deletePkg(pkg.id)}
+                        className="rounded-full border border-line px-2 py-1 text-red-500 hover:bg-red-50 transition"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {data.packages.length === 0 && (
+              <p className="px-3 py-3 text-xs text-ink/40">결제 이력이 없어요.</p>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <input
               type="number"
@@ -535,14 +858,17 @@ function MemberDetailModal({
         </div>
 
         <div>
-          <p className="text-sm font-medium mb-2">최근 세션</p>
+          <p className="text-sm font-medium mb-2">최근 세션 기록</p>
           <div className="max-h-40 overflow-y-auto space-y-1">
             {data.sessions.slice(0, 8).map((s) => (
               <div key={s.id} className="flex justify-between text-xs text-ink/60">
                 <span>
                   {s.session_date} {s.session_hour}:00
                 </span>
-                <span>{s.status}</span>
+                <span>
+                  {s.status}
+                  {Number(s.total_sessions) > 0 ? ` · ${s.ordinal}/${s.total_sessions}` : ""}
+                </span>
               </div>
             ))}
             {data.sessions.length === 0 && (
@@ -553,12 +879,33 @@ function MemberDetailModal({
 
         {error && <p className="text-sm text-coral">{error}</p>}
 
-        <button
-          onClick={handleStatusToggle}
-          className="w-full rounded-full border border-line py-2 text-sm hover:bg-bone transition"
-        >
-          {data.member.status === "active" ? "비활성으로 전환" : "다시 활성화"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleDeleteMember}
+            disabled={data.packages.length > 0 || saving}
+            title={
+              data.packages.length > 0
+                ? "결제 이력이 있는 회원은 삭제할 수 없어요. 상태를 '비활성'으로 바꿔주세요."
+                : undefined
+            }
+            className="rounded-full border border-line px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            삭제
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-full border border-line py-2 text-sm hover:bg-bone transition"
+          >
+            닫기
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 rounded-full bg-ink text-white py-2 text-sm font-medium hover:bg-coral transition disabled:opacity-50"
+          >
+            {saving ? "저장 중..." : "저장"}
+          </button>
+        </div>
       </div>
     </ModalShell>
   );

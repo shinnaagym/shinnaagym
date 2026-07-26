@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
         phone?: unknown;
         coachId?: unknown;
         notes?: unknown;
+        referrer?: unknown;
+        availableTimes?: unknown;
         totalSessions?: unknown;
         price?: unknown;
       }
@@ -31,6 +33,9 @@ export async function POST(req: NextRequest) {
   }
   const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
   const notes = typeof body?.notes === "string" ? body.notes.trim() : "";
+  const referrer = typeof body?.referrer === "string" ? body.referrer.trim() : "";
+  const availableTimes =
+    typeof body?.availableTimes === "string" ? body.availableTimes.trim() : "";
   const coachId =
     typeof body?.coachId === "number" && Number.isInteger(body.coachId)
       ? body.coachId
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "등록 횟수를 올바르게 입력해주세요." }, { status: 400 });
   }
 
-  const member = await createMember({ name, phone, coachId, notes });
+  const member = await createMember({ name, phone, coachId, notes, referrer, availableTimes });
   await addPackage(member.id, totalSessions, price, "최초 등록");
 
   return NextResponse.json({ member }, { status: 201 });

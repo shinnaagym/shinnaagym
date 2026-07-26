@@ -106,13 +106,25 @@ export interface MemberInput {
   phone: string;
   coachId: number | null;
   notes: string;
+  referrer?: string;
+  availableTimes?: string;
+  followupStatus?: string;
+  followupMemo?: string;
 }
 
 export async function createMember(input: MemberInput): Promise<MemberRow> {
   const result = await query<MemberRow>(
-    `INSERT INTO members (name, phone, coach_id, notes, token)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [input.name, input.phone, input.coachId, input.notes, generateMemberToken()],
+    `INSERT INTO members (name, phone, coach_id, notes, referrer, available_times, token)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [
+      input.name,
+      input.phone,
+      input.coachId,
+      input.notes,
+      input.referrer ?? "",
+      input.availableTimes ?? "",
+      generateMemberToken(),
+    ],
   );
   return result.rows[0];
 }
@@ -141,6 +153,22 @@ export async function updateMember(
     fields.push(`notes = $${++i}`);
     values.push(input.notes);
   }
+  if (input.referrer !== undefined) {
+    fields.push(`referrer = $${++i}`);
+    values.push(input.referrer);
+  }
+  if (input.availableTimes !== undefined) {
+    fields.push(`available_times = $${++i}`);
+    values.push(input.availableTimes);
+  }
+  if (input.followupStatus !== undefined) {
+    fields.push(`followup_status = $${++i}`);
+    values.push(input.followupStatus);
+  }
+  if (input.followupMemo !== undefined) {
+    fields.push(`followup_memo = $${++i}`);
+    values.push(input.followupMemo);
+  }
   if (input.status !== undefined) {
     fields.push(`status = $${++i}`);
     values.push(input.status);
@@ -148,6 +176,11 @@ export async function updateMember(
   if (fields.length === 0) return;
 
   await query(`UPDATE members SET ${fields.join(", ")} WHERE id = $1`, [id, ...values]);
+}
+
+/** 패키지가 하나도 없는(=결제 이력 없는) 회원만 완전 삭제를 허용한다. */
+export async function deleteMember(id: number): Promise<void> {
+  await query(`DELETE FROM members WHERE id = $1`, [id]);
 }
 
 export async function listMembers(): Promise<MemberRow[]> {
@@ -158,21 +191,32 @@ export async function listMembers(): Promise<MemberRow[]> {
 export interface MemberWithProgress extends MemberRow {
   total_sessions: number;
   done_count: number;
+  package_count: number;
+  latest_price: number | null;
+  latest_total_sessions: number | null;
 }
 
 export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
   const result = await query<MemberWithProgress>(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
-       COALESCE(s.done, 0)::int as done_count
+       COALESCE(s.done, 0)::int as done_count,
+       COALESCE(p.pkg_count, 0)::int as package_count,
+       latest.price as latest_price,
+       latest.total_sessions as latest_total_sessions
      FROM members m
      LEFT JOIN (
-       SELECT member_id, SUM(total_sessions) as total FROM packages GROUP BY member_id
+       SELECT member_id, SUM(total_sessions) as total, COUNT(*) as pkg_count
+       FROM packages GROUP BY member_id
      ) p ON p.member_id = m.id
      LEFT JOIN (
        SELECT member_id, COUNT(*) as done FROM class_sessions
        WHERE status IN ('completed', 'no_show') GROUP BY member_id
      ) s ON s.member_id = m.id
+     LEFT JOIN LATERAL (
+       SELECT price, total_sessions FROM packages p2
+       WHERE p2.member_id = m.id ORDER BY purchased_at DESC LIMIT 1
+     ) latest ON true
      ORDER BY m.name ASC`,
   );
   return result.rows;
@@ -210,6 +254,38 @@ export async function listPackages(memberId: number): Promise<PackageRow[]> {
     [memberId],
   );
   return result.rows;
+}
+
+export async function updatePackage(
+  id: number,
+  input: { totalSessions?: number; price?: number; note?: string },
+): Promise<PackageRow> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+
+  if (input.totalSessions !== undefined) {
+    fields.push(`total_sessions = $${++i}`);
+    values.push(input.totalSessions);
+  }
+  if (input.price !== undefined) {
+    fields.push(`price = $${++i}`);
+    values.push(input.price);
+  }
+  if (input.note !== undefined) {
+    fields.push(`note = $${++i}`);
+    values.push(input.note);
+  }
+
+  const result = await query<PackageRow>(
+    `UPDATE packages SET ${fields.join(", ")} WHERE id = $1 RETURNING *`,
+    [id, ...values],
+  );
+  return result.rows[0];
+}
+
+export async function deletePackage(id: number): Promise<void> {
+  await query(`DELETE FROM packages WHERE id = $1`, [id]);
 }
 
 export interface MemberProgress {
