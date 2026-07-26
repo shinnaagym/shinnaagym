@@ -34,6 +34,15 @@ export function isValidDateKey(key: string): boolean {
   );
 }
 
+/** Returns the Monday (YYYY-MM-DD) of the week containing `key`. */
+export function mondayOfWeek(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const weekday = dt.getUTCDay(); // 0=Sun..6=Sat
+  const diff = weekday === 0 ? -6 : 1 - weekday; // 월요일로 이동
+  return addDaysToKey(key, diff);
+}
+
 /** Current hour of day (0-23) in KST. */
 export function koreaCurrentHour(): number {
   const now = new Date();

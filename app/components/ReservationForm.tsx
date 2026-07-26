@@ -212,7 +212,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
                     : selectable
                       ? "hover:bg-sage/25 hover:scale-105 active:scale-95 border border-line"
                       : "text-ink/25 border border-transparent cursor-not-allowed",
-                  isToday && !isSelected ? "ring-1 ring-coral" : "",
+                  isToday && !isSelected ? "ring-1 ring-gold" : "",
                 ].join(" ")}
               >
                 {cell.day}
@@ -243,8 +243,8 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
                       isTaken
                         ? "border-line text-ink/30 line-through cursor-not-allowed"
                         : isSelected
-                          ? "bg-coral text-bone border-coral shadow-md shadow-coral/25"
-                          : "border-line hover:border-coral hover:scale-105 active:scale-95",
+                          ? "bg-gold text-bone border-gold shadow-md shadow-gold/25"
+                          : "border-line hover:border-gold hover:scale-105 active:scale-95",
                     ].join(" ")}
                   >
                     {h}:00
@@ -264,7 +264,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
             onChange={(e) => setName(e.target.value)}
             maxLength={30}
             required
-            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-coral focus:ring-1 focus:ring-coral"
+            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-gold focus:ring-1 focus:ring-gold"
             placeholder="홍길동"
           />
         </div>
@@ -278,7 +278,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
             value={age}
             onChange={(e) => setAge(e.target.value)}
             required
-            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-coral focus:ring-1 focus:ring-coral"
+            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-gold focus:ring-1 focus:ring-gold"
             placeholder="30"
           />
         </div>
@@ -289,7 +289,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             required
-            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-coral focus:ring-1 focus:ring-coral"
+            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-gold focus:ring-1 focus:ring-gold"
             placeholder="010-1234-5678"
           />
         </div>
@@ -324,7 +324,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
             onChange={(e) => setPurposeNote(e.target.value)}
             maxLength={200}
             rows={2}
-            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-coral focus:ring-1 focus:ring-coral resize-none"
+            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-gold focus:ring-1 focus:ring-gold resize-none"
             placeholder="추가로 알려주고 싶은 내용을 한 줄 정도 적어주세요. (예: 허리 디스크 재활 중이에요)"
           />
         </div>
@@ -356,7 +356,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-full bg-ink text-bone py-3.5 font-medium tracking-wide transition-all duration-200 hover:bg-coral hover:-translate-y-0.5 hover:shadow-lg hover:shadow-coral/25 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+          className="w-full rounded-full bg-ink text-bone py-3.5 font-medium tracking-wide transition-all duration-200 hover:bg-gold hover:-translate-y-0.5 hover:shadow-lg hover:shadow-gold/25 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
         >
           {submitting ? "예약 처리 중..." : "사전예약 신청하기"}
         </button>
