@@ -14,6 +14,7 @@ const SITE_DESCRIPTION =
   "전 직원이 물리치료사인 프리미엄 PT 스튜디오, 신나아짐의 오픈 전 사전예약 페이지입니다.";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://shinnaagym.vercel.app"),
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
   openGraph: {
