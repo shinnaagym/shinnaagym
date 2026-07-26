@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 
 const TRAINER_NAME = "신종수";
 const TRAINER_BIO =
-  "청주·파주·서울의 재활의학과와 정형외과에서 임상 경험을 쌓아온 물리치료사입니다. " +
-  "근골격계·스포츠 재활, 도수치료, 만성통증 관리까지 폭넓게 교육을 이수하며 몸의 문제를 " +
-  "근본부터 짚어내는 방식을 고민해왔습니다. 신나아짐에서는 그 경험을 바탕으로 회원님 " +
-  "한 분 한 분에게 맞는 운동을 처방합니다.";
+  "보건복지부 면허를 보유한 운동 전문 물리치료사이자 생활체육지도자(보디빌딩 2급)로서, " +
+  "병원에서의 재활 경험과 헬스장 현장에서의 실전 트레이닝 노하우를 결합했습니다. " +
+  "회원님이 궁극적으로 저 없이도 스스로 안전하고 운동에 재미를 붙여드려 평생의 습관을 " +
+  "만들어 드리는 것이 저의 확고한 목표입니다.";
 
 const TRAINER_QUALIFICATIONS = ["보건복지부 물리치료사 면허", "생활체육지도자 보디빌딩 2급"];
 
@@ -33,6 +33,7 @@ const TRAINER_EDUCATION = [
   "도수치료 및 카이로프랙틱(MTA) 교육 이수",
   "만성통증 중재 교육(Hello Pain) 이수",
   "러닝 피지오 교육 이수",
+  "근골격계 운동치료(EMP) 교육 이수",
 ];
 
 const STUDIO_ADDRESS = "충청북도 청주시 흥덕구 서현로32 210,211호";
@@ -51,13 +52,13 @@ const PROCESS_STEPS = [
   },
   {
     n: "03",
-    title: "처방",
+    title: "운동 지도",
     body: "검사 결과를 바탕으로 지금 이 몸에 필요한 운동만 설계합니다.",
   },
   {
     n: "04",
     title: "기록",
-    body: "매 세션의 변화를 기록하고, 처방을 계속 조율해 나갑니다.",
+    body: "매 세션의 변화를 기록하고, 운동 지도를 계속 조율해 나갑니다.",
   },
 ];
 
@@ -72,16 +73,16 @@ export default async function Home() {
           className="energy-glow pointer-events-none absolute -top-32 right-[-10%] h-96 w-96 rounded-full bg-gold/30 blur-3xl"
         />
         <div className="relative mx-auto max-w-5xl px-6 pt-8 sm:pt-10">
-          <a href="#" className="hero-fade-1 inline-flex items-center gap-2.5">
+          <a href="#" className="hero-fade-1 inline-flex items-center gap-3">
             <Image
               src="/logo.png"
               alt="신나아짐 로고"
               width={271}
               height={341}
               priority
-              className="h-9 w-auto sm:h-10"
+              className="h-12 w-auto sm:h-16"
             />
-            <span className="font-display text-lg sm:text-xl tracking-wide text-bone">
+            <span className="font-display text-2xl sm:text-3xl tracking-wide text-bone">
               신나아짐
             </span>
           </a>
@@ -91,17 +92,26 @@ export default async function Home() {
             Pre-Open Reservation
           </p>
           <h1 className="hero-fade-2 font-display text-4xl sm:text-7xl leading-[1.25] sm:leading-[1.15] tracking-tight mb-8">
-            신나게 나아지는 몸,
+            내 몸이 나아지고,
             <br />
-            신나아짐에서 시작합니다
+            운동이 신나는 공간.
+            <br />
+            신나아짐에서 시작됩니다.
           </h1>
           <p className="hero-fade-3 max-w-xl text-bone/80 leading-relaxed mb-3">
             물리치료사가 설계하는 프리미엄 PT, 신나아짐이 곧 문을 엽니다.
             오픈에 앞서 가장 먼저 예약하고 첫 회원이 되어주세요.
           </p>
-          <p className="hero-fade-3 max-w-xl text-sm text-sage mb-12">
-            트레이너 전원 물리치료사 면허 보유 · 재활 임상 경험 기반 운동 설계
-          </p>
+          <div className="hero-fade-3 max-w-xl text-sm text-sage leading-relaxed mb-12 space-y-1.5">
+            <p>1. 전 직원 물리치료사 출신</p>
+            <p>2. 100% 프라이빗 회원 전용 공간</p>
+            <p>3. 1:1 맞춤 기능성 트레이닝</p>
+            <p>4. 아픈 몸 재활부터 완벽한 운동 자립까지!</p>
+            <p className="pt-1.5">
+              개인마다 다른 체형과 불균형. 획일화된 머신이 아닌 맨몸과 프리웨이트로
+              진짜 내 몸을 통제하는 능력을 키워드립니다.
+            </p>
+          </div>
           <div className="hero-fade-4">
             <PulseLine className="w-full max-w-xl h-16 text-gold" />
             <a
@@ -121,15 +131,15 @@ export default async function Home() {
         <section id="trainer" className="mx-auto max-w-5xl px-6 py-20">
           <Reveal>
             <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
-              Our Trainer
+              Owner
             </p>
-            <h2 className="font-display text-3xl mb-14">트레이너 소개</h2>
+            <h2 className="font-display text-3xl mb-14">대표 소개</h2>
           </Reveal>
           <div className="grid gap-10 sm:grid-cols-[280px_1fr] items-start">
             <Reveal>
               <Image
                 src="/trainer-shinjongsu.jpg"
-                alt={`물리치료사 ${TRAINER_NAME}`}
+                alt={`신나아짐 대표 ${TRAINER_NAME}`}
                 width={472}
                 height={692}
                 className="w-full max-w-[280px] mx-auto sm:max-w-none rounded-2xl shadow-lg"

@@ -154,6 +154,13 @@ function ensureSchema(): Promise<void> {
           ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS entry_type TEXT NOT NULL DEFAULT 'session';
           ALTER TABLE reservations ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id);
           ALTER TABLE reservations ADD COLUMN IF NOT EXISTS class_session_id INTEGER REFERENCES class_sessions(id);
+          ALTER TABLE members ADD COLUMN IF NOT EXISTS referrer TEXT NOT NULL DEFAULT '';
+          ALTER TABLE members ADD COLUMN IF NOT EXISTS available_times TEXT NOT NULL DEFAULT '';
+          ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_status TEXT NOT NULL DEFAULT '대기';
+          ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_memo TEXT NOT NULL DEFAULT '';
+          ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
+          ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
+            FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
           `,
         ),
       )
@@ -218,6 +225,10 @@ export interface MemberRow {
   phone: string;
   coach_id: number | null;
   notes: string;
+  referrer: string;
+  available_times: string;
+  followup_status: string;
+  followup_memo: string;
   status: MemberStatus;
   token: string;
   created_at: string;
@@ -233,7 +244,7 @@ export interface PackageRow {
 }
 
 export type SessionStatus = "reserved" | "completed" | "no_show" | "cancelled";
-export type SessionEntryType = "session" | "memo";
+export type SessionEntryType = "session" | "consultation" | "memo" | "blocked";
 
 export interface ClassSessionRow {
   id: number;

@@ -9,7 +9,7 @@ import type {
   PackageRow,
   SessionStatus,
 } from "./db";
-import { addDaysToKey } from "./date";
+import { addDaysToKey, addMonthsToKey } from "./date";
 import { scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
@@ -106,13 +106,25 @@ export interface MemberInput {
   phone: string;
   coachId: number | null;
   notes: string;
+  referrer?: string;
+  availableTimes?: string;
+  followupStatus?: string;
+  followupMemo?: string;
 }
 
 export async function createMember(input: MemberInput): Promise<MemberRow> {
   const result = await query<MemberRow>(
-    `INSERT INTO members (name, phone, coach_id, notes, token)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [input.name, input.phone, input.coachId, input.notes, generateMemberToken()],
+    `INSERT INTO members (name, phone, coach_id, notes, referrer, available_times, token)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [
+      input.name,
+      input.phone,
+      input.coachId,
+      input.notes,
+      input.referrer ?? "",
+      input.availableTimes ?? "",
+      generateMemberToken(),
+    ],
   );
   return result.rows[0];
 }
@@ -141,6 +153,22 @@ export async function updateMember(
     fields.push(`notes = $${++i}`);
     values.push(input.notes);
   }
+  if (input.referrer !== undefined) {
+    fields.push(`referrer = $${++i}`);
+    values.push(input.referrer);
+  }
+  if (input.availableTimes !== undefined) {
+    fields.push(`available_times = $${++i}`);
+    values.push(input.availableTimes);
+  }
+  if (input.followupStatus !== undefined) {
+    fields.push(`followup_status = $${++i}`);
+    values.push(input.followupStatus);
+  }
+  if (input.followupMemo !== undefined) {
+    fields.push(`followup_memo = $${++i}`);
+    values.push(input.followupMemo);
+  }
   if (input.status !== undefined) {
     fields.push(`status = $${++i}`);
     values.push(input.status);
@@ -148,6 +176,11 @@ export async function updateMember(
   if (fields.length === 0) return;
 
   await query(`UPDATE members SET ${fields.join(", ")} WHERE id = $1`, [id, ...values]);
+}
+
+/** 패키지가 하나도 없는(=결제 이력 없는) 회원만 완전 삭제를 허용한다. */
+export async function deleteMember(id: number): Promise<void> {
+  await query(`DELETE FROM members WHERE id = $1`, [id]);
 }
 
 export async function listMembers(): Promise<MemberRow[]> {
@@ -158,21 +191,32 @@ export async function listMembers(): Promise<MemberRow[]> {
 export interface MemberWithProgress extends MemberRow {
   total_sessions: number;
   done_count: number;
+  package_count: number;
+  latest_price: number | null;
+  latest_total_sessions: number | null;
 }
 
 export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
   const result = await query<MemberWithProgress>(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
-       COALESCE(s.done, 0)::int as done_count
+       COALESCE(s.done, 0)::int as done_count,
+       COALESCE(p.pkg_count, 0)::int as package_count,
+       latest.price as latest_price,
+       latest.total_sessions as latest_total_sessions
      FROM members m
      LEFT JOIN (
-       SELECT member_id, SUM(total_sessions) as total FROM packages GROUP BY member_id
+       SELECT member_id, SUM(total_sessions) as total, COUNT(*) as pkg_count
+       FROM packages GROUP BY member_id
      ) p ON p.member_id = m.id
      LEFT JOIN (
        SELECT member_id, COUNT(*) as done FROM class_sessions
        WHERE status IN ('completed', 'no_show') GROUP BY member_id
      ) s ON s.member_id = m.id
+     LEFT JOIN LATERAL (
+       SELECT price, total_sessions FROM packages p2
+       WHERE p2.member_id = m.id ORDER BY purchased_at DESC LIMIT 1
+     ) latest ON true
      ORDER BY m.name ASC`,
   );
   return result.rows;
@@ -210,6 +254,38 @@ export async function listPackages(memberId: number): Promise<PackageRow[]> {
     [memberId],
   );
   return result.rows;
+}
+
+export async function updatePackage(
+  id: number,
+  input: { totalSessions?: number; price?: number; note?: string },
+): Promise<PackageRow> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+
+  if (input.totalSessions !== undefined) {
+    fields.push(`total_sessions = $${++i}`);
+    values.push(input.totalSessions);
+  }
+  if (input.price !== undefined) {
+    fields.push(`price = $${++i}`);
+    values.push(input.price);
+  }
+  if (input.note !== undefined) {
+    fields.push(`note = $${++i}`);
+    values.push(input.note);
+  }
+
+  const result = await query<PackageRow>(
+    `UPDATE packages SET ${fields.join(", ")} WHERE id = $1 RETURNING *`,
+    [id, ...values],
+  );
+  return result.rows[0];
+}
+
+export async function deletePackage(id: number): Promise<void> {
+  await query(`DELETE FROM packages WHERE id = $1`, [id]);
 }
 
 export interface MemberProgress {
@@ -292,7 +368,7 @@ export async function createSession(input: {
   date: string;
   hour: number;
   memo?: string;
-  entryType?: "session" | "memo";
+  entryType?: "session" | "consultation" | "memo" | "blocked";
 }): Promise<ClassSessionRow> {
   const result = await query<ClassSessionRow>(
     `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo, entry_type)
@@ -357,6 +433,32 @@ async function pickDefaultCoachId(): Promise<number | null> {
 }
 
 /**
+ * 연락처로 기존 회원을 찾고, 없으면 새로 만든다. 아직 패키지를 구매하지 않은
+ * "상담 대기" 회원을 빠르게 찾거나 등록할 때 쓴다(사전예약 자동 연동, 관리자의
+ * 수동 상담 예약 등).
+ */
+export async function findOrCreateMemberByPhone(input: {
+  name: string;
+  phone: string;
+  coachId: number | null;
+  notes?: string;
+}): Promise<MemberRow> {
+  if (input.phone.trim()) {
+    const existing = await query<MemberRow>(
+      `SELECT * FROM members WHERE phone = $1 AND phone <> '' LIMIT 1`,
+      [input.phone.trim()],
+    );
+    if (existing.rows[0]) return existing.rows[0];
+  }
+  return createMember({
+    name: input.name,
+    phone: input.phone,
+    coachId: input.coachId,
+    notes: input.notes ?? "",
+  });
+}
+
+/**
  * 공개 사전예약 폼에서 예약이 들어오면 회원(연락처로 조회, 없으면 신규 등록)과
  * 스케줄표 세션을 자동으로 만들어 관리자가 스케줄표에서 바로 볼 수 있게 한다.
  */
@@ -369,18 +471,12 @@ export async function linkPreReservationToSchedule(input: {
   const coachId = await pickDefaultCoachId();
   if (!coachId) return null; // 활성 코치가 없으면 연동을 건너뛴다.
 
-  const existing = await query<MemberRow>(
-    `SELECT * FROM members WHERE phone = $1 AND phone <> '' LIMIT 1`,
-    [input.phone],
-  );
-  const member =
-    existing.rows[0] ??
-    (await createMember({
-      name: input.name,
-      phone: input.phone,
-      coachId,
-      notes: "사전예약 폼을 통해 자동 등록됨",
-    }));
+  const member = await findOrCreateMemberByPhone({
+    name: input.name,
+    phone: input.phone,
+    coachId,
+    notes: "사전예약 폼을 통해 자동 등록됨",
+  });
 
   try {
     const session = await createSession({
@@ -388,7 +484,8 @@ export async function linkPreReservationToSchedule(input: {
       coachId: member.coach_id ?? coachId,
       date: input.date,
       hour: input.hour,
-      memo: "사전예약(상담) 자동 등록",
+      memo: "사전예약 자동 등록",
+      entryType: "consultation",
     });
     return { memberId: member.id, sessionId: session.id };
   } catch {
@@ -405,6 +502,7 @@ export interface CoachMonthlyReport {
   coachName: string;
   memberCount: number;
   completedSessions: number;
+  noShowCount: number;
   revenue: number;
   reRegisteredCount: number;
   churnedCount: number;
@@ -425,10 +523,12 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
        GROUP BY m.coach_id`,
       [yearMonth],
     ),
-    query<{ coach_id: number; completed: string }>(
-      `SELECT coach_id, COUNT(*) as completed
+    query<{ coach_id: number; completed: string; no_show: string }>(
+      `SELECT coach_id,
+         COUNT(*) FILTER (WHERE status IN ('completed', 'no_show')) as completed,
+         COUNT(*) FILTER (WHERE status = 'no_show') as no_show
        FROM class_sessions
-       WHERE status IN ('completed', 'no_show') AND entry_type = 'session'
+       WHERE entry_type = 'session'
          AND session_date >= $1 AND session_date < to_char((to_date($1, 'YYYY-MM-DD') + interval '1 month'), 'YYYY-MM-DD')
        GROUP BY coach_id`,
       [monthStart],
@@ -456,6 +556,7 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
   const sessionsMap = new Map(
     sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed ?? 0)]),
   );
+  const noShowMap = new Map(sessionsResult.rows.map((r) => [r.coach_id, Number(r.no_show ?? 0)]));
   const memberStatsMap = new Map(memberStatsResult.rows.map((r) => [r.coach_id, r]));
 
   return coachesResult.rows.map((coach) => {
@@ -468,12 +569,194 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
       coachName: coach.name,
       memberCount: Number(stats?.member_count ?? 0),
       completedSessions: sessionsMap.get(coach.id) ?? 0,
+      noShowCount: noShowMap.get(coach.id) ?? 0,
       revenue: revenueMap.get(coach.id) ?? 0,
       reRegisteredCount: reRegistered,
       churnedCount: churned,
       reRegistrationRate: denom > 0 ? reRegistered / denom : null,
     };
   });
+}
+
+// ---- 관리자 대시보드 개요 ----
+
+export interface DashboardOverview {
+  activeMemberCount: number;
+  monthlyRevenue: number;
+  monthlyCompletedSessions: number;
+  monthlyNoShowCount: number;
+  noShowRate: number | null;
+  monthlyNewMemberCount: number;
+  monthlyReRegisteredMemberCount: number;
+}
+
+/** yearMonth: "YYYY-MM" */
+export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
+  const [activeMembers, revenue, sessionStats, newMembers, reRegistered] = await Promise.all([
+    query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
+    query<{ revenue: string }>(
+      `SELECT COALESCE(SUM(price), 0) as revenue FROM packages
+       WHERE to_char(purchased_at, 'YYYY-MM') = $1`,
+      [yearMonth],
+    ),
+    query<{ completed: string; no_show: string }>(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'completed') as completed,
+         COUNT(*) FILTER (WHERE status = 'no_show') as no_show
+       FROM class_sessions
+       WHERE entry_type = 'session' AND LEFT(session_date, 7) = $1`,
+      [yearMonth],
+    ),
+    query<{ count: string }>(
+      `SELECT COUNT(*) as count FROM (
+         SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id
+       ) f WHERE to_char(f.first_at, 'YYYY-MM') = $1`,
+      [yearMonth],
+    ),
+    query<{ count: string }>(
+      `SELECT COUNT(DISTINCT p.member_id) as count FROM packages p
+       WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+         AND p.purchased_at <> (
+           SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+         )`,
+      [yearMonth],
+    ),
+  ]);
+
+  const completed = Number(sessionStats.rows[0]?.completed ?? 0);
+  const noShow = Number(sessionStats.rows[0]?.no_show ?? 0);
+  const denom = completed + noShow;
+
+  return {
+    activeMemberCount: Number(activeMembers.rows[0]?.count ?? 0),
+    monthlyRevenue: Number(revenue.rows[0]?.revenue ?? 0),
+    monthlyCompletedSessions: completed,
+    monthlyNoShowCount: noShow,
+    noShowRate: denom > 0 ? noShow / denom : null,
+    monthlyNewMemberCount: Number(newMembers.rows[0]?.count ?? 0),
+    monthlyReRegisteredMemberCount: Number(reRegistered.rows[0]?.count ?? 0),
+  };
+}
+
+export interface MonthlyTrendPoint {
+  month: string; // YYYY-MM
+  revenue: number;
+  completedSessions: number;
+}
+
+/** endYearMonth 기준 최근 `months`개월 치 매출·완료세션 추이 (차트용). */
+export async function getMonthlyTrend(
+  endYearMonth: string,
+  months: number,
+): Promise<MonthlyTrendPoint[]> {
+  const monthKeys: string[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    monthKeys.push(addMonthsToKey(endYearMonth, -i));
+  }
+
+  const [revenueResult, sessionResult] = await Promise.all([
+    query<{ month: string; revenue: string }>(
+      `SELECT to_char(purchased_at, 'YYYY-MM') as month, SUM(price) as revenue
+       FROM packages
+       WHERE to_char(purchased_at, 'YYYY-MM') = ANY($1)
+       GROUP BY month`,
+      [monthKeys],
+    ),
+    query<{ month: string; completed: string }>(
+      `SELECT LEFT(session_date, 7) as month, COUNT(*) as completed
+       FROM class_sessions
+       WHERE entry_type = 'session' AND status IN ('completed', 'no_show')
+         AND LEFT(session_date, 7) = ANY($1)
+       GROUP BY month`,
+      [monthKeys],
+    ),
+  ]);
+
+  const revenueMap = new Map(revenueResult.rows.map((r) => [r.month, Number(r.revenue ?? 0)]));
+  const sessionMap = new Map(sessionResult.rows.map((r) => [r.month, Number(r.completed ?? 0)]));
+
+  return monthKeys.map((month) => ({
+    month,
+    revenue: revenueMap.get(month) ?? 0,
+    completedSessions: sessionMap.get(month) ?? 0,
+  }));
+}
+
+export interface NewRegistration {
+  memberId: number;
+  memberName: string;
+  coachName: string;
+  firstPurchasedAt: string;
+}
+
+/** 이번 달에 첫 패키지를 구매한(=신규 등록) 회원 목록. */
+export async function listNewRegistrations(yearMonth: string): Promise<NewRegistration[]> {
+  const result = await query<{
+    member_id: number;
+    member_name: string;
+    coach_name: string | null;
+    first_at: string;
+  }>(
+    `SELECT f.member_id, m.name as member_name, c.name as coach_name, f.first_at
+     FROM (
+       SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id
+     ) f
+     JOIN members m ON m.id = f.member_id
+     LEFT JOIN coaches c ON c.id = m.coach_id
+     WHERE to_char(f.first_at, 'YYYY-MM') = $1
+     ORDER BY f.first_at ASC`,
+    [yearMonth],
+  );
+  return result.rows.map((r) => ({
+    memberId: r.member_id,
+    memberName: r.member_name,
+    coachName: r.coach_name ?? "미배정",
+    firstPurchasedAt: r.first_at,
+  }));
+}
+
+export interface PackagePurchaseEntry {
+  id: number;
+  purchasedAt: string;
+  memberName: string;
+  coachName: string | null;
+  totalSessions: number;
+  price: number;
+  isFirst: boolean;
+}
+
+/** 이번 달 패키지 결제 내역 (신규/재등록 여부 포함). */
+export async function listPackagePurchases(yearMonth: string): Promise<PackagePurchaseEntry[]> {
+  const result = await query<{
+    id: number;
+    purchased_at: string;
+    member_name: string;
+    coach_name: string | null;
+    total_sessions: number;
+    price: number;
+    is_first: boolean;
+  }>(
+    `SELECT p.id, p.purchased_at, m.name as member_name, c.name as coach_name,
+       p.total_sessions, p.price,
+       (p.purchased_at = (
+         SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+       )) as is_first
+     FROM packages p
+     JOIN members m ON m.id = p.member_id
+     LEFT JOIN coaches c ON c.id = m.coach_id
+     WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+     ORDER BY p.purchased_at DESC`,
+    [yearMonth],
+  );
+  return result.rows.map((r) => ({
+    id: r.id,
+    purchasedAt: r.purchased_at,
+    memberName: r.member_name,
+    coachName: r.coach_name,
+    totalSessions: Number(r.total_sessions),
+    price: Number(r.price),
+    isFirst: r.is_first,
+  }));
 }
 
 /** 회원 화면용: 담당 코치의 향후 N일 가능/마감 시간대 (다른 회원 이름은 노출하지 않음). */
