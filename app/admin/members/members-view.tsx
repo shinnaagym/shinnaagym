@@ -19,6 +19,7 @@ export function MembersView({
   coaches: CoachRow[];
 }) {
   const members = initialMembers;
+  const activeCoaches = useMemo(() => coaches.filter((c) => c.active), [coaches]);
   const [search, setSearch] = useState("");
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
   const [showCreate, setShowCreate] = useState(false);
@@ -200,7 +201,7 @@ export function MembersView({
 
       {showCreate && (
         <CreateMemberModal
-          coaches={coaches}
+          coaches={activeCoaches}
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false);
@@ -213,6 +214,7 @@ export function MembersView({
         <MemberDetailModal
           memberId={detailId}
           coaches={coaches}
+          activeCoaches={activeCoaches}
           onClose={() => setDetailId(null)}
           onChanged={refresh}
         />
@@ -352,11 +354,13 @@ function CreateMemberModal({
 function MemberDetailModal({
   memberId,
   coaches,
+  activeCoaches,
   onClose,
   onChanged,
 }: {
   memberId: number;
   coaches: CoachRow[];
+  activeCoaches: CoachRow[];
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -369,6 +373,7 @@ function MemberDetailModal({
   const [copied, setCopied] = useState(false);
   const [addSessions, setAddSessions] = useState("");
   const [addPrice, setAddPrice] = useState("");
+  const [coachSaving, setCoachSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -415,6 +420,27 @@ function MemberDetailModal({
     onClose();
   }
 
+  async function handleCoachChange(newCoachId: number | null) {
+    setCoachSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coachId: newCoachId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? "담당 코치 변경에 실패했습니다.");
+        return;
+      }
+      setData((prev) => (prev ? { ...prev, member: { ...prev.member, coach_id: newCoachId } } : prev));
+      onChanged();
+    } finally {
+      setCoachSaving(false);
+    }
+  }
+
   async function handleStatusToggle() {
     const nextStatus = data!.member.status === "active" ? "inactive" : "active";
     await fetch(`/api/admin/members/${memberId}`, {
@@ -429,14 +455,37 @@ function MemberDetailModal({
   return (
     <ModalShell title={`${data.member.name} — 회원 정보`} onClose={onClose}>
       <div className="space-y-5">
-        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm space-y-0.5">
+        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm space-y-2">
           <p>
             진행 {data.progress.doneCount} / {data.progress.totalSessions} · 잔여{" "}
             {data.progress.remaining}회
           </p>
-          <p className="text-ink/50">
-            담당: {coaches.find((c) => c.id === data.member.coach_id)?.name ?? "미지정"}
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-ink/50 shrink-0">담당 코치</span>
+            <select
+              value={data.member.coach_id ?? ""}
+              disabled={coachSaving}
+              onChange={(e) =>
+                handleCoachChange(e.target.value ? Number(e.target.value) : null)
+              }
+              className="flex-1 min-w-0 rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm outline-none focus:border-coral disabled:opacity-50"
+            >
+              <option value="">미지정</option>
+              {activeCoaches.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              {/* 이미 퇴사한 코치가 배정돼 있다면 목록에 없어도 현재 값은 보여준다 */}
+              {data.member.coach_id &&
+                !activeCoaches.some((c) => c.id === data.member.coach_id) && (
+                  <option value={data.member.coach_id}>
+                    {coaches.find((c) => c.id === data.member.coach_id)?.name ?? "알 수 없음"}
+                    (퇴사)
+                  </option>
+                )}
+            </select>
+          </div>
         </div>
 
         <div>

@@ -43,6 +43,26 @@ export function mondayOfWeek(key: string): string {
   return addDaysToKey(key, diff);
 }
 
+/** Current month in KST as a YYYY-MM key. */
+export function koreaCurrentMonthKey(): string {
+  return koreaTodayKey().slice(0, 7);
+}
+
+export function isValidMonthKey(key: string): boolean {
+  if (!/^\d{4}-\d{2}$/.test(key)) return false;
+  const month = Number(key.slice(5, 7));
+  return month >= 1 && month <= 12;
+}
+
+/** Adds `months` calendar months to a YYYY-MM key. */
+export function addMonthsToKey(key: string, months: number): string {
+  const [y, m] = key.split("-").map(Number);
+  const total = y * 12 + (m - 1) + months;
+  const newYear = Math.floor(total / 12);
+  const newMonth = (total % 12) + 1;
+  return `${newYear}-${pad(newMonth)}`;
+}
+
 /** Current hour of day (0-23) in KST. */
 export function koreaCurrentHour(): number {
   const now = new Date();

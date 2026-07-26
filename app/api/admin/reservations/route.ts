@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { query, type ReservationRow } from "@/lib/db";
+import { updateSession } from "@/lib/schedule";
 
 export async function GET() {
   if (!(await isAdminAuthed())) {
@@ -21,6 +22,16 @@ export async function DELETE(req: NextRequest) {
   if (!Number.isInteger(idNum)) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
+
+  const existing = await query<ReservationRow>(
+    `SELECT * FROM reservations WHERE id = $1`,
+    [idNum],
+  );
+  const linkedSessionId = existing.rows[0]?.class_session_id;
+  if (linkedSessionId) {
+    await updateSession(linkedSessionId, { status: "cancelled" });
+  }
+
   await query(`DELETE FROM reservations WHERE id = $1`, [idNum]);
   return NextResponse.json({ ok: true });
 }

@@ -130,12 +130,13 @@ function ensureSchema(): Promise<void> {
 
         CREATE TABLE IF NOT EXISTS class_sessions (
           id SERIAL PRIMARY KEY,
-          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
           coach_id INTEGER NOT NULL REFERENCES coaches(id),
           session_date TEXT NOT NULL,
           session_hour INTEGER NOT NULL,
           status TEXT NOT NULL DEFAULT 'reserved',
           memo TEXT NOT NULL DEFAULT '',
+          entry_type TEXT NOT NULL DEFAULT 'session',
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           UNIQUE (coach_id, session_date, session_hour)
         );
@@ -143,6 +144,18 @@ function ensureSchema(): Promise<void> {
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
+      )
+      .then(() =>
+        // 기존(프로덕션) 테이블에는 위 CREATE TABLE IF NOT EXISTS 가 적용되지 않으므로
+        // 이미 배포된 스키마를 위해 컬럼 추가 마이그레이션을 별도로 실행한다.
+        getPool().query(
+          `
+          ALTER TABLE class_sessions ALTER COLUMN member_id DROP NOT NULL;
+          ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS entry_type TEXT NOT NULL DEFAULT 'session';
+          ALTER TABLE reservations ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id);
+          ALTER TABLE reservations ADD COLUMN IF NOT EXISTS class_session_id INTEGER REFERENCES class_sessions(id);
+          `,
+        ),
       )
       .then(() =>
         getPool().query(
@@ -181,6 +194,8 @@ export interface ReservationRow {
   reservation_date: string;
   reservation_hour: number;
   created_at: string;
+  member_id: number | null;
+  class_session_id: number | null;
 }
 
 export interface CoachRow {
@@ -218,14 +233,16 @@ export interface PackageRow {
 }
 
 export type SessionStatus = "reserved" | "completed" | "no_show" | "cancelled";
+export type SessionEntryType = "session" | "memo";
 
 export interface ClassSessionRow {
   id: number;
-  member_id: number;
+  member_id: number | null;
   coach_id: number;
   session_date: string;
   session_hour: number;
   status: SessionStatus;
   memo: string;
+  entry_type: SessionEntryType;
   created_at: string;
 }
