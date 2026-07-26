@@ -292,7 +292,7 @@ export async function createSession(input: {
   date: string;
   hour: number;
   memo?: string;
-  entryType?: "session" | "memo";
+  entryType?: "session" | "consultation" | "memo" | "blocked";
 }): Promise<ClassSessionRow> {
   const result = await query<ClassSessionRow>(
     `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo, entry_type)
@@ -357,6 +357,32 @@ async function pickDefaultCoachId(): Promise<number | null> {
 }
 
 /**
+ * 연락처로 기존 회원을 찾고, 없으면 새로 만든다. 아직 패키지를 구매하지 않은
+ * "상담 대기" 회원을 빠르게 찾거나 등록할 때 쓴다(사전예약 자동 연동, 관리자의
+ * 수동 상담 예약 등).
+ */
+export async function findOrCreateMemberByPhone(input: {
+  name: string;
+  phone: string;
+  coachId: number | null;
+  notes?: string;
+}): Promise<MemberRow> {
+  if (input.phone.trim()) {
+    const existing = await query<MemberRow>(
+      `SELECT * FROM members WHERE phone = $1 AND phone <> '' LIMIT 1`,
+      [input.phone.trim()],
+    );
+    if (existing.rows[0]) return existing.rows[0];
+  }
+  return createMember({
+    name: input.name,
+    phone: input.phone,
+    coachId: input.coachId,
+    notes: input.notes ?? "",
+  });
+}
+
+/**
  * 공개 사전예약 폼에서 예약이 들어오면 회원(연락처로 조회, 없으면 신규 등록)과
  * 스케줄표 세션을 자동으로 만들어 관리자가 스케줄표에서 바로 볼 수 있게 한다.
  */
@@ -369,18 +395,12 @@ export async function linkPreReservationToSchedule(input: {
   const coachId = await pickDefaultCoachId();
   if (!coachId) return null; // 활성 코치가 없으면 연동을 건너뛴다.
 
-  const existing = await query<MemberRow>(
-    `SELECT * FROM members WHERE phone = $1 AND phone <> '' LIMIT 1`,
-    [input.phone],
-  );
-  const member =
-    existing.rows[0] ??
-    (await createMember({
-      name: input.name,
-      phone: input.phone,
-      coachId,
-      notes: "사전예약 폼을 통해 자동 등록됨",
-    }));
+  const member = await findOrCreateMemberByPhone({
+    name: input.name,
+    phone: input.phone,
+    coachId,
+    notes: "사전예약 폼을 통해 자동 등록됨",
+  });
 
   try {
     const session = await createSession({
@@ -388,7 +408,8 @@ export async function linkPreReservationToSchedule(input: {
       coachId: member.coach_id ?? coachId,
       date: input.date,
       hour: input.hour,
-      memo: "사전예약(상담) 자동 등록",
+      memo: "사전예약 자동 등록",
+      entryType: "consultation",
     });
     return { memberId: member.id, sessionId: session.id };
   } catch {

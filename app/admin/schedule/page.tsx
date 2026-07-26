@@ -51,7 +51,7 @@ export default async function AdminSchedulePage({
             dateKeys={dateKeys}
             today={today}
             coaches={coaches.filter((c) => c.active)}
-            members={members.filter((m) => m.status === "active" && m.total_sessions > 0)}
+            members={members.filter((m) => m.status === "active")}
             initialSessions={sessions}
             dayHours={dayHours}
             holidayMap={holidayMap}

@@ -3,8 +3,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
-import { addDaysToKey } from "@/lib/date";
-import type { CoachRow, MemberRow, SessionEntryType, SessionStatus } from "@/lib/db";
+import { addDaysToKey, mondayOfWeek } from "@/lib/date";
+import type { CoachRow, SessionEntryType, SessionStatus } from "@/lib/db";
+import type { MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
 
 type SessionWithMember = {
@@ -24,6 +25,13 @@ type SessionWithMember = {
 
 const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 
+const CATEGORY_LABELS: Record<SessionEntryType, string> = {
+  session: "PT 수업",
+  consultation: "상담",
+  memo: "개인 일정",
+  blocked: "수업 불가",
+};
+
 const STATUS_STYLE: Record<SessionStatus, string> = {
   reserved: "bg-white border-coral/40 text-ink",
   completed: "bg-sage/20 border-sage/50 text-ink",
@@ -32,6 +40,8 @@ const STATUS_STYLE: Record<SessionStatus, string> = {
 };
 
 const MEMO_STYLE = "bg-violet-50 border-violet-200 text-violet-700";
+const CONSULT_STYLE = "bg-amber-50 border-amber-300 text-amber-800";
+const BLOCKED_STYLE = "bg-ink/5 border-ink/25 text-ink/50";
 
 const STATUS_LABEL: Record<SessionStatus, string> = {
   reserved: "예약",
@@ -40,11 +50,43 @@ const STATUS_LABEL: Record<SessionStatus, string> = {
   cancelled: "취소",
 };
 
-/** 세션 pill에 표시할 "진행/총" 회차 문구. 회원 세션이 아니거나 아직 패키지가 없으면 null. */
+/** 일정 pill의 배경/테두리 스타일. 상담·메모·수업불가는 상태와 무관하게 고정 톤을 쓴다(취소 제외). */
+function entryStyle(session: SessionWithMember): string {
+  if (session.entry_type === "memo") return MEMO_STYLE;
+  if (session.entry_type === "blocked") return BLOCKED_STYLE;
+  if (session.status === "cancelled") return STATUS_STYLE.cancelled;
+  if (session.entry_type === "consultation") return CONSULT_STYLE;
+  return STATUS_STYLE[session.status];
+}
+
+function entryIcon(session: SessionWithMember): string {
+  switch (session.entry_type) {
+    case "consultation":
+      return "💬 ";
+    case "memo":
+      return "📝 ";
+    case "blocked":
+      return "🚫 ";
+    default:
+      return "";
+  }
+}
+
+function isSimpleEntry(session: SessionWithMember): boolean {
+  return session.entry_type === "memo" || session.entry_type === "blocked";
+}
+
+function entryMainLabel(session: SessionWithMember): string {
+  if (isSimpleEntry(session)) return session.memo || (session.entry_type === "blocked" ? "수업 불가" : "메모");
+  return session.member_name ?? "";
+}
+
+/** 세션 pill에 표시할 "진행/총" 회차 문구. 개인 일정·수업 불가는 대상이 없어 null. */
 function progressLabel(session: SessionWithMember): string | null {
-  if (session.entry_type !== "session") return null;
-  if (!session.total_sessions) return null;
-  return `${session.ordinal ?? "-"}/${session.total_sessions}`;
+  if (isSimpleEntry(session)) return null;
+  const total = Number(session.total_sessions);
+  if (!total) return null;
+  return `${session.ordinal ?? "-"}/${total}`;
 }
 
 function formatWeekLabel(dateKeys: string[]) {
@@ -67,7 +109,7 @@ export function ScheduleGrid({
   dateKeys: string[];
   today: string;
   coaches: CoachRow[];
-  members: MemberRow[];
+  members: MemberWithProgress[];
   initialSessions: SessionWithMember[];
   dayHours: Record<string, DayHours>;
   holidayMap: Record<string, string>;
@@ -262,14 +304,20 @@ export function ScheduleGrid({
                           onClick={() => setEditTarget(session)}
                           className={[
                             "flex-1 rounded-lg border px-3 py-2 text-left text-sm",
-                            session.entry_type === "memo" ? MEMO_STYLE : STATUS_STYLE[session.status],
+                            entryStyle(session),
                           ].join(" ")}
                         >
-                          {session.entry_type === "memo" ? (
-                            <span className="font-medium">📝 {session.memo}</span>
+                          {isSimpleEntry(session) ? (
+                            <span className="font-medium">
+                              {entryIcon(session)}
+                              {entryMainLabel(session)}
+                            </span>
                           ) : (
                             <>
-                              <span className="font-medium">{session.member_name}</span>
+                              <span className="font-medium">
+                                {entryIcon(session)}
+                                {session.member_name}
+                              </span>
                               {progressLabel(session) && (
                                 <span className="ml-1.5 text-xs opacity-70">
                                   {progressLabel(session)}
@@ -376,21 +424,24 @@ export function ScheduleGrid({
                   const session = sessionMap.get(`${date}-${coach.id}-${hour}`);
 
                   if (session) {
-                    const isMemo = session.entry_type === "memo";
                     return (
                       <button
                         key={key}
                         onClick={() => setEditTarget(session)}
                         className={[
                           "border-b border-line/40 m-1 rounded-lg border px-1.5 py-1 text-[11px] text-left transition hover:shadow-sm",
-                          isMemo ? MEMO_STYLE : STATUS_STYLE[session.status],
+                          entryStyle(session),
                         ].join(" ")}
                       >
-                        {isMemo ? (
-                          <p className="font-medium truncate">📝 {session.memo}</p>
+                        {isSimpleEntry(session) ? (
+                          <p className="font-medium truncate">
+                            {entryIcon(session)}
+                            {entryMainLabel(session)}
+                          </p>
                         ) : (
                           <>
                             <p className="font-medium truncate">
+                              {entryIcon(session)}
                               {session.member_name}
                               {progressLabel(session) && (
                                 <span className="ml-1 font-normal opacity-70">
@@ -430,8 +481,7 @@ export function ScheduleGrid({
                       const initial = coach.name.slice(0, 1);
 
                       if (session) {
-                        const isMemo = session.entry_type === "memo";
-                        const label = isMemo ? `📝${session.memo}` : session.member_name;
+                        const label = `${entryIcon(session)}${entryMainLabel(session)}`;
                         return (
                           <button
                             key={coach.id}
@@ -439,7 +489,7 @@ export function ScheduleGrid({
                             title={`${coach.name} · ${label}`}
                             className={[
                               "rounded border px-1 py-0.5 text-left text-[10px] leading-tight truncate transition hover:shadow-sm",
-                              isMemo ? MEMO_STYLE : STATUS_STYLE[session.status],
+                              entryStyle(session),
                             ].join(" ")}
                           >
                             <span className="opacity-50">{initial}·</span>
@@ -472,6 +522,7 @@ export function ScheduleGrid({
           date={createTarget.date}
           hour={createTarget.hour}
           coachId={createTarget.coachId}
+          coaches={effectiveCoaches}
           members={members}
           onClose={() => setCreateTarget(null)}
           onCreated={async () => {
@@ -504,10 +555,20 @@ export function ScheduleGrid({
   );
 }
 
+const DURATION_OPTIONS: Array<{ value: string; weeks: number; label: string }> = [
+  { value: "1", weeks: 1, label: "이번 주만" },
+  { value: "4", weeks: 4, label: "4주간" },
+  { value: "8", weeks: 8, label: "8주간" },
+  { value: "12", weeks: 12, label: "12주간" },
+];
+
+const NEW_CONTACT = "__new__";
+
 function CreateSessionModal({
   date,
   hour,
   coachId,
+  coaches,
   members,
   onClose,
   onCreated,
@@ -515,99 +576,276 @@ function CreateSessionModal({
   date: string;
   hour: number;
   coachId: number;
-  members: MemberRow[];
+  coaches: CoachRow[];
+  members: MemberWithProgress[];
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [mode, setMode] = useState<"session" | "memo">("session");
+  const [category, setCategory] = useState<SessionEntryType>("session");
+  const [selectedCoachId, setSelectedCoachId] = useState(coachId);
+  const [showOtherCoachMembers, setShowOtherCoachMembers] = useState(false);
   const [memberId, setMemberId] = useState<number | "">("");
+  const [useNewContact, setUseNewContact] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const [memo, setMemo] = useState("");
+  const [weekdays, setWeekdays] = useState<Set<number>>(new Set());
+  const [duration, setDuration] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  function switchCategory(next: SessionEntryType) {
+    setCategory(next);
+    setMemberId("");
+    setUseNewContact(false);
+    setNewName("");
+    setNewPhone("");
+    setError(null);
+  }
+
+  function toggleWeekday(idx: number) {
+    setWeekdays((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
+
+  const scopedMembers = members.filter(
+    (m) => showOtherCoachMembers || m.coach_id === selectedCoachId,
+  );
+  const registeredMembers = scopedMembers.filter((m) => m.total_sessions > 0);
+  const waitingMembers = scopedMembers.filter((m) => m.total_sessions === 0);
+
+  function computeOccurrences(): string[] {
+    if (weekdays.size === 0) return [date];
+    const weeks = DURATION_OPTIONS.find((d) => d.value === duration)?.weeks ?? 1;
+    const monday = mondayOfWeek(date);
+    const result = new Set<string>();
+    for (let w = 0; w < weeks; w++) {
+      for (const wd of weekdays) {
+        const occDate = addDaysToKey(monday, w * 7 + wd);
+        if (occDate >= date) result.add(occDate);
+      }
+    }
+    return Array.from(result).sort();
+  }
+
   async function handleSubmit() {
-    if (mode === "session" && !memberId) {
+    setError(null);
+    if (category === "session" && !memberId) {
       setError("회원을 선택해주세요.");
       return;
     }
-    if (mode === "memo" && !memo.trim()) {
+    if (category === "consultation") {
+      if (useNewContact) {
+        if (!newName.trim()) {
+          setError("상담자 이름을 입력해주세요.");
+          return;
+        }
+      } else if (!memberId) {
+        setError("상담자를 선택하거나 새로 등록해주세요.");
+        return;
+      }
+    }
+    if (category === "memo" && !memo.trim()) {
       setError("메모 내용을 입력해주세요.");
       return;
     }
+
+    const occurrences = computeOccurrences();
     setSubmitting(true);
-    setError(null);
+
+    let resolvedMemberId = typeof memberId === "number" ? memberId : undefined;
+    const results: Array<{ date: string; ok: boolean; error?: string }> = [];
+
     try {
-      const res = await fetch("/api/admin/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          entryType: mode,
-          memberId: mode === "session" ? memberId : undefined,
-          coachId,
-          date,
+      for (const occDate of occurrences) {
+        const body: Record<string, unknown> = {
+          entryType: category,
+          coachId: selectedCoachId,
+          date: occDate,
           hour,
           memo,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "등록에 실패했습니다.");
+        };
+        if (category === "session") {
+          body.memberId = resolvedMemberId;
+        } else if (category === "consultation") {
+          if (resolvedMemberId) {
+            body.memberId = resolvedMemberId;
+          } else {
+            body.newName = newName;
+            body.newPhone = newPhone;
+          }
+        }
+
+        const res = await fetch("/api/admin/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          results.push({ date: occDate, ok: true });
+          if (category === "consultation" && !resolvedMemberId && data.session?.member_id) {
+            resolvedMemberId = data.session.member_id;
+          }
+        } else {
+          results.push({ date: occDate, ok: false, error: data.error });
+        }
+      }
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
+      setSubmitting(false);
+      return;
+    }
+
+    setSubmitting(false);
+    const failCount = results.filter((r) => !r.ok).length;
+
+    if (occurrences.length === 1) {
+      if (failCount > 0) {
+        setError(results[0].error ?? "등록에 실패했습니다.");
         return;
       }
       onCreated();
-    } catch {
-      setError("네트워크 오류가 발생했습니다.");
-    } finally {
-      setSubmitting(false);
+      return;
     }
+
+    const successCount = results.length - failCount;
+    if (failCount > 0) {
+      const failDates = results
+        .filter((r) => !r.ok)
+        .map((r) => `${r.date}(${r.error ?? "실패"})`)
+        .join(", ");
+      alert(`${successCount}건 등록 완료, ${failCount}건 실패\n${failDates}`);
+    } else {
+      alert(`${successCount}건 등록 완료`);
+    }
+    onCreated();
   }
 
   return (
     <ModalShell title={`새 일정 — ${date} ${hour}:00`} onClose={onClose}>
       <div className="space-y-4">
-        <div className="flex gap-1 rounded-full bg-bone/70 p-1 text-sm">
-          {(["session", "memo"] as const).map((m) => (
+        <div className="grid grid-cols-4 gap-1 rounded-full bg-bone/70 p-1 text-xs">
+          {(Object.keys(CATEGORY_LABELS) as SessionEntryType[]).map((cat) => (
             <button
-              key={m}
-              onClick={() => setMode(m)}
+              key={cat}
+              onClick={() => switchCategory(cat)}
               className={[
-                "flex-1 rounded-full py-1.5 font-medium transition",
-                mode === m ? "bg-coral text-white shadow-sm" : "text-ink/60",
+                "rounded-full py-1.5 font-medium transition text-center",
+                category === cat ? "bg-coral text-white shadow-sm" : "text-ink/60",
               ].join(" ")}
             >
-              {m === "session" ? "회원 예약" : "개인 메모"}
+              {CATEGORY_LABELS[cat]}
             </button>
           ))}
         </div>
 
-        {mode === "session" ? (
-          <>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">회원 선택</label>
-              <select
-                value={memberId}
-                onChange={(e) => setMemberId(e.target.value ? Number(e.target.value) : "")}
-                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-              >
-                <option value="">선택해주세요</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">메모</label>
+        {coaches.length > 1 && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">담당 코치</label>
+            <select
+              value={selectedCoachId}
+              onChange={(e) => {
+                setSelectedCoachId(Number(e.target.value));
+                setMemberId("");
+              }}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            >
+              {coaches.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <label className="mt-2 flex items-center gap-1.5 text-xs text-ink/60">
               <input
-                value={memo}
-                onChange={(e) => setMemo(e.target.value)}
-                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-                placeholder="선택 입력"
+                type="checkbox"
+                checked={showOtherCoachMembers}
+                onChange={(e) => setShowOtherCoachMembers(e.target.checked)}
               />
-            </div>
-          </>
-        ) : (
+              다른 코치 회원도 표시
+            </label>
+          </div>
+        )}
+
+        {category === "session" && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">회원 선택</label>
+            <select
+              value={memberId}
+              onChange={(e) => setMemberId(e.target.value ? Number(e.target.value) : "")}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            >
+              <option value="">선택해주세요</option>
+              {registeredMembers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {category === "consultation" && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">상담 대상</label>
+            <select
+              value={useNewContact ? NEW_CONTACT : memberId}
+              onChange={(e) => {
+                if (e.target.value === NEW_CONTACT) {
+                  setUseNewContact(true);
+                  setMemberId("");
+                } else {
+                  setUseNewContact(false);
+                  setMemberId(e.target.value ? Number(e.target.value) : "");
+                }
+              }}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            >
+              <option value="">선택해주세요</option>
+              {waitingMembers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+              <option value={NEW_CONTACT}>+ 새 상담자 등록</option>
+            </select>
+            {useNewContact && (
+              <div className="mt-2 space-y-2">
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="이름"
+                  className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+                />
+                <input
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="연락처 (선택)"
+                  className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {(category === "session" || category === "consultation") && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">메모</label>
+            <input
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              placeholder="선택 입력"
+            />
+          </div>
+        )}
+
+        {category === "memo" && (
           <div>
             <label className="block text-sm font-medium mb-1.5">메모 내용</label>
             <input
@@ -623,14 +861,79 @@ function CreateSessionModal({
           </div>
         )}
 
+        {category === "blocked" && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">사유</label>
+            <input
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              autoFocus
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              placeholder="예: 병가, 휴가 등 (선택 입력)"
+            />
+            <p className="text-xs text-ink/40 mt-1.5">
+              해당 시간에 예약이 들어오지 않도록 막아둡니다.
+            </p>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium mb-1.5">고정 요일</label>
+          <div className="grid grid-cols-7 gap-1">
+            {WEEKDAY_LABELS.map((label, idx) => (
+              <button
+                key={label}
+                onClick={() => toggleWeekday(idx)}
+                className={[
+                  "rounded-lg border py-1.5 text-xs font-medium transition",
+                  weekdays.has(idx)
+                    ? "bg-ink text-white border-ink"
+                    : "border-line text-ink/60 hover:bg-bone",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-ink/40 mt-1.5">
+            선택한 요일에 매주 반복 등록합니다. (선택하지 않으면 이 날짜에만 등록)
+          </p>
+        </div>
+
+        {weekdays.size > 0 && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">반복 기간</label>
+            <select
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            >
+              {DURATION_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {error && <p className="text-sm text-coral">{error}</p>}
-        <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full rounded-full bg-ink text-white py-2.5 font-medium hover:bg-coral transition disabled:opacity-50"
-        >
-          {submitting ? "저장 중..." : "등록"}
-        </button>
+
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-full border border-line py-2.5 font-medium hover:bg-bone transition"
+          >
+            닫기
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="flex-1 rounded-full bg-ink text-white py-2.5 font-medium hover:bg-coral transition disabled:opacity-50"
+          >
+            {submitting ? "저장 중..." : "예약 추가"}
+          </button>
+        </div>
       </div>
     </ModalShell>
   );
@@ -675,7 +978,7 @@ function EditSessionModal({
   }
 
   async function handleDelete() {
-    if (!confirm("이 예약 기록을 완전히 삭제할까요?")) return;
+    if (!confirm("이 일정을 완전히 삭제할까요?")) return;
     setSubmitting(true);
     try {
       const res = await fetch(`/api/admin/sessions/${session.id}`, { method: "DELETE" });
@@ -685,17 +988,17 @@ function EditSessionModal({
     }
   }
 
-  const isMemo = session.entry_type === "memo";
-
-  if (isMemo) {
+  if (isSimpleEntry(session)) {
     return (
       <ModalShell
-        title={`개인 메모 — ${session.session_date} ${session.session_hour}:00`}
+        title={`${CATEGORY_LABELS[session.entry_type]} — ${session.session_date} ${session.session_hour}:00`}
         onClose={onClose}
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1.5">메모 내용</label>
+            <label className="block text-sm font-medium mb-1.5">
+              {session.entry_type === "blocked" ? "사유" : "메모 내용"}
+            </label>
             <input
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
@@ -729,6 +1032,11 @@ function EditSessionModal({
     >
       <div className="space-y-4">
         <p className="text-sm text-ink/60">
+          {session.entry_type === "consultation" && (
+            <span className="mr-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+              상담
+            </span>
+          )}
           현재 상태: <span className="font-medium text-ink">{STATUS_LABEL[session.status]}</span>
           {progressLabel(session) && (
             <span className="ml-2 text-ink/50">· 회차 {progressLabel(session)}</span>
@@ -817,7 +1125,7 @@ function ModalShell({
 }) {
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-ink/40 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl p-6">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <p className="font-display text-lg">{title}</p>
           <button onClick={onClose} className="text-ink/40 hover:text-ink text-xl leading-none">

@@ -233,7 +233,7 @@ export interface PackageRow {
 }
 
 export type SessionStatus = "reserved" | "completed" | "no_show" | "cancelled";
-export type SessionEntryType = "session" | "memo";
+export type SessionEntryType = "session" | "consultation" | "memo" | "blocked";
 
 export interface ClassSessionRow {
   id: number;
