@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 const TABS = [
   { href: "/admin/schedule", label: "스케줄" },
   { href: "/admin/members", label: "회원 관리" },
+  { href: "/admin/reports", label: "매출" },
   { href: "/admin/dashboard", label: "사전예약" },
   { href: "/admin/settings", label: "설정" },
 ];

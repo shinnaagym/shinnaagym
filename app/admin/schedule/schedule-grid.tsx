@@ -4,19 +4,22 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { addDaysToKey } from "@/lib/date";
-import type { CoachRow, MemberRow, SessionStatus } from "@/lib/db";
+import type { CoachRow, MemberRow, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { DayHours } from "@/lib/constants";
 
 type SessionWithMember = {
   id: number;
-  member_id: number;
+  member_id: number | null;
   coach_id: number;
   session_date: string;
   session_hour: number;
   status: SessionStatus;
   memo: string;
-  member_name: string;
+  entry_type: SessionEntryType;
+  member_name: string | null;
   coach_name: string;
+  ordinal: number | null;
+  total_sessions: number | null;
 };
 
 const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -28,12 +31,21 @@ const STATUS_STYLE: Record<SessionStatus, string> = {
   cancelled: "bg-transparent border-dashed border-line text-ink/30 line-through",
 };
 
+const MEMO_STYLE = "bg-violet-50 border-violet-200 text-violet-700";
+
 const STATUS_LABEL: Record<SessionStatus, string> = {
   reserved: "예약",
   completed: "완료",
   no_show: "노쇼",
   cancelled: "취소",
 };
+
+/** 세션 pill에 표시할 "진행/총" 회차 문구. 회원 세션이 아니거나 아직 패키지가 없으면 null. */
+function progressLabel(session: SessionWithMember): string | null {
+  if (session.entry_type !== "session") return null;
+  if (!session.total_sessions) return null;
+  return `${session.ordinal ?? "-"}/${session.total_sessions}`;
+}
 
 function formatWeekLabel(dateKeys: string[]) {
   const [, m1, d1] = dateKeys[0].split("-");
@@ -231,13 +243,24 @@ export function ScheduleGrid({
                           onClick={() => setEditTarget(session)}
                           className={[
                             "flex-1 rounded-lg border px-3 py-2 text-left text-sm",
-                            STATUS_STYLE[session.status],
+                            session.entry_type === "memo" ? MEMO_STYLE : STATUS_STYLE[session.status],
                           ].join(" ")}
                         >
-                          <span className="font-medium">{session.member_name}</span>
-                          <span className="ml-2 text-xs opacity-70">
-                            {STATUS_LABEL[session.status]}
-                          </span>
+                          {session.entry_type === "memo" ? (
+                            <span className="font-medium">📝 {session.memo}</span>
+                          ) : (
+                            <>
+                              <span className="font-medium">{session.member_name}</span>
+                              {progressLabel(session) && (
+                                <span className="ml-1.5 text-xs opacity-70">
+                                  {progressLabel(session)}
+                                </span>
+                              )}
+                              <span className="ml-2 text-xs opacity-70">
+                                {STATUS_LABEL[session.status]}
+                              </span>
+                            </>
+                          )}
                           {showCoachLabel && (
                             <span className="block text-[11px] opacity-60">{session.coach_name}</span>
                           )}
@@ -247,7 +270,7 @@ export function ScheduleGrid({
                           onClick={() => setCreateTarget({ date, hour, coachId: coach.id })}
                           className="flex-1 rounded-lg border border-dashed border-line px-3 py-2 text-left text-sm text-ink/30 hover:text-coral hover:border-coral transition"
                         >
-                          + 예약 추가{showCoachLabel ? ` · ${coach.name}` : ""}
+                          + 추가{showCoachLabel ? ` · ${coach.name}` : ""}
                         </button>
                       ) : null}
                     </div>
@@ -333,17 +356,31 @@ export function ScheduleGrid({
                     }
 
                     if (session) {
+                      const isMemo = session.entry_type === "memo";
                       return (
                         <button
                           key={key}
                           onClick={() => setEditTarget(session)}
                           className={[
                             "border-b border-line/40 m-1 rounded-lg border px-1.5 py-1 text-[11px] text-left transition hover:shadow-sm",
-                            STATUS_STYLE[session.status],
+                            isMemo ? MEMO_STYLE : STATUS_STYLE[session.status],
                           ].join(" ")}
                         >
-                          <p className="font-medium truncate">{session.member_name}</p>
-                          <p className="text-[10px] opacity-70">{STATUS_LABEL[session.status]}</p>
+                          {isMemo ? (
+                            <p className="font-medium truncate">📝 {session.memo}</p>
+                          ) : (
+                            <>
+                              <p className="font-medium truncate">
+                                {session.member_name}
+                                {progressLabel(session) && (
+                                  <span className="ml-1 font-normal opacity-70">
+                                    {progressLabel(session)}
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[10px] opacity-70">{STATUS_LABEL[session.status]}</p>
+                            </>
+                          )}
                         </button>
                       );
                     }
@@ -420,14 +457,19 @@ function CreateSessionModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const [mode, setMode] = useState<"session" | "memo">("session");
   const [memberId, setMemberId] = useState<number | "">("");
   const [memo, setMemo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
-    if (!memberId) {
+    if (mode === "session" && !memberId) {
       setError("회원을 선택해주세요.");
+      return;
+    }
+    if (mode === "memo" && !memo.trim()) {
+      setError("메모 내용을 입력해주세요.");
       return;
     }
     setSubmitting(true);
@@ -436,11 +478,18 @@ function CreateSessionModal({
       const res = await fetch("/api/admin/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberId, coachId, date, hour, memo }),
+        body: JSON.stringify({
+          entryType: mode,
+          memberId: mode === "session" ? memberId : undefined,
+          coachId,
+          date,
+          hour,
+          memo,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "예약 생성에 실패했습니다.");
+        setError(data.error ?? "등록에 실패했습니다.");
         return;
       }
       onCreated();
@@ -452,39 +501,73 @@ function CreateSessionModal({
   }
 
   return (
-    <ModalShell title={`새 예약 — ${date} ${hour}:00`} onClose={onClose}>
+    <ModalShell title={`새 일정 — ${date} ${hour}:00`} onClose={onClose}>
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1.5">회원 선택</label>
-          <select
-            value={memberId}
-            onChange={(e) => setMemberId(e.target.value ? Number(e.target.value) : "")}
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-          >
-            <option value="">선택해주세요</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+        <div className="flex gap-1 rounded-full bg-bone/70 p-1 text-sm">
+          {(["session", "memo"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={[
+                "flex-1 rounded-full py-1.5 font-medium transition",
+                mode === m ? "bg-coral text-white shadow-sm" : "text-ink/60",
+              ].join(" ")}
+            >
+              {m === "session" ? "회원 예약" : "개인 메모"}
+            </button>
+          ))}
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1.5">메모</label>
-          <input
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-            placeholder="선택 입력"
-          />
-        </div>
+
+        {mode === "session" ? (
+          <>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">회원 선택</label>
+              <select
+                value={memberId}
+                onChange={(e) => setMemberId(e.target.value ? Number(e.target.value) : "")}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              >
+                <option value="">선택해주세요</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">메모</label>
+              <input
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+                placeholder="선택 입력"
+              />
+            </div>
+          </>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">메모 내용</label>
+            <input
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              autoFocus
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              placeholder="예: 개인 운동 시간, 외부 일정 등"
+            />
+            <p className="text-xs text-ink/40 mt-1.5">
+              회원 예약 없이 이 시간대를 비워두고 싶을 때 사용하세요.
+            </p>
+          </div>
+        )}
+
         {error && <p className="text-sm text-coral">{error}</p>}
         <button
           onClick={handleSubmit}
           disabled={submitting}
           className="w-full rounded-full bg-ink text-white py-2.5 font-medium hover:bg-coral transition disabled:opacity-50"
         >
-          {submitting ? "저장 중..." : "예약 등록"}
+          {submitting ? "저장 중..." : "등록"}
         </button>
       </div>
     </ModalShell>
@@ -540,6 +623,43 @@ function EditSessionModal({
     }
   }
 
+  const isMemo = session.entry_type === "memo";
+
+  if (isMemo) {
+    return (
+      <ModalShell
+        title={`개인 메모 — ${session.session_date} ${session.session_hour}:00`}
+        onClose={onClose}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1.5">메모 내용</label>
+            <input
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </div>
+          {error && <p className="text-sm text-coral">{error}</p>}
+          <button
+            disabled={submitting}
+            onClick={() => patch({ memo })}
+            className="w-full rounded-full bg-ink text-white py-2.5 text-sm font-medium hover:bg-coral transition disabled:opacity-50"
+          >
+            저장
+          </button>
+          <button
+            disabled={submitting}
+            onClick={handleDelete}
+            className="w-full text-sm text-red-500 hover:underline"
+          >
+            삭제
+          </button>
+        </div>
+      </ModalShell>
+    );
+  }
+
   return (
     <ModalShell
       title={`${session.member_name} — ${session.session_date} ${session.session_hour}:00`}
@@ -548,6 +668,9 @@ function EditSessionModal({
       <div className="space-y-4">
         <p className="text-sm text-ink/60">
           현재 상태: <span className="font-medium text-ink">{STATUS_LABEL[session.status]}</span>
+          {progressLabel(session) && (
+            <span className="ml-2 text-ink/50">· 회차 {progressLabel(session)}</span>
+          )}
         </p>
 
         {coaches.length > 1 && (

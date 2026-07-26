@@ -27,21 +27,32 @@ export async function POST(req: NextRequest) {
         date?: unknown;
         hour?: unknown;
         memo?: unknown;
+        entryType?: unknown;
       }
     | null;
 
-  const memberId = Number(body?.memberId);
+  const entryType = body?.entryType === "memo" ? "memo" : "session";
   const coachId = Number(body?.coachId);
   const date = typeof body?.date === "string" ? body.date : "";
   const hour = Number(body?.hour);
   const memo = typeof body?.memo === "string" ? body.memo : "";
 
-  if (!Number.isInteger(memberId) || !Number.isInteger(coachId) || !isValidDateKey(date) || !Number.isInteger(hour)) {
+  if (!Number.isInteger(coachId) || !isValidDateKey(date) || !Number.isInteger(hour)) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
+  let memberId: number | null = null;
+  if (entryType === "session") {
+    memberId = Number(body?.memberId);
+    if (!Number.isInteger(memberId)) {
+      return NextResponse.json({ error: "회원을 선택해주세요." }, { status: 400 });
+    }
+  } else if (!memo.trim()) {
+    return NextResponse.json({ error: "메모 내용을 입력해주세요." }, { status: 400 });
+  }
+
   try {
-    const session = await createSession({ memberId, coachId, date, hour, memo });
+    const session = await createSession({ memberId, coachId, date, hour, memo, entryType });
     return NextResponse.json({ session }, { status: 201 });
   } catch (err: unknown) {
     if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505") {

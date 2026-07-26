@@ -35,6 +35,16 @@ export async function setCoachActive(id: number, active: boolean): Promise<void>
   await query(`UPDATE coaches SET active = $2 WHERE id = $1`, [id, active]);
 }
 
+/** 코치별 담당 활성 회원 수 (퇴사 처리 전 경고용). */
+export async function getActiveMemberCountsByCoach(): Promise<Record<number, number>> {
+  const result = await query<{ coach_id: number; count: string }>(
+    `SELECT coach_id, COUNT(*) as count FROM members
+     WHERE coach_id IS NOT NULL AND status = 'active'
+     GROUP BY coach_id`,
+  );
+  return Object.fromEntries(result.rows.map((r) => [r.coach_id, Number(r.count)]));
+}
+
 // ---- 공휴일 ----
 
 export async function listHolidays(): Promise<HolidayRow[]> {
@@ -228,18 +238,33 @@ export async function computeMemberProgress(memberId: number): Promise<MemberPro
 // ---- 수업 세션 ----
 
 export interface SessionWithMember extends ClassSessionRow {
-  member_name: string;
+  member_name: string | null;
   coach_name: string;
+  // 이 세션이 그 회원의 몇 번째 세션인지(취소 제외, 예약 포함), 그리고 현재까지 구매한 총 회차.
+  ordinal: number | null;
+  total_sessions: number | null;
 }
+
+const SESSION_SELECT_FIELDS = `
+  s.*, m.name as member_name, c.name as coach_name,
+  (CASE WHEN s.member_id IS NULL THEN NULL ELSE (
+    SELECT COUNT(*) FROM class_sessions s2
+    WHERE s2.member_id = s.member_id AND s2.status <> 'cancelled'
+      AND (s2.session_date, s2.session_hour) <= (s.session_date, s.session_hour)
+  ) END) as ordinal,
+  (CASE WHEN s.member_id IS NULL THEN NULL ELSE (
+    SELECT COALESCE(SUM(p.total_sessions), 0) FROM packages p WHERE p.member_id = s.member_id
+  ) END) as total_sessions
+`;
 
 export async function listSessionsInRange(
   fromKey: string,
   toKey: string,
 ): Promise<SessionWithMember[]> {
   const result = await query<SessionWithMember>(
-    `SELECT s.*, m.name as member_name, c.name as coach_name
+    `SELECT ${SESSION_SELECT_FIELDS}
      FROM class_sessions s
-     JOIN members m ON m.id = s.member_id
+     LEFT JOIN members m ON m.id = s.member_id
      JOIN coaches c ON c.id = s.coach_id
      WHERE s.session_date >= $1 AND s.session_date <= $2
      ORDER BY s.session_date ASC, s.session_hour ASC`,
@@ -250,9 +275,9 @@ export async function listSessionsInRange(
 
 export async function listMemberSessions(memberId: number): Promise<SessionWithMember[]> {
   const result = await query<SessionWithMember>(
-    `SELECT s.*, m.name as member_name, c.name as coach_name
+    `SELECT ${SESSION_SELECT_FIELDS}
      FROM class_sessions s
-     JOIN members m ON m.id = s.member_id
+     LEFT JOIN members m ON m.id = s.member_id
      JOIN coaches c ON c.id = s.coach_id
      WHERE s.member_id = $1
      ORDER BY s.session_date DESC, s.session_hour DESC`,
@@ -262,16 +287,24 @@ export async function listMemberSessions(memberId: number): Promise<SessionWithM
 }
 
 export async function createSession(input: {
-  memberId: number;
+  memberId: number | null;
   coachId: number;
   date: string;
   hour: number;
   memo?: string;
+  entryType?: "session" | "memo";
 }): Promise<ClassSessionRow> {
   const result = await query<ClassSessionRow>(
-    `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [input.memberId, input.coachId, input.date, input.hour, input.memo ?? ""],
+    `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo, entry_type)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [
+      input.memberId,
+      input.coachId,
+      input.date,
+      input.hour,
+      input.memo ?? "",
+      input.entryType ?? "session",
+    ],
   );
   return result.rows[0];
 }
@@ -306,6 +339,141 @@ export async function updateSession(
 
 export async function deleteSession(id: number): Promise<void> {
   await query(`DELETE FROM class_sessions WHERE id = $1`, [id]);
+}
+
+// ---- 사전예약 → 스케줄표 자동 연동 ----
+
+/** 활성 코치 중 담당 회원이 가장 적은 코치를 기본 배정 코치로 고른다 (코치가 1명이면 그 코치). */
+async function pickDefaultCoachId(): Promise<number | null> {
+  const result = await query<{ id: number }>(
+    `SELECT c.id FROM coaches c
+     LEFT JOIN members m ON m.coach_id = c.id AND m.status = 'active'
+     WHERE c.active = true
+     GROUP BY c.id
+     ORDER BY COUNT(m.id) ASC, c.id ASC
+     LIMIT 1`,
+  );
+  return result.rows[0]?.id ?? null;
+}
+
+/**
+ * 공개 사전예약 폼에서 예약이 들어오면 회원(연락처로 조회, 없으면 신규 등록)과
+ * 스케줄표 세션을 자동으로 만들어 관리자가 스케줄표에서 바로 볼 수 있게 한다.
+ */
+export async function linkPreReservationToSchedule(input: {
+  name: string;
+  phone: string;
+  date: string;
+  hour: number;
+}): Promise<{ memberId: number; sessionId: number } | null> {
+  const coachId = await pickDefaultCoachId();
+  if (!coachId) return null; // 활성 코치가 없으면 연동을 건너뛴다.
+
+  const existing = await query<MemberRow>(
+    `SELECT * FROM members WHERE phone = $1 AND phone <> '' LIMIT 1`,
+    [input.phone],
+  );
+  const member =
+    existing.rows[0] ??
+    (await createMember({
+      name: input.name,
+      phone: input.phone,
+      coachId,
+      notes: "사전예약 폼을 통해 자동 등록됨",
+    }));
+
+  try {
+    const session = await createSession({
+      memberId: member.id,
+      coachId: member.coach_id ?? coachId,
+      date: input.date,
+      hour: input.hour,
+      memo: "사전예약(상담) 자동 등록",
+    });
+    return { memberId: member.id, sessionId: session.id };
+  } catch {
+    // 같은 코치의 같은 시간대가 이미 차 있는 등 스케줄 연동에 실패해도
+    // 사전예약 자체는 이미 접수된 상태이므로 조용히 넘어간다.
+    return { memberId: member.id, sessionId: -1 };
+  }
+}
+
+// ---- 코치별 매출 · 재등록율 리포트 ----
+
+export interface CoachMonthlyReport {
+  coachId: number;
+  coachName: string;
+  memberCount: number;
+  completedSessions: number;
+  revenue: number;
+  reRegisteredCount: number;
+  churnedCount: number;
+  reRegistrationRate: number | null; // 재등록 / (재등록 + 이탈), 분모 0이면 null
+}
+
+/** yearMonth: "YYYY-MM" */
+export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMonthlyReport[]> {
+  const monthStart = `${yearMonth}-01`;
+
+  const [coachesResult, revenueResult, sessionsResult, memberStatsResult] = await Promise.all([
+    query<CoachRow>(`SELECT * FROM coaches ORDER BY id ASC`),
+    query<{ coach_id: number; revenue: string }>(
+      `SELECT m.coach_id as coach_id, SUM(p.price) as revenue
+       FROM packages p
+       JOIN members m ON m.id = p.member_id
+       WHERE to_char(p.purchased_at, 'YYYY-MM') = $1 AND m.coach_id IS NOT NULL
+       GROUP BY m.coach_id`,
+      [yearMonth],
+    ),
+    query<{ coach_id: number; completed: string }>(
+      `SELECT coach_id, COUNT(*) as completed
+       FROM class_sessions
+       WHERE status IN ('completed', 'no_show') AND entry_type = 'session'
+         AND session_date >= $1 AND session_date < to_char((to_date($1, 'YYYY-MM-DD') + interval '1 month'), 'YYYY-MM-DD')
+       GROUP BY coach_id`,
+      [monthStart],
+    ),
+    query<{
+      coach_id: number;
+      member_count: string;
+      re_registered: string;
+      churned: string;
+    }>(
+      `SELECT m.coach_id as coach_id,
+         COUNT(*) as member_count,
+         COUNT(*) FILTER (WHERE pkg.package_count >= 2) as re_registered,
+         COUNT(*) FILTER (WHERE m.status = 'inactive' AND COALESCE(pkg.package_count, 0) < 2) as churned
+       FROM members m
+       LEFT JOIN (
+         SELECT member_id, COUNT(*) as package_count FROM packages GROUP BY member_id
+       ) pkg ON pkg.member_id = m.id
+       WHERE m.coach_id IS NOT NULL
+       GROUP BY m.coach_id`,
+    ),
+  ]);
+
+  const revenueMap = new Map(revenueResult.rows.map((r) => [r.coach_id, Number(r.revenue ?? 0)]));
+  const sessionsMap = new Map(
+    sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed ?? 0)]),
+  );
+  const memberStatsMap = new Map(memberStatsResult.rows.map((r) => [r.coach_id, r]));
+
+  return coachesResult.rows.map((coach) => {
+    const stats = memberStatsMap.get(coach.id);
+    const reRegistered = Number(stats?.re_registered ?? 0);
+    const churned = Number(stats?.churned ?? 0);
+    const denom = reRegistered + churned;
+    return {
+      coachId: coach.id,
+      coachName: coach.name,
+      memberCount: Number(stats?.member_count ?? 0),
+      completedSessions: sessionsMap.get(coach.id) ?? 0,
+      revenue: revenueMap.get(coach.id) ?? 0,
+      reRegisteredCount: reRegistered,
+      churnedCount: churned,
+      reRegistrationRate: denom > 0 ? reRegistered / denom : null,
+    };
+  });
 }
 
 /** 회원 화면용: 담당 코치의 향후 N일 가능/마감 시간대 (다른 회원 이름은 노출하지 않음). */

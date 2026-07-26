@@ -8,6 +8,7 @@ import {
 import { isWithinBookingWindow, koreaCurrentHour, koreaTodayKey } from "@/lib/date";
 import { getTakenSlots } from "@/lib/reservations";
 import { notifyNewReservation } from "@/lib/notify";
+import { linkPreReservationToSchedule } from "@/lib/schedule";
 
 const PURPOSE_VALUES = new Set(PURPOSE_OPTIONS.map((option) => option.value));
 const PHONE_PATTERN = /^[0-9-+ ]{9,20}$/;
@@ -95,6 +96,27 @@ export async function POST(req: NextRequest) {
       [name.trim(), ageNum, phone.trim(), purposes, purposeNote.trim(), date, hourNum],
     );
     const row = result.rows[0];
+
+    // 스케줄표(관리자 실사용 캘린더)에도 자동으로 반영해, 담당 코치가 사전예약 건을
+    // 별도 화면을 오가지 않고도 바로 볼 수 있게 한다.
+    try {
+      const link = await linkPreReservationToSchedule({
+        name: name.trim(),
+        phone: phone.trim(),
+        date: row.reservation_date,
+        hour: row.reservation_hour,
+      });
+      if (link) {
+        await query(
+          `UPDATE reservations SET member_id = $2, class_session_id = $3 WHERE id = $1`,
+          [row.id, link.memberId, link.sessionId === -1 ? null : link.sessionId],
+        );
+      }
+    } catch (linkErr) {
+      // 스케줄 연동은 부가 기능이므로 실패해도 사전예약 접수 자체는 그대로 성공 처리한다.
+      console.error("사전예약 스케줄 연동 실패:", linkErr);
+    }
+
     await notifyNewReservation({
       name: name.trim(),
       age: ageNum,

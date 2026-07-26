@@ -6,9 +6,11 @@ import type { CoachRow, HolidayRow } from "@/lib/db";
 export function SettingsView({
   initialCoaches,
   initialHolidays,
+  memberCounts,
 }: {
   initialCoaches: CoachRow[];
   initialHolidays: HolidayRow[];
+  memberCounts: Record<number, number>;
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
@@ -35,6 +37,14 @@ export function SettingsView({
   }
 
   async function toggleCoach(coach: CoachRow) {
+    if (coach.active) {
+      const activeMembers = memberCounts[coach.id] ?? 0;
+      const confirmMessage =
+        activeMembers > 0
+          ? `${coach.name} 코치에게 배정된 활성 회원이 ${activeMembers}명 있어요. 퇴사 처리해도 회원 담당은 자동으로 바뀌지 않으니, 회원 관리에서 먼저 담당 코치를 변경하는 걸 추천해요. 그래도 퇴사 처리할까요?`
+          : `${coach.name} 코치를 퇴사 처리할까요? 스케줄표에서 컬럼이 사라지고, 새 회원 등록 시 선택할 수 없게 돼요.`;
+      if (!confirm(confirmMessage)) return;
+    }
     await fetch(`/api/admin/coaches/${coach.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -85,18 +95,33 @@ export function SettingsView({
         </p>
         <div className="divide-y divide-line/50">
           {coaches.map((c) => (
-            <div key={c.id} className="flex items-center justify-between py-2.5">
-              <span className="text-sm">{c.name}</span>
+            <div key={c.id} className="flex items-center justify-between py-2.5 gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{c.name}</span>
+                <span
+                  className={[
+                    "rounded-full px-2 py-0.5 text-[11px]",
+                    c.active ? "bg-sage/10 text-sage" : "bg-line/40 text-ink/40",
+                  ].join(" ")}
+                >
+                  {c.active ? "재직 중" : "퇴사함"}
+                </span>
+                {c.active && (memberCounts[c.id] ?? 0) > 0 && (
+                  <span className="text-[11px] text-ink/40">
+                    담당 {memberCounts[c.id]}명
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => toggleCoach(c)}
                 className={[
-                  "rounded-full px-3 py-1 text-xs border transition",
+                  "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs border transition",
                   c.active
-                    ? "border-sage/50 text-sage bg-sage/10"
-                    : "border-line text-ink/40",
+                    ? "border-red-200 text-red-500 hover:bg-red-50"
+                    : "border-sage/50 text-sage hover:bg-sage/10",
                 ].join(" ")}
               >
-                {c.active ? "근무 중" : "비활성"}
+                {c.active ? "퇴사 처리" : "재직으로 전환"}
               </button>
             </div>
           ))}
