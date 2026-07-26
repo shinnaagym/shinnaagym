@@ -5,7 +5,7 @@ import {
   getDayHoursForRange,
   listCoaches,
   listHolidays,
-  listMembers,
+  listMembersWithProgress,
   listSessionsInRange,
 } from "@/lib/schedule";
 import { AdminNav } from "../admin-nav";
@@ -28,7 +28,7 @@ export default async function AdminSchedulePage({
 
   const [coaches, members, sessions, dayHours, holidays] = await Promise.all([
     listCoaches(),
-    listMembers(),
+    listMembersWithProgress(),
     listSessionsInRange(weekStart, weekEnd),
     getDayHoursForRange(dateKeys),
     listHolidays(),
@@ -51,7 +51,7 @@ export default async function AdminSchedulePage({
             dateKeys={dateKeys}
             today={today}
             coaches={coaches.filter((c) => c.active)}
-            members={members.filter((m) => m.status === "active")}
+            members={members.filter((m) => m.status === "active" && m.total_sessions > 0)}
             initialSessions={sessions}
             dayHours={dayHours}
             holidayMap={holidayMap}
