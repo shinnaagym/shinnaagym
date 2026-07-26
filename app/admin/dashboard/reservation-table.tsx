@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PURPOSE_LABELS } from "@/lib/constants";
 import type { ReservationRow } from "@/lib/db";
@@ -10,15 +9,8 @@ export function ReservationTable({
 }: {
   initialReservations: ReservationRow[];
 }) {
-  const router = useRouter();
   const [reservations, setReservations] = useState(initialReservations);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  async function handleLogout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.replace("/admin");
-    router.refresh();
-  }
 
   async function handleDelete(id: number) {
     if (!confirm("이 예약을 취소(삭제)할까요?")) return;
@@ -35,17 +27,9 @@ export function ReservationTable({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <p className="font-display text-2xl">예약 현황</p>
-          <p className="text-sm text-ink/60 mt-1">총 {reservations.length}건</p>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="rounded-full border border-line px-4 py-2 text-sm hover:bg-bone transition"
-        >
-          로그아웃
-        </button>
+      <div className="mb-8">
+        <p className="font-display text-2xl">사전예약 현황</p>
+        <p className="text-sm text-ink/60 mt-1">총 {reservations.length}건</p>
       </div>
 
       {reservations.length === 0 ? (

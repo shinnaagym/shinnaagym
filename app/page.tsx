@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { PulseLine } from "@/app/components/PulseLine";
 import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
@@ -39,7 +40,22 @@ export default async function Home() {
           aria-hidden="true"
           className="energy-glow pointer-events-none absolute -top-32 right-[-10%] h-96 w-96 rounded-full bg-coral/30 blur-3xl"
         />
-        <div className="relative mx-auto max-w-5xl px-6 pt-20 pb-16 sm:pt-28 sm:pb-24">
+        <div className="relative mx-auto max-w-5xl px-6 pt-8 sm:pt-10">
+          <a href="#" className="hero-fade-1 inline-flex items-center gap-2.5">
+            <Image
+              src="/logo.png"
+              alt="신나아짐 로고"
+              width={271}
+              height={341}
+              priority
+              className="h-9 w-auto sm:h-10"
+            />
+            <span className="font-display text-lg sm:text-xl tracking-wide text-bone">
+              신나아짐
+            </span>
+          </a>
+        </div>
+        <div className="relative mx-auto max-w-5xl px-6 pt-12 pb-16 sm:pt-16 sm:pb-24">
           <p className="hero-fade-1 text-sm tracking-[0.2em] text-sage uppercase mb-6">
             Pre-Open Reservation
           </p>

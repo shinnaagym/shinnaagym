@@ -1,0 +1,28 @@
+import { NextRequest, NextResponse } from "next/server";
+import { isAdminAuthed } from "@/lib/auth";
+import { addPackage } from "@/lib/schedule";
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!(await isAdminAuthed())) {
+    return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+  }
+  const { id } = await params;
+  const idNum = Number(id);
+  if (!Number.isInteger(idNum)) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+  const body = (await req.json().catch(() => null)) as
+    | { totalSessions?: unknown; price?: unknown; note?: unknown }
+    | null;
+  const totalSessions = Number(body?.totalSessions ?? 0);
+  const price = Number(body?.price ?? 0);
+  const note = typeof body?.note === "string" ? body.note.trim() : "";
+  if (!Number.isInteger(totalSessions) || totalSessions < 1) {
+    return NextResponse.json({ error: "등록 횟수를 올바르게 입력해주세요." }, { status: 400 });
+  }
+  const pkg = await addPackage(idNum, totalSessions, price, note || "재등록");
+  return NextResponse.json({ package: pkg }, { status: 201 });
+}
