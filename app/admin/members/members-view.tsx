@@ -74,18 +74,14 @@ export function MembersView({
         </button>
       </div>
 
-      <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
-          <thead>
-            <tr className="text-left text-ink/50 text-xs border-b border-line/60">
-              <th className="px-5 py-3 font-medium">이름</th>
-              <th className="px-5 py-3 font-medium">담당</th>
-              <th className="px-5 py-3 font-medium">진행</th>
-              <th className="px-5 py-3 font-medium">잔여</th>
-              <th className="px-5 py-3 font-medium">상태</th>
-            </tr>
-          </thead>
-          <tbody>
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-10 text-center text-ink/40">
+          회원이 없어요.
+        </div>
+      ) : (
+        <>
+          {/* 모바일: 카드 목록 (좁은 화면에서 표 가로 스크롤 대신) */}
+          <div className="grid gap-3 sm:hidden">
             {filtered.map((m) => {
               const remaining = m.total_sessions - m.done_count;
               const pct =
@@ -94,39 +90,16 @@ export function MembersView({
                   : 0;
               const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
               return (
-                <tr
+                <button
                   key={m.id}
                   onClick={() => setDetailId(m.id)}
-                  className="border-b border-line/40 last:border-0 hover:bg-bone/40 cursor-pointer transition"
+                  className="text-left rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3.5 active:bg-bone/40 transition"
                 >
-                  <td className="px-5 py-3 font-medium">{m.name}</td>
-                  <td className="px-5 py-3 text-ink/70">{coachName}</td>
-                  <td className="px-5 py-3 w-48">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full bg-line/60 overflow-hidden">
-                        <div
-                          className="h-full bg-coral rounded-full"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-ink/50 whitespace-nowrap">
-                        {m.done_count}/{m.total_sessions}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={
-                        remaining <= 3 ? "text-coral font-medium" : "text-ink/70"
-                      }
-                    >
-                      {remaining}회
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium">{m.name}</span>
                     <span
                       className={[
-                        "rounded-full px-2.5 py-0.5 text-xs",
+                        "rounded-full px-2.5 py-0.5 text-xs shrink-0",
                         m.status === "active"
                           ? "bg-sage/20 text-sage"
                           : "bg-line/40 text-ink/50",
@@ -134,20 +107,96 @@ export function MembersView({
                     >
                       {m.status === "active" ? "활성" : "비활성"}
                     </span>
-                  </td>
-                </tr>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-line/60 overflow-hidden">
+                      <div className="h-full bg-coral rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs text-ink/50 whitespace-nowrap">
+                      {m.done_count}/{m.total_sessions}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-ink/60">
+                    <span>담당 {coachName}</span>
+                    <span className={remaining <= 3 ? "text-coral font-medium" : ""}>
+                      잔여 {remaining}회
+                    </span>
+                  </div>
+                </button>
               );
             })}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-ink/40">
-                  회원이 없어요.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          {/* 데스크톱: 표 */}
+          <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead>
+                <tr className="text-left text-ink/50 text-xs border-b border-line/60">
+                  <th className="px-5 py-3 font-medium">이름</th>
+                  <th className="px-5 py-3 font-medium">담당</th>
+                  <th className="px-5 py-3 font-medium">진행</th>
+                  <th className="px-5 py-3 font-medium">잔여</th>
+                  <th className="px-5 py-3 font-medium">상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((m) => {
+                  const remaining = m.total_sessions - m.done_count;
+                  const pct =
+                    m.total_sessions > 0
+                      ? Math.min(100, Math.round((m.done_count / m.total_sessions) * 100))
+                      : 0;
+                  const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
+                  return (
+                    <tr
+                      key={m.id}
+                      onClick={() => setDetailId(m.id)}
+                      className="border-b border-line/40 last:border-0 hover:bg-bone/40 cursor-pointer transition"
+                    >
+                      <td className="px-5 py-3 font-medium">{m.name}</td>
+                      <td className="px-5 py-3 text-ink/70">{coachName}</td>
+                      <td className="px-5 py-3 w-48">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full bg-line/60 overflow-hidden">
+                            <div
+                              className="h-full bg-coral rounded-full"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-ink/50 whitespace-nowrap">
+                            {m.done_count}/{m.total_sessions}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={
+                            remaining <= 3 ? "text-coral font-medium" : "text-ink/70"
+                          }
+                        >
+                          {remaining}회
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={[
+                            "rounded-full px-2.5 py-0.5 text-xs",
+                            m.status === "active"
+                              ? "bg-sage/20 text-sage"
+                              : "bg-line/40 text-ink/50",
+                          ].join(" ")}
+                        >
+                          {m.status === "active" ? "활성" : "비활성"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {showCreate && (
         <CreateMemberModal

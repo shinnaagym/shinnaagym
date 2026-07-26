@@ -46,6 +46,7 @@ export default async function AdminSchedulePage({
       <main className="flex-1 bg-[#f7f8fa]">
         <div className="mx-auto max-w-6xl px-6 py-8">
           <ScheduleGrid
+            key={weekStart}
             weekStart={weekStart}
             dateKeys={dateKeys}
             today={today}

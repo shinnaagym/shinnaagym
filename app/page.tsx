@@ -60,7 +60,7 @@ export default async function Home() {
           <p className="hero-fade-1 text-sm tracking-[0.2em] text-gold uppercase mb-6">
             Pre-Open Reservation
           </p>
-          <h1 className="hero-fade-2 font-display text-5xl sm:text-7xl leading-[1.15] tracking-tight mb-8">
+          <h1 className="hero-fade-2 font-display text-4xl sm:text-7xl leading-[1.25] sm:leading-[1.15] tracking-tight mb-8">
             신나게 나아지는 몸,
             <br />
             신나아짐에서 시작합니다

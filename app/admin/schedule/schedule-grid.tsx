@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { addDaysToKey } from "@/lib/date";
@@ -69,6 +69,16 @@ export function ScheduleGrid({
     coachId: number;
   } | null>(null);
   const [editTarget, setEditTarget] = useState<SessionWithMember | null>(null);
+  const todayIdx = dateKeys.indexOf(today);
+  const [selectedDayIdx, setSelectedDayIdx] = useState(todayIdx >= 0 ? todayIdx : 0);
+  const dayChipRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useEffect(() => {
+    dayChipRefs.current[selectedDayIdx]?.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+    });
+  }, [selectedDayIdx]);
 
   const effectiveCoaches = coaches.length > 0 ? coaches : [];
   const showCoachLabel = effectiveCoaches.length > 1;
@@ -154,8 +164,103 @@ export function ScheduleGrid({
         <p className="font-display text-lg">{formatWeekLabel(dateKeys)}</p>
       </div>
 
-      {/* 그리드 */}
-      <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
+      {/* 모바일: 요일 선택 + 하루치 세로 목록 */}
+      <div className="sm:hidden">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3">
+          {dateKeys.map((date, dayIdx) => {
+            const hours = dayHours[date];
+            const isSelected = dayIdx === selectedDayIdx;
+            const isToday = date === today;
+            return (
+              <button
+                key={date}
+                ref={(el) => {
+                  dayChipRefs.current[dayIdx] = el;
+                }}
+                onClick={() => setSelectedDayIdx(dayIdx)}
+                className={[
+                  "shrink-0 rounded-xl px-3 py-2 text-center min-w-[52px] border transition",
+                  isSelected
+                    ? "bg-ink text-white border-ink"
+                    : isToday
+                      ? "border-coral text-ink bg-white"
+                      : "border-line bg-white text-ink/70",
+                ].join(" ")}
+              >
+                <p className="text-[11px]">{WEEKDAY_LABELS[dayIdx]}</p>
+                <p className="text-sm font-medium">{Number(date.split("-")[2])}</p>
+                {hours?.closed && (
+                  <p className={`text-[9px] ${isSelected ? "text-white/60" : "text-ink/30"}`}>휴무</p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {(() => {
+          const date = dateKeys[selectedDayIdx];
+          const hours = dayHours[date];
+          const holidayName = holidayMap[date];
+          if (hours?.closed) {
+            return (
+              <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-10 text-center text-ink/40 text-sm">
+                이 날은 휴무예요.
+              </div>
+            );
+          }
+          return (
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm divide-y divide-line/40 overflow-hidden">
+              {holidayName && (
+                <p className="px-4 py-2 text-xs text-coral/70 bg-coral/5">{holidayName}</p>
+              )}
+              {SCHEDULE_HOUR_ROWS.filter(
+                (hour) => hours && hour >= hours.start && hour < hours.end,
+              ).map((hour) =>
+                (effectiveCoaches.length > 0 ? effectiveCoaches : [null]).map((coach) => {
+                  const session = coach
+                    ? sessionMap.get(`${date}-${coach.id}-${hour}`)
+                    : undefined;
+                  return (
+                    <div
+                      key={`${coach?.id ?? "x"}-${hour}`}
+                      className="flex items-center gap-3 px-4 py-3"
+                    >
+                      <span className="w-12 shrink-0 text-xs text-ink/50">{hour}:00</span>
+                      {session ? (
+                        <button
+                          onClick={() => setEditTarget(session)}
+                          className={[
+                            "flex-1 rounded-lg border px-3 py-2 text-left text-sm",
+                            STATUS_STYLE[session.status],
+                          ].join(" ")}
+                        >
+                          <span className="font-medium">{session.member_name}</span>
+                          <span className="ml-2 text-xs opacity-70">
+                            {STATUS_LABEL[session.status]}
+                          </span>
+                          {showCoachLabel && (
+                            <span className="block text-[11px] opacity-60">{session.coach_name}</span>
+                          )}
+                        </button>
+                      ) : coach ? (
+                        <button
+                          onClick={() => setCreateTarget({ date, hour, coachId: coach.id })}
+                          className="flex-1 rounded-lg border border-dashed border-line px-3 py-2 text-left text-sm text-ink/30 hover:text-coral hover:border-coral transition"
+                        >
+                          + 예약 추가{showCoachLabel ? ` · ${coach.name}` : ""}
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                }),
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* 데스크톱: 그리드 */}
+      <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
         <div
           className="grid min-w-[720px]"
           style={{ gridTemplateColumns: `64px repeat(${dataColumns}, minmax(100px, 1fr))` }}

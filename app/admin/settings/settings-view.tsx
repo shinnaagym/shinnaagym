@@ -101,16 +101,16 @@ export function SettingsView({
             </div>
           ))}
         </div>
-        <div className="flex gap-2 mt-4">
+        <div className="flex flex-col sm:flex-row gap-2 mt-4">
           <input
             value={newCoachName}
             onChange={(e) => setNewCoachName(e.target.value)}
             placeholder="새 코치 이름"
-            className="flex-1 rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
+            className="flex-1 min-w-0 rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
           />
           <button
             onClick={addCoach}
-            className="rounded-full bg-ink text-white px-4 py-2 text-sm hover:bg-coral transition"
+            className="shrink-0 whitespace-nowrap rounded-full bg-ink text-white px-4 py-2 text-sm hover:bg-coral transition"
           >
             추가
           </button>
@@ -139,22 +139,22 @@ export function SettingsView({
             </div>
           ))}
         </div>
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 mt-4">
           <input
             type="date"
             value={newHolidayDate}
             onChange={(e) => setNewHolidayDate(e.target.value)}
-            className="rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
+            className="w-full sm:w-auto min-w-0 rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
           />
           <input
             value={newHolidayName}
             onChange={(e) => setNewHolidayName(e.target.value)}
             placeholder="이름 (예: 대체공휴일)"
-            className="flex-1 min-w-[140px] rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
+            className="flex-1 min-w-0 sm:min-w-[140px] rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
           />
           <button
             onClick={addHoliday}
-            className="rounded-full bg-ink text-white px-4 py-2 text-sm hover:bg-coral transition"
+            className="shrink-0 whitespace-nowrap rounded-full bg-ink text-white px-4 py-2 text-sm hover:bg-coral transition"
           >
             추가
           </button>

@@ -23,14 +23,14 @@ export function AdminNav() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-white/90 backdrop-blur">
-      <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between gap-4">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 sm:h-16 flex flex-wrap items-center justify-between gap-y-3 gap-x-4 sm:flex-nowrap">
         <Link href="/admin/schedule" className="flex items-center gap-2 shrink-0">
           <Image src="/logo.png" alt="신나아짐" width={271} height={341} className="h-7 w-auto" />
           <span className="font-display text-base text-ink hidden sm:inline">신나아짐</span>
           <span className="text-xs text-ink/40 hidden sm:inline">관리자</span>
         </Link>
 
-        <nav className="flex items-center gap-1 rounded-full bg-bone/70 p-1 overflow-x-auto">
+        <nav className="order-3 w-full sm:order-none sm:w-auto flex items-center gap-1 rounded-full bg-bone/70 p-1 overflow-x-auto">
           {TABS.map((tab) => {
             const active = pathname?.startsWith(tab.href);
             return (
@@ -38,7 +38,7 @@ export function AdminNav() {
                 key={tab.href}
                 href={tab.href}
                 className={[
-                  "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                  "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0",
                   active ? "bg-coral text-white shadow-sm" : "text-ink/60 hover:text-ink",
                 ].join(" ")}
               >
