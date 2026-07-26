@@ -20,8 +20,8 @@
   --color-sage: var(--color-sage);
   --color-bone: var(--color-bone);
   --color-line: var(--color-line);
-  --font-display: var(--font-gowun-batang);
-  --font-body: var(--font-ibm-plex-kr);
+  --font-display: var(--font-pretendard);
+  --font-body: var(--font-pretendard);
 }
 
 body {
@@ -31,7 +31,7 @@ body {
 }
 
 .font-display {
-  font-family: var(--font-display), "Noto Serif KR", serif;
+  font-family: var(--font-display), "Apple SD Gothic Neo", sans-serif;
 }
 
 @keyframes draw-pulse {
