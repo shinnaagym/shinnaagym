@@ -33,6 +33,7 @@ const TRAINER_EDUCATION = [
   "도수치료 및 카이로프랙틱(MTA) 교육 이수",
   "만성통증 중재 교육(Hello Pain) 이수",
   "러닝 피지오 교육 이수",
+  "근골격계 운동치료(EMP) 교육 이수",
 ];
 
 const STUDIO_ADDRESS = "충청북도 청주시 흥덕구 서현로32 210,211호";
@@ -91,21 +92,26 @@ export default async function Home() {
             Pre-Open Reservation
           </p>
           <h1 className="hero-fade-2 font-display text-4xl sm:text-7xl leading-[1.25] sm:leading-[1.15] tracking-tight mb-8">
-            내 몸이 나아지고, 운동이 신나는 공간,
+            내 몸이 나아지고,
             <br />
-            신나아짐에서 시작합니다
+            운동이 신나는 공간.
+            <br />
+            신나아짐에서 시작됩니다.
           </h1>
           <p className="hero-fade-3 max-w-xl text-bone/80 leading-relaxed mb-3">
             물리치료사가 설계하는 프리미엄 PT, 신나아짐이 곧 문을 엽니다.
             오픈에 앞서 가장 먼저 예약하고 첫 회원이 되어주세요.
           </p>
-          <p className="hero-fade-3 max-w-xl text-sm text-sage leading-relaxed mb-12">
-            1. 전 직원 물리치료사 출신 · 2. 100% 프라이빗 회원 전용 공간 · 3. 1:1 맞춤
-            기능성 트레이닝 · 4. 아픈 몸 재활부터 완벽한 운동 자립까지!
-            <br />
-            개인마다 다른 체형과 불균형. 획일화된 머신이 아닌 맨몸과 프리웨이트로 진짜
-            내 몸을 통제하는 능력을 키워드립니다.
-          </p>
+          <div className="hero-fade-3 max-w-xl text-sm text-sage leading-relaxed mb-12 space-y-1.5">
+            <p>1. 전 직원 물리치료사 출신</p>
+            <p>2. 100% 프라이빗 회원 전용 공간</p>
+            <p>3. 1:1 맞춤 기능성 트레이닝</p>
+            <p>4. 아픈 몸 재활부터 완벽한 운동 자립까지!</p>
+            <p className="pt-1.5">
+              개인마다 다른 체형과 불균형. 획일화된 머신이 아닌 맨몸과 프리웨이트로
+              진짜 내 몸을 통제하는 능력을 키워드립니다.
+            </p>
+          </div>
           <div className="hero-fade-4">
             <PulseLine className="w-full max-w-xl h-16 text-gold" />
             <a
