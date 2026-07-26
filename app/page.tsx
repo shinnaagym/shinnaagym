@@ -7,6 +7,36 @@ import { getTakenSlots } from "@/lib/reservations";
 // 예약 현황(DB)에 따라 매 요청마다 달라지므로 정적 프리렌더링을 끈다.
 export const dynamic = "force-dynamic";
 
+const TRAINER_NAME = "신종수";
+const TRAINER_BIO =
+  "청주·파주·서울의 재활의학과와 정형외과에서 임상 경험을 쌓아온 물리치료사입니다. " +
+  "근골격계·스포츠 재활, 도수치료, 만성통증 관리까지 폭넓게 교육을 이수하며 몸의 문제를 " +
+  "근본부터 짚어내는 방식을 고민해왔습니다. 신나아짐에서는 그 경험을 바탕으로 회원님 " +
+  "한 분 한 분에게 맞는 운동을 처방합니다.";
+
+const TRAINER_QUALIFICATIONS = ["보건복지부 물리치료사 면허", "생활체육지도자 보디빌딩 2급"];
+
+const TRAINER_CAREER = [
+  "前 청주 연세재활의학과 물리치료사",
+  "前 파주 야당연세정형외과 물리치료사",
+  "前 서울 랄라짐 트레이너",
+  "前 청주 서울드림정형외과 물리치료사",
+  "前 오송 퍼스트피지오짐 팀장",
+];
+
+const TRAINER_EDUCATION = [
+  "근골격계 재활 전문가(MRS) 교육 이수",
+  "근신경계 기능적 재교육(NFR) 교육 이수",
+  "운동분석 기반 근골격계 관리 솔루션(KEMA) 교육 이수",
+  "스포츠 재활 운동 교육(Sport Physio) 이수",
+  "근골격계 및 스포츠 재활(Personal Physio) 교육 이수",
+  "도수치료 및 카이로프랙틱(MTA) 교육 이수",
+  "만성통증 중재 교육(Hello Pain) 이수",
+  "러닝 피지오 교육 이수",
+];
+
+const STUDIO_ADDRESS = "충청북도 청주시 흥덕구 서현로32 210,211호";
+
 // 실제 내원 순서 그대로 — 순서 자체가 정보라 번호를 붙일 근거가 있다.
 const PROCESS_STEPS = [
   {
@@ -88,7 +118,67 @@ export default async function Home() {
       </header>
 
       <main className="flex-1">
-        <section className="mx-auto max-w-5xl px-6 py-20">
+        <section id="trainer" className="mx-auto max-w-5xl px-6 py-20">
+          <Reveal>
+            <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
+              Our Trainer
+            </p>
+            <h2 className="font-display text-3xl mb-14">트레이너 소개</h2>
+          </Reveal>
+          <div className="grid gap-10 sm:grid-cols-[280px_1fr] items-start">
+            <Reveal>
+              <Image
+                src="/trainer-shinjongsu.jpg"
+                alt={`물리치료사 ${TRAINER_NAME}`}
+                width={472}
+                height={692}
+                className="w-full max-w-[280px] mx-auto sm:max-w-none rounded-2xl shadow-lg"
+              />
+            </Reveal>
+            <Reveal delayMs={100}>
+              <p className="font-display text-2xl mb-1">{TRAINER_NAME}</p>
+              <p className="text-xs tracking-[0.15em] text-gold uppercase mb-5">
+                Physical Therapist
+              </p>
+              <p className="text-ink/70 leading-relaxed mb-8">{TRAINER_BIO}</p>
+
+              <div className="grid gap-8 sm:grid-cols-2 mb-8">
+                <div>
+                  <p className="font-medium text-sm mb-2.5">자격</p>
+                  <ul className="space-y-1.5 text-sm text-ink/70">
+                    {TRAINER_QUALIFICATIONS.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-medium text-sm mb-2.5">경력</p>
+                  <ul className="space-y-1.5 text-sm text-ink/70">
+                    {TRAINER_CAREER.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-medium text-sm mb-2.5">이수 교육</p>
+                <div className="flex flex-wrap gap-2">
+                  {TRAINER_EDUCATION.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full bg-bone px-3 py-1.5 text-xs text-ink/70"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-5xl px-6 py-20 border-t border-line">
           <Reveal>
             <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
               How It Works
@@ -133,16 +223,62 @@ export default async function Home() {
             <ReservationForm initialTaken={initialTaken} />
           </div>
         </section>
+
+        <section id="location" className="border-t border-line">
+          <div className="mx-auto max-w-5xl px-6 py-20">
+            <Reveal>
+              <PulseLine className="w-24 h-8 text-gold/70 mb-6" />
+              <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
+                Location
+              </p>
+              <h2 className="font-display text-3xl mb-3">오시는 길</h2>
+              <p className="text-ink/70 mb-10 leading-relaxed">
+                {STUDIO_ADDRESS}
+                <br />
+                문의 · <span className="text-gold font-medium">010-6859-6114</span>
+              </p>
+            </Reveal>
+            <Reveal delayMs={100}>
+              <div className="grid gap-6 sm:grid-cols-[1fr_1.3fr] items-stretch">
+                <div className="rounded-2xl bg-bone/50 border border-line p-6 flex flex-col justify-between">
+                  <div>
+                    <p className="font-display text-lg mb-2">신나아짐 PT</p>
+                    <p className="text-sm text-ink/70 leading-relaxed">{STUDIO_ADDRESS}</p>
+                  </div>
+                  <a
+                    href={`https://map.naver.com/p/search/${encodeURIComponent(STUDIO_ADDRESS)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 inline-flex items-center gap-1.5 text-sm text-gold font-medium hover:underline"
+                  >
+                    네이버 지도에서 길찾기
+                    <span aria-hidden="true">→</span>
+                  </a>
+                </div>
+                <div className="rounded-2xl overflow-hidden border border-line h-64 sm:h-auto">
+                  <iframe
+                    title="신나아짐 위치 지도"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(STUDIO_ADDRESS)}&z=16&output=embed`}
+                    className="w-full h-full grayscale-[15%]"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
       </main>
 
       <footer className="border-t border-line">
         <div className="mx-auto max-w-5xl px-6 py-12 text-sm text-ink/60 flex flex-col gap-2">
           <p className="font-display text-base text-ink">신나아짐</p>
           <p>전 직원 물리치료사 면허 보유 · 프리미엄 PT 스튜디오</p>
+          <p>{STUDIO_ADDRESS}</p>
           <p>
             문의 · <span className="text-gold font-medium">010-6859-6114</span>
           </p>
-          <p>정확한 위치와 오픈일은 사전예약해주신 분들께 가장 먼저 안내드릴게요.</p>
+          <p>정확한 오픈일은 사전예약해주신 분들께 가장 먼저 안내드릴게요.</p>
         </div>
       </footer>
     </>
