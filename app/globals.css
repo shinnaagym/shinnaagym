@@ -4,6 +4,9 @@
   --color-ink: #16241f;
   --color-paper: #f6f1e7;
   --color-coral: #e2734f;
+  /* 로고의 실제 금색 픽셀에서 추출한 톤. 사전예약 폼(코랄)과는 분리된,
+     홈페이지 전용 시그니처 액센트 — 브랜드 마크와 직접 이어지도록 한다. */
+  --color-gold: #9c7238;
   --color-sage: #7fa694;
   --color-bone: #f3ecdd;
   --color-line: #d9cfb8;
@@ -13,6 +16,7 @@
   --color-ink: var(--color-ink);
   --color-paper: var(--color-paper);
   --color-coral: var(--color-coral);
+  --color-gold: var(--color-gold);
   --color-sage: var(--color-sage);
   --color-bone: var(--color-bone);
   --color-line: var(--color-line);
