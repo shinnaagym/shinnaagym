@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getActiveMemberCountsByCoach, listCoaches, listHolidays } from "@/lib/schedule";
-import { AdminNav } from "../admin-nav";
 import { SettingsView } from "./settings-view";
 
 export default async function AdminSettingsPage() {
@@ -16,17 +15,12 @@ export default async function AdminSettingsPage() {
   ]);
 
   return (
-    <>
-      <AdminNav />
-      <main className="flex-1 bg-[#f7f8fa]">
-        <div className="mx-auto max-w-4xl px-6 py-8">
-          <SettingsView
-            initialCoaches={coaches}
-            initialHolidays={holidays}
-            memberCounts={memberCounts}
-          />
-        </div>
-      </main>
-    </>
+    <div className="mx-auto max-w-4xl px-6 py-8">
+      <SettingsView
+        initialCoaches={coaches}
+        initialHolidays={holidays}
+        memberCounts={memberCounts}
+      />
+    </div>
   );
 }

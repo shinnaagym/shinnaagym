@@ -8,7 +8,6 @@ import {
   listMembersWithProgress,
   listSessionsInRange,
 } from "@/lib/schedule";
-import { AdminNav } from "../admin-nav";
 import { ScheduleGrid } from "./schedule-grid";
 
 export default async function AdminSchedulePage({
@@ -41,23 +40,18 @@ export default async function AdminSchedulePage({
   );
 
   return (
-    <>
-      <AdminNav />
-      <main className="flex-1 bg-[#f7f8fa]">
-        <div className="mx-auto max-w-6xl px-6 py-8">
-          <ScheduleGrid
-            key={weekStart}
-            weekStart={weekStart}
-            dateKeys={dateKeys}
-            today={today}
-            coaches={coaches.filter((c) => c.active)}
-            members={members.filter((m) => m.status === "active")}
-            initialSessions={sessions}
-            dayHours={dayHours}
-            holidayMap={holidayMap}
-          />
-        </div>
-      </main>
-    </>
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <ScheduleGrid
+        key={weekStart}
+        weekStart={weekStart}
+        dateKeys={dateKeys}
+        today={today}
+        coaches={coaches.filter((c) => c.active)}
+        members={members.filter((m) => m.status === "active")}
+        initialSessions={sessions}
+        dayHours={dayHours}
+        holidayMap={holidayMap}
+      />
+    </div>
   );
 }
