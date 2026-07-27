@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CoachRow, MemberStatus, PackageRow, PtType } from "@/lib/db";
-import type { MemberWithProgress } from "@/lib/schedule";
+import type { FixedSlotWithMember, MemberWithProgress } from "@/lib/schedule";
+import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 
 const PT_TYPE_OPTIONS: PtType[] = ["1:1", "2:1"];
+const FIXED_SLOT_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토"];
+const FIXED_SLOT_CAPACITY = 3;
 
 type SessionSummary = {
   id: number;
@@ -86,11 +89,14 @@ function PtTypeToggle({
 export function MembersView({
   initialMembers,
   coaches,
+  initialFixedSlots,
 }: {
   initialMembers: MemberWithProgress[];
   coaches: CoachRow[];
+  initialFixedSlots: FixedSlotWithMember[];
 }) {
   const members = initialMembers;
+  const fixedSlots = initialFixedSlots;
   const activeCoaches = useMemo(() => coaches.filter((c) => c.active), [coaches]);
   const [search, setSearch] = useState("");
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
@@ -219,6 +225,19 @@ export function MembersView({
                       </span>
                     )}
                   </div>
+                  <div className="mt-2 flex items-center gap-1.5 text-xs">
+                    <span
+                      className={[
+                        "flex h-4 w-4 items-center justify-center rounded border",
+                        m.has_next_week_session
+                          ? "border-sage bg-sage text-white"
+                          : "border-line text-transparent",
+                      ].join(" ")}
+                    >
+                      ✓
+                    </span>
+                    <span className="text-ink/50">다음주 수업 예약</span>
+                  </div>
                 </button>
               );
             })}
@@ -235,6 +254,7 @@ export function MembersView({
                   <th className="px-5 py-3 font-medium">잔여</th>
                   <th className="px-5 py-3 font-medium">초/재</th>
                   <th className="px-5 py-3 font-medium">상태</th>
+                  <th className="px-5 py-3 font-medium text-center">다음주</th>
                 </tr>
               </thead>
               <tbody>
@@ -298,6 +318,19 @@ export function MembersView({
                           {m.status === "active" ? "활성" : "비활성"}
                         </span>
                       </td>
+                      <td className="px-5 py-3 text-center">
+                        <span
+                          className={[
+                            "inline-flex h-4 w-4 items-center justify-center rounded border text-xs",
+                            m.has_next_week_session
+                              ? "border-sage bg-sage text-white"
+                              : "border-line text-transparent",
+                          ].join(" ")}
+                          title={m.has_next_week_session ? "다음주 수업 예약됨" : "다음주 예약 없음"}
+                        >
+                          ✓
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}
@@ -306,6 +339,8 @@ export function MembersView({
           </div>
         </>
       )}
+
+      <FixedSlotSchedule fixedSlots={fixedSlots} />
 
       {showCreate && (
         <CreateMemberModal
@@ -323,10 +358,85 @@ export function MembersView({
           memberId={detailId}
           coaches={coaches}
           activeCoaches={activeCoaches}
+          fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
           onClose={() => setDetailId(null)}
           onChanged={refresh}
         />
       )}
+    </div>
+  );
+}
+
+function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }) {
+  const byCell = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const slot of fixedSlots) {
+      const key = `${slot.weekday}-${slot.hour}`;
+      const names = map.get(key) ?? [];
+      names.push(slot.member_name);
+      map.set(key, names);
+    }
+    return map;
+  }, [fixedSlots]);
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center gap-2 mb-1">
+        <p className="font-display text-lg">고정 회원 시간표</p>
+        <span className="text-xs text-ink/40">시간대별 고정 회원 배정 현황</span>
+      </div>
+      <p className="text-xs text-ink/40 mb-3">
+        한 시간대에 {FIXED_SLOT_CAPACITY}명을 초과하면 붉은색으로 표시돼요.
+      </p>
+      <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
+        <table className="w-full text-xs min-w-[720px] border-collapse">
+          <thead>
+            <tr className="text-left text-ink/50 border-b border-line/60">
+              <th className="px-3 py-2.5 font-medium w-14">시간</th>
+              {FIXED_SLOT_WEEKDAY_LABELS.map((label) => (
+                <th key={label} className="px-3 py-2.5 font-medium text-center">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {SCHEDULE_HOUR_ROWS.map((hour) => (
+              <tr key={hour} className="border-b border-line/30 last:border-0">
+                <td className="px-3 py-2.5 text-ink/50 whitespace-nowrap">{hour}시</td>
+                {FIXED_SLOT_WEEKDAY_LABELS.map((_, weekday) => {
+                  const names = byCell.get(`${weekday}-${hour}`) ?? [];
+                  const over = names.length > FIXED_SLOT_CAPACITY;
+                  return (
+                    <td key={weekday} className="px-3 py-2.5 align-top">
+                      {names.length > 0 && (
+                        <div
+                          className={[
+                            "flex flex-wrap gap-1 rounded-lg px-1.5 py-1",
+                            over ? "bg-red-50" : "",
+                          ].join(" ")}
+                        >
+                          {names.map((name, i) => (
+                            <span
+                              key={`${name}-${i}`}
+                              className={[
+                                "rounded-full px-1.5 py-0.5 whitespace-nowrap",
+                                over ? "bg-red-100 text-red-600" : "bg-sage/15 text-ink/70",
+                              ].join(" ")}
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -490,15 +600,46 @@ function MemberDetailModal({
   memberId,
   coaches,
   activeCoaches,
+  fixedSlots,
   onClose,
   onChanged,
 }: {
   memberId: number;
   coaches: CoachRow[];
   activeCoaches: CoachRow[];
+  fixedSlots: FixedSlotWithMember[];
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const [newSlotWeekday, setNewSlotWeekday] = useState(0);
+  const [newSlotHour, setNewSlotHour] = useState(SCHEDULE_HOUR_ROWS[0]);
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [savingSlot, setSavingSlot] = useState(false);
+
+  async function addSlot() {
+    setSavingSlot(true);
+    setSlotError(null);
+    try {
+      const res = await fetch("/api/admin/fixed-slots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, weekday: newSlotWeekday, hour: newSlotHour }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setSlotError(d.error ?? "추가에 실패했습니다.");
+        return;
+      }
+      onChanged();
+    } finally {
+      setSavingSlot(false);
+    }
+  }
+
+  async function removeSlot(id: number) {
+    await fetch(`/api/admin/fixed-slots/${id}`, { method: "DELETE" });
+    onChanged();
+  }
   const [data, setData] = useState<{
     member: MemberDetail;
     progress: { totalSessions: number; doneCount: number; remaining: number };
@@ -789,6 +930,62 @@ function MemberDetailModal({
               className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
             />
           </Field>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium mb-2">고정 시간대</p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {fixedSlots.length === 0 && (
+              <p className="text-xs text-ink/40">등록된 고정 시간대가 없어요.</p>
+            )}
+            {fixedSlots.map((slot) => (
+              <span
+                key={slot.id}
+                className="flex items-center gap-1 rounded-full bg-bone/70 px-2.5 py-1 text-xs"
+              >
+                {FIXED_SLOT_WEEKDAY_LABELS[slot.weekday] ?? "?"} {slot.hour}시
+                <button
+                  onClick={() => removeSlot(slot.id)}
+                  className="text-ink/40 hover:text-coral"
+                  aria-label="삭제"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={newSlotWeekday}
+              onChange={(e) => setNewSlotWeekday(Number(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
+            >
+              {FIXED_SLOT_WEEKDAY_LABELS.map((label, idx) => (
+                <option key={label} value={idx}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={newSlotHour}
+              onChange={(e) => setNewSlotHour(Number(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
+            >
+              {SCHEDULE_HOUR_ROWS.map((hour) => (
+                <option key={hour} value={hour}>
+                  {hour}시
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={addSlot}
+              disabled={savingSlot}
+              className="flex-1 rounded-lg border border-coral text-coral text-sm font-medium hover:bg-coral/5 transition disabled:opacity-50"
+            >
+              추가
+            </button>
+          </div>
+          {slotError && <p className="text-xs text-coral mt-1">{slotError}</p>}
         </div>
 
         <div>

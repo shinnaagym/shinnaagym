@@ -3,6 +3,7 @@ import { query } from "./db";
 import type {
   ClassSessionRow,
   CoachRow,
+  FixedSlotRow,
   HolidayRow,
   MemberRow,
   MemberStatus,
@@ -193,14 +194,19 @@ export interface MemberWithProgress extends MemberRow {
   total_sessions: number;
   done_count: number;
   package_count: number;
+  has_next_week_session: boolean;
 }
 
-export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
+export async function listMembersWithProgress(
+  nextWeekStart?: string,
+  nextWeekEnd?: string,
+): Promise<MemberWithProgress[]> {
   const result = await query<MemberWithProgress>(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
        COALESCE(s.done, 0)::int as done_count,
-       COALESCE(p.pkg_count, 0)::int as package_count
+       COALESCE(p.pkg_count, 0)::int as package_count,
+       (nw.member_id IS NOT NULL) as has_next_week_session
      FROM members m
      LEFT JOIN (
        SELECT member_id, SUM(total_sessions) as total, COUNT(*) as pkg_count
@@ -210,9 +216,58 @@ export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
        SELECT member_id, COUNT(*) as done FROM class_sessions
        WHERE status IN ('completed', 'no_show') GROUP BY member_id
      ) s ON s.member_id = m.id
+     LEFT JOIN (
+       SELECT DISTINCT member_id FROM class_sessions
+       WHERE entry_type = 'session' AND status <> 'cancelled'
+         AND session_date >= $1 AND session_date <= $2
+     ) nw ON nw.member_id = m.id
      ORDER BY m.name ASC`,
+    [nextWeekStart ?? "9999-12-31", nextWeekEnd ?? "9999-12-31"],
   );
   return result.rows;
+}
+
+// ---- 고정 시간대 ----
+
+export interface FixedSlotWithMember extends FixedSlotRow {
+  member_name: string;
+}
+
+export async function listFixedSlots(): Promise<FixedSlotWithMember[]> {
+  const result = await query<FixedSlotWithMember>(
+    `SELECT f.*, m.name as member_name
+     FROM fixed_slots f
+     JOIN members m ON m.id = f.member_id
+     ORDER BY f.weekday ASC, f.hour ASC, m.name ASC`,
+  );
+  return result.rows;
+}
+
+export async function listFixedSlotsByMember(memberId: number): Promise<FixedSlotRow[]> {
+  const result = await query<FixedSlotRow>(
+    `SELECT * FROM fixed_slots WHERE member_id = $1 ORDER BY weekday ASC, hour ASC`,
+    [memberId],
+  );
+  return result.rows;
+}
+
+export async function addFixedSlot(
+  memberId: number,
+  weekday: number,
+  hour: number,
+): Promise<FixedSlotRow> {
+  const result = await query<FixedSlotRow>(
+    `INSERT INTO fixed_slots (member_id, weekday, hour)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (member_id, weekday, hour) DO UPDATE SET member_id = EXCLUDED.member_id
+     RETURNING *`,
+    [memberId, weekday, hour],
+  );
+  return result.rows[0];
+}
+
+export async function removeFixedSlot(id: number): Promise<void> {
+  await query(`DELETE FROM fixed_slots WHERE id = $1`, [id]);
 }
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {

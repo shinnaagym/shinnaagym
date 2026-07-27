@@ -141,6 +141,15 @@ function ensureSchema(): Promise<void> {
           UNIQUE (coach_id, session_date, session_hour)
         );
 
+        CREATE TABLE IF NOT EXISTS fixed_slots (
+          id SERIAL PRIMARY KEY,
+          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          weekday INTEGER NOT NULL, -- 0=월 ... 6=일
+          hour INTEGER NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE (member_id, weekday, hour)
+        );
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -246,6 +255,14 @@ export interface PackageRow {
   purchased_at: string;
   note: string;
   pt_type: PtType;
+}
+
+export interface FixedSlotRow {
+  id: number;
+  member_id: number;
+  weekday: number;
+  hour: number;
+  created_at: string;
 }
 
 export type SessionStatus = "reserved" | "completed" | "no_show" | "cancelled";
