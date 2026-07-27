@@ -1,9 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CoachRow, MemberStatus, PackageRow, PaymentMethod, PtType, VisitChannel } from "@/lib/db";
+import type {
+  CoachRow,
+  ContractRow,
+  MemberStatus,
+  PackageRow,
+  PaymentMethod,
+  PtType,
+  VisitChannel,
+} from "@/lib/db";
 import type { FixedSlotWithMember, MemberWithProgress } from "@/lib/schedule";
 import { PURPOSE_OPTIONS, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+import { ContractDocument } from "@/app/components/ContractDocument";
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
 
 const PT_TYPE_OPTIONS: PtType[] = ["1:1", "2:1"];
 const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = ["card", "transfer"];
@@ -992,6 +1006,76 @@ function WriteContractModal({
   );
 }
 
+function ContractViewModal({
+  memberId,
+  onClose,
+}: {
+  memberId: number;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<{
+    member: { name: string; phone: string };
+    contract: ContractRow & { rrn_front: string };
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/admin/members/${memberId}/contract`)
+      .then(async (res) => {
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(d.error ?? "계약서를 불러오지 못했어요.");
+          return;
+        }
+        setData(d);
+      })
+      .catch(() => setError("네트워크 오류가 발생했어요."));
+  }, [memberId]);
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-ink/40 px-4 overflow-y-auto py-8">
+      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl p-6 sm:p-10 my-auto">
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-display text-lg">계약서</p>
+          <button onClick={onClose} className="text-ink/40 hover:text-ink text-xl leading-none">
+            ×
+          </button>
+        </div>
+        {error && <p className="text-sm text-coral">{error}</p>}
+        {!data && !error && <p className="text-sm text-ink/50">불러오는 중...</p>}
+        {data && (
+          <ContractDocument
+            memberName={data.member.name}
+            memberPhone={data.member.phone}
+            contract={data.contract}
+          >
+            {data.contract.signed_at ? (
+              <div className="rounded-2xl border border-sage/40 bg-sage/10 px-6 py-6">
+                <p className="font-display text-lg mb-3">회원 서명</p>
+                {data.contract.signature_data_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={data.contract.signature_data_url}
+                    alt="회원 서명"
+                    className="h-32 rounded-lg border border-line bg-white"
+                  />
+                )}
+                <p className="text-xs text-ink/50 mt-2">
+                  {formatDateTime(data.contract.signed_at)} 서명 완료
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-line bg-bone/40 px-6 py-6 text-sm text-ink/60">
+                아직 회원이 서명하지 않았어요. 회원 개인 페이지에서 서명할 수 있어요.
+              </div>
+            )}
+          </ContractDocument>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MemberDetailModal({
   memberId,
   coaches,
@@ -1012,6 +1096,7 @@ function MemberDetailModal({
   const [slotError, setSlotError] = useState<string | null>(null);
   const [savingSlot, setSavingSlot] = useState(false);
   const [showWriteContract, setShowWriteContract] = useState(false);
+  const [showContractView, setShowContractView] = useState(false);
 
   async function addSlot() {
     if (!data?.member.coach_id) {
@@ -1263,14 +1348,15 @@ function MemberDetailModal({
             {data.progress.remaining}회)
           </span>
           {data.contract ? (
-            <span
+            <button
+              onClick={() => setShowContractView(true)}
               className={[
-                "rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+                "rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap transition hover:opacity-80",
                 data.contract.signedAt ? "bg-sage/20 text-sage" : "bg-coral/10 text-coral",
               ].join(" ")}
             >
-              계약서 {data.contract.signedAt ? "서명완료" : "서명대기"}
-            </span>
+              계약서 {data.contract.signedAt ? "서명완료" : "서명대기"} · 보기
+            </button>
           ) : (
             data.packages.length > 0 && (
               <button
@@ -1609,6 +1695,9 @@ function MemberDetailModal({
           onClose();
         }}
       />
+    )}
+    {showContractView && (
+      <ContractViewModal memberId={memberId} onClose={() => setShowContractView(false)} />
     )}
     </>
   );
