@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { query, UNIQUE_VIOLATION } from "./db";
 import type {
   ClassSessionRow,
@@ -16,29 +17,39 @@ import { scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
 
-export async function listCoaches(activeOnly = false): Promise<CoachRow[]> {
-  const result = await query<CoachRow>(
-    activeOnly
-      ? `SELECT * FROM coaches WHERE active = true ORDER BY id ASC`
-      : `SELECT * FROM coaches ORDER BY id ASC`,
-  );
-  return result.rows;
-}
+// 코치 목록은 거의 바뀌지 않는 참조성 데이터라, 관리자 페이지를 오갈 때마다
+// 매번 다시 조회하지 않도록 캐싱한다. 실제로 코치 정보가 바뀌면(추가/재직상태/
+// 연락처 변경) 아래 mutate 함수들이 즉시 revalidateTag로 캐시를 무효화한다.
+export const listCoaches = unstable_cache(
+  async (activeOnly = false): Promise<CoachRow[]> => {
+    const result = await query<CoachRow>(
+      activeOnly
+        ? `SELECT * FROM coaches WHERE active = true ORDER BY id ASC`
+        : `SELECT * FROM coaches ORDER BY id ASC`,
+    );
+    return result.rows;
+  },
+  ["list-coaches"],
+  { tags: ["coaches"], revalidate: 300 },
+);
 
 export async function addCoach(name: string, phone = ""): Promise<CoachRow> {
   const result = await query<CoachRow>(
     `INSERT INTO coaches (name, phone) VALUES ($1, $2) RETURNING *`,
     [name, phone],
   );
+  revalidateTag("coaches", { expire: 0 });
   return result.rows[0];
 }
 
 export async function setCoachActive(id: number, active: boolean): Promise<void> {
   await query(`UPDATE coaches SET active = $2 WHERE id = $1`, [id, active]);
+  revalidateTag("coaches", { expire: 0 });
 }
 
 export async function setCoachPhone(id: number, phone: string): Promise<void> {
   await query(`UPDATE coaches SET phone = $2 WHERE id = $1`, [id, phone]);
+  revalidateTag("coaches", { expire: 0 });
 }
 
 /** 코치별 담당 활성 회원 수 (퇴사 처리 전 경고용). */
@@ -53,12 +64,17 @@ export async function getActiveMemberCountsByCoach(): Promise<Record<number, num
 
 // ---- 공휴일 ----
 
-export async function listHolidays(): Promise<HolidayRow[]> {
-  const result = await query<HolidayRow>(
-    `SELECT * FROM holidays ORDER BY holiday_date ASC`,
-  );
-  return result.rows;
-}
+// 공휴일도 코치 목록과 마찬가지로 자주 바뀌지 않는 참조성 데이터라 캐싱한다.
+export const listHolidays = unstable_cache(
+  async (): Promise<HolidayRow[]> => {
+    const result = await query<HolidayRow>(
+      `SELECT * FROM holidays ORDER BY holiday_date ASC`,
+    );
+    return result.rows;
+  },
+  ["list-holidays"],
+  { tags: ["holidays"], revalidate: 300 },
+);
 
 export async function addHoliday(date: string, name: string): Promise<void> {
   await query(
@@ -66,10 +82,12 @@ export async function addHoliday(date: string, name: string): Promise<void> {
      ON CONFLICT (holiday_date) DO UPDATE SET name = EXCLUDED.name`,
     [date, name],
   );
+  revalidateTag("holidays", { expire: 0 });
 }
 
 export async function removeHoliday(date: string): Promise<void> {
   await query(`DELETE FROM holidays WHERE holiday_date = $1`, [date]);
+  revalidateTag("holidays", { expire: 0 });
 }
 
 /** dateKey(YYYY-MM-DD) 요일 + 공휴일 여부를 반영한 실제 운영시간. */
