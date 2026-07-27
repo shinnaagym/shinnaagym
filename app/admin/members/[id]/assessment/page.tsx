@@ -4,6 +4,7 @@ import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listAssessmentsByMember } from "@/lib/assessments";
 import { findMovementLabel } from "@/lib/assessment-movements";
+import { AssessmentPainChart } from "./pain-chart";
 import type { AssessmentRow } from "@/lib/db";
 
 function formatDateTime(iso: string): string {
@@ -66,6 +67,8 @@ export default async function AssessmentHistoryPage({
           아직 작성된 평가가 없어요.
         </div>
       ) : (
+        <>
+        <AssessmentPainChart assessments={assessments} />
         <ul className="space-y-2">
           {assessments.map((a) => {
             const flagged = flaggedMovementSummaries(a);
@@ -104,6 +107,7 @@ export default async function AssessmentHistoryPage({
             );
           })}
         </ul>
+        </>
       )}
     </div>
   );
