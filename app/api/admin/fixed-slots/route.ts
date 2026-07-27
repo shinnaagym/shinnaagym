@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
-import { addFixedSlot, listFixedSlots } from "@/lib/schedule";
+import { addFixedSlotWithBackfill, listFixedSlots } from "@/lib/schedule";
 
 export async function GET() {
   if (!(await isAdminAuthed())) {
@@ -31,6 +31,11 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  const slot = await addFixedSlot(memberId, weekday, hour);
-  return NextResponse.json({ slot }, { status: 201 });
+  try {
+    const result = await addFixedSlotWithBackfill(memberId, weekday, hour);
+    return NextResponse.json(result, { status: 201 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "고정 시간대 추가 중 오류가 발생했습니다.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }
