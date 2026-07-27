@@ -152,6 +152,22 @@ function ensureSchema(): Promise<void> {
           UNIQUE (member_id, weekday, hour)
         );
 
+        CREATE TABLE IF NOT EXISTS assessments (
+          id SERIAL PRIMARY KEY,
+          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          evaluator_name TEXT NOT NULL DEFAULT '',
+          evaluated_at TEXT NOT NULL DEFAULT '',
+          movements JSONB NOT NULL DEFAULT '{}'::jsonb,
+          core_note TEXT NOT NULL DEFAULT '',
+          squat_note TEXT NOT NULL DEFAULT '',
+          overhead_squat_note TEXT NOT NULL DEFAULT '',
+          pushup_note TEXT NOT NULL DEFAULT '',
+          hip_hinge_note TEXT NOT NULL DEFAULT '',
+          pain_trigger_note TEXT NOT NULL DEFAULT '',
+          pain_scale INTEGER,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
         CREATE TABLE IF NOT EXISTS contracts (
           id SERIAL PRIMARY KEY,
           member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
@@ -320,6 +336,31 @@ export interface ContractRow {
   privacy_consent: boolean;
   signature_data_url: string | null;
   signed_at: string | null;
+  created_at: string;
+}
+
+export interface AssessmentMovementEntry {
+  romPassive: string;
+  romActive: string;
+  strength: string;
+  compensation: string;
+}
+
+export type AssessmentMovements = Record<string, AssessmentMovementEntry>;
+
+export interface AssessmentRow {
+  id: number;
+  member_id: number;
+  evaluator_name: string;
+  evaluated_at: string;
+  movements: AssessmentMovements;
+  core_note: string;
+  squat_note: string;
+  overhead_squat_note: string;
+  pushup_note: string;
+  hip_hinge_note: string;
+  pain_trigger_note: string;
+  pain_scale: number | null;
   created_at: string;
 }
 

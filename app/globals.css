@@ -40,6 +40,12 @@ body {
   font-family: var(--font-gowun-batang), "Apple SD Gothic Neo", serif;
 }
 
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
 @keyframes draw-pulse {
   from {
     stroke-dashoffset: 620;

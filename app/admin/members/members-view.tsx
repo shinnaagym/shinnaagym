@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type {
   CoachRow,
   ContractRow,
@@ -1160,6 +1161,7 @@ function MemberDetailModal({
     packages: PackageRow[];
     sessions: SessionSummary[];
     contract: { id: number; entryType: string; signedAt: string | null } | null;
+    assessmentSummary: { count: number; latestAt: string | null };
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [addSessions, setAddSessions] = useState("");
@@ -1384,6 +1386,21 @@ function MemberDetailModal({
               </button>
             )
           )}
+        </div>
+
+        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm flex items-center justify-between gap-2">
+          <span>
+            체형 평가{" "}
+            {data.assessmentSummary.count > 0
+              ? `${data.assessmentSummary.count}건 · 최근 ${data.assessmentSummary.latestAt}`
+              : "기록 없음"}
+          </span>
+          <Link
+            href={`/admin/members/${memberId}/assessment`}
+            className="rounded-full border border-coral text-coral px-2.5 py-0.5 text-xs font-medium hover:bg-coral/5 transition whitespace-nowrap"
+          >
+            {data.assessmentSummary.count > 0 ? "이력 보기" : "+ 평가 작성"}
+          </Link>
         </div>
 
         <div>
