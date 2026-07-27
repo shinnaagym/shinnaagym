@@ -152,6 +152,7 @@ function ensureSchema(): Promise<void> {
           `
           ALTER TABLE class_sessions ALTER COLUMN member_id DROP NOT NULL;
           ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS entry_type TEXT NOT NULL DEFAULT 'session';
+          ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS pt_type TEXT NOT NULL DEFAULT '1:1';
           ALTER TABLE reservations ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id);
           ALTER TABLE reservations ADD COLUMN IF NOT EXISTS class_session_id INTEGER REFERENCES class_sessions(id);
           ALTER TABLE members ADD COLUMN IF NOT EXISTS referrer TEXT NOT NULL DEFAULT '';
@@ -245,6 +246,8 @@ export interface PackageRow {
 
 export type SessionStatus = "reserved" | "completed" | "no_show" | "cancelled";
 export type SessionEntryType = "session" | "consultation" | "memo" | "blocked";
+/** entry_type이 'session'일 때만 의미 있음: 1:1 PT인지 2:1 PT인지 구분. */
+export type PtType = "1:1" | "2:1";
 
 export interface ClassSessionRow {
   id: number;
@@ -255,5 +258,6 @@ export interface ClassSessionRow {
   status: SessionStatus;
   memo: string;
   entry_type: SessionEntryType;
+  pt_type: PtType;
   created_at: string;
 }

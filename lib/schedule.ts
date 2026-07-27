@@ -7,6 +7,7 @@ import type {
   MemberRow,
   MemberStatus,
   PackageRow,
+  PtType,
   SessionStatus,
 } from "./db";
 import { addDaysToKey, addMonthsToKey } from "./date";
@@ -369,10 +370,11 @@ export async function createSession(input: {
   hour: number;
   memo?: string;
   entryType?: "session" | "consultation" | "memo" | "blocked";
+  ptType?: PtType;
 }): Promise<ClassSessionRow> {
   const result = await query<ClassSessionRow>(
-    `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo, entry_type)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo, entry_type, pt_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
     [
       input.memberId,
       input.coachId,
@@ -380,6 +382,7 @@ export async function createSession(input: {
       input.hour,
       input.memo ?? "",
       input.entryType ?? "session",
+      input.ptType ?? "1:1",
     ],
   );
   return result.rows[0];
@@ -387,7 +390,7 @@ export async function createSession(input: {
 
 export async function updateSession(
   id: number,
-  input: { status?: SessionStatus; memo?: string; coachId?: number },
+  input: { status?: SessionStatus; memo?: string; coachId?: number; ptType?: PtType },
 ): Promise<void> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -404,6 +407,10 @@ export async function updateSession(
   if (input.coachId !== undefined) {
     fields.push(`coach_id = $${++i}`);
     values.push(input.coachId);
+  }
+  if (input.ptType !== undefined) {
+    fields.push(`pt_type = $${++i}`);
+    values.push(input.ptType);
   }
   if (fields.length === 0) return;
 

@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { addDaysToKey, mondayOfWeek } from "@/lib/date";
-import type { CoachRow, SessionEntryType, SessionStatus } from "@/lib/db";
+import type { CoachRow, PtType, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
 
@@ -17,6 +17,7 @@ type SessionWithMember = {
   status: SessionStatus;
   memo: string;
   entry_type: SessionEntryType;
+  pt_type: PtType;
   member_name: string | null;
   coach_name: string;
   ordinal: number | null;
@@ -50,6 +51,18 @@ const STATUS_LABEL: Record<SessionStatus, string> = {
   cancelled: "취소",
 };
 
+/** 코치별로 다른 색을 매기기 위한 팔레트. 코치 순서에 따라 순환한다. */
+const COACH_COLOR_PALETTE: Array<{ header: string; headerText: string; accent: string }> = [
+  { header: "bg-sky-100", headerText: "text-sky-700", accent: "border-l-sky-400" },
+  { header: "bg-rose-100", headerText: "text-rose-700", accent: "border-l-rose-400" },
+  { header: "bg-emerald-100", headerText: "text-emerald-700", accent: "border-l-emerald-400" },
+  { header: "bg-orange-100", headerText: "text-orange-700", accent: "border-l-orange-400" },
+  { header: "bg-indigo-100", headerText: "text-indigo-700", accent: "border-l-indigo-400" },
+  { header: "bg-cyan-100", headerText: "text-cyan-700", accent: "border-l-cyan-400" },
+  { header: "bg-fuchsia-100", headerText: "text-fuchsia-700", accent: "border-l-fuchsia-400" },
+  { header: "bg-lime-100", headerText: "text-lime-700", accent: "border-l-lime-400" },
+];
+
 /** 일정 pill의 배경/테두리 스타일. 상담·메모·수업불가는 상태와 무관하게 고정 톤을 쓴다(취소 제외). */
 function entryStyle(session: SessionWithMember): string {
   if (session.entry_type === "memo") return MEMO_STYLE;
@@ -67,6 +80,8 @@ function entryIcon(session: SessionWithMember): string {
       return "📝 ";
     case "blocked":
       return "🚫 ";
+    case "session":
+      return session.pt_type === "2:1" ? "👥 " : "";
     default:
       return "";
   }
@@ -139,6 +154,15 @@ export function ScheduleGrid({
   const visibleCoaches =
     coachFilter === "all" ? effectiveCoaches : effectiveCoaches.filter((c) => c.id === coachFilter);
 
+  /** 코치별 색상은 전체 코치 목록 기준 순서로 고정해, 필터링해도 같은 코치는 항상 같은 색을 쓴다. */
+  const coachColorMap = useMemo(() => {
+    const map = new Map<number, (typeof COACH_COLOR_PALETTE)[number]>();
+    coaches.forEach((c, i) => {
+      map.set(c.id, COACH_COLOR_PALETTE[i % COACH_COLOR_PALETTE.length]);
+    });
+    return map;
+  }, [coaches]);
+
   const sessionMap = useMemo(() => {
     const map = new Map<string, SessionWithMember>();
     for (const s of sessions) {
@@ -157,16 +181,22 @@ export function ScheduleGrid({
 
   const selectedDate = dateKeys[selectedDayIdx];
 
-  /** 선택한 날짜의 코치별 항목 유형 카운트 (하단 요약 표용). */
+  /** 선택한 날짜의 코치별 PT(1:1)/2:1/상담 카운트 (하단 요약 표용. 개인 일정·수업 불가는 제외). */
   const dailySummary = useMemo(() => {
-    const map = new Map<number, Record<SessionEntryType, number>>();
+    const map = new Map<number, { pt: number; pair: number; consultation: number }>();
     for (const coach of visibleCoaches) {
-      map.set(coach.id, { session: 0, consultation: 0, memo: 0, blocked: 0 });
+      map.set(coach.id, { pt: 0, pair: 0, consultation: 0 });
     }
     for (const s of sessions) {
       if (s.session_date !== selectedDate) continue;
       const counts = map.get(s.coach_id);
-      if (counts) counts[s.entry_type] += 1;
+      if (!counts) continue;
+      if (s.entry_type === "session") {
+        if (s.pt_type === "2:1") counts.pair += 1;
+        else counts.pt += 1;
+      } else if (s.entry_type === "consultation") {
+        counts.consultation += 1;
+      }
     }
     return map;
   }, [sessions, selectedDate, visibleCoaches]);
@@ -327,16 +357,25 @@ export function ScheduleGrid({
                   </p>
                 </div>
 
-                {/* 코치 이름 헤더 행 */}
+                {/* 코치 이름 헤더 행 (코치별 색상 적용) */}
                 <div className="border-b border-line/40 bg-bone/30" />
-                {visibleCoaches.map((c) => (
-                  <div
-                    key={c.id}
-                    className="border-b border-l border-line/40 bg-bone/30 px-2 py-2 text-center"
-                  >
-                    <p className="text-xs font-medium text-ink/70 truncate">{c.name}</p>
-                  </div>
-                ))}
+                {visibleCoaches.map((c) => {
+                  const palette = coachColorMap.get(c.id);
+                  return (
+                    <div
+                      key={c.id}
+                      className={[
+                        "border-b border-l-4 border-line/40 px-2 py-2 text-center",
+                        palette?.header ?? "bg-bone/30",
+                        palette?.accent ?? "",
+                      ].join(" ")}
+                    >
+                      <p className={`text-xs font-medium truncate ${palette?.headerText ?? "text-ink/70"}`}>
+                        {c.name}
+                      </p>
+                    </div>
+                  );
+                })}
 
                 {/* 시간 행들 — 코치 하나당 컬럼 하나 */}
                 {hourList.map((hour) => (
@@ -346,8 +385,15 @@ export function ScheduleGrid({
                     </div>
                     {visibleCoaches.map((coach) => {
                       const session = sessionMap.get(`${date}-${coach.id}-${hour}`);
+                      const palette = coachColorMap.get(coach.id);
                       return (
-                        <div key={coach.id} className="border-b border-l border-line/40 p-1">
+                        <div
+                          key={coach.id}
+                          className={[
+                            "border-b border-l-4 border-line/40 p-1",
+                            palette?.accent ?? "",
+                          ].join(" ")}
+                        >
                           {session ? (
                             <button
                               onClick={() => setEditTarget(session)}
@@ -416,12 +462,18 @@ export function ScheduleGrid({
                   </tr>
                 </thead>
                 <tbody>
-                  {(Object.keys(CATEGORY_LABELS) as SessionEntryType[]).map((type) => (
-                    <tr key={type} className="border-b border-line/40 last:border-0">
-                      <td className="px-3 py-2 text-ink/60">{CATEGORY_LABELS[type]}</td>
+                  {(
+                    [
+                      ["pt", "PT"],
+                      ["pair", "2:1"],
+                      ["consultation", "상담"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <tr key={key} className="border-b border-line/40 last:border-0">
+                      <td className="px-3 py-2 text-ink/60">{label}</td>
                       {visibleCoaches.map((c) => (
                         <td key={c.id} className="px-3 py-2 text-center text-ink/70">
-                          {dailySummary.get(c.id)?.[type] ?? 0}
+                          {dailySummary.get(c.id)?.[key] ?? 0}
                         </td>
                       ))}
                     </tr>
@@ -430,9 +482,7 @@ export function ScheduleGrid({
                     <td className="px-3 py-2">총합</td>
                     {visibleCoaches.map((c) => {
                       const counts = dailySummary.get(c.id);
-                      const sum = counts
-                        ? counts.session + counts.consultation + counts.memo + counts.blocked
-                        : 0;
+                      const sum = counts ? counts.pt + counts.pair + counts.consultation : 0;
                       return (
                         <td key={c.id} className="px-3 py-2 text-center">
                           {sum}
@@ -512,6 +562,7 @@ function CreateSessionModal({
   onCreated: () => void;
 }) {
   const [category, setCategory] = useState<SessionEntryType>("session");
+  const [ptType, setPtType] = useState<PtType>("1:1");
   const [selectedCoachId, setSelectedCoachId] = useState(coachId);
   const [showOtherCoachMembers, setShowOtherCoachMembers] = useState(false);
   const [memberId, setMemberId] = useState<number | "">("");
@@ -601,6 +652,7 @@ function CreateSessionModal({
         };
         if (category === "session") {
           body.memberId = resolvedMemberId;
+          body.ptType = ptType;
         } else if (category === "consultation") {
           if (resolvedMemberId) {
             body.memberId = resolvedMemberId;
@@ -703,21 +755,40 @@ function CreateSessionModal({
         )}
 
         {category === "session" && (
-          <div>
-            <label className="block text-sm font-medium mb-1.5">회원 선택</label>
-            <select
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-            >
-              <option value="">선택해주세요</option>
-              {registeredMembers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">수업 형태</label>
+              <div className="flex gap-1 rounded-full bg-bone/70 p-1 text-sm">
+                {(["1:1", "2:1"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setPtType(t)}
+                    className={[
+                      "flex-1 rounded-full py-1.5 font-medium transition",
+                      ptType === t ? "bg-coral text-white shadow-sm" : "text-ink/60",
+                    ].join(" ")}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">회원 선택</label>
+              <select
+                value={memberId}
+                onChange={(e) => setMemberId(e.target.value ? Number(e.target.value) : "")}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              >
+                <option value="">선택해주세요</option>
+                {registeredMembers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
 
         {category === "consultation" && (
@@ -882,6 +953,7 @@ function EditSessionModal({
 }) {
   const [memo, setMemo] = useState(session.memo);
   const [coachId, setCoachId] = useState(session.coach_id);
+  const [ptType, setPtType] = useState<PtType>(session.pt_type);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -990,6 +1062,26 @@ function EditSessionModal({
           </div>
         )}
 
+        {session.entry_type === "session" && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">수업 형태</label>
+            <div className="flex gap-1 rounded-full bg-bone/70 p-1 text-sm">
+              {(["1:1", "2:1"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setPtType(t)}
+                  className={[
+                    "flex-1 rounded-full py-1.5 font-medium transition",
+                    ptType === t ? "bg-coral text-white shadow-sm" : "text-ink/60",
+                  ].join(" ")}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium mb-1.5">메모</label>
           <input
@@ -1025,7 +1117,11 @@ function EditSessionModal({
           </button>
           <button
             disabled={submitting}
-            onClick={() => patch({ memo, coachId })}
+            onClick={() =>
+              patch(
+                session.entry_type === "session" ? { memo, coachId, ptType } : { memo, coachId },
+              )
+            }
             className="rounded-full border border-line py-2 text-sm hover:bg-bone transition disabled:opacity-50"
           >
             메모·담당 저장

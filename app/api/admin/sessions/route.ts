@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { createSession, findOrCreateMemberByPhone, listSessionsInRange } from "@/lib/schedule";
 import { isValidDateKey } from "@/lib/date";
-import type { SessionEntryType } from "@/lib/db";
+import type { PtType, SessionEntryType } from "@/lib/db";
 
 const VALID_ENTRY_TYPES: SessionEntryType[] = ["session", "consultation", "memo", "blocked"];
+const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminAuthed())) {
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
         hour?: unknown;
         memo?: unknown;
         entryType?: unknown;
+        ptType?: unknown;
         newName?: unknown;
         newPhone?: unknown;
       }
@@ -40,6 +42,10 @@ export async function POST(req: NextRequest) {
     typeof body?.entryType === "string" && VALID_ENTRY_TYPES.includes(body.entryType as SessionEntryType)
       ? (body.entryType as SessionEntryType)
       : "session";
+  const ptType: PtType =
+    typeof body?.ptType === "string" && VALID_PT_TYPES.includes(body.ptType as PtType)
+      ? (body.ptType as PtType)
+      : "1:1";
   const coachId = Number(body?.coachId);
   const date = typeof body?.date === "string" ? body.date : "";
   const hour = Number(body?.hour);
@@ -84,7 +90,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const session = await createSession({ memberId, coachId, date, hour, memo, entryType });
+    const session = await createSession({ memberId, coachId, date, hour, memo, entryType, ptType });
     return NextResponse.json({ session }, { status: 201 });
   } catch (err: unknown) {
     if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505") {
