@@ -163,6 +163,17 @@ export function ScheduleGrid({
     return map;
   }, [coaches]);
 
+  /** 잔여 3회 이하인 활성 회원 — 스케줄표 pill에 재등록 골든벨을 표시하기 위함. */
+  const goldenBellMemberIds = useMemo(() => {
+    const set = new Set<number>();
+    for (const m of members) {
+      if (m.status === "active" && m.total_sessions > 0 && m.total_sessions - m.done_count <= 3) {
+        set.add(m.id);
+      }
+    }
+    return set;
+  }, [members]);
+
   const sessionMap = useMemo(() => {
     const map = new Map<string, SessionWithMember>();
     for (const s of sessions) {
@@ -417,6 +428,13 @@ export function ScheduleGrid({
                                         {progressLabel(session)}
                                       </span>
                                     )}
+                                    {session.entry_type === "session" &&
+                                      session.member_id !== null &&
+                                      goldenBellMemberIds.has(session.member_id) && (
+                                        <span className="ml-1" title="재등록 골든타임 — 잔여 3회 이하">
+                                          🔔
+                                        </span>
+                                      )}
                                   </span>
                                   <span className="block text-[10px] opacity-70">
                                     {STATUS_LABEL[session.status]}

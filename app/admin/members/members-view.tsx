@@ -60,6 +60,17 @@ function PtTypeBadge({ ptType }: { ptType: PtType }) {
   );
 }
 
+function GoldenBellBadge() {
+  return (
+    <span
+      title="재등록 골든타임 — 잔여 3회 이하"
+      className="rounded-full bg-gold/15 text-gold px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
+    >
+      🔔 골든벨
+    </span>
+  );
+}
+
 function PtTypeToggle({
   value,
   onChange,
@@ -177,6 +188,7 @@ export function MembersView({
               const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
               const expired = m.total_sessions > 0 && remaining <= 0;
               const low = !expired && remaining > 0 && remaining <= 3;
+              const goldenBell = m.status === "active" && m.total_sessions > 0 && remaining <= 3;
               return (
                 <button
                   key={m.id}
@@ -187,6 +199,7 @@ export function MembersView({
                     <span className="font-medium flex items-center gap-1.5">
                       {m.name}
                       {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
+                      {goldenBell && <GoldenBellBadge />}
                     </span>
                     <span
                       className={[
@@ -267,6 +280,7 @@ export function MembersView({
                   const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
                   const expired = m.total_sessions > 0 && remaining <= 0;
                   const low = !expired && remaining > 0 && remaining <= 3;
+                  const goldenBell = m.status === "active" && m.total_sessions > 0 && remaining <= 3;
                   return (
                     <tr
                       key={m.id}
@@ -292,16 +306,19 @@ export function MembersView({
                         </div>
                       </td>
                       <td className="px-5 py-3">
-                        {expired ? (
-                          <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium">
-                            만료
-                          </span>
-                        ) : (
-                          <span className={low ? "text-amber-600 font-medium" : "text-ink/70"}>
-                            {low && "⚠ "}
-                            {remaining}회
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {expired ? (
+                            <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium">
+                              만료
+                            </span>
+                          ) : (
+                            <span className={low ? "text-amber-600 font-medium" : "text-ink/70"}>
+                              {low && "⚠ "}
+                              {remaining}회
+                            </span>
+                          )}
+                          {goldenBell && <GoldenBellBadge />}
+                        </div>
                       </td>
                       <td className="px-5 py-3">
                         {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
