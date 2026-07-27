@@ -281,74 +281,94 @@ export function ScheduleGrid({
               </div>
             );
           }
+          const coachColumns = visibleCoaches.length > 0 ? visibleCoaches : [null];
           return (
             <div className="rounded-2xl bg-white border border-line/60 shadow-sm divide-y divide-line/40 overflow-hidden">
               {holidayName && (
                 <p className="px-4 py-2 text-xs text-coral/70 bg-coral/5">{holidayName}</p>
               )}
+              {showCoachLabel && (
+                <div className="flex gap-2 px-4 py-2 bg-bone/40">
+                  <span className="w-10 shrink-0" />
+                  <div
+                    className="flex-1 grid gap-2"
+                    style={{ gridTemplateColumns: `repeat(${coachColumns.length}, 1fr)` }}
+                  >
+                    {visibleCoaches.map((c) => (
+                      <p
+                        key={c.id}
+                        className="text-xs font-medium text-ink/60 text-center truncate"
+                      >
+                        {c.name}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
               {SCHEDULE_HOUR_ROWS.filter(
                 (hour) => hours && hour >= hours.start && hour < hours.end,
-              ).map((hour) =>
-                (visibleCoaches.length > 0 ? visibleCoaches : [null]).map((coach) => {
-                  const session = coach
-                    ? sessionMap.get(`${date}-${coach.id}-${hour}`)
-                    : undefined;
-                  return (
-                    <div
-                      key={`${coach?.id ?? "x"}-${hour}`}
-                      className="flex items-center gap-3 px-4 py-3"
-                    >
-                      <span className="w-12 shrink-0 text-xs text-ink/50">{hour}:00</span>
-                      {session ? (
-                        <button
-                          onClick={() => setEditTarget(session)}
-                          className={[
-                            "flex-1 rounded-lg border px-3 py-2 text-left text-sm",
-                            entryStyle(session),
-                          ].join(" ")}
-                        >
-                          {isSimpleEntry(session) ? (
-                            <span className="font-medium">
-                              {entryIcon(session)}
-                              {entryMainLabel(session)}
-                            </span>
-                          ) : (
-                            <>
-                              <span className="font-medium">
-                                {entryIcon(session)}
-                                {session.member_name}
-                              </span>
-                              {progressLabel(session) && (
-                                <span className="ml-1.5 text-xs opacity-70">
-                                  {progressLabel(session)}
+              ).map((hour) => (
+                <div key={hour} className="flex gap-2 px-4 py-3">
+                  <span className="w-10 shrink-0 text-xs text-ink/50 pt-2">{hour}:00</span>
+                  <div
+                    className="flex-1 grid gap-2"
+                    style={{ gridTemplateColumns: `repeat(${coachColumns.length}, 1fr)` }}
+                  >
+                    {coachColumns.map((coach) => {
+                      const session = coach
+                        ? sessionMap.get(`${date}-${coach.id}-${hour}`)
+                        : undefined;
+                      return (
+                        <div key={coach?.id ?? "x"}>
+                          {session ? (
+                            <button
+                              onClick={() => setEditTarget(session)}
+                              className={[
+                                "w-full rounded-lg border px-2.5 py-2 text-left text-xs",
+                                entryStyle(session),
+                              ].join(" ")}
+                            >
+                              {isSimpleEntry(session) ? (
+                                <span className="font-medium block truncate">
+                                  {entryIcon(session)}
+                                  {entryMainLabel(session)}
                                 </span>
+                              ) : (
+                                <>
+                                  <span className="font-medium block truncate">
+                                    {entryIcon(session)}
+                                    {session.member_name}
+                                    {progressLabel(session) && (
+                                      <span className="ml-1 font-normal opacity-70">
+                                        {progressLabel(session)}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="block text-[10px] opacity-70">
+                                    {STATUS_LABEL[session.status]}
+                                  </span>
+                                  {session.memo && (
+                                    <span className="block text-[10px] opacity-60 truncate">
+                                      {session.memo}
+                                    </span>
+                                  )}
+                                </>
                               )}
-                              <span className="ml-2 text-xs opacity-70">
-                                {STATUS_LABEL[session.status]}
-                              </span>
-                              {session.memo && (
-                                <span className="block text-[11px] opacity-60 truncate">
-                                  {session.memo}
-                                </span>
-                              )}
-                            </>
-                          )}
-                          {showCoachLabel && (
-                            <span className="block text-[11px] opacity-60">{session.coach_name}</span>
-                          )}
-                        </button>
-                      ) : coach ? (
-                        <button
-                          onClick={() => setCreateTarget({ date, hour, coachId: coach.id })}
-                          className="flex-1 rounded-lg border border-dashed border-line px-3 py-2 text-left text-sm text-ink/30 hover:text-coral hover:border-coral transition"
-                        >
-                          + 추가{showCoachLabel ? ` · ${coach.name}` : ""}
-                        </button>
-                      ) : null}
-                    </div>
-                  );
-                }),
-              )}
+                            </button>
+                          ) : coach ? (
+                            <button
+                              onClick={() => setCreateTarget({ date, hour, coachId: coach.id })}
+                              className="w-full rounded-lg border border-dashed border-line px-2.5 py-2 text-left text-xs text-ink/30 hover:text-coral hover:border-coral transition truncate"
+                            >
+                              + 추가
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           );
         })()}
