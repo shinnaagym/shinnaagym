@@ -537,6 +537,146 @@ function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }
   );
 }
 
+function ContractFieldsFieldset({
+  rrnFront,
+  onRrnFrontChange,
+  address,
+  onAddressChange,
+  visitChannel,
+  onVisitChannelChange,
+  visitChannelReferrerName,
+  onVisitChannelReferrerNameChange,
+  purposes,
+  onTogglePurpose,
+  purposeOther,
+  onPurposeOtherChange,
+  startDate,
+  onStartDateChange,
+  optionNote,
+  onOptionNoteChange,
+  privacyConsent,
+  onPrivacyConsentChange,
+}: {
+  rrnFront: string;
+  onRrnFrontChange: (v: string) => void;
+  address: string;
+  onAddressChange: (v: string) => void;
+  visitChannel: VisitChannel;
+  onVisitChannelChange: (v: VisitChannel) => void;
+  visitChannelReferrerName: string;
+  onVisitChannelReferrerNameChange: (v: string) => void;
+  purposes: string[];
+  onTogglePurpose: (v: string) => void;
+  purposeOther: string;
+  onPurposeOtherChange: (v: string) => void;
+  startDate: string;
+  onStartDateChange: (v: string) => void;
+  optionNote: string;
+  onOptionNoteChange: (v: string) => void;
+  privacyConsent: boolean;
+  onPrivacyConsentChange: (v: boolean) => void;
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="주민등록번호 (앞자리)">
+          <input
+            value={rrnFront}
+            onChange={(e) => onRrnFrontChange(e.target.value)}
+            placeholder="예: 900101"
+            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
+        </Field>
+        <Field label="주소">
+          <input
+            value={address}
+            onChange={(e) => onAddressChange(e.target.value)}
+            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
+        </Field>
+      </div>
+      <Field label="방문 경로">
+        <div className="flex flex-wrap gap-1.5">
+          {VISIT_CHANNEL_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onVisitChannelChange(opt.value)}
+              className={[
+                "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                visitChannel === opt.value
+                  ? "bg-coral text-white border-coral"
+                  : "border-line text-ink/60 hover:bg-bone",
+              ].join(" ")}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {visitChannel === "referral" && (
+          <input
+            value={visitChannelReferrerName}
+            onChange={(e) => onVisitChannelReferrerNameChange(e.target.value)}
+            placeholder="소개해주신 분 이름"
+            className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
+        )}
+      </Field>
+      <Field label="운동 목표">
+        <div className="flex flex-wrap gap-1.5">
+          {PURPOSE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onTogglePurpose(opt.value)}
+              className={[
+                "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                purposes.includes(opt.value)
+                  ? "bg-coral text-white border-coral"
+                  : "border-line text-ink/60 hover:bg-bone",
+              ].join(" ")}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <input
+          value={purposeOther}
+          onChange={(e) => onPurposeOtherChange(e.target.value)}
+          placeholder="기타 (선택 입력)"
+          className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="운동 시작일">
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => onStartDateChange(e.target.value)}
+            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
+        </Field>
+        <Field label="옵션">
+          <input
+            value={optionNote}
+            onChange={(e) => onOptionNoteChange(e.target.value)}
+            placeholder="선택 입력"
+            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
+        </Field>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-ink/70">
+        <input
+          type="checkbox"
+          checked={privacyConsent}
+          onChange={(e) => onPrivacyConsentChange(e.target.checked)}
+        />
+        개인 정보 활용에 동의합니다.
+      </label>
+    </>
+  );
+}
+
 function CreateMemberModal({
   coaches,
   onClose,
@@ -713,101 +853,26 @@ function CreateMemberModal({
 
         <div className="border-t border-line/60 pt-4 space-y-4">
           <p className="text-sm font-medium text-ink/70">계약서 정보</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="주민등록번호 (앞자리)">
-              <input
-                value={rrnFront}
-                onChange={(e) => setRrnFront(e.target.value)}
-                placeholder="예: 900101"
-                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-              />
-            </Field>
-            <Field label="주소">
-              <input
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-              />
-            </Field>
-          </div>
-          <Field label="방문 경로">
-            <div className="flex flex-wrap gap-1.5">
-              {VISIT_CHANNEL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setVisitChannel(opt.value)}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-xs font-medium transition border",
-                    visitChannel === opt.value
-                      ? "bg-coral text-white border-coral"
-                      : "border-line text-ink/60 hover:bg-bone",
-                  ].join(" ")}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            {visitChannel === "referral" && (
-              <input
-                value={visitChannelReferrerName}
-                onChange={(e) => setVisitChannelReferrerName(e.target.value)}
-                placeholder="소개해주신 분 이름"
-                className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-              />
-            )}
-          </Field>
-          <Field label="운동 목표">
-            <div className="flex flex-wrap gap-1.5">
-              {PURPOSE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => togglePurpose(opt.value)}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-xs font-medium transition border",
-                    purposes.includes(opt.value)
-                      ? "bg-coral text-white border-coral"
-                      : "border-line text-ink/60 hover:bg-bone",
-                  ].join(" ")}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <input
-              value={purposeOther}
-              onChange={(e) => setPurposeOther(e.target.value)}
-              placeholder="기타 (선택 입력)"
-              className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="운동 시작일">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-              />
-            </Field>
-            <Field label="옵션">
-              <input
-                value={optionNote}
-                onChange={(e) => setOptionNote(e.target.value)}
-                placeholder="선택 입력"
-                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-              />
-            </Field>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-ink/70">
-            <input
-              type="checkbox"
-              checked={privacyConsent}
-              onChange={(e) => setPrivacyConsent(e.target.checked)}
-            />
-            개인 정보 활용에 동의합니다.
-          </label>
+          <ContractFieldsFieldset
+            rrnFront={rrnFront}
+            onRrnFrontChange={setRrnFront}
+            address={address}
+            onAddressChange={setAddress}
+            visitChannel={visitChannel}
+            onVisitChannelChange={setVisitChannel}
+            visitChannelReferrerName={visitChannelReferrerName}
+            onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
+            purposes={purposes}
+            onTogglePurpose={togglePurpose}
+            purposeOther={purposeOther}
+            onPurposeOtherChange={setPurposeOther}
+            startDate={startDate}
+            onStartDateChange={setStartDate}
+            optionNote={optionNote}
+            onOptionNoteChange={setOptionNote}
+            privacyConsent={privacyConsent}
+            onPrivacyConsentChange={setPrivacyConsent}
+          />
         </div>
 
         {error && <p className="text-sm text-coral">{error}</p>}
@@ -817,6 +882,110 @@ function CreateMemberModal({
           className="w-full rounded-full bg-ink text-white py-2.5 font-medium hover:bg-coral transition disabled:opacity-50"
         >
           {submitting ? "저장 중..." : "등록"}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function WriteContractModal({
+  memberId,
+  latestPackage,
+  onClose,
+  onCreated,
+}: {
+  memberId: number;
+  latestPackage: PackageRow;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [rrnFront, setRrnFront] = useState("");
+  const [address, setAddress] = useState("");
+  const [visitChannel, setVisitChannel] = useState<VisitChannel>("");
+  const [visitChannelReferrerName, setVisitChannelReferrerName] = useState("");
+  const [purposes, setPurposes] = useState<string[]>([]);
+  const [purposeOther, setPurposeOther] = useState("");
+  const [optionNote, setOptionNote] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  function togglePurpose(value: string) {
+    setPurposes((prev) =>
+      prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value],
+    );
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}/contract`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rrnFront,
+          address,
+          visitChannel,
+          visitChannelReferrerName,
+          purposes,
+          purposeOther,
+          optionNote,
+          startDate,
+          privacyConsent,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "계약서 작성에 실패했습니다.");
+        return;
+      }
+      onCreated();
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ModalShell title="계약서 작성" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm">
+          <p className="text-xs text-ink/50 mb-1">회원권 정보 (최근 패키지 자동 반영)</p>
+          <p>
+            {latestPackage.pt_type} · {latestPackage.total_sessions}회 ·{" "}
+            {formatWon(latestPackage.price)} · {PAYMENT_METHOD_LABELS[latestPackage.payment_method]}
+          </p>
+        </div>
+        <ContractFieldsFieldset
+          rrnFront={rrnFront}
+          onRrnFrontChange={setRrnFront}
+          address={address}
+          onAddressChange={setAddress}
+          visitChannel={visitChannel}
+          onVisitChannelChange={setVisitChannel}
+          visitChannelReferrerName={visitChannelReferrerName}
+          onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
+          purposes={purposes}
+          onTogglePurpose={togglePurpose}
+          purposeOther={purposeOther}
+          onPurposeOtherChange={setPurposeOther}
+          startDate={startDate}
+          onStartDateChange={setStartDate}
+          optionNote={optionNote}
+          onOptionNoteChange={setOptionNote}
+          privacyConsent={privacyConsent}
+          onPrivacyConsentChange={setPrivacyConsent}
+        />
+        {error && <p className="text-sm text-coral">{error}</p>}
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="w-full rounded-full bg-ink text-white py-2.5 font-medium hover:bg-coral transition disabled:opacity-50"
+        >
+          {submitting ? "저장 중..." : "계약서 작성 완료"}
         </button>
       </div>
     </ModalShell>
@@ -842,6 +1011,7 @@ function MemberDetailModal({
   const [newSlotHour, setNewSlotHour] = useState(SCHEDULE_HOUR_ROWS[0]);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [savingSlot, setSavingSlot] = useState(false);
+  const [showWriteContract, setShowWriteContract] = useState(false);
 
   async function addSlot() {
     if (!data?.member.coach_id) {
@@ -1081,8 +1251,10 @@ function MemberDetailModal({
   }
 
   const firstPackageId = data.packages[0]?.id;
+  const latestPackage = data.packages[data.packages.length - 1];
 
   return (
+    <>
     <ModalShell title={`${data.member.name} — 회원 정보`} onClose={onClose}>
       <div className="space-y-5">
         <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm flex items-center justify-between gap-2">
@@ -1090,7 +1262,7 @@ function MemberDetailModal({
             진행 {data.progress.doneCount} / {data.progress.totalSessions} (잔여{" "}
             {data.progress.remaining}회)
           </span>
-          {data.contract && (
+          {data.contract ? (
             <span
               className={[
                 "rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
@@ -1099,6 +1271,15 @@ function MemberDetailModal({
             >
               계약서 {data.contract.signedAt ? "서명완료" : "서명대기"}
             </span>
+          ) : (
+            data.packages.length > 0 && (
+              <button
+                onClick={() => setShowWriteContract(true)}
+                className="rounded-full border border-coral text-coral px-2.5 py-0.5 text-xs font-medium hover:bg-coral/5 transition whitespace-nowrap"
+              >
+                + 계약서 작성
+              </button>
+            )
           )}
         </div>
 
@@ -1417,6 +1598,19 @@ function MemberDetailModal({
         </div>
       </div>
     </ModalShell>
+    {showWriteContract && latestPackage && (
+      <WriteContractModal
+        memberId={memberId}
+        latestPackage={latestPackage}
+        onClose={() => setShowWriteContract(false)}
+        onCreated={() => {
+          setShowWriteContract(false);
+          onChanged();
+          onClose();
+        }}
+      />
+    )}
+    </>
   );
 }
 
