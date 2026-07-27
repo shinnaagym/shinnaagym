@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   computeMemberProgress,
@@ -7,6 +8,7 @@ import {
   listCoaches,
   listMemberSessions,
 } from "@/lib/schedule";
+import { getLatestContractByMember } from "@/lib/contracts";
 import { koreaTodayKey } from "@/lib/date";
 
 // 담당 코치의 개인 연락처가 등록되지 않은 경우를 위한 기본(스튜디오) 문의 번호.
@@ -37,13 +39,14 @@ export default async function MyReservationPage({
     notFound();
   }
 
-  const [progress, sessions, availability, coaches] = await Promise.all([
+  const [progress, sessions, availability, coaches, contract] = await Promise.all([
     computeMemberProgress(member.id),
     listMemberSessions(member.id),
     member.coach_id
       ? getCoachAvailability(member.coach_id, koreaTodayKey(), 14)
       : Promise.resolve([]),
     listCoaches(),
+    getLatestContractByMember(member.id),
   ]);
 
   const contactPhone =
@@ -79,6 +82,30 @@ export default async function MyReservationPage({
             </span>
           </p>
         </div>
+
+        {contract && (
+          <Link
+            href={`/my/${token}/contract`}
+            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10 hover:border-coral/40 transition"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-display text-lg mb-1">📄 계약서</p>
+                <p className="text-sm text-ink/60">
+                  {contract.signed_at ? "서명 완료 · 내용 확인하기" : "서명이 필요해요"}
+                </p>
+              </div>
+              <span
+                className={[
+                  "rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap",
+                  contract.signed_at ? "bg-sage/20 text-sage" : "bg-coral/10 text-coral",
+                ].join(" ")}
+              >
+                {contract.signed_at ? "서명완료" : "서명대기"}
+              </span>
+            </div>
+          </Link>
+        )}
 
         {progress.totalSessions > 0 && progress.remaining <= 3 && (
           <div className="rounded-2xl bg-gold/10 border border-gold/30 px-6 py-5 mb-12">

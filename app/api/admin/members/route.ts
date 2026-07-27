@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { addPackage, createMember, listMembers } from "@/lib/schedule";
-import type { PaymentMethod, PtType } from "@/lib/db";
+import { createContract } from "@/lib/contracts";
+import type { PaymentMethod, PtType, VisitChannel } from "@/lib/db";
 
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 const VALID_PAYMENT_METHODS: PaymentMethod[] = ["card", "transfer"];
+const VALID_VISIT_CHANNELS: VisitChannel[] = ["naver", "instagram", "flyer", "referral", "other", ""];
 
 export async function GET() {
   if (!(await isAdminAuthed())) {
@@ -30,6 +32,15 @@ export async function POST(req: NextRequest) {
         price?: unknown;
         ptType?: unknown;
         paymentMethod?: unknown;
+        rrnFront?: unknown;
+        address?: unknown;
+        visitChannel?: unknown;
+        visitChannelReferrerName?: unknown;
+        purposes?: unknown;
+        purposeOther?: unknown;
+        optionNote?: unknown;
+        startDate?: unknown;
+        privacyConsent?: unknown;
       }
     | null;
 
@@ -62,8 +73,45 @@ export async function POST(req: NextRequest) {
       ? (body.paymentMethod as PaymentMethod)
       : "card";
 
+  // 계약서 전용 필드 — 전부 선택 입력(등록 당시 정보가 부족해도 등록 자체는 막지 않는다).
+  const rrnFront = typeof body?.rrnFront === "string" ? body.rrnFront.trim() : "";
+  const address = typeof body?.address === "string" ? body.address.trim() : "";
+  const visitChannel: VisitChannel =
+    typeof body?.visitChannel === "string" &&
+    VALID_VISIT_CHANNELS.includes(body.visitChannel as VisitChannel)
+      ? (body.visitChannel as VisitChannel)
+      : "";
+  const visitChannelReferrerName =
+    typeof body?.visitChannelReferrerName === "string"
+      ? body.visitChannelReferrerName.trim()
+      : "";
+  const purposes = Array.isArray(body?.purposes)
+    ? body.purposes.filter((p): p is string => typeof p === "string")
+    : [];
+  const purposeOther = typeof body?.purposeOther === "string" ? body.purposeOther.trim() : "";
+  const optionNote = typeof body?.optionNote === "string" ? body.optionNote.trim() : "";
+  const startDate = typeof body?.startDate === "string" ? body.startDate.trim() : "";
+  const privacyConsent = body?.privacyConsent === true;
+
   const member = await createMember({ name, phone, coachId, notes, referrer, availableTimes });
   await addPackage(member.id, totalSessions, price, "최초 등록", ptType, paymentMethod);
+  await createContract({
+    memberId: member.id,
+    entryType: "new",
+    ptType,
+    totalSessions,
+    price,
+    paymentMethod,
+    rrnFront,
+    address,
+    visitChannel,
+    visitChannelReferrerName,
+    purposes,
+    purposeOther,
+    optionNote,
+    startDate,
+    privacyConsent,
+  });
 
   return NextResponse.json({ member }, { status: 201 });
 }
