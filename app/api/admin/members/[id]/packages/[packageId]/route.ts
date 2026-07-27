@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { deletePackage, updatePackage } from "@/lib/schedule";
-import type { PtType } from "@/lib/db";
+import type { PaymentMethod, PtType } from "@/lib/db";
 
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
+const VALID_PAYMENT_METHODS: PaymentMethod[] = ["card", "transfer"];
 
 export async function PATCH(
   req: NextRequest,
@@ -18,7 +19,13 @@ export async function PATCH(
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
   const body = (await req.json().catch(() => null)) as
-    | { totalSessions?: unknown; price?: unknown; note?: unknown; ptType?: unknown }
+    | {
+        totalSessions?: unknown;
+        price?: unknown;
+        note?: unknown;
+        ptType?: unknown;
+        paymentMethod?: unknown;
+      }
     | null;
 
   const totalSessions =
@@ -32,8 +39,13 @@ export async function PATCH(
     typeof body?.ptType === "string" && VALID_PT_TYPES.includes(body.ptType as PtType)
       ? (body.ptType as PtType)
       : undefined;
+  const paymentMethod =
+    typeof body?.paymentMethod === "string" &&
+    VALID_PAYMENT_METHODS.includes(body.paymentMethod as PaymentMethod)
+      ? (body.paymentMethod as PaymentMethod)
+      : undefined;
 
-  const pkg = await updatePackage(idNum, { totalSessions, price, note, ptType });
+  const pkg = await updatePackage(idNum, { totalSessions, price, note, ptType, paymentMethod });
   return NextResponse.json({ package: pkg });
 }
 

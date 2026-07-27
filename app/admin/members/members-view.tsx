@@ -1,13 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CoachRow, MemberStatus, PackageRow, PtType } from "@/lib/db";
+import type { CoachRow, MemberStatus, PackageRow, PaymentMethod, PtType, VisitChannel } from "@/lib/db";
 import type { FixedSlotWithMember, MemberWithProgress } from "@/lib/schedule";
-import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+import { PURPOSE_OPTIONS, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 
 const PT_TYPE_OPTIONS: PtType[] = ["1:1", "2:1"];
+const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = ["card", "transfer"];
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  card: "카드결제",
+  transfer: "계좌이체",
+};
 const FIXED_SLOT_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토"];
 const FIXED_SLOT_CAPACITY = 3;
+
+const VISIT_CHANNEL_OPTIONS: Array<{ value: VisitChannel; label: string }> = [
+  { value: "naver", label: "네이버" },
+  { value: "instagram", label: "인스타" },
+  { value: "flyer", label: "외부 홍보물" },
+  { value: "referral", label: "지인" },
+  { value: "other", label: "기타" },
+];
 
 type SessionSummary = {
   id: number;
@@ -105,6 +118,45 @@ function PtTypeToggle({
         </button>
       ))}
     </div>
+  );
+}
+
+function PaymentMethodToggle({
+  value,
+  onChange,
+}: {
+  value: PaymentMethod;
+  onChange: (m: PaymentMethod) => void;
+}) {
+  return (
+    <div className="flex gap-1 rounded-full bg-bone/70 p-1 text-sm">
+      {PAYMENT_METHOD_OPTIONS.map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => onChange(m)}
+          className={[
+            "flex-1 rounded-full py-1.5 font-medium transition",
+            value === m ? "bg-coral text-white shadow-sm" : "text-ink/60",
+          ].join(" ")}
+        >
+          {PAYMENT_METHOD_LABELS[m]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PaymentMethodBadge({ method }: { method: PaymentMethod }) {
+  return (
+    <span
+      className={[
+        "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+        method === "transfer" ? "bg-sage/20 text-sage" : "bg-line/40 text-ink/50",
+      ].join(" ")}
+    >
+      {PAYMENT_METHOD_LABELS[method]}
+    </span>
   );
 }
 
@@ -501,10 +553,28 @@ function CreateMemberModal({
   const [availableTimes, setAvailableTimes] = useState("");
   const [notes, setNotes] = useState("");
   const [ptType, setPtType] = useState<PtType>("1:1");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [totalSessions, setTotalSessions] = useState("");
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // 계약서 전용 항목
+  const [rrnFront, setRrnFront] = useState("");
+  const [address, setAddress] = useState("");
+  const [visitChannel, setVisitChannel] = useState<VisitChannel>("");
+  const [visitChannelReferrerName, setVisitChannelReferrerName] = useState("");
+  const [purposes, setPurposes] = useState<string[]>([]);
+  const [purposeOther, setPurposeOther] = useState("");
+  const [optionNote, setOptionNote] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [privacyConsent, setPrivacyConsent] = useState(false);
+
+  function togglePurpose(value: string) {
+    setPurposes((prev) =>
+      prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value],
+    );
+  }
 
   async function handleSubmit() {
     if (!name.trim()) {
@@ -531,6 +601,16 @@ function CreateMemberModal({
           totalSessions: Number(totalSessions),
           price: Number(price || 0),
           ptType,
+          paymentMethod,
+          rrnFront,
+          address,
+          visitChannel,
+          visitChannelReferrerName,
+          purposes,
+          purposeOther,
+          optionNote,
+          startDate,
+          privacyConsent,
         }),
       });
       const data = await res.json();
@@ -619,6 +699,9 @@ function CreateMemberModal({
             />
           </Field>
         </div>
+        <Field label="결제 수단">
+          <PaymentMethodToggle value={paymentMethod} onChange={setPaymentMethod} />
+        </Field>
         <Field label="운동 목적 / 특이사항">
           <textarea
             value={notes}
@@ -627,6 +710,106 @@ function CreateMemberModal({
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral resize-none"
           />
         </Field>
+
+        <div className="border-t border-line/60 pt-4 space-y-4">
+          <p className="text-sm font-medium text-ink/70">계약서 정보</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="주민등록번호 (앞자리)">
+              <input
+                value={rrnFront}
+                onChange={(e) => setRrnFront(e.target.value)}
+                placeholder="예: 900101"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="주소">
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+          </div>
+          <Field label="방문 경로">
+            <div className="flex flex-wrap gap-1.5">
+              {VISIT_CHANNEL_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setVisitChannel(opt.value)}
+                  className={[
+                    "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                    visitChannel === opt.value
+                      ? "bg-coral text-white border-coral"
+                      : "border-line text-ink/60 hover:bg-bone",
+                  ].join(" ")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {visitChannel === "referral" && (
+              <input
+                value={visitChannelReferrerName}
+                onChange={(e) => setVisitChannelReferrerName(e.target.value)}
+                placeholder="소개해주신 분 이름"
+                className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            )}
+          </Field>
+          <Field label="운동 목표">
+            <div className="flex flex-wrap gap-1.5">
+              {PURPOSE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => togglePurpose(opt.value)}
+                  className={[
+                    "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                    purposes.includes(opt.value)
+                      ? "bg-coral text-white border-coral"
+                      : "border-line text-ink/60 hover:bg-bone",
+                  ].join(" ")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={purposeOther}
+              onChange={(e) => setPurposeOther(e.target.value)}
+              placeholder="기타 (선택 입력)"
+              className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="운동 시작일">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="옵션">
+              <input
+                value={optionNote}
+                onChange={(e) => setOptionNote(e.target.value)}
+                placeholder="선택 입력"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-ink/70">
+            <input
+              type="checkbox"
+              checked={privacyConsent}
+              onChange={(e) => setPrivacyConsent(e.target.checked)}
+            />
+            개인 정보 활용에 동의합니다.
+          </label>
+        </div>
+
         {error && <p className="text-sm text-coral">{error}</p>}
         <button
           onClick={handleSubmit}
@@ -704,11 +887,13 @@ function MemberDetailModal({
     progress: { totalSessions: number; doneCount: number; remaining: number };
     packages: PackageRow[];
     sessions: SessionSummary[];
+    contract: { id: number; entryType: string; signedAt: string | null } | null;
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [addSessions, setAddSessions] = useState("");
   const [addPrice, setAddPrice] = useState("");
   const [addPtType, setAddPtType] = useState<PtType>("1:1");
+  const [addPaymentMethod, setAddPaymentMethod] = useState<PaymentMethod>("card");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -726,6 +911,7 @@ function MemberDetailModal({
   const [editPrice, setEditPrice] = useState("");
   const [editNote, setEditNote] = useState("");
   const [editPtType, setEditPtType] = useState<PtType>("1:1");
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>("card");
 
   function loadFrom(member: MemberDetail) {
     setName(member.name);
@@ -826,6 +1012,7 @@ function MemberDetailModal({
         totalSessions: Number(addSessions),
         price: Number(addPrice || 0),
         ptType: addPtType,
+        paymentMethod: addPaymentMethod,
       }),
     });
     if (!res.ok) {
@@ -836,6 +1023,7 @@ function MemberDetailModal({
     setAddSessions("");
     setAddPrice("");
     setAddPtType("1:1");
+    setAddPaymentMethod("card");
     onChanged();
     onClose();
   }
@@ -846,6 +1034,7 @@ function MemberDetailModal({
     setEditPrice(String(pkg.price));
     setEditNote(pkg.note);
     setEditPtType(pkg.pt_type);
+    setEditPaymentMethod(pkg.payment_method);
   }
 
   async function saveEditPkg(pkgId: number) {
@@ -858,7 +1047,13 @@ function MemberDetailModal({
     const res = await fetch(`/api/admin/members/${memberId}/packages/${pkgId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ totalSessions, price, note: editNote, ptType: editPtType }),
+      body: JSON.stringify({
+        totalSessions,
+        price,
+        note: editNote,
+        ptType: editPtType,
+        paymentMethod: editPaymentMethod,
+      }),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -890,9 +1085,21 @@ function MemberDetailModal({
   return (
     <ModalShell title={`${data.member.name} — 회원 정보`} onClose={onClose}>
       <div className="space-y-5">
-        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm">
-          진행 {data.progress.doneCount} / {data.progress.totalSessions} (잔여{" "}
-          {data.progress.remaining}회)
+        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm flex items-center justify-between gap-2">
+          <span>
+            진행 {data.progress.doneCount} / {data.progress.totalSessions} (잔여{" "}
+            {data.progress.remaining}회)
+          </span>
+          {data.contract && (
+            <span
+              className={[
+                "rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+                data.contract.signedAt ? "bg-sage/20 text-sage" : "bg-coral/10 text-coral",
+              ].join(" ")}
+            >
+              계약서 {data.contract.signedAt ? "서명완료" : "서명대기"}
+            </span>
+          )}
         </div>
 
         <div>
@@ -1055,6 +1262,7 @@ function MemberDetailModal({
                 {editingPkgId === pkg.id ? (
                   <div className="space-y-1.5">
                     <PtTypeToggle value={editPtType} onChange={setEditPtType} />
+                    <PaymentMethodToggle value={editPaymentMethod} onChange={setEditPaymentMethod} />
                     <div className="grid grid-cols-2 gap-1.5">
                       <input
                         type="number"
@@ -1101,6 +1309,7 @@ function MemberDetailModal({
                         </span>
                         <TypeBadge isFirst={pkg.id === firstPackageId} />
                         <PtTypeBadge ptType={pkg.pt_type} />
+                        <PaymentMethodBadge method={pkg.payment_method} />
                       </p>
                       <p className="text-ink/60 truncate">
                         {pkg.total_sessions}회 · {formatWon(pkg.price)}
@@ -1130,6 +1339,9 @@ function MemberDetailModal({
             )}
           </div>
           <PtTypeToggle value={addPtType} onChange={setAddPtType} />
+          <div className="mt-1.5">
+            <PaymentMethodToggle value={addPaymentMethod} onChange={setAddPaymentMethod} />
+          </div>
           <div className="grid grid-cols-2 gap-2 mt-2">
             <input
               type="number"

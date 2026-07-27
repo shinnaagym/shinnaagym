@@ -68,7 +68,9 @@ export default async function AdminDashboardPage({
   const kpiCards: Array<{ label: string; value: string; accent?: boolean }> = [
     { label: "활성 회원", value: `${overview.activeMemberCount}명` },
     { label: "이번 달 완료 세션", value: `${overview.monthlyCompletedSessions}회` },
-    { label: "이번 달 매출", value: formatWon(overview.monthlyRevenue), accent: true },
+    { label: "이번 달 총 상담수", value: `${overview.monthlyConsultationCount}건` },
+    { label: "카드결제 매출 (부가세포함)", value: formatWon(overview.monthlyRevenueCard), accent: true },
+    { label: "계좌이체 매출 (부가세제외)", value: formatWon(overview.monthlyRevenueTransfer), accent: true },
     { label: "이번 달 신규 등록", value: `${overview.monthlyNewMemberCount}명` },
     { label: "이번 달 재등록", value: `${overview.monthlyReRegisteredMemberCount}명` },
     { label: "노쇼율", value: formatRate(overview.noShowRate) },
@@ -102,7 +104,7 @@ export default async function AdminDashboardPage({
           </div>
 
           {/* KPI 카드 */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
             {kpiCards.map((card) => (
               <div
                 key={card.label}
@@ -181,6 +183,8 @@ export default async function AdminDashboardPage({
                   <span>완료 {r.completedSessions}회</span>
                   <span>노쇼 {r.noShowCount}회</span>
                   <span>재등록율 {formatRate(r.reRegistrationRate)}</span>
+                  <span>월 상담수 {r.consultationCount}명</span>
+                  <span>상담 성공율 {formatRate(r.consultationSuccessRate)}</span>
                 </div>
               </div>
             ))}
@@ -191,7 +195,7 @@ export default async function AdminDashboardPage({
 
           {/* 트레이너별 성과 — 데스크톱 표 */}
           <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-6">
-            <table className="w-full text-sm min-w-[640px]">
+            <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="text-left text-ink/50 text-xs border-b border-line/60">
                   <th className="px-5 py-3 font-medium">코치</th>
@@ -200,6 +204,8 @@ export default async function AdminDashboardPage({
                   <th className="px-5 py-3 font-medium">노쇼</th>
                   <th className="px-5 py-3 font-medium">매출</th>
                   <th className="px-5 py-3 font-medium">재등록율</th>
+                  <th className="px-5 py-3 font-medium">월 상담수</th>
+                  <th className="px-5 py-3 font-medium">상담 성공율</th>
                 </tr>
               </thead>
               <tbody>
@@ -211,11 +217,13 @@ export default async function AdminDashboardPage({
                     <td className="px-5 py-3 text-ink/70">{r.noShowCount}회</td>
                     <td className="px-5 py-3 text-gold font-medium">{formatWon(r.revenue)}</td>
                     <td className="px-5 py-3 text-ink/70">{formatRate(r.reRegistrationRate)}</td>
+                    <td className="px-5 py-3 text-ink/70">{r.consultationCount}명</td>
+                    <td className="px-5 py-3 text-ink/70">{formatRate(r.consultationSuccessRate)}</td>
                   </tr>
                 ))}
                 {coachReports.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-ink/40">
+                    <td colSpan={8} className="px-5 py-10 text-center text-ink/40">
                       코치가 없어요.
                     </td>
                   </tr>

@@ -126,7 +126,8 @@ function ensureSchema(): Promise<void> {
           total_sessions INTEGER NOT NULL,
           price INTEGER NOT NULL DEFAULT 0,
           purchased_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-          note TEXT NOT NULL DEFAULT ''
+          note TEXT NOT NULL DEFAULT '',
+          payment_method TEXT NOT NULL DEFAULT 'card'
         );
 
         CREATE TABLE IF NOT EXISTS class_sessions (
@@ -149,6 +150,28 @@ function ensureSchema(): Promise<void> {
           hour INTEGER NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           UNIQUE (member_id, weekday, hour)
+        );
+
+        CREATE TABLE IF NOT EXISTS contracts (
+          id SERIAL PRIMARY KEY,
+          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          entry_type TEXT NOT NULL DEFAULT 'new', -- 'new' | 'renewal'
+          pt_type TEXT NOT NULL DEFAULT '1:1',
+          total_sessions INTEGER NOT NULL DEFAULT 0,
+          price INTEGER NOT NULL DEFAULT 0,
+          payment_method TEXT NOT NULL DEFAULT 'card',
+          rrn_front_encrypted TEXT NOT NULL DEFAULT '',
+          address TEXT NOT NULL DEFAULT '',
+          visit_channel TEXT NOT NULL DEFAULT '',
+          visit_channel_referrer_name TEXT NOT NULL DEFAULT '',
+          purposes TEXT[] NOT NULL DEFAULT '{}',
+          purpose_other TEXT NOT NULL DEFAULT '',
+          option_note TEXT NOT NULL DEFAULT '',
+          start_date TEXT NOT NULL DEFAULT '',
+          privacy_consent BOOLEAN NOT NULL DEFAULT false,
+          signature_data_url TEXT,
+          signed_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
         INSERT INTO coaches (name) VALUES ('신종수')
@@ -175,6 +198,7 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_status TEXT NOT NULL DEFAULT '대기';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_memo TEXT NOT NULL DEFAULT '';
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+          ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -253,6 +277,8 @@ export interface MemberRow {
 
 export type PtType = "1:1" | "2:1";
 
+export type PaymentMethod = "card" | "transfer";
+
 export interface PackageRow {
   id: number;
   member_id: number;
@@ -261,6 +287,7 @@ export interface PackageRow {
   purchased_at: string;
   note: string;
   pt_type: PtType;
+  payment_method: PaymentMethod;
 }
 
 export interface FixedSlotRow {
@@ -268,6 +295,31 @@ export interface FixedSlotRow {
   member_id: number;
   weekday: number;
   hour: number;
+  created_at: string;
+}
+
+export type ContractEntryType = "new" | "renewal";
+export type VisitChannel = "naver" | "instagram" | "flyer" | "referral" | "other" | "";
+
+export interface ContractRow {
+  id: number;
+  member_id: number;
+  entry_type: ContractEntryType;
+  pt_type: PtType;
+  total_sessions: number;
+  price: number;
+  payment_method: PaymentMethod;
+  rrn_front_encrypted: string;
+  address: string;
+  visit_channel: VisitChannel;
+  visit_channel_referrer_name: string;
+  purposes: string[];
+  purpose_other: string;
+  option_note: string;
+  start_date: string;
+  privacy_consent: boolean;
+  signature_data_url: string | null;
+  signed_at: string | null;
   created_at: string;
 }
 

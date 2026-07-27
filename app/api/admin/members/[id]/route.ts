@@ -8,6 +8,7 @@ import {
   listMemberSessions,
   updateMember,
 } from "@/lib/schedule";
+import { getLatestContractByMember } from "@/lib/contracts";
 import type { MemberStatus } from "@/lib/db";
 
 export async function GET(
@@ -23,12 +24,17 @@ export async function GET(
   if (!member) {
     return NextResponse.json({ error: "회원을 찾을 수 없습니다." }, { status: 404 });
   }
-  const [progress, packages, sessions] = await Promise.all([
+  const [progress, packages, sessions, fullContract] = await Promise.all([
     computeMemberProgress(idNum),
     listPackages(idNum),
     listMemberSessions(idNum),
+    getLatestContractByMember(idNum),
   ]);
-  return NextResponse.json({ member, progress, packages, sessions });
+  // 민감한 필드(주민등록번호 앞자리, 서명 이미지)는 이 요약 응답에는 담지 않는다.
+  const contract = fullContract
+    ? { id: fullContract.id, entryType: fullContract.entry_type, signedAt: fullContract.signed_at }
+    : null;
+  return NextResponse.json({ member, progress, packages, sessions, contract });
 }
 
 export async function PATCH(
