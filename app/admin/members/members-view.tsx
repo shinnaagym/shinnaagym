@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CoachRow, MemberStatus, PackageRow } from "@/lib/db";
-import type { MemberWithProgress } from "@/lib/schedule";
+import type { CoachRow, MemberStatus, PackageRow, PtType } from "@/lib/db";
+import type { FixedSlotWithMember, MemberWithProgress } from "@/lib/schedule";
+import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+
+const PT_TYPE_OPTIONS: PtType[] = ["1:1", "2:1"];
+const FIXED_SLOT_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토"];
+const FIXED_SLOT_CAPACITY = 3;
 
 type SessionSummary = {
   id: number;
@@ -29,10 +34,6 @@ function formatWon(n: number): string {
   return `₩${n.toLocaleString("ko-KR")}`;
 }
 
-function packageRate(pkg: { price: number; total_sessions: number }): number {
-  return pkg.total_sessions > 0 ? Math.round(pkg.price / pkg.total_sessions) : 0;
-}
-
 function TypeBadge({ isFirst }: { isFirst: boolean }) {
   return (
     <span
@@ -46,14 +47,67 @@ function TypeBadge({ isFirst }: { isFirst: boolean }) {
   );
 }
 
+function PtTypeBadge({ ptType }: { ptType: PtType }) {
+  return (
+    <span
+      className={[
+        "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+        ptType === "2:1" ? "bg-indigo-100 text-indigo-700" : "bg-line/40 text-ink/50",
+      ].join(" ")}
+    >
+      {ptType}
+    </span>
+  );
+}
+
+function GoldenBellBadge() {
+  return (
+    <span
+      title="재등록 골든타임 — 잔여 3회 이하"
+      className="rounded-full bg-gold/15 text-gold px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
+    >
+      🔔 골든벨
+    </span>
+  );
+}
+
+function PtTypeToggle({
+  value,
+  onChange,
+}: {
+  value: PtType;
+  onChange: (t: PtType) => void;
+}) {
+  return (
+    <div className="flex gap-1 rounded-full bg-bone/70 p-1 text-sm">
+      {PT_TYPE_OPTIONS.map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onChange(t)}
+          className={[
+            "flex-1 rounded-full py-1.5 font-medium transition",
+            value === t ? "bg-coral text-white shadow-sm" : "text-ink/60",
+          ].join(" ")}
+        >
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function MembersView({
   initialMembers,
   coaches,
+  initialFixedSlots,
 }: {
   initialMembers: MemberWithProgress[];
   coaches: CoachRow[];
+  initialFixedSlots: FixedSlotWithMember[];
 }) {
   const members = initialMembers;
+  const fixedSlots = initialFixedSlots;
   const activeCoaches = useMemo(() => coaches.filter((c) => c.active), [coaches]);
   const [search, setSearch] = useState("");
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
@@ -134,9 +188,7 @@ export function MembersView({
               const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
               const expired = m.total_sessions > 0 && remaining <= 0;
               const low = !expired && remaining > 0 && remaining <= 3;
-              const rate = m.latest_price != null && m.latest_total_sessions
-                ? packageRate({ price: m.latest_price, total_sessions: m.latest_total_sessions })
-                : null;
+              const goldenBell = m.status === "active" && m.total_sessions > 0 && remaining <= 3;
               return (
                 <button
                   key={m.id}
@@ -147,6 +199,7 @@ export function MembersView({
                     <span className="font-medium flex items-center gap-1.5">
                       {m.name}
                       {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
+                      {goldenBell && <GoldenBellBadge />}
                     </span>
                     <span
                       className={[
@@ -175,7 +228,6 @@ export function MembersView({
                   </div>
                   <div className="flex items-center justify-between text-xs text-ink/60">
                     <span>담당 {coachName}</span>
-                    <span>{rate !== null ? `회당 ${formatWon(rate)}` : ""}</span>
                     {expired ? (
                       <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 font-medium">
                         만료
@@ -185,6 +237,19 @@ export function MembersView({
                         {low && "⚠ "}잔여 {remaining}회
                       </span>
                     )}
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5 text-xs">
+                    <span
+                      className={[
+                        "flex h-4 w-4 items-center justify-center rounded border",
+                        m.has_next_week_session
+                          ? "border-sage bg-sage text-white"
+                          : "border-line text-transparent",
+                      ].join(" ")}
+                    >
+                      ✓
+                    </span>
+                    <span className="text-ink/50">다음주 수업 예약</span>
                   </div>
                 </button>
               );
@@ -200,9 +265,9 @@ export function MembersView({
                   <th className="px-5 py-3 font-medium">담당</th>
                   <th className="px-5 py-3 font-medium">진행</th>
                   <th className="px-5 py-3 font-medium">잔여</th>
-                  <th className="px-5 py-3 font-medium">회당 가격</th>
                   <th className="px-5 py-3 font-medium">초/재</th>
                   <th className="px-5 py-3 font-medium">상태</th>
+                  <th className="px-5 py-3 font-medium text-center">다음주</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,9 +280,7 @@ export function MembersView({
                   const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
                   const expired = m.total_sessions > 0 && remaining <= 0;
                   const low = !expired && remaining > 0 && remaining <= 3;
-                  const rate = m.latest_price != null && m.latest_total_sessions
-                    ? packageRate({ price: m.latest_price, total_sessions: m.latest_total_sessions })
-                    : null;
+                  const goldenBell = m.status === "active" && m.total_sessions > 0 && remaining <= 3;
                   return (
                     <tr
                       key={m.id}
@@ -243,19 +306,19 @@ export function MembersView({
                         </div>
                       </td>
                       <td className="px-5 py-3">
-                        {expired ? (
-                          <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium">
-                            만료
-                          </span>
-                        ) : (
-                          <span className={low ? "text-amber-600 font-medium" : "text-ink/70"}>
-                            {low && "⚠ "}
-                            {remaining}회
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-ink/70">
-                        {rate !== null ? formatWon(rate) : "-"}
+                        <div className="flex items-center gap-1.5">
+                          {expired ? (
+                            <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium">
+                              만료
+                            </span>
+                          ) : (
+                            <span className={low ? "text-amber-600 font-medium" : "text-ink/70"}>
+                              {low && "⚠ "}
+                              {remaining}회
+                            </span>
+                          )}
+                          {goldenBell && <GoldenBellBadge />}
+                        </div>
                       </td>
                       <td className="px-5 py-3">
                         {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
@@ -272,6 +335,19 @@ export function MembersView({
                           {m.status === "active" ? "활성" : "비활성"}
                         </span>
                       </td>
+                      <td className="px-5 py-3 text-center">
+                        <span
+                          className={[
+                            "inline-flex h-4 w-4 items-center justify-center rounded border text-xs",
+                            m.has_next_week_session
+                              ? "border-sage bg-sage text-white"
+                              : "border-line text-transparent",
+                          ].join(" ")}
+                          title={m.has_next_week_session ? "다음주 수업 예약됨" : "다음주 예약 없음"}
+                        >
+                          ✓
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}
@@ -280,6 +356,8 @@ export function MembersView({
           </div>
         </>
       )}
+
+      <FixedSlotSchedule fixedSlots={fixedSlots} />
 
       {showCreate && (
         <CreateMemberModal
@@ -297,10 +375,95 @@ export function MembersView({
           memberId={detailId}
           coaches={coaches}
           activeCoaches={activeCoaches}
+          fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
           onClose={() => setDetailId(null)}
           onChanged={refresh}
         />
       )}
+    </div>
+  );
+}
+
+function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }) {
+  const byCell = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const slot of fixedSlots) {
+      const key = `${slot.weekday}-${slot.hour}`;
+      const names = map.get(key) ?? [];
+      names.push(slot.member_name);
+      map.set(key, names);
+    }
+    return map;
+  }, [fixedSlots]);
+
+  const hourTotals = useMemo(() => {
+    const totals = new Map<number, number>();
+    for (const slot of fixedSlots) {
+      totals.set(slot.hour, (totals.get(slot.hour) ?? 0) + 1);
+    }
+    return totals;
+  }, [fixedSlots]);
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center gap-2 mb-1">
+        <p className="font-display text-lg">고정 회원 시간표</p>
+        <span className="text-xs text-ink/40">시간대별 고정 회원 배정 현황</span>
+      </div>
+      <p className="text-xs text-ink/40 mb-3">
+        한 시간대에 일주일 합계 {FIXED_SLOT_CAPACITY}명을 초과하면 붉은색으로 표시돼요.
+      </p>
+      <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
+        <table className="w-full text-xs min-w-[720px] border-collapse">
+          <thead>
+            <tr className="text-left text-ink/50 border-b border-line/60">
+              <th className="px-3 py-2.5 font-medium w-14">시간</th>
+              {FIXED_SLOT_WEEKDAY_LABELS.map((label) => (
+                <th key={label} className="px-3 py-2.5 font-medium text-center">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {SCHEDULE_HOUR_ROWS.map((hour) => {
+              const over = (hourTotals.get(hour) ?? 0) > FIXED_SLOT_CAPACITY;
+              return (
+              <tr key={hour} className="border-b border-line/30 last:border-0">
+                <td className="px-3 py-2.5 text-ink/50 whitespace-nowrap">{hour}시</td>
+                {FIXED_SLOT_WEEKDAY_LABELS.map((_, weekday) => {
+                  const names = byCell.get(`${weekday}-${hour}`) ?? [];
+                  return (
+                    <td key={weekday} className="px-3 py-2.5 align-top">
+                      {names.length > 0 && (
+                        <div
+                          className={[
+                            "flex flex-wrap gap-1 rounded-lg px-1.5 py-1",
+                            over ? "bg-red-50" : "",
+                          ].join(" ")}
+                        >
+                          {names.map((name, i) => (
+                            <span
+                              key={`${name}-${i}`}
+                              className={[
+                                "rounded-full px-1.5 py-0.5 whitespace-nowrap",
+                                over ? "bg-red-100 text-red-600" : "bg-sage/15 text-ink/70",
+                              ].join(" ")}
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -320,6 +483,7 @@ function CreateMemberModal({
   const [referrer, setReferrer] = useState("");
   const [availableTimes, setAvailableTimes] = useState("");
   const [notes, setNotes] = useState("");
+  const [ptType, setPtType] = useState<PtType>("1:1");
   const [totalSessions, setTotalSessions] = useState("");
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -349,6 +513,7 @@ function CreateMemberModal({
           availableTimes,
           totalSessions: Number(totalSessions),
           price: Number(price || 0),
+          ptType,
         }),
       });
       const data = await res.json();
@@ -414,6 +579,9 @@ function CreateMemberModal({
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
           />
         </Field>
+        <Field label="PT 유형">
+          <PtTypeToggle value={ptType} onChange={setPtType} />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="등록 횟수 *">
             <input
@@ -459,15 +627,46 @@ function MemberDetailModal({
   memberId,
   coaches,
   activeCoaches,
+  fixedSlots,
   onClose,
   onChanged,
 }: {
   memberId: number;
   coaches: CoachRow[];
   activeCoaches: CoachRow[];
+  fixedSlots: FixedSlotWithMember[];
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const [newSlotWeekday, setNewSlotWeekday] = useState(0);
+  const [newSlotHour, setNewSlotHour] = useState(SCHEDULE_HOUR_ROWS[0]);
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const [savingSlot, setSavingSlot] = useState(false);
+
+  async function addSlot() {
+    setSavingSlot(true);
+    setSlotError(null);
+    try {
+      const res = await fetch("/api/admin/fixed-slots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, weekday: newSlotWeekday, hour: newSlotHour }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setSlotError(d.error ?? "추가에 실패했습니다.");
+        return;
+      }
+      onChanged();
+    } finally {
+      setSavingSlot(false);
+    }
+  }
+
+  async function removeSlot(id: number) {
+    await fetch(`/api/admin/fixed-slots/${id}`, { method: "DELETE" });
+    onChanged();
+  }
   const [data, setData] = useState<{
     member: MemberDetail;
     progress: { totalSessions: number; doneCount: number; remaining: number };
@@ -477,6 +676,7 @@ function MemberDetailModal({
   const [copied, setCopied] = useState(false);
   const [addSessions, setAddSessions] = useState("");
   const [addPrice, setAddPrice] = useState("");
+  const [addPtType, setAddPtType] = useState<PtType>("1:1");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -493,6 +693,7 @@ function MemberDetailModal({
   const [editTotal, setEditTotal] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editNote, setEditNote] = useState("");
+  const [editPtType, setEditPtType] = useState<PtType>("1:1");
 
   function loadFrom(member: MemberDetail) {
     setName(member.name);
@@ -589,7 +790,11 @@ function MemberDetailModal({
     const res = await fetch(`/api/admin/members/${memberId}/packages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ totalSessions: Number(addSessions), price: Number(addPrice || 0) }),
+      body: JSON.stringify({
+        totalSessions: Number(addSessions),
+        price: Number(addPrice || 0),
+        ptType: addPtType,
+      }),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -598,6 +803,7 @@ function MemberDetailModal({
     }
     setAddSessions("");
     setAddPrice("");
+    setAddPtType("1:1");
     onChanged();
     onClose();
   }
@@ -607,6 +813,7 @@ function MemberDetailModal({
     setEditTotal(String(pkg.total_sessions));
     setEditPrice(String(pkg.price));
     setEditNote(pkg.note);
+    setEditPtType(pkg.pt_type);
   }
 
   async function saveEditPkg(pkgId: number) {
@@ -619,7 +826,7 @@ function MemberDetailModal({
     const res = await fetch(`/api/admin/members/${memberId}/packages/${pkgId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ totalSessions, price, note: editNote }),
+      body: JSON.stringify({ totalSessions, price, note: editNote, ptType: editPtType }),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -753,12 +960,69 @@ function MemberDetailModal({
         </div>
 
         <div>
+          <p className="text-sm font-medium mb-2">고정 시간대</p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {fixedSlots.length === 0 && (
+              <p className="text-xs text-ink/40">등록된 고정 시간대가 없어요.</p>
+            )}
+            {fixedSlots.map((slot) => (
+              <span
+                key={slot.id}
+                className="flex items-center gap-1 rounded-full bg-bone/70 px-2.5 py-1 text-xs"
+              >
+                {FIXED_SLOT_WEEKDAY_LABELS[slot.weekday] ?? "?"} {slot.hour}시
+                <button
+                  onClick={() => removeSlot(slot.id)}
+                  className="text-ink/40 hover:text-coral"
+                  aria-label="삭제"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={newSlotWeekday}
+              onChange={(e) => setNewSlotWeekday(Number(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
+            >
+              {FIXED_SLOT_WEEKDAY_LABELS.map((label, idx) => (
+                <option key={label} value={idx}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={newSlotHour}
+              onChange={(e) => setNewSlotHour(Number(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
+            >
+              {SCHEDULE_HOUR_ROWS.map((hour) => (
+                <option key={hour} value={hour}>
+                  {hour}시
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={addSlot}
+              disabled={savingSlot}
+              className="flex-1 rounded-lg border border-coral text-coral text-sm font-medium hover:bg-coral/5 transition disabled:opacity-50"
+            >
+              추가
+            </button>
+          </div>
+          {slotError && <p className="text-xs text-coral mt-1">{slotError}</p>}
+        </div>
+
+        <div>
           <p className="text-sm font-medium mb-2">결제·패키지 이력</p>
           <div className="rounded-xl border border-line/60 divide-y divide-line/40 overflow-hidden mb-2">
             {data.packages.map((pkg) => (
               <div key={pkg.id} className="px-3 py-2 text-xs">
                 {editingPkgId === pkg.id ? (
                   <div className="space-y-1.5">
+                    <PtTypeToggle value={editPtType} onChange={setEditPtType} />
                     <div className="grid grid-cols-2 gap-1.5">
                       <input
                         type="number"
@@ -804,10 +1068,10 @@ function MemberDetailModal({
                           {new Date(pkg.purchased_at).toLocaleDateString("ko-KR")}
                         </span>
                         <TypeBadge isFirst={pkg.id === firstPackageId} />
+                        <PtTypeBadge ptType={pkg.pt_type} />
                       </p>
                       <p className="text-ink/60 truncate">
-                        {pkg.total_sessions}회 · 회당 {formatWon(packageRate(pkg))} ·{" "}
-                        {formatWon(pkg.price)}
+                        {pkg.total_sessions}회 · {formatWon(pkg.price)}
                         {pkg.note && ` · ${pkg.note}`}
                       </p>
                     </div>
@@ -833,7 +1097,8 @@ function MemberDetailModal({
               <p className="px-3 py-3 text-xs text-ink/40">결제 이력이 없어요.</p>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <PtTypeToggle value={addPtType} onChange={setAddPtType} />
+          <div className="grid grid-cols-2 gap-2 mt-2">
             <input
               type="number"
               value={addSessions}

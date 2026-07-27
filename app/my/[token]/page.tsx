@@ -4,9 +4,13 @@ import {
   computeMemberProgress,
   getCoachAvailability,
   getMemberByToken,
+  listCoaches,
   listMemberSessions,
 } from "@/lib/schedule";
 import { koreaTodayKey } from "@/lib/date";
+
+// 담당 코치의 개인 연락처가 등록되지 않은 경우를 위한 기본(스튜디오) 문의 번호.
+const DEFAULT_STUDIO_PHONE = "010-6859-6114";
 
 const STATUS_LABEL: Record<string, string> = {
   reserved: "예약",
@@ -33,13 +37,17 @@ export default async function MyReservationPage({
     notFound();
   }
 
-  const [progress, sessions, availability] = await Promise.all([
+  const [progress, sessions, availability, coaches] = await Promise.all([
     computeMemberProgress(member.id),
     listMemberSessions(member.id),
     member.coach_id
       ? getCoachAvailability(member.coach_id, koreaTodayKey(), 14)
       : Promise.resolve([]),
+    listCoaches(),
   ]);
+
+  const contactPhone =
+    coaches.find((c) => c.id === member.coach_id)?.phone.trim() || DEFAULT_STUDIO_PHONE;
 
   const today = koreaTodayKey();
   const upcoming = sessions
@@ -71,6 +79,22 @@ export default async function MyReservationPage({
             </span>
           </p>
         </div>
+
+        {progress.totalSessions > 0 && progress.remaining <= 3 && (
+          <div className="rounded-2xl bg-gold/10 border border-gold/30 px-6 py-5 mb-12">
+            <p className="font-display text-lg mb-2">🔔 재등록 골든타임</p>
+            <p className="text-sm text-ink/70 leading-relaxed mb-4">
+              잔여 세션이 얼마 남지 않았어요. 지금 재등록하시면 재등록 할인 5%와 50분 마사지
+              1회를 무료로 드려요!
+            </p>
+            <a
+              href={`tel:${contactPhone}`}
+              className="inline-block rounded-full bg-gold text-white px-5 py-2.5 text-sm font-medium hover:opacity-90 transition"
+            >
+              🔔 지금 재등록 문의하기 · {contactPhone}
+            </a>
+          </div>
+        )}
 
         <section className="mb-12">
           <h2 className="font-display text-xl mb-4">다가오는 예약</h2>
@@ -156,7 +180,7 @@ export default async function MyReservationPage({
             예약 변경이나 취소는 이 페이지에서 직접 하실 수 없어요. 담당 선생님께 전화나
             메시지로 먼저 알려주시면 조율해드릴게요.
           </p>
-          <p className="mt-2 text-bone/70">문의 · 010-6859-6114</p>
+          <p className="mt-2 text-bone/70">문의 · {contactPhone}</p>
         </div>
       </div>
     </main>

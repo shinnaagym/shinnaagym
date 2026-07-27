@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { deleteSession, updateSession } from "@/lib/schedule";
-import type { SessionStatus } from "@/lib/db";
+import type { PtType, SessionStatus } from "@/lib/db";
 
 const VALID_STATUSES: SessionStatus[] = ["reserved", "completed", "no_show", "cancelled"];
+const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 
 export async function PATCH(
   req: NextRequest,
@@ -18,7 +19,7 @@ export async function PATCH(
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
   const body = (await req.json().catch(() => null)) as
-    | { status?: unknown; memo?: unknown; coachId?: unknown }
+    | { status?: unknown; memo?: unknown; coachId?: unknown; ptType?: unknown }
     | null;
 
   const status =
@@ -30,8 +31,12 @@ export async function PATCH(
     typeof body?.coachId === "number" && Number.isInteger(body.coachId)
       ? body.coachId
       : undefined;
+  const ptType =
+    typeof body?.ptType === "string" && VALID_PT_TYPES.includes(body.ptType as PtType)
+      ? (body.ptType as PtType)
+      : undefined;
 
-  await updateSession(idNum, { status, memo, coachId });
+  await updateSession(idNum, { status, memo, coachId, ptType });
   return NextResponse.json({ ok: true });
 }
 

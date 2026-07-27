@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { PURPOSE_OPTIONS, businessHours, BOOKING_WINDOW_DAYS } from "@/lib/constants";
 import { addDaysToKey, koreaCurrentHour, koreaTodayKey } from "@/lib/date";
 
@@ -30,7 +30,7 @@ function buildMonthCells(year: number, month: number) {
   return cells;
 }
 
-export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] }) {
+export function ReservationForm() {
   const todayKey = koreaTodayKey();
   const currentHour = koreaCurrentHour();
   const maxKey = addDaysToKey(todayKey, BOOKING_WINDOW_DAYS);
@@ -40,7 +40,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
   const [viewMonth, setViewMonth] = useState(todayM);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
-  const [taken, setTaken] = useState<Set<string>>(() => toTakenSet(initialTaken));
+  const [taken, setTaken] = useState<Set<string>>(() => new Set());
 
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
@@ -61,6 +61,17 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
       // 네트워크 오류 시엔 목록을 갱신하지 못해도 예약 시도 시 서버가 다시 막아준다.
     }
   }
+
+  // 페이지 자체는 정적으로 즉시 렌더링하고, 예약 현황만 마운트 후 비동기로 불러온다
+  // (DB 조회가 홈페이지 첫 응답을 막지 않도록 하기 위함).
+  useEffect(() => {
+    fetch("/api/reservations", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => setTaken(toTakenSet(data.taken ?? [])))
+      .catch(() => {
+        // 네트워크 오류 시엔 목록을 갱신하지 못해도 예약 시도 시 서버가 다시 막아준다.
+      });
+  }, []);
 
   const cells = useMemo(() => buildMonthCells(viewYear, viewMonth), [viewYear, viewMonth]);
   const monthLabel = `${viewYear}년 ${viewMonth}월`;
@@ -178,7 +189,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
           >
             ‹
           </button>
-          <p className="font-display text-xl">{monthLabel}</p>
+          <p className="font-serif-display text-xl">{monthLabel}</p>
           <button
             type="button"
             onClick={goNextMonth}

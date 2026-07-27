@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { addPackage, createMember, listMembers } from "@/lib/schedule";
+import type { PtType } from "@/lib/db";
+
+const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 
 export async function GET() {
   if (!(await isAdminAuthed())) {
@@ -24,6 +27,7 @@ export async function POST(req: NextRequest) {
         availableTimes?: unknown;
         totalSessions?: unknown;
         price?: unknown;
+        ptType?: unknown;
       }
     | null;
 
@@ -46,9 +50,13 @@ export async function POST(req: NextRequest) {
   if (!Number.isInteger(totalSessions) || totalSessions < 1) {
     return NextResponse.json({ error: "등록 횟수를 올바르게 입력해주세요." }, { status: 400 });
   }
+  const ptType: PtType =
+    typeof body?.ptType === "string" && VALID_PT_TYPES.includes(body.ptType as PtType)
+      ? (body.ptType as PtType)
+      : "1:1";
 
   const member = await createMember({ name, phone, coachId, notes, referrer, availableTimes });
-  await addPackage(member.id, totalSessions, price, "최초 등록");
+  await addPackage(member.id, totalSessions, price, "최초 등록", ptType);
 
   return NextResponse.json({ member }, { status: 201 });
 }

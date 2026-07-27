@@ -15,6 +15,7 @@ export function SettingsView({
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
   const [newCoachName, setNewCoachName] = useState("");
+  const [newCoachPhone, setNewCoachPhone] = useState("");
   const [newHolidayDate, setNewHolidayDate] = useState("");
   const [newHolidayName, setNewHolidayName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export function SettingsView({
     const res = await fetch("/api/admin/coaches", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newCoachName.trim() }),
+      body: JSON.stringify({ name: newCoachName.trim(), phone: newCoachPhone.trim() }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -34,6 +35,16 @@ export function SettingsView({
     }
     setCoaches((prev) => [...prev, data.coach]);
     setNewCoachName("");
+    setNewCoachPhone("");
+  }
+
+  async function updateCoachPhone(id: number, phone: string) {
+    setCoaches((prev) => prev.map((c) => (c.id === id ? { ...c, phone } : c)));
+    await fetch(`/api/admin/coaches/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
   }
 
   async function toggleCoach(coach: CoachRow) {
@@ -95,8 +106,8 @@ export function SettingsView({
         </p>
         <div className="divide-y divide-line/50">
           {coaches.map((c) => (
-            <div key={c.id} className="flex items-center justify-between py-2.5 gap-3">
-              <div className="flex items-center gap-2">
+            <div key={c.id} className="flex items-center justify-between py-2.5 gap-3 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm">{c.name}</span>
                 <span
                   className={[
@@ -111,6 +122,12 @@ export function SettingsView({
                     담당 {memberCounts[c.id]}명
                   </span>
                 )}
+                <input
+                  defaultValue={c.phone}
+                  placeholder="연락처 (예: 010-0000-0000)"
+                  onBlur={(e) => updateCoachPhone(c.id, e.target.value.trim())}
+                  className="w-40 rounded-lg border border-line px-2.5 py-1 text-xs outline-none focus:border-coral"
+                />
               </div>
               <button
                 onClick={() => toggleCoach(c)}
@@ -131,6 +148,12 @@ export function SettingsView({
             value={newCoachName}
             onChange={(e) => setNewCoachName(e.target.value)}
             placeholder="새 코치 이름"
+            className="flex-1 min-w-0 rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
+          />
+          <input
+            value={newCoachPhone}
+            onChange={(e) => setNewCoachPhone(e.target.value)}
+            placeholder="연락처 (예: 010-0000-0000)"
             className="flex-1 min-w-0 rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
           />
           <button

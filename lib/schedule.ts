@@ -3,13 +3,15 @@ import { query } from "./db";
 import type {
   ClassSessionRow,
   CoachRow,
+  FixedSlotRow,
   HolidayRow,
   MemberRow,
   MemberStatus,
   PackageRow,
+  PtType,
   SessionStatus,
 } from "./db";
-import { addDaysToKey, addMonthsToKey } from "./date";
+import { addDaysToKey, addMonthsToKey, koreaCurrentHour, koreaTodayKey } from "./date";
 import { scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
@@ -23,16 +25,20 @@ export async function listCoaches(activeOnly = false): Promise<CoachRow[]> {
   return result.rows;
 }
 
-export async function addCoach(name: string): Promise<CoachRow> {
+export async function addCoach(name: string, phone = ""): Promise<CoachRow> {
   const result = await query<CoachRow>(
-    `INSERT INTO coaches (name) VALUES ($1) RETURNING *`,
-    [name],
+    `INSERT INTO coaches (name, phone) VALUES ($1, $2) RETURNING *`,
+    [name, phone],
   );
   return result.rows[0];
 }
 
 export async function setCoachActive(id: number, active: boolean): Promise<void> {
   await query(`UPDATE coaches SET active = $2 WHERE id = $1`, [id, active]);
+}
+
+export async function setCoachPhone(id: number, phone: string): Promise<void> {
+  await query(`UPDATE coaches SET phone = $2 WHERE id = $1`, [id, phone]);
 }
 
 /** 코치별 담당 활성 회원 수 (퇴사 처리 전 경고용). */
@@ -192,18 +198,20 @@ export interface MemberWithProgress extends MemberRow {
   total_sessions: number;
   done_count: number;
   package_count: number;
-  latest_price: number | null;
-  latest_total_sessions: number | null;
+  has_next_week_session: boolean;
 }
 
-export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
+export async function listMembersWithProgress(
+  nextWeekStart?: string,
+  nextWeekEnd?: string,
+): Promise<MemberWithProgress[]> {
+  await autoCompletePastSessions();
   const result = await query<MemberWithProgress>(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
        COALESCE(s.done, 0)::int as done_count,
        COALESCE(p.pkg_count, 0)::int as package_count,
-       latest.price as latest_price,
-       latest.total_sessions as latest_total_sessions
+       (nw.member_id IS NOT NULL) as has_next_week_session
      FROM members m
      LEFT JOIN (
        SELECT member_id, SUM(total_sessions) as total, COUNT(*) as pkg_count
@@ -211,15 +219,60 @@ export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
      ) p ON p.member_id = m.id
      LEFT JOIN (
        SELECT member_id, COUNT(*) as done FROM class_sessions
-       WHERE status IN ('completed', 'no_show') GROUP BY member_id
+       WHERE entry_type = 'session' AND status IN ('completed', 'no_show') GROUP BY member_id
      ) s ON s.member_id = m.id
-     LEFT JOIN LATERAL (
-       SELECT price, total_sessions FROM packages p2
-       WHERE p2.member_id = m.id ORDER BY purchased_at DESC LIMIT 1
-     ) latest ON true
+     LEFT JOIN (
+       SELECT DISTINCT member_id FROM class_sessions
+       WHERE entry_type = 'session' AND status <> 'cancelled'
+         AND session_date >= $1 AND session_date <= $2
+     ) nw ON nw.member_id = m.id
      ORDER BY m.name ASC`,
+    [nextWeekStart ?? "9999-12-31", nextWeekEnd ?? "9999-12-31"],
   );
   return result.rows;
+}
+
+// ---- 고정 시간대 ----
+
+export interface FixedSlotWithMember extends FixedSlotRow {
+  member_name: string;
+}
+
+export async function listFixedSlots(): Promise<FixedSlotWithMember[]> {
+  const result = await query<FixedSlotWithMember>(
+    `SELECT f.*, m.name as member_name
+     FROM fixed_slots f
+     JOIN members m ON m.id = f.member_id
+     ORDER BY f.weekday ASC, f.hour ASC, m.name ASC`,
+  );
+  return result.rows;
+}
+
+export async function listFixedSlotsByMember(memberId: number): Promise<FixedSlotRow[]> {
+  const result = await query<FixedSlotRow>(
+    `SELECT * FROM fixed_slots WHERE member_id = $1 ORDER BY weekday ASC, hour ASC`,
+    [memberId],
+  );
+  return result.rows;
+}
+
+export async function addFixedSlot(
+  memberId: number,
+  weekday: number,
+  hour: number,
+): Promise<FixedSlotRow> {
+  const result = await query<FixedSlotRow>(
+    `INSERT INTO fixed_slots (member_id, weekday, hour)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (member_id, weekday, hour) DO UPDATE SET member_id = EXCLUDED.member_id
+     RETURNING *`,
+    [memberId, weekday, hour],
+  );
+  return result.rows[0];
+}
+
+export async function removeFixedSlot(id: number): Promise<void> {
+  await query(`DELETE FROM fixed_slots WHERE id = $1`, [id]);
 }
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {
@@ -239,11 +292,12 @@ export async function addPackage(
   totalSessions: number,
   price: number,
   note: string,
+  ptType: PtType = "1:1",
 ): Promise<PackageRow> {
   const result = await query<PackageRow>(
-    `INSERT INTO packages (member_id, total_sessions, price, note)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [memberId, totalSessions, price, note],
+    `INSERT INTO packages (member_id, total_sessions, price, note, pt_type)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [memberId, totalSessions, price, note, ptType],
   );
   return result.rows[0];
 }
@@ -258,7 +312,7 @@ export async function listPackages(memberId: number): Promise<PackageRow[]> {
 
 export async function updatePackage(
   id: number,
-  input: { totalSessions?: number; price?: number; note?: string },
+  input: { totalSessions?: number; price?: number; note?: string; ptType?: PtType },
 ): Promise<PackageRow> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -275,6 +329,10 @@ export async function updatePackage(
   if (input.note !== undefined) {
     fields.push(`note = $${++i}`);
     values.push(input.note);
+  }
+  if (input.ptType !== undefined) {
+    fields.push(`pt_type = $${++i}`);
+    values.push(input.ptType);
   }
 
   const result = await query<PackageRow>(
@@ -295,6 +353,7 @@ export interface MemberProgress {
 }
 
 export async function computeMemberProgress(memberId: number): Promise<MemberProgress> {
+  await autoCompletePastSessions();
   const [packagesResult, doneResult] = await Promise.all([
     query<{ sum: string | null }>(
       `SELECT SUM(total_sessions) as sum FROM packages WHERE member_id = $1`,
@@ -302,7 +361,7 @@ export async function computeMemberProgress(memberId: number): Promise<MemberPro
     ),
     query<{ count: string }>(
       `SELECT COUNT(*) as count FROM class_sessions
-       WHERE member_id = $1 AND status IN ('completed', 'no_show')`,
+       WHERE member_id = $1 AND entry_type = 'session' AND status IN ('completed', 'no_show')`,
       [memberId],
     ),
   ]);
@@ -333,10 +392,31 @@ const SESSION_SELECT_FIELDS = `
   ) END) as total_sessions
 `;
 
+// 이미 지난 PT 수업(entry_type='session')은 관리자가 수동으로 완료 처리하지 않아도
+// 자동으로 '완료' 상태가 되도록 한다. 같은 시(時) 안에서는 반복 실행해도 결과가
+// 같은 멱등 UPDATE라, 서버 인스턴스별로 KST 기준 (오늘 날짜, 시각)이 바뀔 때만 재실행한다.
+let autoCompleteCacheKey: string | null = null;
+
+async function autoCompletePastSessions(): Promise<void> {
+  const todayKey = koreaTodayKey();
+  const hour = koreaCurrentHour();
+  const cacheKey = `${todayKey}-${hour}`;
+  if (autoCompleteCacheKey === cacheKey) return;
+  autoCompleteCacheKey = cacheKey;
+  await query(
+    `UPDATE class_sessions
+     SET status = 'completed'
+     WHERE entry_type = 'session' AND status = 'reserved'
+       AND (session_date < $1 OR (session_date = $1 AND session_hour < $2))`,
+    [todayKey, hour],
+  );
+}
+
 export async function listSessionsInRange(
   fromKey: string,
   toKey: string,
 ): Promise<SessionWithMember[]> {
+  await autoCompletePastSessions();
   const result = await query<SessionWithMember>(
     `SELECT ${SESSION_SELECT_FIELDS}
      FROM class_sessions s
@@ -350,6 +430,7 @@ export async function listSessionsInRange(
 }
 
 export async function listMemberSessions(memberId: number): Promise<SessionWithMember[]> {
+  await autoCompletePastSessions();
   const result = await query<SessionWithMember>(
     `SELECT ${SESSION_SELECT_FIELDS}
      FROM class_sessions s
@@ -369,10 +450,11 @@ export async function createSession(input: {
   hour: number;
   memo?: string;
   entryType?: "session" | "consultation" | "memo" | "blocked";
+  ptType?: PtType;
 }): Promise<ClassSessionRow> {
   const result = await query<ClassSessionRow>(
-    `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo, entry_type)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo, entry_type, pt_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
     [
       input.memberId,
       input.coachId,
@@ -380,6 +462,7 @@ export async function createSession(input: {
       input.hour,
       input.memo ?? "",
       input.entryType ?? "session",
+      input.ptType ?? "1:1",
     ],
   );
   return result.rows[0];
@@ -387,7 +470,7 @@ export async function createSession(input: {
 
 export async function updateSession(
   id: number,
-  input: { status?: SessionStatus; memo?: string; coachId?: number },
+  input: { status?: SessionStatus; memo?: string; coachId?: number; ptType?: PtType },
 ): Promise<void> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -404,6 +487,10 @@ export async function updateSession(
   if (input.coachId !== undefined) {
     fields.push(`coach_id = $${++i}`);
     values.push(input.coachId);
+  }
+  if (input.ptType !== undefined) {
+    fields.push(`pt_type = $${++i}`);
+    values.push(input.ptType);
   }
   if (fields.length === 0) return;
 
@@ -511,6 +598,7 @@ export interface CoachMonthlyReport {
 
 /** yearMonth: "YYYY-MM" */
 export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMonthlyReport[]> {
+  await autoCompletePastSessions();
   const monthStart = `${yearMonth}-01`;
 
   const [coachesResult, revenueResult, sessionsResult, memberStatsResult] = await Promise.all([
@@ -592,6 +680,7 @@ export interface DashboardOverview {
 
 /** yearMonth: "YYYY-MM" */
 export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
+  await autoCompletePastSessions();
   const [activeMembers, revenue, sessionStats, newMembers, reRegistered] = await Promise.all([
     query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
     query<{ revenue: string }>(
@@ -649,6 +738,7 @@ export async function getMonthlyTrend(
   endYearMonth: string,
   months: number,
 ): Promise<MonthlyTrendPoint[]> {
+  await autoCompletePastSessions();
   const monthKeys: string[] = [];
   for (let i = months - 1; i >= 0; i--) {
     monthKeys.push(addMonthsToKey(endYearMonth, -i));

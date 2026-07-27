@@ -2,10 +2,6 @@ import Image from "next/image";
 import { PulseLine } from "@/app/components/PulseLine";
 import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
-import { getTakenSlots } from "@/lib/reservations";
-
-// 예약 현황(DB)에 따라 매 요청마다 달라지므로 정적 프리렌더링을 끈다.
-export const dynamic = "force-dynamic";
 
 const TRAINER_NAME = "신종수";
 const TRAINER_BIO =
@@ -62,9 +58,7 @@ const PROCESS_STEPS = [
   },
 ];
 
-export default async function Home() {
-  const initialTaken = await getTakenSlots();
-
+export default function Home() {
   return (
     <>
       <header className="relative overflow-hidden bg-ink text-bone">
@@ -82,7 +76,7 @@ export default async function Home() {
               priority
               className="h-12 w-auto sm:h-16"
             />
-            <span className="font-display text-2xl sm:text-3xl tracking-wide text-bone">
+            <span className="font-serif-display text-2xl sm:text-3xl tracking-wide text-bone">
               신나아짐
             </span>
           </a>
@@ -91,7 +85,7 @@ export default async function Home() {
           <p className="hero-fade-1 text-sm tracking-[0.2em] text-gold uppercase mb-6">
             Pre-Open Reservation
           </p>
-          <h1 className="hero-fade-2 font-display text-4xl sm:text-7xl leading-[1.25] sm:leading-[1.15] tracking-tight mb-8">
+          <h1 className="hero-fade-2 font-serif-display text-[1.9rem] sm:text-7xl leading-[1.3] sm:leading-[1.15] tracking-tight mb-8">
             내 몸이 나아지고,
             <br />
             운동이 신나는 공간.
@@ -130,10 +124,7 @@ export default async function Home() {
       <main className="flex-1">
         <section id="trainer" className="mx-auto max-w-5xl px-6 py-20">
           <Reveal>
-            <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
-              Owner
-            </p>
-            <h2 className="font-display text-3xl mb-14">대표 소개</h2>
+            <h2 className="font-serif-display text-3xl mb-14">대표 소개</h2>
           </Reveal>
           <div className="grid gap-10 sm:grid-cols-[280px_1fr] items-start">
             <Reveal>
@@ -146,7 +137,7 @@ export default async function Home() {
               />
             </Reveal>
             <Reveal delayMs={100}>
-              <p className="font-display text-2xl mb-1">{TRAINER_NAME}</p>
+              <p className="font-serif-display text-2xl mb-1">{TRAINER_NAME}</p>
               <p className="text-xs tracking-[0.15em] text-gold uppercase mb-5">
                 Physical Therapist
               </p>
@@ -188,49 +179,53 @@ export default async function Home() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-5xl px-6 py-20 border-t border-line">
-          <Reveal>
-            <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
-              How It Works
-            </p>
-            <h2 className="font-display text-3xl mb-14">처음 오시는 날의 순서</h2>
-          </Reveal>
-          <div className="relative">
-            <div
-              aria-hidden="true"
-              className="hidden sm:block absolute left-0 right-0 top-[26px] border-t border-line"
-            />
-            <div className="grid gap-10 sm:grid-cols-4">
-              {PROCESS_STEPS.map((step, i) => (
-                <Reveal key={step.n} delayMs={i * 100}>
-                  <div className="relative">
-                    <span className="relative z-10 inline-block bg-paper pr-4 font-display text-5xl text-gold">
-                      {step.n}
-                    </span>
-                    <h3 className="font-display text-lg mt-4 mb-2">{step.title}</h3>
-                    <p className="text-sm text-ink/70 leading-relaxed">{step.body}</p>
-                  </div>
-                </Reveal>
-              ))}
+        <section className="bg-ink text-bone py-20 sm:py-24">
+          <div className="mx-auto max-w-5xl px-6">
+            <Reveal>
+              <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
+                How It Works
+              </p>
+              <h2 className="font-serif-display text-3xl mb-14">처음 오시는 날의 순서</h2>
+            </Reveal>
+            <div className="relative">
+              <div
+                aria-hidden="true"
+                className="hidden sm:block absolute left-0 right-0 top-1 h-10 text-gold/40"
+              >
+                <PulseLine className="w-full h-full" />
+              </div>
+              <div className="grid gap-10 sm:grid-cols-4">
+                {PROCESS_STEPS.map((step, i) => (
+                  <Reveal key={step.n} delayMs={i * 100}>
+                    <div className="relative">
+                      <span className="relative z-10 inline-block bg-ink pr-4 font-serif-display text-5xl text-gold">
+                        {step.n}
+                      </span>
+                      <h3 className="font-serif-display text-lg mt-4 mb-2">{step.title}</h3>
+                      <p className="text-sm text-bone/70 leading-relaxed">{step.body}</p>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="reserve" className="border-t border-line">
+        <section id="reserve">
           <div className="mx-auto max-w-5xl px-6 py-20">
             <Reveal>
               <PulseLine className="w-24 h-8 text-gold/70 mb-6" />
               <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
                 Reservation
               </p>
-              <h2 className="font-display text-3xl mb-3">사전예약 안내</h2>
+              <h2 className="font-serif-display text-3xl mb-3">사전예약 안내</h2>
               <p className="text-ink/70 mb-12 leading-relaxed">
                 아래 달력에서 원하시는 날짜와 시간을 선택해주세요. 예약은 오전 9시부터
                 오후 10시까지 1시간 단위로 가능하며, 한 시간에 한 분만 예약하실 수
                 있어요. 예약이 확정되면 남겨주신 연락처로 안내드릴게요.
               </p>
             </Reveal>
-            <ReservationForm initialTaken={initialTaken} />
+            <ReservationForm />
           </div>
         </section>
 
@@ -241,7 +236,7 @@ export default async function Home() {
               <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
                 Location
               </p>
-              <h2 className="font-display text-3xl mb-3">오시는 길</h2>
+              <h2 className="font-serif-display text-3xl mb-3">오시는 길</h2>
               <p className="text-ink/70 mb-10 leading-relaxed">
                 {STUDIO_ADDRESS}
                 <br />
@@ -252,7 +247,7 @@ export default async function Home() {
               <div className="grid gap-6 sm:grid-cols-[1fr_1.3fr] items-stretch">
                 <div className="rounded-2xl bg-bone/50 border border-line p-6 flex flex-col justify-between">
                   <div>
-                    <p className="font-display text-lg mb-2">신나아짐 PT</p>
+                    <p className="font-serif-display text-lg mb-2">신나아짐 PT</p>
                     <p className="text-sm text-ink/70 leading-relaxed">{STUDIO_ADDRESS}</p>
                   </div>
                   <a
@@ -282,7 +277,7 @@ export default async function Home() {
 
       <footer className="border-t border-line">
         <div className="mx-auto max-w-5xl px-6 py-12 text-sm text-ink/60 flex flex-col gap-2">
-          <p className="font-display text-base text-ink">신나아짐</p>
+          <p className="font-serif-display text-base text-ink">신나아짐</p>
           <p>전 직원 물리치료사 면허 보유 · 프리미엄 PT 스튜디오</p>
           <p>{STUDIO_ADDRESS}</p>
           <p>

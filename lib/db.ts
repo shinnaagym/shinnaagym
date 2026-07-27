@@ -99,6 +99,7 @@ function ensureSchema(): Promise<void> {
         CREATE TABLE IF NOT EXISTS coaches (
           id SERIAL PRIMARY KEY,
           name TEXT NOT NULL UNIQUE,
+          phone TEXT NOT NULL DEFAULT '',
           active BOOLEAN NOT NULL DEFAULT true,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -141,6 +142,15 @@ function ensureSchema(): Promise<void> {
           UNIQUE (coach_id, session_date, session_hour)
         );
 
+        CREATE TABLE IF NOT EXISTS fixed_slots (
+          id SERIAL PRIMARY KEY,
+          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          weekday INTEGER NOT NULL, -- 0=월 ... 6=일
+          hour INTEGER NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE (member_id, weekday, hour)
+        );
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -148,30 +158,36 @@ function ensureSchema(): Promise<void> {
       .then(() =>
         // 기존(프로덕션) 테이블에는 위 CREATE TABLE IF NOT EXISTS 가 적용되지 않으므로
         // 이미 배포된 스키마를 위해 컬럼 추가 마이그레이션을 별도로 실행한다.
-        getPool().query(
-          `
-          ALTER TABLE class_sessions ALTER COLUMN member_id DROP NOT NULL;
-          ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS entry_type TEXT NOT NULL DEFAULT 'session';
-          ALTER TABLE reservations ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id);
-          ALTER TABLE reservations ADD COLUMN IF NOT EXISTS class_session_id INTEGER REFERENCES class_sessions(id);
-          ALTER TABLE members ADD COLUMN IF NOT EXISTS referrer TEXT NOT NULL DEFAULT '';
-          ALTER TABLE members ADD COLUMN IF NOT EXISTS available_times TEXT NOT NULL DEFAULT '';
-          ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_status TEXT NOT NULL DEFAULT '대기';
-          ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_memo TEXT NOT NULL DEFAULT '';
-          ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
-          ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
-            FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
-          `,
-        ),
-      )
-      .then(() =>
-        getPool().query(
-          `INSERT INTO holidays (holiday_date, name) VALUES ${SEED_HOLIDAYS_2026.map(
-            (_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`,
-          ).join(", ")}
-           ON CONFLICT (holiday_date) DO NOTHING;`,
-          SEED_HOLIDAYS_2026.flat(),
-        ),
+        // 컬럼 추가(ALTER)와 공휴일 시드(INSERT)는 서로 의존하지 않으므로(둘 다 위
+        // CREATE TABLE 블록에만 의존) 순차 대신 병렬로 실행해 콜드스타트 시
+        // 왕복 횟수를 줄인다.
+        Promise.all([
+          getPool().query(
+            `
+            ALTER TABLE class_sessions ALTER COLUMN member_id DROP NOT NULL;
+            ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS entry_type TEXT NOT NULL DEFAULT 'session';
+            ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS pt_type TEXT NOT NULL DEFAULT '1:1';
+            ALTER TABLE packages ADD COLUMN IF NOT EXISTS pt_type TEXT NOT NULL DEFAULT '1:1';
+            ALTER TABLE reservations ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id);
+            ALTER TABLE reservations ADD COLUMN IF NOT EXISTS class_session_id INTEGER REFERENCES class_sessions(id);
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS referrer TEXT NOT NULL DEFAULT '';
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS available_times TEXT NOT NULL DEFAULT '';
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_status TEXT NOT NULL DEFAULT '대기';
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_memo TEXT NOT NULL DEFAULT '';
+            ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+            ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
+            ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
+              FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
+            `,
+          ),
+          getPool().query(
+            `INSERT INTO holidays (holiday_date, name) VALUES ${SEED_HOLIDAYS_2026.map(
+              (_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`,
+            ).join(", ")}
+             ON CONFLICT (holiday_date) DO NOTHING;`,
+            SEED_HOLIDAYS_2026.flat(),
+          ),
+        ]),
       )
       .then(() => undefined)
       .catch((err) => {
@@ -208,6 +224,7 @@ export interface ReservationRow {
 export interface CoachRow {
   id: number;
   name: string;
+  phone: string;
   active: boolean;
   created_at: string;
 }
@@ -234,6 +251,8 @@ export interface MemberRow {
   created_at: string;
 }
 
+export type PtType = "1:1" | "2:1";
+
 export interface PackageRow {
   id: number;
   member_id: number;
@@ -241,6 +260,15 @@ export interface PackageRow {
   price: number;
   purchased_at: string;
   note: string;
+  pt_type: PtType;
+}
+
+export interface FixedSlotRow {
+  id: number;
+  member_id: number;
+  weekday: number;
+  hour: number;
+  created_at: string;
 }
 
 export type SessionStatus = "reserved" | "completed" | "no_show" | "cancelled";
@@ -255,5 +283,6 @@ export interface ClassSessionRow {
   status: SessionStatus;
   memo: string;
   entry_type: SessionEntryType;
+  pt_type: PtType;
   created_at: string;
 }
