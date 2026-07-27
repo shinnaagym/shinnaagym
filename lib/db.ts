@@ -126,7 +126,8 @@ function ensureSchema(): Promise<void> {
           total_sessions INTEGER NOT NULL,
           price INTEGER NOT NULL DEFAULT 0,
           purchased_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-          note TEXT NOT NULL DEFAULT ''
+          note TEXT NOT NULL DEFAULT '',
+          payment_method TEXT NOT NULL DEFAULT 'card'
         );
 
         CREATE TABLE IF NOT EXISTS class_sessions (
@@ -175,6 +176,7 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_status TEXT NOT NULL DEFAULT '대기';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_memo TEXT NOT NULL DEFAULT '';
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+          ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -253,6 +255,8 @@ export interface MemberRow {
 
 export type PtType = "1:1" | "2:1";
 
+export type PaymentMethod = "card" | "transfer";
+
 export interface PackageRow {
   id: number;
   member_id: number;
@@ -261,6 +265,7 @@ export interface PackageRow {
   purchased_at: string;
   note: string;
   pt_type: PtType;
+  payment_method: PaymentMethod;
 }
 
 export interface FixedSlotRow {

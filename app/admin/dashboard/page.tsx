@@ -68,7 +68,9 @@ export default async function AdminDashboardPage({
   const kpiCards: Array<{ label: string; value: string; accent?: boolean }> = [
     { label: "활성 회원", value: `${overview.activeMemberCount}명` },
     { label: "이번 달 완료 세션", value: `${overview.monthlyCompletedSessions}회` },
-    { label: "이번 달 매출", value: formatWon(overview.monthlyRevenue), accent: true },
+    { label: "이번 달 총 상담수", value: `${overview.monthlyConsultationCount}건` },
+    { label: "카드결제 매출 (부가세포함)", value: formatWon(overview.monthlyRevenueCard), accent: true },
+    { label: "계좌이체 매출 (부가세제외)", value: formatWon(overview.monthlyRevenueTransfer), accent: true },
     { label: "이번 달 신규 등록", value: `${overview.monthlyNewMemberCount}명` },
     { label: "이번 달 재등록", value: `${overview.monthlyReRegisteredMemberCount}명` },
     { label: "노쇼율", value: formatRate(overview.noShowRate) },
@@ -102,7 +104,7 @@ export default async function AdminDashboardPage({
           </div>
 
           {/* KPI 카드 */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
             {kpiCards.map((card) => (
               <div
                 key={card.label}

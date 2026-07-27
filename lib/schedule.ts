@@ -9,6 +9,7 @@ import type {
   MemberRow,
   MemberStatus,
   PackageRow,
+  PaymentMethod,
   PtType,
   SessionStatus,
 } from "./db";
@@ -423,11 +424,12 @@ export async function addPackage(
   price: number,
   note: string,
   ptType: PtType = "1:1",
+  paymentMethod: PaymentMethod = "card",
 ): Promise<PackageRow> {
   const result = await query<PackageRow>(
-    `INSERT INTO packages (member_id, total_sessions, price, note, pt_type)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [memberId, totalSessions, price, note, ptType],
+    `INSERT INTO packages (member_id, total_sessions, price, note, pt_type, payment_method)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [memberId, totalSessions, price, note, ptType, paymentMethod],
   );
   return result.rows[0];
 }
@@ -442,7 +444,13 @@ export async function listPackages(memberId: number): Promise<PackageRow[]> {
 
 export async function updatePackage(
   id: number,
-  input: { totalSessions?: number; price?: number; note?: string; ptType?: PtType },
+  input: {
+    totalSessions?: number;
+    price?: number;
+    note?: string;
+    ptType?: PtType;
+    paymentMethod?: PaymentMethod;
+  },
 ): Promise<PackageRow> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -463,6 +471,10 @@ export async function updatePackage(
   if (input.ptType !== undefined) {
     fields.push(`pt_type = $${++i}`);
     values.push(input.ptType);
+  }
+  if (input.paymentMethod !== undefined) {
+    fields.push(`payment_method = $${++i}`);
+    values.push(input.paymentMethod);
   }
 
   const result = await query<PackageRow>(
@@ -800,60 +812,75 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
 
 export interface DashboardOverview {
   activeMemberCount: number;
-  monthlyRevenue: number;
+  monthlyRevenueCard: number;
+  monthlyRevenueTransfer: number;
   monthlyCompletedSessions: number;
   monthlyNoShowCount: number;
   noShowRate: number | null;
   monthlyNewMemberCount: number;
   monthlyReRegisteredMemberCount: number;
+  monthlyConsultationCount: number;
 }
 
 /** yearMonth: "YYYY-MM" */
 export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
   await autoCompletePastSessions();
-  const [activeMembers, revenue, sessionStats, newMembers, reRegistered] = await Promise.all([
-    query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
-    query<{ revenue: string }>(
-      `SELECT COALESCE(SUM(price), 0) as revenue FROM packages
-       WHERE to_char(purchased_at, 'YYYY-MM') = $1`,
-      [yearMonth],
-    ),
-    query<{ completed: string; no_show: string }>(
-      `SELECT
-         COUNT(*) FILTER (WHERE status = 'completed') as completed,
-         COUNT(*) FILTER (WHERE status = 'no_show') as no_show
-       FROM class_sessions
-       WHERE entry_type = 'session' AND LEFT(session_date, 7) = $1`,
-      [yearMonth],
-    ),
-    query<{ count: string }>(
-      `SELECT COUNT(*) as count FROM (
-         SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id
-       ) f WHERE to_char(f.first_at, 'YYYY-MM') = $1`,
-      [yearMonth],
-    ),
-    query<{ count: string }>(
-      `SELECT COUNT(DISTINCT p.member_id) as count FROM packages p
-       WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
-         AND p.purchased_at <> (
-           SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
-         )`,
-      [yearMonth],
-    ),
-  ]);
+  const [activeMembers, revenue, sessionStats, newMembers, reRegistered, consultations] =
+    await Promise.all([
+      query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
+      query<{ payment_method: PaymentMethod; revenue: string }>(
+        `SELECT payment_method, COALESCE(SUM(price), 0) as revenue FROM packages
+         WHERE to_char(purchased_at, 'YYYY-MM') = $1
+         GROUP BY payment_method`,
+        [yearMonth],
+      ),
+      query<{ completed: string; no_show: string }>(
+        `SELECT
+           COUNT(*) FILTER (WHERE status = 'completed') as completed,
+           COUNT(*) FILTER (WHERE status = 'no_show') as no_show
+         FROM class_sessions
+         WHERE entry_type = 'session' AND LEFT(session_date, 7) = $1`,
+        [yearMonth],
+      ),
+      query<{ count: string }>(
+        `SELECT COUNT(*) as count FROM (
+           SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id
+         ) f WHERE to_char(f.first_at, 'YYYY-MM') = $1`,
+        [yearMonth],
+      ),
+      query<{ count: string }>(
+        `SELECT COUNT(DISTINCT p.member_id) as count FROM packages p
+         WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+           AND p.purchased_at <> (
+             SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+           )`,
+        [yearMonth],
+      ),
+      query<{ count: string }>(
+        `SELECT COUNT(*) as count FROM class_sessions
+         WHERE entry_type = 'consultation' AND status <> 'cancelled'
+           AND LEFT(session_date, 7) = $1`,
+        [yearMonth],
+      ),
+    ]);
 
   const completed = Number(sessionStats.rows[0]?.completed ?? 0);
   const noShow = Number(sessionStats.rows[0]?.no_show ?? 0);
   const denom = completed + noShow;
+  const revenueByMethod = new Map(
+    revenue.rows.map((r) => [r.payment_method, Number(r.revenue ?? 0)]),
+  );
 
   return {
     activeMemberCount: Number(activeMembers.rows[0]?.count ?? 0),
-    monthlyRevenue: Number(revenue.rows[0]?.revenue ?? 0),
+    monthlyRevenueCard: revenueByMethod.get("card") ?? 0,
+    monthlyRevenueTransfer: revenueByMethod.get("transfer") ?? 0,
     monthlyCompletedSessions: completed,
     monthlyNoShowCount: noShow,
     noShowRate: denom > 0 ? noShow / denom : null,
     monthlyNewMemberCount: Number(newMembers.rows[0]?.count ?? 0),
     monthlyReRegisteredMemberCount: Number(reRegistered.rows[0]?.count ?? 0),
+    monthlyConsultationCount: Number(consultations.rows[0]?.count ?? 0),
   };
 }
 

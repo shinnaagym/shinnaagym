@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CoachRow, MemberStatus, PackageRow, PtType } from "@/lib/db";
+import type { CoachRow, MemberStatus, PackageRow, PaymentMethod, PtType } from "@/lib/db";
 import type { FixedSlotWithMember, MemberWithProgress } from "@/lib/schedule";
 import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 
 const PT_TYPE_OPTIONS: PtType[] = ["1:1", "2:1"];
+const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = ["card", "transfer"];
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  card: "카드결제",
+  transfer: "계좌이체",
+};
 const FIXED_SLOT_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토"];
 const FIXED_SLOT_CAPACITY = 3;
 
@@ -105,6 +110,45 @@ function PtTypeToggle({
         </button>
       ))}
     </div>
+  );
+}
+
+function PaymentMethodToggle({
+  value,
+  onChange,
+}: {
+  value: PaymentMethod;
+  onChange: (m: PaymentMethod) => void;
+}) {
+  return (
+    <div className="flex gap-1 rounded-full bg-bone/70 p-1 text-sm">
+      {PAYMENT_METHOD_OPTIONS.map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => onChange(m)}
+          className={[
+            "flex-1 rounded-full py-1.5 font-medium transition",
+            value === m ? "bg-coral text-white shadow-sm" : "text-ink/60",
+          ].join(" ")}
+        >
+          {PAYMENT_METHOD_LABELS[m]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PaymentMethodBadge({ method }: { method: PaymentMethod }) {
+  return (
+    <span
+      className={[
+        "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+        method === "transfer" ? "bg-sage/20 text-sage" : "bg-line/40 text-ink/50",
+      ].join(" ")}
+    >
+      {PAYMENT_METHOD_LABELS[method]}
+    </span>
   );
 }
 
@@ -501,6 +545,7 @@ function CreateMemberModal({
   const [availableTimes, setAvailableTimes] = useState("");
   const [notes, setNotes] = useState("");
   const [ptType, setPtType] = useState<PtType>("1:1");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [totalSessions, setTotalSessions] = useState("");
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -531,6 +576,7 @@ function CreateMemberModal({
           totalSessions: Number(totalSessions),
           price: Number(price || 0),
           ptType,
+          paymentMethod,
         }),
       });
       const data = await res.json();
@@ -619,6 +665,9 @@ function CreateMemberModal({
             />
           </Field>
         </div>
+        <Field label="결제 수단">
+          <PaymentMethodToggle value={paymentMethod} onChange={setPaymentMethod} />
+        </Field>
         <Field label="운동 목적 / 특이사항">
           <textarea
             value={notes}
@@ -709,6 +758,7 @@ function MemberDetailModal({
   const [addSessions, setAddSessions] = useState("");
   const [addPrice, setAddPrice] = useState("");
   const [addPtType, setAddPtType] = useState<PtType>("1:1");
+  const [addPaymentMethod, setAddPaymentMethod] = useState<PaymentMethod>("card");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -726,6 +776,7 @@ function MemberDetailModal({
   const [editPrice, setEditPrice] = useState("");
   const [editNote, setEditNote] = useState("");
   const [editPtType, setEditPtType] = useState<PtType>("1:1");
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>("card");
 
   function loadFrom(member: MemberDetail) {
     setName(member.name);
@@ -826,6 +877,7 @@ function MemberDetailModal({
         totalSessions: Number(addSessions),
         price: Number(addPrice || 0),
         ptType: addPtType,
+        paymentMethod: addPaymentMethod,
       }),
     });
     if (!res.ok) {
@@ -836,6 +888,7 @@ function MemberDetailModal({
     setAddSessions("");
     setAddPrice("");
     setAddPtType("1:1");
+    setAddPaymentMethod("card");
     onChanged();
     onClose();
   }
@@ -846,6 +899,7 @@ function MemberDetailModal({
     setEditPrice(String(pkg.price));
     setEditNote(pkg.note);
     setEditPtType(pkg.pt_type);
+    setEditPaymentMethod(pkg.payment_method);
   }
 
   async function saveEditPkg(pkgId: number) {
@@ -858,7 +912,13 @@ function MemberDetailModal({
     const res = await fetch(`/api/admin/members/${memberId}/packages/${pkgId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ totalSessions, price, note: editNote, ptType: editPtType }),
+      body: JSON.stringify({
+        totalSessions,
+        price,
+        note: editNote,
+        ptType: editPtType,
+        paymentMethod: editPaymentMethod,
+      }),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -1055,6 +1115,7 @@ function MemberDetailModal({
                 {editingPkgId === pkg.id ? (
                   <div className="space-y-1.5">
                     <PtTypeToggle value={editPtType} onChange={setEditPtType} />
+                    <PaymentMethodToggle value={editPaymentMethod} onChange={setEditPaymentMethod} />
                     <div className="grid grid-cols-2 gap-1.5">
                       <input
                         type="number"
@@ -1101,6 +1162,7 @@ function MemberDetailModal({
                         </span>
                         <TypeBadge isFirst={pkg.id === firstPackageId} />
                         <PtTypeBadge ptType={pkg.pt_type} />
+                        <PaymentMethodBadge method={pkg.payment_method} />
                       </p>
                       <p className="text-ink/60 truncate">
                         {pkg.total_sessions}회 · {formatWon(pkg.price)}
@@ -1130,6 +1192,9 @@ function MemberDetailModal({
             )}
           </div>
           <PtTypeToggle value={addPtType} onChange={setAddPtType} />
+          <div className="mt-1.5">
+            <PaymentMethodToggle value={addPaymentMethod} onChange={setAddPaymentMethod} />
+          </div>
           <div className="grid grid-cols-2 gap-2 mt-2">
             <input
               type="number"
