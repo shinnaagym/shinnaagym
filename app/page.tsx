@@ -2,10 +2,6 @@ import Image from "next/image";
 import { PulseLine } from "@/app/components/PulseLine";
 import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
-import { getTakenSlots } from "@/lib/reservations";
-
-// 예약 현황(DB)에 따라 매 요청마다 달라지므로 정적 프리렌더링을 끈다.
-export const dynamic = "force-dynamic";
 
 const TRAINER_NAME = "신종수";
 const TRAINER_BIO =
@@ -62,9 +58,7 @@ const PROCESS_STEPS = [
   },
 ];
 
-export default async function Home() {
-  const initialTaken = await getTakenSlots();
-
+export default function Home() {
   return (
     <>
       <header className="relative overflow-hidden bg-ink text-bone">
@@ -231,7 +225,7 @@ export default async function Home() {
                 있어요. 예약이 확정되면 남겨주신 연락처로 안내드릴게요.
               </p>
             </Reveal>
-            <ReservationForm initialTaken={initialTaken} />
+            <ReservationForm />
           </div>
         </section>
 
