@@ -99,6 +99,7 @@ function ensureSchema(): Promise<void> {
         CREATE TABLE IF NOT EXISTS coaches (
           id SERIAL PRIMARY KEY,
           name TEXT NOT NULL UNIQUE,
+          phone TEXT NOT NULL DEFAULT '',
           active BOOLEAN NOT NULL DEFAULT true,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -169,6 +170,7 @@ function ensureSchema(): Promise<void> {
           ALTER TABLE members ADD COLUMN IF NOT EXISTS available_times TEXT NOT NULL DEFAULT '';
           ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_status TEXT NOT NULL DEFAULT '대기';
           ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_memo TEXT NOT NULL DEFAULT '';
+          ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
           ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
           ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
             FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -219,6 +221,7 @@ export interface ReservationRow {
 export interface CoachRow {
   id: number;
   name: string;
+  phone: string;
   active: boolean;
   created_at: string;
 }

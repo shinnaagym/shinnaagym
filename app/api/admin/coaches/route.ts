@@ -14,13 +14,16 @@ export async function POST(req: NextRequest) {
   if (!(await isAdminAuthed())) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
-  const body = (await req.json().catch(() => null)) as { name?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as
+    | { name?: unknown; phone?: unknown }
+    | null;
   const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
   if (!name) {
     return NextResponse.json({ error: "코치 이름을 입력해주세요." }, { status: 400 });
   }
   try {
-    const coach = await addCoach(name);
+    const coach = await addCoach(name, phone);
     return NextResponse.json({ coach }, { status: 201 });
   } catch (err: unknown) {
     if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505") {

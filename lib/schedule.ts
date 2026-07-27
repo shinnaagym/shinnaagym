@@ -25,16 +25,20 @@ export async function listCoaches(activeOnly = false): Promise<CoachRow[]> {
   return result.rows;
 }
 
-export async function addCoach(name: string): Promise<CoachRow> {
+export async function addCoach(name: string, phone = ""): Promise<CoachRow> {
   const result = await query<CoachRow>(
-    `INSERT INTO coaches (name) VALUES ($1) RETURNING *`,
-    [name],
+    `INSERT INTO coaches (name, phone) VALUES ($1, $2) RETURNING *`,
+    [name, phone],
   );
   return result.rows[0];
 }
 
 export async function setCoachActive(id: number, active: boolean): Promise<void> {
   await query(`UPDATE coaches SET active = $2 WHERE id = $1`, [id, active]);
+}
+
+export async function setCoachPhone(id: number, phone: string): Promise<void> {
+  await query(`UPDATE coaches SET phone = $2 WHERE id = $1`, [id, phone]);
 }
 
 /** 코치별 담당 활성 회원 수 (퇴사 처리 전 경고용). */
