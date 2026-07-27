@@ -52,15 +52,15 @@ const STATUS_LABEL: Record<SessionStatus, string> = {
 };
 
 /** 코치별로 다른 색을 매기기 위한 팔레트. 코치 순서에 따라 순환한다. */
+// 신나아짐 브랜드 톤(골드·세이지·코랄 + 보조 색)에서 파생한 코치 색상 팔레트.
+// Tailwind 기본 rainbow 팔레트 대신 브랜드와 어울리는 톤만 순환시킨다.
 const COACH_COLOR_PALETTE: Array<{ header: string; headerText: string; accent: string }> = [
-  { header: "bg-sky-100", headerText: "text-sky-700", accent: "border-l-sky-400" },
-  { header: "bg-rose-100", headerText: "text-rose-700", accent: "border-l-rose-400" },
-  { header: "bg-emerald-100", headerText: "text-emerald-700", accent: "border-l-emerald-400" },
-  { header: "bg-orange-100", headerText: "text-orange-700", accent: "border-l-orange-400" },
-  { header: "bg-indigo-100", headerText: "text-indigo-700", accent: "border-l-indigo-400" },
-  { header: "bg-cyan-100", headerText: "text-cyan-700", accent: "border-l-cyan-400" },
-  { header: "bg-fuchsia-100", headerText: "text-fuchsia-700", accent: "border-l-fuchsia-400" },
-  { header: "bg-lime-100", headerText: "text-lime-700", accent: "border-l-lime-400" },
+  { header: "bg-gold/15", headerText: "text-gold", accent: "border-l-gold" },
+  { header: "bg-sage/20", headerText: "text-[#3f6357]", accent: "border-l-sage" },
+  { header: "bg-coral/12", headerText: "text-[#a84a2c]", accent: "border-l-coral" },
+  { header: "bg-[#e6ecec]", headerText: "text-[#3d5a5c]", accent: "border-l-[#8fadaf]" },
+  { header: "bg-[#f1e3e0]", headerText: "text-[#8a5347]", accent: "border-l-[#c98f83]" },
+  { header: "bg-[#f3e9d2]", headerText: "text-[#8a6a1f]", accent: "border-l-[#cdae6a]" },
 ];
 
 /** 일정 pill의 배경/테두리 스타일. 상담·메모·수업불가는 상태와 무관하게 고정 톤을 쓴다(취소 제외). */
