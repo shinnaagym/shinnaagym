@@ -736,6 +736,8 @@ export interface CoachMonthlyReport {
   reRegisteredCount: number;
   churnedCount: number;
   reRegistrationRate: number | null; // 재등록 / (재등록 + 이탈), 분모 0이면 null
+  consultationCount: number; // 그 달에 상담한 서로 다른 사람 수
+  consultationSuccessRate: number | null; // 그 중 (기간 제한 없이) 결제까지 이어진 비율, 분모 0이면 null
 }
 
 /** yearMonth: "YYYY-MM" */
@@ -743,44 +745,58 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
   await autoCompletePastSessions();
   const monthStart = `${yearMonth}-01`;
 
-  const [coachesResult, revenueResult, sessionsResult, memberStatsResult] = await Promise.all([
-    query<CoachRow>(`SELECT * FROM coaches ORDER BY id ASC`),
-    query<{ coach_id: number; revenue: string }>(
-      `SELECT m.coach_id as coach_id, SUM(p.price) as revenue
-       FROM packages p
-       JOIN members m ON m.id = p.member_id
-       WHERE to_char(p.purchased_at, 'YYYY-MM') = $1 AND m.coach_id IS NOT NULL
-       GROUP BY m.coach_id`,
-      [yearMonth],
-    ),
-    query<{ coach_id: number; completed: string; no_show: string }>(
-      `SELECT coach_id,
-         COUNT(*) FILTER (WHERE status IN ('completed', 'no_show')) as completed,
-         COUNT(*) FILTER (WHERE status = 'no_show') as no_show
-       FROM class_sessions
-       WHERE entry_type = 'session'
-         AND session_date >= $1 AND session_date < to_char((to_date($1, 'YYYY-MM-DD') + interval '1 month'), 'YYYY-MM-DD')
-       GROUP BY coach_id`,
-      [monthStart],
-    ),
-    query<{
-      coach_id: number;
-      member_count: string;
-      re_registered: string;
-      churned: string;
-    }>(
-      `SELECT m.coach_id as coach_id,
-         COUNT(*) as member_count,
-         COUNT(*) FILTER (WHERE pkg.package_count >= 2) as re_registered,
-         COUNT(*) FILTER (WHERE m.status = 'inactive' AND COALESCE(pkg.package_count, 0) < 2) as churned
-       FROM members m
-       LEFT JOIN (
-         SELECT member_id, COUNT(*) as package_count FROM packages GROUP BY member_id
-       ) pkg ON pkg.member_id = m.id
-       WHERE m.coach_id IS NOT NULL
-       GROUP BY m.coach_id`,
-    ),
-  ]);
+  const [coachesResult, revenueResult, sessionsResult, memberStatsResult, consultationResult] =
+    await Promise.all([
+      query<CoachRow>(`SELECT * FROM coaches ORDER BY id ASC`),
+      query<{ coach_id: number; revenue: string }>(
+        `SELECT m.coach_id as coach_id, SUM(p.price) as revenue
+         FROM packages p
+         JOIN members m ON m.id = p.member_id
+         WHERE to_char(p.purchased_at, 'YYYY-MM') = $1 AND m.coach_id IS NOT NULL
+         GROUP BY m.coach_id`,
+        [yearMonth],
+      ),
+      query<{ coach_id: number; completed: string; no_show: string }>(
+        `SELECT coach_id,
+           COUNT(*) FILTER (WHERE status IN ('completed', 'no_show')) as completed,
+           COUNT(*) FILTER (WHERE status = 'no_show') as no_show
+         FROM class_sessions
+         WHERE entry_type = 'session'
+           AND session_date >= $1 AND session_date < to_char((to_date($1, 'YYYY-MM-DD') + interval '1 month'), 'YYYY-MM-DD')
+         GROUP BY coach_id`,
+        [monthStart],
+      ),
+      query<{
+        coach_id: number;
+        member_count: string;
+        re_registered: string;
+        churned: string;
+      }>(
+        `SELECT m.coach_id as coach_id,
+           COUNT(*) as member_count,
+           COUNT(*) FILTER (WHERE pkg.package_count >= 2) as re_registered,
+           COUNT(*) FILTER (WHERE m.status = 'inactive' AND COALESCE(pkg.package_count, 0) < 2) as churned
+         FROM members m
+         LEFT JOIN (
+           SELECT member_id, COUNT(*) as package_count FROM packages GROUP BY member_id
+         ) pkg ON pkg.member_id = m.id
+         WHERE m.coach_id IS NOT NULL
+         GROUP BY m.coach_id`,
+      ),
+      query<{ coach_id: number; consultation_count: string; success_count: string }>(
+        `SELECT cs.coach_id,
+           COUNT(DISTINCT cs.member_id) as consultation_count,
+           COUNT(DISTINCT cs.member_id) FILTER (
+             WHERE EXISTS (SELECT 1 FROM packages p WHERE p.member_id = cs.member_id)
+           ) as success_count
+         FROM class_sessions cs
+         WHERE cs.entry_type = 'consultation' AND cs.status <> 'cancelled'
+           AND cs.member_id IS NOT NULL
+           AND LEFT(cs.session_date, 7) = $1
+         GROUP BY cs.coach_id`,
+        [yearMonth],
+      ),
+    ]);
 
   const revenueMap = new Map(revenueResult.rows.map((r) => [r.coach_id, Number(r.revenue ?? 0)]));
   const sessionsMap = new Map(
@@ -788,12 +804,16 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
   );
   const noShowMap = new Map(sessionsResult.rows.map((r) => [r.coach_id, Number(r.no_show ?? 0)]));
   const memberStatsMap = new Map(memberStatsResult.rows.map((r) => [r.coach_id, r]));
+  const consultationMap = new Map(consultationResult.rows.map((r) => [r.coach_id, r]));
 
   return coachesResult.rows.map((coach) => {
     const stats = memberStatsMap.get(coach.id);
     const reRegistered = Number(stats?.re_registered ?? 0);
     const churned = Number(stats?.churned ?? 0);
     const denom = reRegistered + churned;
+    const consultation = consultationMap.get(coach.id);
+    const consultationCount = Number(consultation?.consultation_count ?? 0);
+    const consultationSuccessCount = Number(consultation?.success_count ?? 0);
     return {
       coachId: coach.id,
       coachName: coach.name,
@@ -804,6 +824,8 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
       reRegisteredCount: reRegistered,
       churnedCount: churned,
       reRegistrationRate: denom > 0 ? reRegistered / denom : null,
+      consultationCount,
+      consultationSuccessRate: consultationCount > 0 ? consultationSuccessCount / consultationCount : null,
     };
   });
 }
