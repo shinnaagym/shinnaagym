@@ -178,7 +178,7 @@ export function ReservationForm({ initialTaken }: { initialTaken: TakenSlot[] })
           >
             ‹
           </button>
-          <p className="font-display text-xl">{monthLabel}</p>
+          <p className="font-serif-display text-xl">{monthLabel}</p>
           <button
             type="button"
             onClick={goNextMonth}

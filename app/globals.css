@@ -34,6 +34,11 @@ body {
   font-family: var(--font-display), "Apple SD Gothic Neo", sans-serif;
 }
 
+/* 홈페이지 전용 — 본문(Pretendard)과 대비되는 세리프 제목 서체. */
+.font-serif-display {
+  font-family: var(--font-gowun-batang), "Apple SD Gothic Neo", serif;
+}
+
 @keyframes draw-pulse {
   from {
     stroke-dashoffset: 620;
