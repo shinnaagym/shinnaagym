@@ -138,6 +138,8 @@ export type FunctionalTestKey = (typeof FUNCTIONAL_TESTS)[number]["key"];
 
 export const MMT_STRENGTH_OPTIONS = ["0", "1", "2", "3", "4", "5"] as const;
 
+export const NRS_PAIN_OPTIONS = Array.from({ length: 11 }, (_, i) => String(i));
+
 export const MMT_STRENGTH_LABELS: Record<string, string> = {
   "0": "0 (수축 없음)",
   "1": "1 (미세 수축만 촉진)",

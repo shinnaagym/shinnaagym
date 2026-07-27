@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { createAssessment, listAssessmentsByMember } from "@/lib/assessments";
-import { ASSESSMENT_REGIONS, MMT_STRENGTH_OPTIONS } from "@/lib/assessment-movements";
+import { ASSESSMENT_REGIONS, MMT_STRENGTH_OPTIONS, NRS_PAIN_OPTIONS } from "@/lib/assessment-movements";
 import type { AssessmentMovements } from "@/lib/db";
 
 const VALID_MOVEMENT_IDS = new Set(
   ASSESSMENT_REGIONS.flatMap((region) => region.movements.map((m) => m.id)),
 );
 const VALID_STRENGTH_VALUES = new Set<string>([...MMT_STRENGTH_OPTIONS, ""]);
+const VALID_PAIN_SCALE_VALUES = new Set<string>([...NRS_PAIN_OPTIONS, ""]);
 
 function parseMovements(raw: unknown): AssessmentMovements {
   const movements: AssessmentMovements = {};
@@ -22,9 +23,13 @@ function parseMovements(raw: unknown): AssessmentMovements {
       typeof entry.strength === "string" && VALID_STRENGTH_VALUES.has(entry.strength)
         ? entry.strength
         : "";
+    const painScale =
+      typeof entry.painScale === "string" && VALID_PAIN_SCALE_VALUES.has(entry.painScale)
+        ? entry.painScale
+        : "";
     const compensation = typeof entry.compensation === "string" ? entry.compensation.trim() : "";
-    if (!romPassive && !romActive && !strength && !compensation) continue;
-    movements[key] = { romPassive, romActive, strength, compensation };
+    if (!romPassive && !romActive && !strength && !painScale && !compensation) continue;
+    movements[key] = { romPassive, romActive, strength, painScale, compensation };
   }
   return movements;
 }

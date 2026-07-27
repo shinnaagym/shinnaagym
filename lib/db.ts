@@ -343,6 +343,7 @@ export interface AssessmentMovementEntry {
   romPassive: string;
   romActive: string;
   strength: string;
+  painScale: string;
   compensation: string;
 }
 

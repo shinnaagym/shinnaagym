@@ -63,6 +63,7 @@ export function AssessmentDocument({
                   <th className="px-3 py-2 font-medium">가동범위(수동)</th>
                   <th className="px-3 py-2 font-medium">가동범위(능동)</th>
                   <th className="px-3 py-2 font-medium">근력</th>
+                  <th className="px-3 py-2 font-medium">통증척도</th>
                   <th className="px-3 py-2 font-medium">보상패턴</th>
                 </tr>
               </thead>
@@ -79,6 +80,9 @@ export function AssessmentDocument({
                       <td className="px-3 py-2 text-ink/70">{entry?.romActive || "-"}</td>
                       <td className="px-3 py-2 text-ink/70">
                         {entry?.strength ? MMT_STRENGTH_LABELS[entry.strength] ?? entry.strength : "-"}
+                      </td>
+                      <td className="px-3 py-2 text-ink/70">
+                        {entry?.painScale ? `${entry.painScale} / 10` : "-"}
                       </td>
                       <td className="px-3 py-2 text-ink/70">{entry?.compensation || "-"}</td>
                     </tr>

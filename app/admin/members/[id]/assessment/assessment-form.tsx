@@ -6,6 +6,7 @@ import {
   ASSESSMENT_REGIONS,
   FUNCTIONAL_TESTS,
   MMT_STRENGTH_OPTIONS,
+  NRS_PAIN_OPTIONS,
   type FunctionalTestKey,
   type MovementDef,
 } from "@/lib/assessment-movements";
@@ -14,10 +15,17 @@ interface MovementEntry {
   romPassive: string;
   romActive: string;
   strength: string;
+  painScale: string;
   compensation: string;
 }
 
-const EMPTY_ENTRY: MovementEntry = { romPassive: "", romActive: "", strength: "", compensation: "" };
+const EMPTY_ENTRY: MovementEntry = {
+  romPassive: "",
+  romActive: "",
+  strength: "",
+  painScale: "",
+  compensation: "",
+};
 
 const EMPTY_FUNCTIONAL_NOTES: Record<FunctionalTestKey, string> = {
   core: "",
@@ -41,7 +49,7 @@ function MovementRow({
   onChange: (patch: Partial<MovementEntry>) => void;
 }) {
   return (
-    <div className="border-t border-line/50 px-3 py-3 sm:grid sm:grid-cols-[1.1fr_0.85fr_0.85fr_110px_1.2fr] sm:items-center sm:gap-2 sm:py-2">
+    <div className="border-t border-line/50 px-3 py-3 sm:grid sm:grid-cols-[1fr_0.55fr_0.55fr_88px_88px_1.1fr] sm:items-center sm:gap-2 sm:py-2">
       <p className="text-sm font-medium mb-2 sm:mb-0">
         {movement.ko} <span className="text-xs text-ink/40">({movement.en})</span>
       </p>
@@ -72,13 +80,25 @@ function MovementRow({
             </option>
           ))}
         </select>
-        <input
-          value={entry.compensation}
-          onChange={(e) => onChange({ compensation: e.target.value })}
-          placeholder="보상패턴"
-          className={inputClass()}
-        />
+        <select
+          value={entry.painScale}
+          onChange={(e) => onChange({ painScale: e.target.value })}
+          className={inputClass() + " bg-white"}
+        >
+          <option value="">통증</option>
+          {NRS_PAIN_OPTIONS.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
       </div>
+      <input
+        value={entry.compensation}
+        onChange={(e) => onChange({ compensation: e.target.value })}
+        placeholder="보상패턴"
+        className={inputClass() + " mt-2 sm:mt-0"}
+      />
     </div>
   );
 }
@@ -244,11 +264,12 @@ export function AssessmentForm({
           isOpen={openRegions.has(region.key)}
           onToggle={() => toggleRegion(region.key)}
         >
-          <div className="hidden sm:grid sm:grid-cols-[1.1fr_0.85fr_0.85fr_110px_1.2fr] sm:gap-2 px-3 py-2 text-xs text-ink/40 border-t border-line/50 bg-bone/30">
+          <div className="hidden sm:grid sm:grid-cols-[1fr_0.55fr_0.55fr_88px_88px_1.1fr] sm:gap-2 px-3 py-2 text-xs text-ink/40 border-t border-line/50 bg-bone/30">
             <span>동작</span>
             <span>가동범위(수동)</span>
             <span>가동범위(능동)</span>
             <span>근력</span>
+            <span>통증척도</span>
             <span>보상패턴</span>
           </div>
           {region.movements.map((movement) => (
