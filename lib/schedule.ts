@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { query } from "./db";
+import { query, UNIQUE_VIOLATION } from "./db";
 import type {
   ClassSessionRow,
   CoachRow,
@@ -199,6 +199,7 @@ export interface MemberWithProgress extends MemberRow {
   done_count: number;
   package_count: number;
   has_next_week_session: boolean;
+  latest_pt_type: PtType;
 }
 
 export async function listMembersWithProgress(
@@ -211,7 +212,8 @@ export async function listMembersWithProgress(
        COALESCE(p.total, 0)::int as total_sessions,
        COALESCE(s.done, 0)::int as done_count,
        COALESCE(p.pkg_count, 0)::int as package_count,
-       (nw.member_id IS NOT NULL) as has_next_week_session
+       (nw.member_id IS NOT NULL) as has_next_week_session,
+       COALESCE(lp.pt_type, '1:1') as latest_pt_type
      FROM members m
      LEFT JOIN (
        SELECT member_id, SUM(total_sessions) as total, COUNT(*) as pkg_count
@@ -226,6 +228,11 @@ export async function listMembersWithProgress(
        WHERE entry_type = 'session' AND status <> 'cancelled'
          AND session_date >= $1 AND session_date <= $2
      ) nw ON nw.member_id = m.id
+     LEFT JOIN (
+       SELECT DISTINCT ON (member_id) member_id, pt_type
+       FROM packages
+       ORDER BY member_id, purchased_at DESC
+     ) lp ON lp.member_id = m.id
      ORDER BY m.name ASC`,
     [nextWeekStart ?? "9999-12-31", nextWeekEnd ?? "9999-12-31"],
   );
@@ -273,6 +280,111 @@ export async function addFixedSlot(
 
 export async function removeFixedSlot(id: number): Promise<void> {
   await query(`DELETE FROM fixed_slots WHERE id = $1`, [id]);
+}
+
+/** 회원의 가장 최근 결제 패키지의 PT 유형(없으면 1:1). */
+async function getLatestPtType(memberId: number): Promise<PtType> {
+  const result = await query<{ pt_type: PtType }>(
+    `SELECT pt_type FROM packages WHERE member_id = $1 ORDER BY purchased_at DESC LIMIT 1`,
+    [memberId],
+  );
+  return result.rows[0]?.pt_type ?? "1:1";
+}
+
+/** 아직 스케줄표에 예약으로 배정되지 않은 잔여 회차 수(= 잔여 회차 - 이미 예약된 건수). */
+async function getUnallocatedSessionCount(memberId: number): Promise<number> {
+  const result = await query<{ total: string | null; done: string; reserved: string }>(
+    `SELECT
+       (SELECT COALESCE(SUM(total_sessions), 0) FROM packages WHERE member_id = $1) as total,
+       (SELECT COUNT(*) FROM class_sessions
+          WHERE member_id = $1 AND entry_type = 'session' AND status IN ('completed', 'no_show')) as done,
+       (SELECT COUNT(*) FROM class_sessions
+          WHERE member_id = $1 AND entry_type = 'session' AND status = 'reserved') as reserved`,
+    [memberId],
+  );
+  const row = result.rows[0];
+  const total = Number(row?.total ?? 0);
+  const done = Number(row?.done ?? 0);
+  const reserved = Number(row?.reserved ?? 0);
+  return Math.max(0, total - done - reserved);
+}
+
+/** YYYY-MM-DD 날짜의 요일을 0=월 ... 6=일 인덱스로 변환 (fixed_slots.weekday와 동일한 규칙). */
+function mondayIndexedWeekday(dateKey: string): number {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const jsDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=일 ... 6=토
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
+
+export interface FixedSlotBackfillResult {
+  slot: FixedSlotRow;
+  created: number;
+  skippedDates: string[];
+}
+
+/**
+ * 고정 시간대를 추가하고, 그 요일·시간에 회원의 잔여(미배정) 회차만큼 스케줄표에
+ * 실제 주간 반복 예약을 자동 생성한다. 이미 예약이 있는 주는 건너뛰고 계속 다음
+ * 주로 넘어가 목표 건수를 채운다(최대 2년치까지만 시도).
+ */
+export async function addFixedSlotWithBackfill(
+  memberId: number,
+  weekday: number,
+  hour: number,
+): Promise<FixedSlotBackfillResult> {
+  const member = await getMemberById(memberId);
+  if (!member) {
+    throw new Error("회원을 찾을 수 없습니다.");
+  }
+  if (!member.coach_id) {
+    throw new Error("담당 코치를 먼저 지정해주세요.");
+  }
+
+  const slot = await addFixedSlot(memberId, weekday, hour);
+
+  const unallocated = await getUnallocatedSessionCount(memberId);
+  if (unallocated <= 0) {
+    return { slot, created: 0, skippedDates: [] };
+  }
+
+  const ptType = await getLatestPtType(memberId);
+  const todayKey = koreaTodayKey();
+  const todayWeekday = mondayIndexedWeekday(todayKey);
+
+  let offset = (weekday - todayWeekday + 7) % 7;
+  if (offset === 0 && hour <= koreaCurrentHour()) {
+    offset = 7;
+  }
+  let candidateDate = addDaysToKey(todayKey, offset);
+
+  let created = 0;
+  const skippedDates: string[] = [];
+  const MAX_ATTEMPTS = 104; // 최대 2년치까지만 시도(무한 루프 방지)
+  let attempts = 0;
+
+  while (created < unallocated && attempts < MAX_ATTEMPTS) {
+    attempts += 1;
+    try {
+      await createSession({
+        memberId,
+        coachId: member.coach_id,
+        date: candidateDate,
+        hour,
+        entryType: "session",
+        ptType,
+      });
+      created += 1;
+    } catch (err: unknown) {
+      if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === UNIQUE_VIOLATION) {
+        skippedDates.push(candidateDate);
+      } else {
+        throw err;
+      }
+    }
+    candidateDate = addDaysToKey(candidateDate, 7);
+  }
+
+  return { slot, created, skippedDates };
 }
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {

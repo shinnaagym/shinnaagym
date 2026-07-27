@@ -71,6 +71,17 @@ function GoldenBellBadge() {
   );
 }
 
+function ReferrerBadge({ referrer }: { referrer: string }) {
+  return (
+    <span
+      title="소개해주신 분"
+      className="rounded-full bg-line/40 text-ink/50 px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
+    >
+      소개: {referrer}
+    </span>
+  );
+}
+
 function PtTypeToggle({
   value,
   onChange,
@@ -196,10 +207,11 @@ export function MembersView({
                   className="text-left rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3.5 active:bg-bone/40 transition"
                 >
                   <div className="flex items-center justify-between mb-2 gap-2">
-                    <span className="font-medium flex items-center gap-1.5">
+                    <span className="font-medium flex items-center gap-1.5 flex-wrap">
                       {m.name}
                       {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
                       {goldenBell && <GoldenBellBadge />}
+                      {m.referrer && <ReferrerBadge referrer={m.referrer} />}
                     </span>
                     <span
                       className={[
@@ -287,7 +299,12 @@ export function MembersView({
                       onClick={() => setDetailId(m.id)}
                       className="border-b border-line/40 last:border-0 hover:bg-bone/40 cursor-pointer transition"
                     >
-                      <td className="px-5 py-3 font-medium">{m.name}</td>
+                      <td className="px-5 py-3 font-medium">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {m.name}
+                          {m.referrer && <ReferrerBadge referrer={m.referrer} />}
+                        </div>
+                      </td>
                       <td className="px-5 py-3 text-ink/70">{coachName}</td>
                       <td className="px-5 py-3 w-48">
                         <div className="flex items-center gap-2">
@@ -644,6 +661,10 @@ function MemberDetailModal({
   const [savingSlot, setSavingSlot] = useState(false);
 
   async function addSlot() {
+    if (!data?.member.coach_id) {
+      setSlotError("담당 코치를 먼저 지정해주세요.");
+      return;
+    }
     setSavingSlot(true);
     setSlotError(null);
     try {
@@ -652,10 +673,21 @@ function MemberDetailModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ memberId, weekday: newSlotWeekday, hour: newSlotHour }),
       });
+      const d = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
         setSlotError(d.error ?? "추가에 실패했습니다.");
         return;
+      }
+      const created = d.created ?? 0;
+      const skippedDates: string[] = d.skippedDates ?? [];
+      if (created > 0 || skippedDates.length > 0) {
+        let message = created > 0 ? `스케줄표에 ${created}건 자동 예약됐어요.` : "";
+        if (skippedDates.length > 0) {
+          message +=
+            (message ? "\n" : "") +
+            `${skippedDates.length}건은 이미 다른 예약이 있어 건너뛰었어요: ${skippedDates.join(", ")}`;
+        }
+        alert(message);
       }
       onChanged();
     } finally {

@@ -795,7 +795,12 @@ function CreateSessionModal({
               <label className="block text-sm font-medium mb-1.5">회원 선택</label>
               <select
                 value={memberId}
-                onChange={(e) => setMemberId(e.target.value ? Number(e.target.value) : "")}
+                onChange={(e) => {
+                  const id = e.target.value ? Number(e.target.value) : "";
+                  setMemberId(id);
+                  const selected = registeredMembers.find((m) => m.id === id);
+                  if (selected) setPtType(selected.latest_pt_type);
+                }}
                 className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
               >
                 <option value="">선택해주세요</option>
