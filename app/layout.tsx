@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Gowun_Batang } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -10,14 +9,11 @@ const pretendard = localFont({
   display: "swap",
 });
 
-// 홈페이지 제목/이정표용 세리프 — 본문(Pretendard)과 뚜렷이 구분되는
-// 서체 페어링으로, 물리치료 전문 클리닉다운 차분하고 신뢰감 있는 인상을 준다.
-const gowunBatang = Gowun_Batang({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-gowun-batang",
-  display: "swap",
-});
+// 홈페이지 제목/이정표용 세리프(Gowun Batang)는 next/font/google 대신 일반
+// <link> 태그로 불러온다. next/font/google은 빌드 시점에 Google 서버에서
+// 폰트 파일을 직접 내려받는데, Vercel 빌드 환경에서 그 요청이 실패하면
+// 빌드 자체가 통째로 실패한다(실제로 이 문제로 배포가 깨진 적이 있음).
+// 브라우저가 런타임에 직접 불러오는 방식으로 바꿔 빌드 시 네트워크 의존을 없앤다.
 
 const SITE_TITLE = "신나아짐 예약 사이트";
 const SITE_DESCRIPTION =
@@ -41,10 +37,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="ko"
-      className={`${pretendard.variable} ${gowunBatang.variable} h-full antialiased`}
-    >
+    <html lang="ko" className={`${pretendard.variable} h-full antialiased`}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap"
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-paper text-ink">{children}</body>
     </html>
   );
