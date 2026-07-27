@@ -3,10 +3,27 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listAssessmentsByMember } from "@/lib/assessments";
+import { findMovementLabel } from "@/lib/assessment-movements";
+import type { AssessmentRow } from "@/lib/db";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function flaggedMovementSummaries(assessment: AssessmentRow): string[] {
+  return Object.entries(assessment.movements)
+    .filter(
+      ([, entry]) =>
+        entry.compensation.trim().length > 0 || (entry.painScale && Number(entry.painScale) > 0),
+    )
+    .map(([movementId, entry]) => {
+      const label = findMovementLabel(movementId)?.ko ?? movementId;
+      const parts: string[] = [];
+      if (entry.compensation) parts.push(entry.compensation);
+      if (entry.painScale) parts.push(`통증 ${entry.painScale}/10`);
+      return `${label} — ${parts.join(" · ")}`;
+    });
 }
 
 export default async function AssessmentHistoryPage({
@@ -31,7 +48,7 @@ export default async function AssessmentHistoryPage({
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Assessment</p>
           <h1 className="font-display text-2xl">{member.name}님의 체형 평가 이력</h1>
@@ -50,25 +67,42 @@ export default async function AssessmentHistoryPage({
         </div>
       ) : (
         <ul className="space-y-2">
-          {assessments.map((a) => (
-            <li key={a.id}>
-              <Link
-                href={`/admin/members/${idNum}/assessment/${a.id}`}
-                className="flex items-center justify-between rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4 hover:border-coral/40 transition"
-              >
-                <div>
-                  <p className="font-medium">
-                    {a.evaluated_at || formatDateTime(a.created_at)}
-                  </p>
-                  <p className="text-xs text-ink/50 mt-0.5">
-                    담당 {a.evaluator_name || "-"}
-                    {a.pain_scale != null && ` · 통증 ${a.pain_scale}/10`}
-                  </p>
-                </div>
-                <span className="text-ink/30">→</span>
-              </Link>
-            </li>
-          ))}
+          {assessments.map((a) => {
+            const flagged = flaggedMovementSummaries(a);
+            return (
+              <li key={a.id}>
+                <Link
+                  href={`/admin/members/${idNum}/assessment/${a.id}`}
+                  className="block rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4 hover:border-coral/40 transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">
+                        {a.evaluated_at || formatDateTime(a.created_at)}
+                      </p>
+                      <p className="text-xs text-ink/50 mt-0.5">
+                        담당 {a.evaluator_name || "-"}
+                        {a.pain_scale != null && ` · 통증 ${a.pain_scale}/10`}
+                      </p>
+                    </div>
+                    <span className="text-ink/30">→</span>
+                  </div>
+                  {(flagged.length > 0 || a.pain_trigger_note) && (
+                    <div className="mt-3 pt-3 border-t border-line/50 space-y-1 text-sm text-ink/70">
+                      {flagged.map((line, i) => (
+                        <p key={i}>{line}</p>
+                      ))}
+                      {a.pain_trigger_note && (
+                        <p>
+                          통증 유발 동작 — {a.pain_trigger_note}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
