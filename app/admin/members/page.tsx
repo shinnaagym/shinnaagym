@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { listCoaches, listFixedSlots, listMembersWithProgress } from "@/lib/schedule";
-import { AdminNav } from "../admin-nav";
 import { MembersView } from "./members-view";
 
 export default async function AdminMembersPage() {
@@ -21,13 +20,8 @@ export default async function AdminMembersPage() {
   ]);
 
   return (
-    <>
-      <AdminNav />
-      <main className="flex-1 bg-[#f7f8fa]">
-        <div className="mx-auto max-w-6xl px-6 py-8">
-          <MembersView initialMembers={members} coaches={coaches} initialFixedSlots={fixedSlots} />
-        </div>
-      </main>
-    </>
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <MembersView initialMembers={members} coaches={coaches} initialFixedSlots={fixedSlots} />
+    </div>
   );
 }

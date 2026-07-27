@@ -9,7 +9,6 @@ import {
   listNewRegistrations,
   listPackagePurchases,
 } from "@/lib/schedule";
-import { AdminNav } from "../admin-nav";
 
 const TREND_MONTHS = 6;
 
@@ -76,11 +75,8 @@ export default async function AdminDashboardPage({
   ];
 
   return (
-    <>
-      <AdminNav />
-      <main className="flex-1 bg-[#f7f8fa]">
-        <div className="mx-auto max-w-6xl px-6 py-8">
-          {/* 월 네비게이션 */}
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      {/* 월 네비게이션 */}
           <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
             <div className="flex items-center gap-2">
               <Link
@@ -289,13 +285,11 @@ export default async function AdminDashboardPage({
             </div>
           </div>
 
-          <p className="text-xs text-ink/40 mt-4 leading-relaxed">
-            매출은 그 달에 결제된 패키지 금액 합계이고, 완료 세션은 세션 상태가 &apos;완료&apos;인
-            건수예요. 신규 등록은 첫 패키지를 이번 달에 구매한 회원, 재등록은 이미 패키지가 있던
-            회원이 이번 달에 추가로 구매한 경우예요.
-          </p>
-        </div>
-      </main>
-    </>
+      <p className="text-xs text-ink/40 mt-4 leading-relaxed">
+        매출은 그 달에 결제된 패키지 금액 합계이고, 완료 세션은 세션 상태가 &apos;완료&apos;인
+        건수예요. 신규 등록은 첫 패키지를 이번 달에 구매한 회원, 재등록은 이미 패키지가 있던
+        회원이 이번 달에 추가로 구매한 경우예요.
+      </p>
+    </div>
   );
 }
