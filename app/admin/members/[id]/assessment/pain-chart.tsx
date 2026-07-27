@@ -20,11 +20,18 @@ interface Point {
   fullDate: string;
   overall: number | null;
   movement: number | null;
+  painTriggerNote: string;
 }
 
 function shortDateLabel(raw: string): string {
   const [, m, d] = raw.split("-");
   return m && d ? `${Number(m)}/${Number(d)}` : raw;
+}
+
+// "폄", "굽힘"처럼 여러 부위에서 똑같이 쓰이는 동작명이 있어서, 드롭다운에는
+// 부위를 함께 표기한다("폄 (경추)" vs "폄 (흉추)").
+function shortRegionLabel(regionLabel: string): string {
+  return regionLabel.split(" (")[0];
 }
 
 function parsePainScale(raw: string | undefined): number | null {
@@ -59,7 +66,11 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
     const order = ASSESSMENT_REGIONS.flatMap((r) => r.movements.map((m) => m.id));
     return order
       .filter((id) => idsWithData.has(id))
-      .map((id) => ({ id, label: findMovementLabel(id)?.ko ?? id }));
+      .map((id) => {
+        const found = findMovementLabel(id);
+        if (!found) return { id, label: id };
+        return { id, label: `${found.ko} (${shortRegionLabel(found.region)})` };
+      });
   }, [chronological]);
 
   if (chronological.length === 0) return null;
@@ -72,6 +83,7 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
       fullDate: rawDate,
       overall: a.pain_scale,
       movement: movementId ? parsePainScale(a.movements[movementId]?.painScale) : null,
+      painTriggerNote: a.pain_trigger_note,
     };
   });
 
@@ -135,18 +147,18 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
         )}
       </div>
 
-      {movementId && (
-        <div className="flex items-center gap-4 mb-2 text-xs text-ink/60">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-4" style={{ backgroundColor: OVERALL_COLOR }} />
-            전체 통증
-          </span>
+      <div className="flex items-center gap-4 mb-2 text-xs text-ink/60 flex-wrap">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0.5 w-4" style={{ backgroundColor: OVERALL_COLOR }} />
+          통증 유발 동작
+        </span>
+        {movementId && (
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-0.5 w-4" style={{ backgroundColor: MOVEMENT_COLOR }} />
             {movementOptions.find((o) => o.id === movementId)?.label}
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="relative">
         <svg
@@ -218,18 +230,23 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
 
         {hovered && (
           <div
-            className="absolute top-0 -translate-x-1/2 rounded-lg border border-line bg-white shadow-md px-2.5 py-1.5 text-xs pointer-events-none whitespace-nowrap"
+            className="absolute top-0 -translate-x-1/2 rounded-lg border border-line bg-white shadow-md px-2.5 py-1.5 text-xs pointer-events-none w-max max-w-[220px]"
             style={{ left: `${tooltipLeftPct}%` }}
           >
-            <p className="text-ink/50 mb-0.5">{hovered.fullDate}</p>
+            <p className="text-ink/50 mb-0.5 whitespace-nowrap">{hovered.fullDate}</p>
             {hovered.overall != null && (
-              <p>
+              <p className="whitespace-nowrap">
                 <span className="font-medium">{hovered.overall}</span>
-                <span className="text-ink/50"> /10 전체</span>
+                <span className="text-ink/50"> /10 통증 유발 동작</span>
+              </p>
+            )}
+            {hovered.painTriggerNote && (
+              <p className="text-ink/60 mt-0.5 leading-snug break-words">
+                {hovered.painTriggerNote}
               </p>
             )}
             {movementId && hovered.movement != null && (
-              <p>
+              <p className="whitespace-nowrap mt-0.5">
                 <span className="font-medium">{hovered.movement}</span>
                 <span className="text-ink/50">
                   {" "}
