@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CoachRow, MemberStatus, PackageRow } from "@/lib/db";
+import type { CoachRow, MemberStatus, PackageRow, PtType } from "@/lib/db";
 import type { MemberWithProgress } from "@/lib/schedule";
+
+const PT_TYPE_OPTIONS: PtType[] = ["1:1", "2:1"];
 
 type SessionSummary = {
   id: number;
@@ -29,10 +31,6 @@ function formatWon(n: number): string {
   return `₩${n.toLocaleString("ko-KR")}`;
 }
 
-function packageRate(pkg: { price: number; total_sessions: number }): number {
-  return pkg.total_sessions > 0 ? Math.round(pkg.price / pkg.total_sessions) : 0;
-}
-
 function TypeBadge({ isFirst }: { isFirst: boolean }) {
   return (
     <span
@@ -43,6 +41,45 @@ function TypeBadge({ isFirst }: { isFirst: boolean }) {
     >
       {isFirst ? "초" : "재"}
     </span>
+  );
+}
+
+function PtTypeBadge({ ptType }: { ptType: PtType }) {
+  return (
+    <span
+      className={[
+        "rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+        ptType === "2:1" ? "bg-indigo-100 text-indigo-700" : "bg-line/40 text-ink/50",
+      ].join(" ")}
+    >
+      {ptType}
+    </span>
+  );
+}
+
+function PtTypeToggle({
+  value,
+  onChange,
+}: {
+  value: PtType;
+  onChange: (t: PtType) => void;
+}) {
+  return (
+    <div className="flex gap-1 rounded-full bg-bone/70 p-1 text-sm">
+      {PT_TYPE_OPTIONS.map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onChange(t)}
+          className={[
+            "flex-1 rounded-full py-1.5 font-medium transition",
+            value === t ? "bg-coral text-white shadow-sm" : "text-ink/60",
+          ].join(" ")}
+        >
+          {t}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -134,9 +171,6 @@ export function MembersView({
               const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
               const expired = m.total_sessions > 0 && remaining <= 0;
               const low = !expired && remaining > 0 && remaining <= 3;
-              const rate = m.latest_price != null && m.latest_total_sessions
-                ? packageRate({ price: m.latest_price, total_sessions: m.latest_total_sessions })
-                : null;
               return (
                 <button
                   key={m.id}
@@ -175,7 +209,6 @@ export function MembersView({
                   </div>
                   <div className="flex items-center justify-between text-xs text-ink/60">
                     <span>담당 {coachName}</span>
-                    <span>{rate !== null ? `회당 ${formatWon(rate)}` : ""}</span>
                     {expired ? (
                       <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 font-medium">
                         만료
@@ -200,7 +233,6 @@ export function MembersView({
                   <th className="px-5 py-3 font-medium">담당</th>
                   <th className="px-5 py-3 font-medium">진행</th>
                   <th className="px-5 py-3 font-medium">잔여</th>
-                  <th className="px-5 py-3 font-medium">회당 가격</th>
                   <th className="px-5 py-3 font-medium">초/재</th>
                   <th className="px-5 py-3 font-medium">상태</th>
                 </tr>
@@ -215,9 +247,6 @@ export function MembersView({
                   const coachName = coaches.find((c) => c.id === m.coach_id)?.name ?? "-";
                   const expired = m.total_sessions > 0 && remaining <= 0;
                   const low = !expired && remaining > 0 && remaining <= 3;
-                  const rate = m.latest_price != null && m.latest_total_sessions
-                    ? packageRate({ price: m.latest_price, total_sessions: m.latest_total_sessions })
-                    : null;
                   return (
                     <tr
                       key={m.id}
@@ -253,9 +282,6 @@ export function MembersView({
                             {remaining}회
                           </span>
                         )}
-                      </td>
-                      <td className="px-5 py-3 text-ink/70">
-                        {rate !== null ? formatWon(rate) : "-"}
                       </td>
                       <td className="px-5 py-3">
                         {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
@@ -320,6 +346,7 @@ function CreateMemberModal({
   const [referrer, setReferrer] = useState("");
   const [availableTimes, setAvailableTimes] = useState("");
   const [notes, setNotes] = useState("");
+  const [ptType, setPtType] = useState<PtType>("1:1");
   const [totalSessions, setTotalSessions] = useState("");
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -349,6 +376,7 @@ function CreateMemberModal({
           availableTimes,
           totalSessions: Number(totalSessions),
           price: Number(price || 0),
+          ptType,
         }),
       });
       const data = await res.json();
@@ -414,6 +442,9 @@ function CreateMemberModal({
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
           />
         </Field>
+        <Field label="PT 유형">
+          <PtTypeToggle value={ptType} onChange={setPtType} />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="등록 횟수 *">
             <input
@@ -477,6 +508,7 @@ function MemberDetailModal({
   const [copied, setCopied] = useState(false);
   const [addSessions, setAddSessions] = useState("");
   const [addPrice, setAddPrice] = useState("");
+  const [addPtType, setAddPtType] = useState<PtType>("1:1");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -493,6 +525,7 @@ function MemberDetailModal({
   const [editTotal, setEditTotal] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editNote, setEditNote] = useState("");
+  const [editPtType, setEditPtType] = useState<PtType>("1:1");
 
   function loadFrom(member: MemberDetail) {
     setName(member.name);
@@ -589,7 +622,11 @@ function MemberDetailModal({
     const res = await fetch(`/api/admin/members/${memberId}/packages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ totalSessions: Number(addSessions), price: Number(addPrice || 0) }),
+      body: JSON.stringify({
+        totalSessions: Number(addSessions),
+        price: Number(addPrice || 0),
+        ptType: addPtType,
+      }),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -598,6 +635,7 @@ function MemberDetailModal({
     }
     setAddSessions("");
     setAddPrice("");
+    setAddPtType("1:1");
     onChanged();
     onClose();
   }
@@ -607,6 +645,7 @@ function MemberDetailModal({
     setEditTotal(String(pkg.total_sessions));
     setEditPrice(String(pkg.price));
     setEditNote(pkg.note);
+    setEditPtType(pkg.pt_type);
   }
 
   async function saveEditPkg(pkgId: number) {
@@ -619,7 +658,7 @@ function MemberDetailModal({
     const res = await fetch(`/api/admin/members/${memberId}/packages/${pkgId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ totalSessions, price, note: editNote }),
+      body: JSON.stringify({ totalSessions, price, note: editNote, ptType: editPtType }),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -759,6 +798,7 @@ function MemberDetailModal({
               <div key={pkg.id} className="px-3 py-2 text-xs">
                 {editingPkgId === pkg.id ? (
                   <div className="space-y-1.5">
+                    <PtTypeToggle value={editPtType} onChange={setEditPtType} />
                     <div className="grid grid-cols-2 gap-1.5">
                       <input
                         type="number"
@@ -804,10 +844,10 @@ function MemberDetailModal({
                           {new Date(pkg.purchased_at).toLocaleDateString("ko-KR")}
                         </span>
                         <TypeBadge isFirst={pkg.id === firstPackageId} />
+                        <PtTypeBadge ptType={pkg.pt_type} />
                       </p>
                       <p className="text-ink/60 truncate">
-                        {pkg.total_sessions}회 · 회당 {formatWon(packageRate(pkg))} ·{" "}
-                        {formatWon(pkg.price)}
+                        {pkg.total_sessions}회 · {formatWon(pkg.price)}
                         {pkg.note && ` · ${pkg.note}`}
                       </p>
                     </div>
@@ -833,7 +873,8 @@ function MemberDetailModal({
               <p className="px-3 py-3 text-xs text-ink/40">결제 이력이 없어요.</p>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <PtTypeToggle value={addPtType} onChange={setAddPtType} />
+          <div className="grid grid-cols-2 gap-2 mt-2">
             <input
               type="number"
               value={addSessions}

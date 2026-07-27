@@ -193,8 +193,6 @@ export interface MemberWithProgress extends MemberRow {
   total_sessions: number;
   done_count: number;
   package_count: number;
-  latest_price: number | null;
-  latest_total_sessions: number | null;
 }
 
 export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
@@ -202,9 +200,7 @@ export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
        COALESCE(s.done, 0)::int as done_count,
-       COALESCE(p.pkg_count, 0)::int as package_count,
-       latest.price as latest_price,
-       latest.total_sessions as latest_total_sessions
+       COALESCE(p.pkg_count, 0)::int as package_count
      FROM members m
      LEFT JOIN (
        SELECT member_id, SUM(total_sessions) as total, COUNT(*) as pkg_count
@@ -214,10 +210,6 @@ export async function listMembersWithProgress(): Promise<MemberWithProgress[]> {
        SELECT member_id, COUNT(*) as done FROM class_sessions
        WHERE status IN ('completed', 'no_show') GROUP BY member_id
      ) s ON s.member_id = m.id
-     LEFT JOIN LATERAL (
-       SELECT price, total_sessions FROM packages p2
-       WHERE p2.member_id = m.id ORDER BY purchased_at DESC LIMIT 1
-     ) latest ON true
      ORDER BY m.name ASC`,
   );
   return result.rows;
@@ -240,11 +232,12 @@ export async function addPackage(
   totalSessions: number,
   price: number,
   note: string,
+  ptType: PtType = "1:1",
 ): Promise<PackageRow> {
   const result = await query<PackageRow>(
-    `INSERT INTO packages (member_id, total_sessions, price, note)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [memberId, totalSessions, price, note],
+    `INSERT INTO packages (member_id, total_sessions, price, note, pt_type)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [memberId, totalSessions, price, note, ptType],
   );
   return result.rows[0];
 }
@@ -259,7 +252,7 @@ export async function listPackages(memberId: number): Promise<PackageRow[]> {
 
 export async function updatePackage(
   id: number,
-  input: { totalSessions?: number; price?: number; note?: string },
+  input: { totalSessions?: number; price?: number; note?: string; ptType?: PtType },
 ): Promise<PackageRow> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -276,6 +269,10 @@ export async function updatePackage(
   if (input.note !== undefined) {
     fields.push(`note = $${++i}`);
     values.push(input.note);
+  }
+  if (input.ptType !== undefined) {
+    fields.push(`pt_type = $${++i}`);
+    values.push(input.ptType);
   }
 
   const result = await query<PackageRow>(
