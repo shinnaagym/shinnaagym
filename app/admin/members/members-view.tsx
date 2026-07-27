@@ -13,6 +13,7 @@ import type {
 import type { FixedSlotWithMember, MemberWithProgress } from "@/lib/schedule";
 import { PURPOSE_OPTIONS, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { ContractDocument } from "@/app/components/ContractDocument";
+import { SignaturePad } from "@/app/components/SignaturePad";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
@@ -1009,9 +1010,11 @@ function WriteContractModal({
 function ContractViewModal({
   memberId,
   onClose,
+  onSigned,
 }: {
   memberId: number;
   onClose: () => void;
+  onSigned?: () => void;
 }) {
   const [data, setData] = useState<{
     member: { name: string; phone: string };
@@ -1019,7 +1022,7 @@ function ContractViewModal({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
     fetch(`/api/admin/members/${memberId}/contract`)
       .then(async (res) => {
         const d = await res.json().catch(() => ({}));
@@ -1030,7 +1033,14 @@ function ContractViewModal({
         setData(d);
       })
       .catch(() => setError("네트워크 오류가 발생했어요."));
-  }, [memberId]);
+  }
+
+  useEffect(load, [memberId]);
+
+  function handleSigned() {
+    load();
+    onSigned?.();
+  }
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-ink/40 px-4 overflow-y-auto py-8">
@@ -1065,8 +1075,15 @@ function ContractViewModal({
                 </p>
               </div>
             ) : (
-              <div className="rounded-2xl border border-line bg-bone/40 px-6 py-6 text-sm text-ink/60">
-                아직 회원이 서명하지 않았어요. 회원 개인 페이지에서 서명할 수 있어요.
+              <div>
+                <p className="text-xs text-ink/50 mb-3">
+                  아직 서명 전이에요. 회원이 매장에 방문했다면 아래에서 바로 서명받을 수
+                  있고, 회원 개인 페이지에서 직접 서명할 수도 있어요.
+                </p>
+                <SignaturePad
+                  signUrl={`/api/admin/members/${memberId}/contract/sign`}
+                  onSigned={handleSigned}
+                />
               </div>
             )}
           </ContractDocument>
@@ -1697,7 +1714,17 @@ function MemberDetailModal({
       />
     )}
     {showContractView && (
-      <ContractViewModal memberId={memberId} onClose={() => setShowContractView(false)} />
+      <ContractViewModal
+        memberId={memberId}
+        onClose={() => setShowContractView(false)}
+        onSigned={() =>
+          setData((prev) =>
+            prev && prev.contract
+              ? { ...prev, contract: { ...prev.contract, signedAt: new Date().toISOString() } }
+              : prev,
+          )
+        }
+      />
     )}
     </>
   );

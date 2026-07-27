@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getMemberByToken } from "@/lib/schedule";
 import { getLatestContractByMember } from "@/lib/contracts";
 import { ContractDocument } from "@/app/components/ContractDocument";
-import { SignaturePad } from "./signature-pad";
+import { SignaturePad } from "@/app/components/SignaturePad";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
@@ -43,7 +43,7 @@ export default async function ContractPage({
               <p className="text-xs text-ink/50 mt-2">{formatDateTime(contract.signed_at)} 서명 완료</p>
             </div>
           ) : (
-            <SignaturePad token={token} contractId={contract.id} />
+            <SignaturePad signUrl={`/api/my/${token}/contract/sign`} />
           )}
         </ContractDocument>
       </div>
