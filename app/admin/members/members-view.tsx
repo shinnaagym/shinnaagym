@@ -379,6 +379,14 @@ function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }
     return map;
   }, [fixedSlots]);
 
+  const hourTotals = useMemo(() => {
+    const totals = new Map<number, number>();
+    for (const slot of fixedSlots) {
+      totals.set(slot.hour, (totals.get(slot.hour) ?? 0) + 1);
+    }
+    return totals;
+  }, [fixedSlots]);
+
   return (
     <div className="mt-10">
       <div className="flex items-center gap-2 mb-1">
@@ -386,7 +394,7 @@ function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }
         <span className="text-xs text-ink/40">시간대별 고정 회원 배정 현황</span>
       </div>
       <p className="text-xs text-ink/40 mb-3">
-        한 시간대에 {FIXED_SLOT_CAPACITY}명을 초과하면 붉은색으로 표시돼요.
+        한 시간대에 일주일 합계 {FIXED_SLOT_CAPACITY}명을 초과하면 붉은색으로 표시돼요.
       </p>
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
         <table className="w-full text-xs min-w-[720px] border-collapse">
@@ -401,12 +409,13 @@ function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }
             </tr>
           </thead>
           <tbody>
-            {SCHEDULE_HOUR_ROWS.map((hour) => (
+            {SCHEDULE_HOUR_ROWS.map((hour) => {
+              const over = (hourTotals.get(hour) ?? 0) > FIXED_SLOT_CAPACITY;
+              return (
               <tr key={hour} className="border-b border-line/30 last:border-0">
                 <td className="px-3 py-2.5 text-ink/50 whitespace-nowrap">{hour}시</td>
                 {FIXED_SLOT_WEEKDAY_LABELS.map((_, weekday) => {
                   const names = byCell.get(`${weekday}-${hour}`) ?? [];
-                  const over = names.length > FIXED_SLOT_CAPACITY;
                   return (
                     <td key={weekday} className="px-3 py-2.5 align-top">
                       {names.length > 0 && (
@@ -433,7 +442,8 @@ function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -11,7 +11,7 @@ import type {
   PtType,
   SessionStatus,
 } from "./db";
-import { addDaysToKey, addMonthsToKey } from "./date";
+import { addDaysToKey, addMonthsToKey, koreaCurrentHour, koreaTodayKey } from "./date";
 import { scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
@@ -201,6 +201,7 @@ export async function listMembersWithProgress(
   nextWeekStart?: string,
   nextWeekEnd?: string,
 ): Promise<MemberWithProgress[]> {
+  await autoCompletePastSessions();
   const result = await query<MemberWithProgress>(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
@@ -214,7 +215,7 @@ export async function listMembersWithProgress(
      ) p ON p.member_id = m.id
      LEFT JOIN (
        SELECT member_id, COUNT(*) as done FROM class_sessions
-       WHERE status IN ('completed', 'no_show') GROUP BY member_id
+       WHERE entry_type = 'session' AND status IN ('completed', 'no_show') GROUP BY member_id
      ) s ON s.member_id = m.id
      LEFT JOIN (
        SELECT DISTINCT member_id FROM class_sessions
@@ -348,6 +349,7 @@ export interface MemberProgress {
 }
 
 export async function computeMemberProgress(memberId: number): Promise<MemberProgress> {
+  await autoCompletePastSessions();
   const [packagesResult, doneResult] = await Promise.all([
     query<{ sum: string | null }>(
       `SELECT SUM(total_sessions) as sum FROM packages WHERE member_id = $1`,
@@ -355,7 +357,7 @@ export async function computeMemberProgress(memberId: number): Promise<MemberPro
     ),
     query<{ count: string }>(
       `SELECT COUNT(*) as count FROM class_sessions
-       WHERE member_id = $1 AND status IN ('completed', 'no_show')`,
+       WHERE member_id = $1 AND entry_type = 'session' AND status IN ('completed', 'no_show')`,
       [memberId],
     ),
   ]);
@@ -386,10 +388,31 @@ const SESSION_SELECT_FIELDS = `
   ) END) as total_sessions
 `;
 
+// 이미 지난 PT 수업(entry_type='session')은 관리자가 수동으로 완료 처리하지 않아도
+// 자동으로 '완료' 상태가 되도록 한다. 같은 시(時) 안에서는 반복 실행해도 결과가
+// 같은 멱등 UPDATE라, 서버 인스턴스별로 KST 기준 (오늘 날짜, 시각)이 바뀔 때만 재실행한다.
+let autoCompleteCacheKey: string | null = null;
+
+async function autoCompletePastSessions(): Promise<void> {
+  const todayKey = koreaTodayKey();
+  const hour = koreaCurrentHour();
+  const cacheKey = `${todayKey}-${hour}`;
+  if (autoCompleteCacheKey === cacheKey) return;
+  autoCompleteCacheKey = cacheKey;
+  await query(
+    `UPDATE class_sessions
+     SET status = 'completed'
+     WHERE entry_type = 'session' AND status = 'reserved'
+       AND (session_date < $1 OR (session_date = $1 AND session_hour < $2))`,
+    [todayKey, hour],
+  );
+}
+
 export async function listSessionsInRange(
   fromKey: string,
   toKey: string,
 ): Promise<SessionWithMember[]> {
+  await autoCompletePastSessions();
   const result = await query<SessionWithMember>(
     `SELECT ${SESSION_SELECT_FIELDS}
      FROM class_sessions s
@@ -403,6 +426,7 @@ export async function listSessionsInRange(
 }
 
 export async function listMemberSessions(memberId: number): Promise<SessionWithMember[]> {
+  await autoCompletePastSessions();
   const result = await query<SessionWithMember>(
     `SELECT ${SESSION_SELECT_FIELDS}
      FROM class_sessions s
@@ -570,6 +594,7 @@ export interface CoachMonthlyReport {
 
 /** yearMonth: "YYYY-MM" */
 export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMonthlyReport[]> {
+  await autoCompletePastSessions();
   const monthStart = `${yearMonth}-01`;
 
   const [coachesResult, revenueResult, sessionsResult, memberStatsResult] = await Promise.all([
@@ -651,6 +676,7 @@ export interface DashboardOverview {
 
 /** yearMonth: "YYYY-MM" */
 export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
+  await autoCompletePastSessions();
   const [activeMembers, revenue, sessionStats, newMembers, reRegistered] = await Promise.all([
     query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
     query<{ revenue: string }>(
@@ -708,6 +734,7 @@ export async function getMonthlyTrend(
   endYearMonth: string,
   months: number,
 ): Promise<MonthlyTrendPoint[]> {
+  await autoCompletePastSessions();
   const monthKeys: string[] = [];
   for (let i = months - 1; i >= 0; i--) {
     monthKeys.push(addMonthsToKey(endYearMonth, -i));
