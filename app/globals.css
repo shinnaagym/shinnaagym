@@ -5,8 +5,16 @@
   --color-paper: #f6f1e7;
   --color-coral: #e2734f;
   /* 로고의 실제 금색 픽셀에서 추출한 톤. 사전예약 폼(코랄)과는 분리된,
-     홈페이지 전용 시그니처 액센트 — 브랜드 마크와 직접 이어지도록 한다. */
+     홈페이지 전용 시그니처 액센트 — 브랜드 마크와 직접 이어지도록 한다.
+     장식(펄스라인, 큰 스텝 숫자, 보더)에만 쓰고, 작은 텍스트에는 아래
+     gold-light/gold-deep을 대신 쓴다 — 원래 gold는 배경 대비 WCAG AA
+     명도 대비(4.5:1)를 못 넘긴다. */
   --color-gold: #9c7238;
+  /* 어두운(ink) 배경 위의 작은 텍스트용 — 밝은 골드, ink 대비 6.3:1. */
+  --color-gold-light: #c99a5c;
+  /* 밝은(cream/bone) 배경 위의 작은 텍스트·버튼 배경용 — 짙은 브론즈,
+     bone 텍스트와 짝지으면 5.6:1. */
+  --color-gold-deep: #7a5527;
   --color-sage: #7fa694;
   --color-bone: #f3ecdd;
   --color-line: #d9cfb8;
@@ -18,6 +26,8 @@
   --color-paper: var(--color-paper);
   --color-coral: var(--color-coral);
   --color-gold: var(--color-gold);
+  --color-gold-light: var(--color-gold-light);
+  --color-gold-deep: var(--color-gold-deep);
   --color-sage: var(--color-sage);
   --color-bone: var(--color-bone);
   --color-line: var(--color-line);

@@ -254,7 +254,7 @@ export function ReservationForm() {
                       isTaken
                         ? "border-line text-ink/30 line-through cursor-not-allowed"
                         : isSelected
-                          ? "bg-gold text-bone border-gold shadow-md shadow-gold/25"
+                          ? "bg-gold-deep text-bone border-gold-deep shadow-md shadow-gold-deep/25"
                           : "border-line hover:border-gold hover:scale-105 active:scale-95",
                     ].join(" ")}
                   >
