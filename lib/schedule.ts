@@ -650,23 +650,15 @@ export async function deleteSession(id: number): Promise<void> {
 // ---- 사전예약 → 스케줄표 자동 연동 ----
 
 /**
- * 사전예약으로 들어오는 회원은 모두 '신종수' 코치에게 배정한다. 해당 코치가
- * 없거나 비활성 상태면(이름 변경 등) 담당 회원이 가장 적은 활성 코치로
- * 대체한다.
+ * 사전예약 스케줄 연동은 '신종수' 코치의 시간표 칸만 빌려 쓴다. 이름이
+ * 정확히 일치하는 활성 코치를 찾지 못하면(비활성화, 이름 변경 등) 다른
+ * 코치로 조용히 대체하지 않고 null을 반환해 스케줄 연동 자체를 건너뛴다.
+ * 엉뚱한 코치에게 배정되는 것보다 관리자가 눈치채고 코치 설정을 확인하게
+ * 하는 편이 안전하다.
  */
 async function pickDefaultCoachId(): Promise<number | null> {
-  const named = await query<{ id: number }>(
-    `SELECT id FROM coaches WHERE name = '신종수' AND active = true LIMIT 1`,
-  );
-  if (named.rows[0]) return named.rows[0].id;
-
   const result = await query<{ id: number }>(
-    `SELECT c.id FROM coaches c
-     LEFT JOIN members m ON m.coach_id = c.id AND m.status = 'active'
-     WHERE c.active = true
-     GROUP BY c.id
-     ORDER BY COUNT(m.id) ASC, c.id ASC
-     LIMIT 1`,
+    `SELECT id FROM coaches WHERE trim(name) = '신종수' AND active = true LIMIT 1`,
   );
   return result.rows[0]?.id ?? null;
 }
