@@ -240,7 +240,7 @@ const MovementRow = memo(function MovementRow({
       <input
         value={entry.compensation}
         onChange={(e) => onChange(movement.id, { compensation: e.target.value })}
-        placeholder="보상패턴"
+        placeholder="보상패턴 및 특이사항"
         className={inputClass() + " mt-2 sm:mt-0"}
       />
     </div>
@@ -777,7 +777,7 @@ export function AssessmentForm({
             <span>가동범위(능동)</span>
             <span>근력</span>
             <span>통증척도</span>
-            <span>보상패턴</span>
+            <span>보상패턴 및 특이사항</span>
           </div>
           {region.movements.map((movement) => (
             <MovementRow

@@ -248,7 +248,7 @@ export function AssessmentDocument({
                   <th className="px-3 py-2 font-medium">가동범위(능동)</th>
                   <th className="px-3 py-2 font-medium">근력</th>
                   <th className="px-3 py-2 font-medium">통증척도</th>
-                  <th className="px-3 py-2 font-medium">보상패턴</th>
+                  <th className="px-3 py-2 font-medium">보상패턴 및 특이사항</th>
                 </tr>
               </thead>
               <tbody>
