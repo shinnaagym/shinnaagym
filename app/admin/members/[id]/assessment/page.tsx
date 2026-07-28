@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
-import { listAssessmentsByMember } from "@/lib/assessments";
-import { findMovementLabel } from "@/lib/assessment-movements";
+import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { movementLabelWithRegion } from "@/lib/assessment-movements";
 import { AssessmentPainChart } from "./pain-chart";
 import type { AssessmentRow } from "@/lib/db";
 
@@ -19,7 +19,7 @@ function flaggedMovementSummaries(assessment: AssessmentRow): string[] {
         entry.compensation.trim().length > 0 || (entry.painScale && Number(entry.painScale) > 0),
     )
     .map(([movementId, entry]) => {
-      const label = findMovementLabel(movementId)?.ko ?? movementId;
+      const label = movementLabelWithRegion(movementId);
       const parts: string[] = [];
       if (entry.compensation) parts.push(entry.compensation);
       if (entry.painScale) parts.push(`통증 ${entry.painScale}/10`);
@@ -72,6 +72,11 @@ export default async function AssessmentHistoryPage({
         <ul className="space-y-2">
           {assessments.map((a) => {
             const flagged = flaggedMovementSummaries(a);
+            const painTriggers = getPainTriggerEntries(a);
+            const maxPain = painTriggers.reduce<number | null>(
+              (max, e) => (e.painScale != null && (max == null || e.painScale > max) ? e.painScale : max),
+              null,
+            );
             return (
               <li key={a.id}>
                 <Link
@@ -85,21 +90,22 @@ export default async function AssessmentHistoryPage({
                       </p>
                       <p className="text-xs text-ink/50 mt-0.5">
                         담당 {a.evaluator_name || "-"}
-                        {a.pain_scale != null && ` · 통증 ${a.pain_scale}/10`}
+                        {maxPain != null && ` · 최고 통증 ${maxPain}/10`}
                       </p>
                     </div>
                     <span className="text-ink/30">→</span>
                   </div>
-                  {(flagged.length > 0 || a.pain_trigger_note) && (
+                  {(flagged.length > 0 || painTriggers.length > 0) && (
                     <div className="mt-3 pt-3 border-t border-line/50 space-y-1 text-sm text-ink/70">
                       {flagged.map((line, i) => (
                         <p key={i}>{line}</p>
                       ))}
-                      {a.pain_trigger_note && (
-                        <p>
-                          통증 유발 동작 — {a.pain_trigger_note}
+                      {painTriggers.map((entry, i) => (
+                        <p key={i}>
+                          통증 유발 동작 — {entry.note || "-"}
+                          {entry.painScale != null && ` · ${entry.painScale}/10`}
                         </p>
-                      )}
+                      ))}
                     </div>
                   )}
                 </Link>

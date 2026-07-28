@@ -3,7 +3,7 @@ import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { createAssessment, listAssessmentsByMember } from "@/lib/assessments";
 import { ASSESSMENT_REGIONS, MMT_STRENGTH_OPTIONS, NRS_PAIN_OPTIONS } from "@/lib/assessment-movements";
-import type { AssessmentMovements } from "@/lib/db";
+import type { AssessmentMovements, PainTriggerEntry } from "@/lib/db";
 
 const VALID_MOVEMENT_IDS = new Set(
   ASSESSMENT_REGIONS.flatMap((region) => region.movements.map((m) => m.id)),
@@ -32,6 +32,26 @@ function parseMovements(raw: unknown): AssessmentMovements {
     movements[key] = { romPassive, romActive, strength, painScale, compensation };
   }
   return movements;
+}
+
+function parsePainTriggers(raw: unknown): PainTriggerEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const entries: PainTriggerEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const note = typeof record.note === "string" ? record.note.trim() : "";
+    const painScale =
+      typeof record.painScale === "number" &&
+      Number.isInteger(record.painScale) &&
+      record.painScale >= 0 &&
+      record.painScale <= 10
+        ? record.painScale
+        : null;
+    if (!note && painScale == null) continue;
+    entries.push({ note, painScale });
+  }
+  return entries;
 }
 
 export async function GET(
@@ -77,8 +97,7 @@ export async function POST(
         overheadSquatNote?: unknown;
         pushupNote?: unknown;
         hipHingeNote?: unknown;
-        painTriggerNote?: unknown;
-        painScale?: unknown;
+        painTriggers?: unknown;
       }
     | null;
 
@@ -91,15 +110,7 @@ export async function POST(
     typeof body?.overheadSquatNote === "string" ? body.overheadSquatNote.trim() : "";
   const pushupNote = typeof body?.pushupNote === "string" ? body.pushupNote.trim() : "";
   const hipHingeNote = typeof body?.hipHingeNote === "string" ? body.hipHingeNote.trim() : "";
-  const painTriggerNote =
-    typeof body?.painTriggerNote === "string" ? body.painTriggerNote.trim() : "";
-  const painScale =
-    typeof body?.painScale === "number" &&
-    Number.isInteger(body.painScale) &&
-    body.painScale >= 0 &&
-    body.painScale <= 10
-      ? body.painScale
-      : null;
+  const painTriggers = parsePainTriggers(body?.painTriggers);
 
   const assessment = await createAssessment({
     memberId: idNum,
@@ -111,8 +122,7 @@ export async function POST(
     overheadSquatNote,
     pushupNote,
     hipHingeNote,
-    painTriggerNote,
-    painScale,
+    painTriggers,
   });
 
   return NextResponse.json({ assessment }, { status: 201 });

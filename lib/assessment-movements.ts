@@ -158,3 +158,17 @@ export function findMovementLabel(movementId: string): { region: string; ko: str
   }
   return null;
 }
+
+// "폄", "굽힘"처럼 여러 부위에서 똑같이 쓰이는 동작명이 있어서, 부위를 함께
+// 표기한다("폄 (경추)" vs "폄 (흉추)"). regionLabel은 "경추 (Cervical)" 형태이므로
+// 괄호 앞 한글 부위명만 잘라 쓴다.
+export function shortRegionLabel(regionLabel: string): string {
+  return regionLabel.split(" (")[0];
+}
+
+/** "폄 (경추)"처럼 부위를 함께 표기한 동작 라벨을 반환한다. */
+export function movementLabelWithRegion(movementId: string): string {
+  const found = findMovementLabel(movementId);
+  if (!found) return movementId;
+  return `${found.ko} (${shortRegionLabel(found.region)})`;
+}

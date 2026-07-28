@@ -1,5 +1,5 @@
 import { query } from "./db";
-import type { AssessmentMovements, AssessmentRow } from "./db";
+import type { AssessmentMovements, AssessmentRow, PainTriggerEntry } from "./db";
 
 export interface CreateAssessmentInput {
   memberId: number;
@@ -11,8 +11,7 @@ export interface CreateAssessmentInput {
   overheadSquatNote?: string;
   pushupNote?: string;
   hipHingeNote?: string;
-  painTriggerNote?: string;
-  painScale?: number | null;
+  painTriggers?: PainTriggerEntry[];
 }
 
 export async function createAssessment(input: CreateAssessmentInput): Promise<AssessmentRow> {
@@ -20,8 +19,8 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
     `INSERT INTO assessments (
        member_id, evaluator_name, evaluated_at, movements,
        core_note, squat_note, overhead_squat_note, pushup_note, hip_hinge_note,
-       pain_trigger_note, pain_scale
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       pain_triggers
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING *`,
     [
       input.memberId,
@@ -33,8 +32,7 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
       input.overheadSquatNote ?? "",
       input.pushupNote ?? "",
       input.hipHingeNote ?? "",
-      input.painTriggerNote ?? "",
-      input.painScale ?? null,
+      JSON.stringify(input.painTriggers ?? []),
     ],
   );
   return result.rows[0];
@@ -60,4 +58,17 @@ export async function getLatestAssessmentByMember(memberId: number): Promise<Ass
     [memberId],
   );
   return result.rows[0] ?? null;
+}
+
+/**
+ * 통증 유발 동작 목록을 반환한다. pain_triggers 배열이 도입되기 전에 저장된
+ * 평가는 레거시 단일 필드(pain_trigger_note/pain_scale)만 있으므로, 그 경우
+ * 한 건짜리 배열로 변환해 돌려준다.
+ */
+export function getPainTriggerEntries(assessment: AssessmentRow): PainTriggerEntry[] {
+  if (assessment.pain_triggers.length > 0) return assessment.pain_triggers;
+  if (assessment.pain_trigger_note) {
+    return [{ note: assessment.pain_trigger_note, painScale: assessment.pain_scale }];
+  }
+  return [];
 }

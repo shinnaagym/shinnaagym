@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
-import { getAssessmentById } from "@/lib/assessments";
+import { getAssessmentById, getPainTriggerEntries } from "@/lib/assessments";
 import { AssessmentDocument } from "@/app/components/AssessmentDocument";
 import { PrintButton } from "@/app/components/PrintButton";
 
@@ -37,7 +37,10 @@ export default async function AssessmentDetailPage({
         </Link>
         <PrintButton />
       </div>
-      <AssessmentDocument memberName={member.name} assessment={assessment} />
+      <AssessmentDocument
+        memberName={member.name}
+        assessment={{ ...assessment, painTriggers: getPainTriggerEntries(assessment) }}
+      />
     </div>
   );
 }

@@ -165,6 +165,7 @@ function ensureSchema(): Promise<void> {
           hip_hinge_note TEXT NOT NULL DEFAULT '',
           pain_trigger_note TEXT NOT NULL DEFAULT '',
           pain_scale INTEGER,
+          pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
@@ -215,6 +216,7 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_memo TEXT NOT NULL DEFAULT '';
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
           ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -349,6 +351,11 @@ export interface AssessmentMovementEntry {
 
 export type AssessmentMovements = Record<string, AssessmentMovementEntry>;
 
+export interface PainTriggerEntry {
+  note: string;
+  painScale: number | null;
+}
+
 export interface AssessmentRow {
   id: number;
   member_id: number;
@@ -360,8 +367,10 @@ export interface AssessmentRow {
   overhead_squat_note: string;
   pushup_note: string;
   hip_hinge_note: string;
+  // 레거시 단일 필드 — pain_triggers 도입 전에 저장된 평가에서만 값이 있다.
   pain_trigger_note: string;
   pain_scale: number | null;
+  pain_triggers: PainTriggerEntry[];
   created_at: string;
 }
 

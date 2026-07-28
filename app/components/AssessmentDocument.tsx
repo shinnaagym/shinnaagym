@@ -3,7 +3,7 @@ import {
   FUNCTIONAL_TESTS,
   MMT_STRENGTH_LABELS,
 } from "@/lib/assessment-movements";
-import type { AssessmentMovements } from "@/lib/db";
+import type { AssessmentMovements, PainTriggerEntry } from "@/lib/db";
 
 export interface AssessmentDocumentData {
   evaluator_name: string;
@@ -14,8 +14,7 @@ export interface AssessmentDocumentData {
   overhead_squat_note: string;
   pushup_note: string;
   hip_hinge_note: string;
-  pain_trigger_note: string;
-  pain_scale: number | null;
+  painTriggers: PainTriggerEntry[];
 }
 
 type NoteField =
@@ -108,18 +107,20 @@ export function AssessmentDocument({
 
       <section className="mb-8">
         <h2 className="font-display text-lg mb-3">통증 유발 동작</h2>
-        <div className="rounded-2xl border border-line px-4 py-4 text-sm space-y-3">
-          <div>
-            <p className="text-xs text-ink/40 mb-0.5">회원마다 다른 동작(통증 나타나는 동작)</p>
-            <p>{assessment.pain_trigger_note || "-"}</p>
+        {assessment.painTriggers.length === 0 ? (
+          <div className="rounded-2xl border border-line px-4 py-4 text-sm text-ink/50">-</div>
+        ) : (
+          <div className="rounded-2xl border border-line divide-y divide-line/60 text-sm">
+            {assessment.painTriggers.map((entry, i) => (
+              <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
+                <p>{entry.note || "-"}</p>
+                <p className="font-display text-lg whitespace-nowrap">
+                  {entry.painScale != null ? `${entry.painScale} / 10` : "-"}
+                </p>
+              </div>
+            ))}
           </div>
-          <div>
-            <p className="text-xs text-ink/40 mb-0.5">통증 척도 (NRS 0~10)</p>
-            <p className="font-display text-xl">
-              {assessment.pain_scale != null ? `${assessment.pain_scale} / 10` : "-"}
-            </p>
-          </div>
-        </div>
+        )}
       </section>
     </>
   );

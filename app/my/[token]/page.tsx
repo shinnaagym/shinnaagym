@@ -9,8 +9,8 @@ import {
   listMemberSessions,
 } from "@/lib/schedule";
 import { getLatestContractByMember } from "@/lib/contracts";
-import { getLatestAssessmentByMember } from "@/lib/assessments";
-import { findMovementLabel } from "@/lib/assessment-movements";
+import { getLatestAssessmentByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { movementLabelWithRegion } from "@/lib/assessment-movements";
 import { koreaTodayKey } from "@/lib/date";
 
 // 담당 코치의 개인 연락처가 등록되지 않은 경우를 위한 기본(스튜디오) 문의 번호.
@@ -56,10 +56,11 @@ export default async function MyReservationPage({
     ? Object.entries(assessment.movements)
         .filter(([, entry]) => entry.compensation.trim().length > 0)
         .map(([movementId, entry]) => ({
-          label: findMovementLabel(movementId)?.ko ?? movementId,
+          label: movementLabelWithRegion(movementId),
           compensation: entry.compensation,
         }))
     : [];
+  const painTriggers = assessment ? getPainTriggerEntries(assessment) : [];
 
   const contactPhone =
     coaches.find((c) => c.id === member.coach_id)?.phone.trim() || DEFAULT_STUDIO_PHONE;
@@ -119,7 +120,7 @@ export default async function MyReservationPage({
           </Link>
         )}
 
-        {assessment && (flaggedMovements.length > 0 || assessment.pain_trigger_note) && (
+        {assessment && (flaggedMovements.length > 0 || painTriggers.length > 0) && (
           <div className="rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10">
             <p className="font-display text-lg mb-3">🧍 체형 평가 요약</p>
             {flaggedMovements.length > 0 && (
@@ -134,13 +135,17 @@ export default async function MyReservationPage({
                 </ul>
               </div>
             )}
-            {assessment.pain_trigger_note && (
+            {painTriggers.length > 0 && (
               <div>
                 <p className="text-xs text-ink/40 mb-1">통증 유발 동작</p>
-                <p className="text-sm text-ink/70">
-                  {assessment.pain_trigger_note}
-                  {assessment.pain_scale != null && ` (통증 척도 ${assessment.pain_scale}/10)`}
-                </p>
+                <ul className="space-y-1 text-sm text-ink/70">
+                  {painTriggers.map((entry, i) => (
+                    <li key={i}>
+                      {entry.note}
+                      {entry.painScale != null && ` (통증 척도 ${entry.painScale}/10)`}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

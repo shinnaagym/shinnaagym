@@ -39,6 +39,78 @@ function inputClass(): string {
   return "w-full rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral";
 }
 
+interface PainTriggerFormEntry {
+  note: string;
+  painScale: number | null;
+}
+
+function PainTriggerRow({
+  entry,
+  pastNotes,
+  onChange,
+  onRemove,
+}: {
+  entry: PainTriggerFormEntry;
+  pastNotes: string[];
+  onChange: (patch: Partial<PainTriggerFormEntry>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-line/60 px-3 py-3 mb-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <label className="text-xs text-ink/40">동작 설명</label>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-xs text-coral hover:opacity-70"
+        >
+          삭제
+        </button>
+      </div>
+      {pastNotes.length > 0 && (
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onChange({ note: e.target.value });
+          }}
+          className={inputClass() + " bg-white mb-2"}
+        >
+          <option value="">이 회원의 과거 문구에서 선택</option>
+          {pastNotes.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      )}
+      <input
+        value={entry.note}
+        onChange={(e) => onChange({ note: e.target.value })}
+        placeholder="예: 계단 내려갈 때 무릎 안쪽 통증"
+        className={inputClass() + " mb-2"}
+      />
+      <label className="block text-xs text-ink/40 mb-1.5">통증 척도 (NRS 0~10)</label>
+      <div className="flex flex-wrap gap-1.5">
+        {NRS_PAIN_OPTIONS.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange({ painScale: Number(n) })}
+            className={[
+              "h-8 w-8 rounded-full border text-xs font-medium transition",
+              entry.painScale === Number(n)
+                ? "bg-coral text-white border-coral"
+                : "border-line text-ink/60 hover:bg-bone",
+            ].join(" ")}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MovementRow({
   movement,
   entry,
@@ -132,9 +204,11 @@ function Accordion({
 export function AssessmentForm({
   memberId,
   memberName,
+  pastPainTriggerNotes,
 }: {
   memberId: number;
   memberName: string;
+  pastPainTriggerNotes: string[];
 }) {
   const router = useRouter();
   const [evaluatorName, setEvaluatorName] = useState("");
@@ -146,8 +220,9 @@ export function AssessmentForm({
   const [functionalOpen, setFunctionalOpen] = useState(false);
   const [functionalNotes, setFunctionalNotes] =
     useState<Record<FunctionalTestKey, string>>(EMPTY_FUNCTIONAL_NOTES);
-  const [painTriggerNote, setPainTriggerNote] = useState("");
-  const [painScale, setPainScale] = useState<number | null>(null);
+  const [painTriggers, setPainTriggers] = useState<PainTriggerFormEntry[]>([
+    { note: "", painScale: null },
+  ]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -162,6 +237,18 @@ export function AssessmentForm({
 
   function updateMovement(id: string, patch: Partial<MovementEntry>) {
     setMovements((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY_ENTRY), ...patch } }));
+  }
+
+  function updatePainTrigger(index: number, patch: Partial<PainTriggerFormEntry>) {
+    setPainTriggers((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+  }
+
+  function addPainTrigger() {
+    setPainTriggers((prev) => [...prev, { note: "", painScale: null }]);
+  }
+
+  function removePainTrigger(index: number) {
+    setPainTriggers((prev) => prev.filter((_, i) => i !== index));
   }
 
   function expandAll() {
@@ -190,8 +277,7 @@ export function AssessmentForm({
           overheadSquatNote: functionalNotes.overheadSquat,
           pushupNote: functionalNotes.pushup,
           hipHingeNote: functionalNotes.hipHinge,
-          painTriggerNote,
-          painScale,
+          painTriggers,
         }),
       });
       if (!res.ok) {
@@ -308,32 +394,25 @@ export function AssessmentForm({
 
       <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-8">
         <h2 className="font-display text-lg mb-3">통증 유발 동작</h2>
-        <label className="block text-sm font-medium mb-1.5">
-          회원마다 다른 동작(통증 나타나는 동작)
-        </label>
-        <textarea
-          value={painTriggerNote}
-          onChange={(e) => setPainTriggerNote(e.target.value)}
-          rows={2}
-          placeholder="예: 계단 내려갈 때 무릎 안쪽 통증"
-          className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none mb-4"
-        />
-        <label className="block text-sm font-medium mb-2">통증 척도 (NRS 0~10)</label>
-        <div className="flex flex-wrap gap-1.5">
-          {Array.from({ length: 11 }, (_, i) => i).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setPainScale(n)}
-              className={[
-                "h-9 w-9 rounded-full border text-sm font-medium transition",
-                painScale === n ? "bg-coral text-white border-coral" : "border-line text-ink/60 hover:bg-bone",
-              ].join(" ")}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
+        <p className="text-xs text-ink/50 mb-3">
+          회원마다 다른 동작(통증 나타나는 동작)이 여러 개면 하나씩 추가해주세요.
+        </p>
+        {painTriggers.map((entry, i) => (
+          <PainTriggerRow
+            key={i}
+            entry={entry}
+            pastNotes={pastPainTriggerNotes}
+            onChange={(patch) => updatePainTrigger(i, patch)}
+            onRemove={() => removePainTrigger(i)}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={addPainTrigger}
+          className="rounded-full border border-coral text-coral px-4 py-2 text-sm font-medium hover:bg-coral/5 transition"
+        >
+          + 통증 유발 동작 추가
+        </button>
       </div>
 
       {error && <p className="text-sm text-coral mb-3 no-print">{error}</p>}

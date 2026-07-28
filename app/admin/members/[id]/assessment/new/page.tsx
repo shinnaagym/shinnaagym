@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
+import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { AssessmentForm } from "../assessment-form";
 
 export default async function NewAssessmentPage({
@@ -21,9 +22,23 @@ export default async function NewAssessmentPage({
     notFound();
   }
 
+  const pastAssessments = await listAssessmentsByMember(idNum);
+  const pastPainTriggerNotes = Array.from(
+    new Set(
+      pastAssessments
+        .flatMap((a) => getPainTriggerEntries(a))
+        .map((e) => e.note)
+        .filter((note) => note.length > 0),
+    ),
+  );
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
-      <AssessmentForm memberId={idNum} memberName={member.name} />
+      <AssessmentForm
+        memberId={idNum}
+        memberName={member.name}
+        pastPainTriggerNotes={pastPainTriggerNotes}
+      />
     </div>
   );
 }
