@@ -6,11 +6,9 @@ import {
   STANCE_LEG_OPTIONS,
   LEG_CROSS_OPTIONS,
   SLEEP_POSITION_OPTIONS,
-  SLEEP_AMOUNT_OPTIONS,
   SLEEP_QUALITY_OPTIONS,
   STRESS_LEVEL_OPTIONS,
   PAIN_ONSET_TYPE_OPTIONS,
-  PAIN_PERSISTENCE_OPTIONS,
   PAIN_CYCLE_PERIODS,
   PAIN_CHARACTERISTIC_OPTIONS,
 } from "@/lib/intake-questionnaire";
@@ -22,7 +20,7 @@ export interface IntakeFormState {
   legCross: string;
   sleepPosition: string;
   frequentMovement: string;
-  sleepAmount: string;
+  sleepHours: number | null;
   sleepQuality: string;
   stressLevel: string;
   drinking: boolean;
@@ -31,11 +29,10 @@ export interface IntakeFormState {
   painOnsetPeriod: string;
   painOnsetType: string;
   painMoi: string;
-  painProgressNote: string;
+  painTriggerMovements: string[];
   painNrsBest: number | null;
   painNrsWorst: number | null;
   painNrsCurrent: number | null;
-  painPersistence: string;
   painCycleSituation: string;
   painCycleMorning: string;
   painCycleNoon: string;
@@ -58,7 +55,7 @@ export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
   legCross: "",
   sleepPosition: "",
   frequentMovement: "",
-  sleepAmount: "",
+  sleepHours: null,
   sleepQuality: "",
   stressLevel: "",
   drinking: false,
@@ -67,11 +64,10 @@ export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
   painOnsetPeriod: "",
   painOnsetType: "",
   painMoi: "",
-  painProgressNote: "",
+  painTriggerMovements: [""],
   painNrsBest: null,
   painNrsWorst: null,
   painNrsCurrent: null,
-  painPersistence: "",
   painCycleSituation: "",
   painCycleMorning: "",
   painCycleNoon: "",
@@ -181,6 +177,34 @@ function PainCycleToggle({
   );
 }
 
+function PainTriggerMovementRow({
+  value,
+  onChange,
+  onRemove,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="예: 계단 내려갈 때"
+        className={textareaClass() + " flex-1"}
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="text-xs text-coral hover:opacity-70 whitespace-nowrap"
+      >
+        삭제
+      </button>
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mb-4 last:mb-0">
@@ -227,6 +251,20 @@ export function IntakeForm({
         ? form.painCharacteristics.filter((k) => k !== key)
         : [...form.painCharacteristics, key],
     });
+  }
+
+  function updatePainTriggerMovement(index: number, value: string) {
+    patch({
+      painTriggerMovements: form.painTriggerMovements.map((v, i) => (i === index ? value : v)),
+    });
+  }
+
+  function addPainTriggerMovement() {
+    patch({ painTriggerMovements: [...form.painTriggerMovements, ""] });
+  }
+
+  function removePainTriggerMovement(index: number) {
+    patch({ painTriggerMovements: form.painTriggerMovements.filter((_, i) => i !== index) });
   }
 
   async function handleSubmit() {
@@ -300,8 +338,22 @@ export function IntakeForm({
             className={textareaClass()}
           />
         </Field>
-        <Field label="수면 양">
-          <RadioPills options={SLEEP_AMOUNT_OPTIONS} value={form.sleepAmount} onChange={(v) => patch({ sleepAmount: v })} />
+        <Field label="수면 시간">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              max="24"
+              value={form.sleepHours ?? ""}
+              onChange={(e) =>
+                patch({ sleepHours: e.target.value === "" ? null : Number(e.target.value) })
+              }
+              placeholder="예: 6.5"
+              className="w-24 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
+            <span className="text-sm text-ink/50">시간</span>
+          </div>
         </Field>
         <Field label="수면 질">
           <RadioPills
@@ -378,13 +430,22 @@ export function IntakeForm({
       </SectionCard>
 
       <SectionCard title="통증의 강도 (NRS)">
-        <Field label="경과">
-          <input
-            value={form.painProgressNote}
-            onChange={(e) => patch({ painProgressNote: e.target.value })}
-            placeholder="예: 점차 심해짐"
-            className={textareaClass()}
-          />
+        <Field label="통증 나타나는 동작">
+          {form.painTriggerMovements.map((v, i) => (
+            <PainTriggerMovementRow
+              key={i}
+              value={v}
+              onChange={(nv) => updatePainTriggerMovement(i, nv)}
+              onRemove={() => removePainTriggerMovement(i)}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={addPainTriggerMovement}
+            className="rounded-full border border-coral text-coral px-3 py-1.5 text-xs font-medium hover:bg-coral/5 transition"
+          >
+            + 추가
+          </button>
         </Field>
         <Field label="좋을 때">
           <NrsPills value={form.painNrsBest} onChange={(v) => patch({ painNrsBest: v })} />
@@ -395,14 +456,6 @@ export function IntakeForm({
         <Field label="현재">
           <NrsPills value={form.painNrsCurrent} onChange={(v) => patch({ painNrsCurrent: v })} />
         </Field>
-      </SectionCard>
-
-      <SectionCard title="통증의 지속성">
-        <RadioPills
-          options={PAIN_PERSISTENCE_OPTIONS}
-          value={form.painPersistence}
-          onChange={(v) => patch({ painPersistence: v })}
-        />
       </SectionCard>
 
       <SectionCard title="통증의 주기">

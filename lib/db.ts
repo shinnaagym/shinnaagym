@@ -199,7 +199,7 @@ function ensureSchema(): Promise<void> {
           leg_cross TEXT NOT NULL DEFAULT '',
           sleep_position TEXT NOT NULL DEFAULT '',
           frequent_movement TEXT NOT NULL DEFAULT '',
-          sleep_amount TEXT NOT NULL DEFAULT '',
+          sleep_hours NUMERIC,
           sleep_quality TEXT NOT NULL DEFAULT '',
           stress_level TEXT NOT NULL DEFAULT '',
           drinking BOOLEAN NOT NULL DEFAULT false,
@@ -208,11 +208,10 @@ function ensureSchema(): Promise<void> {
           pain_onset_period TEXT NOT NULL DEFAULT '',
           pain_onset_type TEXT NOT NULL DEFAULT '',
           pain_moi TEXT NOT NULL DEFAULT '',
-          pain_progress_note TEXT NOT NULL DEFAULT '',
+          pain_trigger_movements TEXT[] NOT NULL DEFAULT '{}',
           pain_nrs_best INTEGER,
           pain_nrs_worst INTEGER,
           pain_nrs_current INTEGER,
-          pain_persistence TEXT NOT NULL DEFAULT '',
           pain_cycle_situation TEXT NOT NULL DEFAULT '',
           pain_cycle_morning TEXT NOT NULL DEFAULT '',
           pain_cycle_noon TEXT NOT NULL DEFAULT '',
@@ -259,6 +258,8 @@ function ensureSchema(): Promise<void> {
           ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS exercise_performance JSONB NOT NULL DEFAULT '[]'::jsonb;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS sleep_hours NUMERIC;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS pain_trigger_movements TEXT[] NOT NULL DEFAULT '{}';
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -429,7 +430,7 @@ export interface IntakeQuestionnaireRow {
   leg_cross: string;
   sleep_position: string;
   frequent_movement: string;
-  sleep_amount: string;
+  sleep_hours: number | null;
   sleep_quality: string;
   stress_level: string;
   drinking: boolean;
@@ -438,11 +439,10 @@ export interface IntakeQuestionnaireRow {
   pain_onset_period: string;
   pain_onset_type: string;
   pain_moi: string;
-  pain_progress_note: string;
+  pain_trigger_movements: string[];
   pain_nrs_best: number | null;
   pain_nrs_worst: number | null;
   pain_nrs_current: number | null;
-  pain_persistence: string;
   pain_cycle_situation: string;
   pain_cycle_morning: string;
   pain_cycle_noon: string;

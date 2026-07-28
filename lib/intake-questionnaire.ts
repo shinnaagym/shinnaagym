@@ -15,12 +15,6 @@ export const SLEEP_POSITION_OPTIONS = [
   { value: "right_side", label: "옆으로(우)" },
 ] as const;
 
-export const SLEEP_AMOUNT_OPTIONS = [
-  { value: "insufficient", label: "부족" },
-  { value: "normal", label: "보통" },
-  { value: "sufficient", label: "충분" },
-] as const;
-
 export const SLEEP_QUALITY_OPTIONS = [
   { value: "bad", label: "나쁨" },
   { value: "normal", label: "보통" },
@@ -33,17 +27,12 @@ export const STRESS_LEVEL_OPTIONS = [
   { value: "high", label: "높음" },
 ] as const;
 
+// 급성/아급성/만성 구분 기준: 국제통증학회(IASP)의 만성통증 정의(3개월/12주 초과 지속)
+// 및 근골격계 재활 문헌(예: APTA 요통 임상실무지침)에서 널리 쓰이는 4주/12주 구간을 따른다.
 export const PAIN_ONSET_TYPE_OPTIONS = [
-  { value: "acute", label: "급성" },
-  { value: "subacute", label: "아급성" },
-  { value: "chronic", label: "만성" },
-  { value: "progressive", label: "점점 퍼짐" },
-] as const;
-
-export const PAIN_PERSISTENCE_OPTIONS = [
-  { value: "all_day", label: "하루 종일 지속" },
-  { value: "intermittent", label: "간헐적" },
-  { value: "both", label: "두 가지가 공존" },
+  { value: "acute", label: "급성 (4주 이내)" },
+  { value: "subacute", label: "아급성 (4~12주)" },
+  { value: "chronic", label: "만성 (12주 초과)" },
 ] as const;
 
 export const PAIN_CYCLE_PERIODS = [
