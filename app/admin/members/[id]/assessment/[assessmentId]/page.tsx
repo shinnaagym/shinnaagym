@@ -53,7 +53,11 @@ export default async function AssessmentDetailPage({
       </div>
       <AssessmentDocument
         memberName={member.name}
-        assessment={{ ...assessment, painTriggers: getPainTriggerEntries(assessment) }}
+        assessment={{
+          ...assessment,
+          painTriggers: getPainTriggerEntries(assessment),
+          exercisePerformance: assessment.exercise_performance,
+        }}
       />
     </div>
   );

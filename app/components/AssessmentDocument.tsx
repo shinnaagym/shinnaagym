@@ -3,7 +3,7 @@ import {
   FUNCTIONAL_TESTS,
   MMT_STRENGTH_LABELS,
 } from "@/lib/assessment-movements";
-import type { AssessmentMovements, PainTriggerEntry } from "@/lib/db";
+import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
 
 export interface AssessmentDocumentData {
   evaluator_name: string;
@@ -15,6 +15,7 @@ export interface AssessmentDocumentData {
   pushup_note: string;
   hip_hinge_note: string;
   painTriggers: PainTriggerEntry[];
+  exercisePerformance: ExercisePerformanceEntry[];
 }
 
 type NoteField =
@@ -126,6 +127,22 @@ export function AssessmentDocument({
                 <p className="font-display text-lg whitespace-nowrap">
                   {entry.painScale != null ? `${entry.painScale} / 10` : "-"}
                 </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mb-8">
+        <h2 className="font-display text-lg mb-3">운동 수행능력 평가</h2>
+        {assessment.exercisePerformance.length === 0 ? (
+          <div className="rounded-2xl border border-line px-4 py-4 text-sm text-ink/50">-</div>
+        ) : (
+          <div className="rounded-2xl border border-line divide-y divide-line/60 text-sm">
+            {assessment.exercisePerformance.map((entry, i) => (
+              <div key={i} className="px-4 py-3">
+                <p className="font-medium text-ink">{entry.exercise || "-"}</p>
+                <p className="text-ink/70">{entry.note || "-"}</p>
               </div>
             ))}
           </div>

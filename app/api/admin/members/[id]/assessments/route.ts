@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { createAssessment, listAssessmentsByMember } from "@/lib/assessments";
-import { parseMovements, parsePainTriggers } from "@/lib/assessment-validation";
+import { parseExercisePerformance, parseMovements, parsePainTriggers } from "@/lib/assessment-validation";
 
 export async function GET(
   _req: NextRequest,
@@ -48,6 +48,7 @@ export async function POST(
         pushupNote?: unknown;
         hipHingeNote?: unknown;
         painTriggers?: unknown;
+        exercisePerformance?: unknown;
       }
     | null;
 
@@ -61,6 +62,7 @@ export async function POST(
   const pushupNote = typeof body?.pushupNote === "string" ? body.pushupNote.trim() : "";
   const hipHingeNote = typeof body?.hipHingeNote === "string" ? body.hipHingeNote.trim() : "";
   const painTriggers = parsePainTriggers(body?.painTriggers);
+  const exercisePerformance = parseExercisePerformance(body?.exercisePerformance);
 
   const assessment = await createAssessment({
     memberId: idNum,
@@ -73,6 +75,7 @@ export async function POST(
     pushupNote,
     hipHingeNote,
     painTriggers,
+    exercisePerformance,
   });
 
   return NextResponse.json({ assessment }, { status: 201 });

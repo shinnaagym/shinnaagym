@@ -10,7 +10,7 @@ import {
   type FunctionalTestKey,
   type MovementDef,
 } from "@/lib/assessment-movements";
-import type { AssessmentMovements, PainTriggerEntry } from "@/lib/db";
+import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
 
 interface MovementEntry {
   romPassive: string;
@@ -108,6 +108,58 @@ function PainTriggerRow({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ExercisePerformanceRow({
+  entry,
+  pastExercises,
+  onChange,
+  onRemove,
+}: {
+  entry: ExercisePerformanceEntry;
+  pastExercises: string[];
+  onChange: (patch: Partial<ExercisePerformanceEntry>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-line/60 px-3 py-3 mb-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <label className="text-xs text-ink/40">운동</label>
+        <button type="button" onClick={onRemove} className="text-xs text-coral hover:opacity-70">
+          삭제
+        </button>
+      </div>
+      {pastExercises.length > 0 && (
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onChange({ exercise: e.target.value });
+          }}
+          className={inputClass() + " bg-white mb-2"}
+        >
+          <option value="">이 회원의 과거 운동에서 선택</option>
+          {pastExercises.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      )}
+      <input
+        value={entry.exercise}
+        onChange={(e) => onChange({ exercise: e.target.value })}
+        placeholder="예: 한 발 점프"
+        className={inputClass() + " mb-2"}
+      />
+      <label className="block text-xs text-ink/40 mb-1.5">메모 (수행능력)</label>
+      <input
+        value={entry.note}
+        onChange={(e) => onChange({ note: e.target.value })}
+        placeholder="예: 60bpm으로 45회 수행 가능"
+        className={inputClass()}
+      />
     </div>
   );
 }
@@ -212,18 +264,21 @@ export interface AssessmentInitialData {
   pushupNote: string;
   hipHingeNote: string;
   painTriggers: PainTriggerEntry[];
+  exercisePerformance: ExercisePerformanceEntry[];
 }
 
 export function AssessmentForm({
   memberId,
   memberName,
   pastPainTriggerNotes,
+  pastExercises,
   assessmentId,
   initialData,
 }: {
   memberId: number;
   memberName: string;
   pastPainTriggerNotes: string[];
+  pastExercises: string[];
   assessmentId?: number;
   initialData?: AssessmentInitialData;
 }) {
@@ -258,6 +313,12 @@ export function AssessmentForm({
         ? initialData.painTriggers
         : [{ note: "", painScale: null }],
   );
+  const [exercisePerformance, setExercisePerformance] = useState<ExercisePerformanceEntry[]>(
+    () =>
+      initialData && initialData.exercisePerformance.length > 0
+        ? initialData.exercisePerformance
+        : [{ exercise: "", note: "" }],
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -284,6 +345,18 @@ export function AssessmentForm({
 
   function removePainTrigger(index: number) {
     setPainTriggers((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateExercisePerformance(index: number, patch: Partial<ExercisePerformanceEntry>) {
+    setExercisePerformance((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+  }
+
+  function addExercisePerformance() {
+    setExercisePerformance((prev) => [...prev, { exercise: "", note: "" }]);
+  }
+
+  function removeExercisePerformance(index: number) {
+    setExercisePerformance((prev) => prev.filter((_, i) => i !== index));
   }
 
   function expandAll() {
@@ -316,6 +389,7 @@ export function AssessmentForm({
           pushupNote: functionalNotes.pushup,
           hipHingeNote: functionalNotes.hipHinge,
           painTriggers,
+          exercisePerformance,
         }),
       });
       if (!res.ok) {
@@ -454,6 +528,29 @@ export function AssessmentForm({
           className="rounded-full border border-coral text-coral px-4 py-2 text-sm font-medium hover:bg-coral/5 transition"
         >
           + 통증 유발 동작 추가
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-8">
+        <h2 className="font-display text-lg mb-3">운동 수행능력 평가</h2>
+        <p className="text-xs text-ink/50 mb-3">
+          운동별로 현재 수행 가능한 수준을 기록해주세요. 여러 개면 하나씩 추가해주세요.
+        </p>
+        {exercisePerformance.map((entry, i) => (
+          <ExercisePerformanceRow
+            key={i}
+            entry={entry}
+            pastExercises={pastExercises}
+            onChange={(patch) => updateExercisePerformance(i, patch)}
+            onRemove={() => removeExercisePerformance(i)}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={addExercisePerformance}
+          className="rounded-full border border-coral text-coral px-4 py-2 text-sm font-medium hover:bg-coral/5 transition"
+        >
+          + 운동 수행능력 추가
         </button>
       </div>
 

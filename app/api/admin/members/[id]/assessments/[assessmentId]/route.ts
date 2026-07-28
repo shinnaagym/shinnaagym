@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { getAssessmentById, updateAssessment, deleteAssessment } from "@/lib/assessments";
-import { parseMovements, parsePainTriggers } from "@/lib/assessment-validation";
+import { parseExercisePerformance, parseMovements, parsePainTriggers } from "@/lib/assessment-validation";
 
 export async function GET(
   _req: NextRequest,
@@ -52,6 +52,7 @@ export async function PATCH(
         pushupNote?: unknown;
         hipHingeNote?: unknown;
         painTriggers?: unknown;
+        exercisePerformance?: unknown;
       }
     | null;
 
@@ -65,6 +66,7 @@ export async function PATCH(
   const pushupNote = typeof body?.pushupNote === "string" ? body.pushupNote.trim() : "";
   const hipHingeNote = typeof body?.hipHingeNote === "string" ? body.hipHingeNote.trim() : "";
   const painTriggers = parsePainTriggers(body?.painTriggers);
+  const exercisePerformance = parseExercisePerformance(body?.exercisePerformance);
 
   const assessment = await updateAssessment(assessmentIdNum, {
     evaluatorName,
@@ -76,6 +78,7 @@ export async function PATCH(
     pushupNote,
     hipHingeNote,
     painTriggers,
+    exercisePerformance,
   });
 
   return NextResponse.json({ assessment });

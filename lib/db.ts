@@ -166,6 +166,7 @@ function ensureSchema(): Promise<void> {
           pain_trigger_note TEXT NOT NULL DEFAULT '',
           pain_scale INTEGER,
           pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb,
+          exercise_performance JSONB NOT NULL DEFAULT '[]'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
@@ -217,6 +218,7 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
           ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS exercise_performance JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -356,6 +358,11 @@ export interface PainTriggerEntry {
   painScale: number | null;
 }
 
+export interface ExercisePerformanceEntry {
+  exercise: string;
+  note: string;
+}
+
 export interface AssessmentRow {
   id: number;
   member_id: number;
@@ -371,6 +378,7 @@ export interface AssessmentRow {
   pain_trigger_note: string;
   pain_scale: number | null;
   pain_triggers: PainTriggerEntry[];
+  exercise_performance: ExercisePerformanceEntry[];
   created_at: string;
 }
 

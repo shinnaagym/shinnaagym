@@ -1,5 +1,5 @@
 import { query } from "./db";
-import type { AssessmentMovements, AssessmentRow, PainTriggerEntry } from "./db";
+import type { AssessmentMovements, AssessmentRow, ExercisePerformanceEntry, PainTriggerEntry } from "./db";
 
 export interface CreateAssessmentInput {
   memberId: number;
@@ -12,6 +12,7 @@ export interface CreateAssessmentInput {
   pushupNote?: string;
   hipHingeNote?: string;
   painTriggers?: PainTriggerEntry[];
+  exercisePerformance?: ExercisePerformanceEntry[];
 }
 
 export async function createAssessment(input: CreateAssessmentInput): Promise<AssessmentRow> {
@@ -19,8 +20,8 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
     `INSERT INTO assessments (
        member_id, evaluator_name, evaluated_at, movements,
        core_note, squat_note, overhead_squat_note, pushup_note, hip_hinge_note,
-       pain_triggers
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       pain_triggers, exercise_performance
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       input.memberId,
@@ -33,6 +34,7 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
       input.pushupNote ?? "",
       input.hipHingeNote ?? "",
       JSON.stringify(input.painTriggers ?? []),
+      JSON.stringify(input.exercisePerformance ?? []),
     ],
   );
   return result.rows[0];
@@ -48,6 +50,7 @@ export interface UpdateAssessmentInput {
   pushupNote?: string;
   hipHingeNote?: string;
   painTriggers?: PainTriggerEntry[];
+  exercisePerformance?: ExercisePerformanceEntry[];
 }
 
 export async function updateAssessment(
@@ -58,7 +61,8 @@ export async function updateAssessment(
     `UPDATE assessments SET
        evaluator_name = $2, evaluated_at = $3, movements = $4,
        core_note = $5, squat_note = $6, overhead_squat_note = $7,
-       pushup_note = $8, hip_hinge_note = $9, pain_triggers = $10
+       pushup_note = $8, hip_hinge_note = $9, pain_triggers = $10,
+       exercise_performance = $11
      WHERE id = $1
      RETURNING *`,
     [
@@ -72,6 +76,7 @@ export async function updateAssessment(
       input.pushupNote ?? "",
       input.hipHingeNote ?? "",
       JSON.stringify(input.painTriggers ?? []),
+      JSON.stringify(input.exercisePerformance ?? []),
     ],
   );
   return result.rows[0] ?? null;

@@ -1,5 +1,5 @@
 import { ASSESSMENT_REGIONS, MMT_STRENGTH_OPTIONS, NRS_PAIN_OPTIONS } from "./assessment-movements";
-import type { AssessmentMovements, PainTriggerEntry } from "./db";
+import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "./db";
 
 const VALID_MOVEMENT_IDS = new Set(
   ASSESSMENT_REGIONS.flatMap((region) => region.movements.map((m) => m.id)),
@@ -46,6 +46,20 @@ export function parsePainTriggers(raw: unknown): PainTriggerEntry[] {
         : null;
     if (!note && painScale == null) continue;
     entries.push({ note, painScale });
+  }
+  return entries;
+}
+
+export function parseExercisePerformance(raw: unknown): ExercisePerformanceEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const entries: ExercisePerformanceEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const exercise = typeof record.exercise === "string" ? record.exercise.trim() : "";
+    const note = typeof record.note === "string" ? record.note.trim() : "";
+    if (!exercise && !note) continue;
+    entries.push({ exercise, note });
   }
   return entries;
 }

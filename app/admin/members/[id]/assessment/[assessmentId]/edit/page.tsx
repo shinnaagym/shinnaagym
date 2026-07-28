@@ -40,6 +40,14 @@ export default async function EditAssessmentPage({
         .filter((note) => note.length > 0),
     ),
   );
+  const pastExercises = Array.from(
+    new Set(
+      pastAssessments
+        .flatMap((a) => a.exercise_performance)
+        .map((e) => e.exercise)
+        .filter((exercise) => exercise.length > 0),
+    ),
+  );
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -47,6 +55,7 @@ export default async function EditAssessmentPage({
         memberId={idNum}
         memberName={member.name}
         pastPainTriggerNotes={pastPainTriggerNotes}
+        pastExercises={pastExercises}
         assessmentId={assessmentIdNum}
         initialData={{
           evaluatorName: assessment.evaluator_name,
@@ -58,6 +67,7 @@ export default async function EditAssessmentPage({
           pushupNote: assessment.pushup_note,
           hipHingeNote: assessment.hip_hinge_note,
           painTriggers: getPainTriggerEntries(assessment),
+          exercisePerformance: assessment.exercise_performance,
         }}
       />
     </div>
