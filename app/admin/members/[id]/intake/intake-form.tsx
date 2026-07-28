@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  VISIT_CHANNEL_OPTIONS,
   STANCE_LEG_OPTIONS,
   LEG_CROSS_OPTIONS,
   SLEEP_POSITION_OPTIONS,
@@ -294,6 +295,132 @@ export function IntakeForm({
             />
           </Field>
         </div>
+        <Field label="'신나아짐'에 오게 된 경로">
+          <RadioPills
+            options={VISIT_CHANNEL_OPTIONS}
+            value={form.visitChannel}
+            onChange={(v) => patch({ visitChannel: v })}
+          />
+        </Field>
+        {form.visitChannel === "referral" && (
+          <Field label="소개해준 사람">
+            <input
+              value={form.visitChannelReferrerName}
+              onChange={(e) => patch({ visitChannelReferrerName: e.target.value })}
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
+          </Field>
+        )}
+      </SectionCard>
+
+      <SectionCard title="통증의 발생 과정 (MOI)">
+        <textarea
+          value={form.painMoi}
+          onChange={(e) => patch({ painMoi: e.target.value })}
+          rows={4}
+          placeholder="통증이 어떻게 시작되었는지 서술"
+          className={textareaClass()}
+        />
+      </SectionCard>
+
+      <SectionCard title="통증의 발생">
+        <Field label="기간">
+          <input
+            value={form.painOnsetPeriod}
+            onChange={(e) => patch({ painOnsetPeriod: e.target.value })}
+            placeholder="예: 2주 전부터"
+            className={textareaClass()}
+          />
+        </Field>
+        <Field label="양상">
+          <RadioPills
+            options={PAIN_ONSET_TYPE_OPTIONS}
+            value={form.painOnsetType}
+            onChange={(v) => patch({ painOnsetType: v })}
+          />
+        </Field>
+      </SectionCard>
+
+      <SectionCard title="통증의 강도 (NRS)">
+        <p className="text-xs text-ink/50 mb-3">
+          통증 나타나는 동작을 추가할 때마다 그 동작의 통증 척도(좋을 때/나쁠 때/현재)를 함께
+          기록해주세요.
+        </p>
+        {form.painMovements.map((entry, i) => (
+          <PainMovementRow
+            key={i}
+            entry={entry}
+            onChange={(p) => updatePainMovement(i, p)}
+            onRemove={() => removePainMovement(i)}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={addPainMovement}
+          className="rounded-full border border-coral text-coral px-3 py-1.5 text-xs font-medium hover:bg-coral/5 transition"
+        >
+          + 추가
+        </button>
+      </SectionCard>
+
+      <SectionCard title="통증의 주기">
+        <Field label="상황">
+          <input
+            value={form.painCycleSituation}
+            onChange={(e) => patch({ painCycleSituation: e.target.value })}
+            placeholder="예: 앉아 있을 때"
+            className={textareaClass()}
+          />
+        </Field>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {PAIN_CYCLE_PERIODS.map((period) => {
+            const key = (
+              {
+                morning: "painCycleMorning",
+                noon: "painCycleNoon",
+                evening: "painCycleEvening",
+                night: "painCycleNight",
+              } as const
+            )[period.key];
+            return (
+              <PainCycleToggle
+                key={period.key}
+                label={period.label}
+                value={form[key]}
+                onChange={(v) => patch({ [key]: v } as Partial<IntakeFormState>)}
+              />
+            );
+          })}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="통증의 특징">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          {PAIN_CHARACTERISTIC_OPTIONS.map((opt) => (
+            <label
+              key={opt.key}
+              className="flex items-center gap-2 text-sm rounded-lg border border-line px-3 py-2 cursor-pointer hover:bg-bone/40"
+            >
+              <input
+                type="checkbox"
+                checked={form.painCharacteristics.includes(opt.key)}
+                onChange={() => toggleCharacteristic(opt.key)}
+                className="accent-coral"
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+        <Field label="기타">
+          <input
+            value={form.painCharacteristicsOther}
+            onChange={(e) => patch({ painCharacteristicsOther: e.target.value })}
+            className={textareaClass()}
+          />
+        </Field>
+      </SectionCard>
+
+      <SectionCard title="생활습관">
         <Field label="짝다리">
           <RadioPills options={STANCE_LEG_OPTIONS} value={form.stanceLeg} onChange={(v) => patch({ stanceLeg: v })} />
         </Field>
@@ -373,113 +500,6 @@ export function IntakeForm({
             value={form.otherNotes}
             onChange={(e) => patch({ otherNotes: e.target.value })}
             rows={2}
-            className={textareaClass()}
-          />
-        </Field>
-      </SectionCard>
-
-      <SectionCard title="통증의 발생">
-        <Field label="기간">
-          <input
-            value={form.painOnsetPeriod}
-            onChange={(e) => patch({ painOnsetPeriod: e.target.value })}
-            placeholder="예: 2주 전부터"
-            className={textareaClass()}
-          />
-        </Field>
-        <Field label="양상">
-          <RadioPills
-            options={PAIN_ONSET_TYPE_OPTIONS}
-            value={form.painOnsetType}
-            onChange={(v) => patch({ painOnsetType: v })}
-          />
-        </Field>
-      </SectionCard>
-
-      <SectionCard title="통증의 발생 과정 (MOI)">
-        <textarea
-          value={form.painMoi}
-          onChange={(e) => patch({ painMoi: e.target.value })}
-          rows={4}
-          placeholder="통증이 어떻게 시작되었는지 서술"
-          className={textareaClass()}
-        />
-      </SectionCard>
-
-      <SectionCard title="통증의 강도 (NRS)">
-        <p className="text-xs text-ink/50 mb-3">
-          통증 나타나는 동작을 추가할 때마다 그 동작의 통증 척도(좋을 때/나쁠 때/현재)를 함께
-          기록해주세요.
-        </p>
-        {form.painMovements.map((entry, i) => (
-          <PainMovementRow
-            key={i}
-            entry={entry}
-            onChange={(p) => updatePainMovement(i, p)}
-            onRemove={() => removePainMovement(i)}
-          />
-        ))}
-        <button
-          type="button"
-          onClick={addPainMovement}
-          className="rounded-full border border-coral text-coral px-3 py-1.5 text-xs font-medium hover:bg-coral/5 transition"
-        >
-          + 추가
-        </button>
-      </SectionCard>
-
-      <SectionCard title="통증의 주기">
-        <Field label="상황">
-          <input
-            value={form.painCycleSituation}
-            onChange={(e) => patch({ painCycleSituation: e.target.value })}
-            placeholder="예: 앉아 있을 때"
-            className={textareaClass()}
-          />
-        </Field>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {PAIN_CYCLE_PERIODS.map((period) => {
-            const key = (
-              {
-                morning: "painCycleMorning",
-                noon: "painCycleNoon",
-                evening: "painCycleEvening",
-                night: "painCycleNight",
-              } as const
-            )[period.key];
-            return (
-              <PainCycleToggle
-                key={period.key}
-                label={period.label}
-                value={form[key]}
-                onChange={(v) => patch({ [key]: v } as Partial<IntakeFormState>)}
-              />
-            );
-          })}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="통증의 특징">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-          {PAIN_CHARACTERISTIC_OPTIONS.map((opt) => (
-            <label
-              key={opt.key}
-              className="flex items-center gap-2 text-sm rounded-lg border border-line px-3 py-2 cursor-pointer hover:bg-bone/40"
-            >
-              <input
-                type="checkbox"
-                checked={form.painCharacteristics.includes(opt.key)}
-                onChange={() => toggleCharacteristic(opt.key)}
-                className="accent-coral"
-              />
-              {opt.label}
-            </label>
-          ))}
-        </div>
-        <Field label="기타">
-          <input
-            value={form.painCharacteristicsOther}
-            onChange={(e) => patch({ painCharacteristicsOther: e.target.value })}
             className={textareaClass()}
           />
         </Field>

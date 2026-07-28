@@ -1,5 +1,16 @@
 // 신규 회원 초진 문진표 구조 정의. 종이 문진표의 항목 순서·구성을 그대로 따른다.
 
+export const VISIT_CHANNEL_OPTIONS = [
+  { value: "blog", label: "블로그" },
+  { value: "danggeun", label: "당근" },
+  { value: "instagram", label: "인스타그램" },
+  { value: "signboard", label: "간판" },
+  { value: "banner", label: "현수막" },
+  { value: "flyer", label: "전단지" },
+  { value: "referral", label: "소개" },
+  { value: "other", label: "기타" },
+] as const;
+
 export const STANCE_LEG_OPTIONS = [
   { value: "left", label: "왼쪽" },
   { value: "right", label: "오른쪽" },

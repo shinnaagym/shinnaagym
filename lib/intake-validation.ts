@@ -6,6 +6,7 @@ import {
   STRESS_LEVEL_OPTIONS,
   PAIN_ONSET_TYPE_OPTIONS,
   PAIN_CHARACTERISTIC_OPTIONS,
+  VISIT_CHANNEL_OPTIONS,
 } from "./intake-questionnaire";
 import type { PainMovementEntry } from "./db";
 
@@ -19,6 +20,7 @@ const VALID_SLEEP_POSITION = optionValues(SLEEP_POSITION_OPTIONS);
 const VALID_SLEEP_QUALITY = optionValues(SLEEP_QUALITY_OPTIONS);
 const VALID_STRESS_LEVEL = optionValues(STRESS_LEVEL_OPTIONS);
 const VALID_PAIN_ONSET_TYPE = optionValues(PAIN_ONSET_TYPE_OPTIONS);
+const VALID_VISIT_CHANNEL = optionValues(VISIT_CHANNEL_OPTIONS);
 const VALID_PAIN_CYCLE_DIRECTION = new Set(["up", "down", ""]);
 const VALID_CHARACTERISTIC_KEYS = new Set<string>(PAIN_CHARACTERISTIC_OPTIONS.map((o) => o.key));
 
@@ -71,6 +73,8 @@ export interface ParsedIntakeInput {
   intakeName: string;
   age: number | null;
   phone: string;
+  visitChannel: string;
+  visitChannelReferrerName: string;
   stanceLeg: string;
   legCross: string;
   sleepPosition: string;
@@ -107,6 +111,8 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     intakeName: str(body?.intakeName),
     age: age(body?.age),
     phone: str(body?.phone),
+    visitChannel: enumVal(body?.visitChannel, VALID_VISIT_CHANNEL),
+    visitChannelReferrerName: str(body?.visitChannelReferrerName),
     stanceLeg: enumVal(body?.stanceLeg, VALID_STANCE_LEG),
     legCross: enumVal(body?.legCross, VALID_LEG_CROSS),
     sleepPosition: enumVal(body?.sleepPosition, VALID_SLEEP_POSITION),
