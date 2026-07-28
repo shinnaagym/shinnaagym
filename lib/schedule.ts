@@ -649,8 +649,17 @@ export async function deleteSession(id: number): Promise<void> {
 
 // ---- 사전예약 → 스케줄표 자동 연동 ----
 
-/** 활성 코치 중 담당 회원이 가장 적은 코치를 기본 배정 코치로 고른다 (코치가 1명이면 그 코치). */
+/**
+ * 사전예약으로 들어오는 회원은 모두 '신종수' 코치에게 배정한다. 해당 코치가
+ * 없거나 비활성 상태면(이름 변경 등) 담당 회원이 가장 적은 활성 코치로
+ * 대체한다.
+ */
 async function pickDefaultCoachId(): Promise<number | null> {
+  const named = await query<{ id: number }>(
+    `SELECT id FROM coaches WHERE name = '신종수' AND active = true LIMIT 1`,
+  );
+  if (named.rows[0]) return named.rows[0].id;
+
   const result = await query<{ id: number }>(
     `SELECT c.id FROM coaches c
      LEFT JOIN members m ON m.coach_id = c.id AND m.status = 'active'
@@ -706,13 +715,10 @@ export async function linkPreReservationToSchedule(input: {
   const coachId = await pickDefaultCoachId();
   if (!coachId) return null; // 활성 코치가 없으면 연동을 건너뛴다.
 
-  // 회원의 담당 코치는 관리자가 직접 지정하기 전까지 미지정으로 둔다.
-  // coachId는 스케줄표에 임시로 잡아둘 칸(어느 코치 시간표에 올릴지)을 고를
-  // 때만 쓰고, 회원 레코드 자체에는 저장하지 않는다.
   const member = await findOrCreateMemberByPhone({
     name: input.name,
     phone: input.phone,
-    coachId: null,
+    coachId,
     notes: "사전예약 폼을 통해 자동 등록됨",
   });
 
