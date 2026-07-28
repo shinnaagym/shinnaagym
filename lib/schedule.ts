@@ -650,15 +650,15 @@ export async function deleteSession(id: number): Promise<void> {
 // ---- 사전예약 → 스케줄표 자동 연동 ----
 
 /**
- * 사전예약 스케줄 연동은 '신종수' 코치의 시간표 칸만 빌려 쓴다. 이름이
- * 정확히 일치하는 활성 코치를 찾지 못하면(비활성화, 이름 변경 등) 다른
- * 코치로 조용히 대체하지 않고 null을 반환해 스케줄 연동 자체를 건너뛴다.
- * 엉뚱한 코치에게 배정되는 것보다 관리자가 눈치채고 코치 설정을 확인하게
- * 하는 편이 안전하다.
+ * 사전예약 스케줄 연동은 '신종수' 코치의 시간표 칸만 빌려 쓴다. 다른 코치로
+ * 대체하는 조건은 전혀 없다 — 이름에 '신종수'가 들어간 코치를 대소문자/공백
+ * 관계없이 찾아 그 코치로만 배정하고(활성 여부도 따지지 않음), 그 코치
+ * 자체를 못 찾을 때만 null을 반환해 스케줄 연동을 건너뛴다. 다른 코치로
+ * 조용히 새는 경로는 없다.
  */
 async function pickDefaultCoachId(): Promise<number | null> {
   const result = await query<{ id: number }>(
-    `SELECT id FROM coaches WHERE trim(name) = '신종수' AND active = true LIMIT 1`,
+    `SELECT id FROM coaches WHERE name ILIKE '%신종수%' ORDER BY id ASC LIMIT 1`,
   );
   return result.rows[0]?.id ?? null;
 }
