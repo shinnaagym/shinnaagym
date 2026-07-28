@@ -12,6 +12,7 @@ import { getLatestContractByMember } from "@/lib/contracts";
 import { listAssessmentsByMember } from "@/lib/assessments";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { koreaTodayKey } from "@/lib/date";
+import { AssessmentPainChart } from "@/app/admin/members/[id]/assessment/pain-chart";
 
 // 담당 코치의 개인 연락처가 등록되지 않은 경우를 위한 기본(스튜디오) 문의 번호.
 const DEFAULT_STUDIO_PHONE = "010-6859-6114";
@@ -87,6 +88,8 @@ export default async function MyReservationPage({
             </span>
           </p>
         </div>
+
+        {assessments.length > 0 && <AssessmentPainChart assessments={assessments} />}
 
         {contract && (
           <Link
