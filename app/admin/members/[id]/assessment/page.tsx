@@ -5,6 +5,7 @@ import { getMemberById } from "@/lib/schedule";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { movementLabelWithRegion } from "@/lib/assessment-movements";
 import { AssessmentPainChart } from "./pain-chart";
+import { DeleteAssessmentButton } from "@/app/components/DeleteAssessmentButton";
 import type { AssessmentRow } from "@/lib/db";
 
 function formatDateTime(iso: string): string {
@@ -78,10 +79,10 @@ export default async function AssessmentHistoryPage({
               null,
             );
             return (
-              <li key={a.id}>
+              <li key={a.id} className="relative">
                 <Link
                   href={`/admin/members/${idNum}/assessment/${a.id}`}
-                  className="block rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4 hover:border-coral/40 transition"
+                  className="block rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4 pr-16 hover:border-coral/40 transition"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -109,6 +110,11 @@ export default async function AssessmentHistoryPage({
                     </div>
                   )}
                 </Link>
+                <DeleteAssessmentButton
+                  memberId={idNum}
+                  assessmentId={a.id}
+                  className="absolute top-4 right-5 text-xs text-ink/40 hover:text-coral"
+                />
               </li>
             );
           })}

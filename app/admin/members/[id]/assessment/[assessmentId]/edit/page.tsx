@@ -1,0 +1,65 @@
+import { notFound, redirect } from "next/navigation";
+import { isAdminAuthed } from "@/lib/auth";
+import { getMemberById } from "@/lib/schedule";
+import {
+  getAssessmentById,
+  getPainTriggerEntries,
+  listAssessmentsByMember,
+} from "@/lib/assessments";
+import { AssessmentForm } from "../../assessment-form";
+
+export default async function EditAssessmentPage({
+  params,
+}: {
+  params: Promise<{ id: string; assessmentId: string }>;
+}) {
+  if (!(await isAdminAuthed())) {
+    redirect("/admin");
+  }
+  const { id, assessmentId } = await params;
+  const idNum = Number(id);
+  const assessmentIdNum = Number(assessmentId);
+  if (!Number.isInteger(idNum) || !Number.isInteger(assessmentIdNum)) {
+    notFound();
+  }
+  const member = await getMemberById(idNum);
+  if (!member) {
+    notFound();
+  }
+  const assessment = await getAssessmentById(assessmentIdNum);
+  if (!assessment || assessment.member_id !== idNum) {
+    notFound();
+  }
+
+  const pastAssessments = await listAssessmentsByMember(idNum);
+  const pastPainTriggerNotes = Array.from(
+    new Set(
+      pastAssessments
+        .flatMap((a) => getPainTriggerEntries(a))
+        .map((e) => e.note)
+        .filter((note) => note.length > 0),
+    ),
+  );
+
+  return (
+    <div className="mx-auto max-w-4xl px-6 py-8">
+      <AssessmentForm
+        memberId={idNum}
+        memberName={member.name}
+        pastPainTriggerNotes={pastPainTriggerNotes}
+        assessmentId={assessmentIdNum}
+        initialData={{
+          evaluatorName: assessment.evaluator_name,
+          evaluatedAt: assessment.evaluated_at,
+          movements: assessment.movements,
+          coreNote: assessment.core_note,
+          squatNote: assessment.squat_note,
+          overheadSquatNote: assessment.overhead_squat_note,
+          pushupNote: assessment.pushup_note,
+          hipHingeNote: assessment.hip_hinge_note,
+          painTriggers: getPainTriggerEntries(assessment),
+        }}
+      />
+    </div>
+  );
+}

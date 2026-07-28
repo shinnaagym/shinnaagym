@@ -38,6 +38,49 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
   return result.rows[0];
 }
 
+export interface UpdateAssessmentInput {
+  evaluatorName?: string;
+  evaluatedAt?: string;
+  movements: AssessmentMovements;
+  coreNote?: string;
+  squatNote?: string;
+  overheadSquatNote?: string;
+  pushupNote?: string;
+  hipHingeNote?: string;
+  painTriggers?: PainTriggerEntry[];
+}
+
+export async function updateAssessment(
+  id: number,
+  input: UpdateAssessmentInput,
+): Promise<AssessmentRow | null> {
+  const result = await query<AssessmentRow>(
+    `UPDATE assessments SET
+       evaluator_name = $2, evaluated_at = $3, movements = $4,
+       core_note = $5, squat_note = $6, overhead_squat_note = $7,
+       pushup_note = $8, hip_hinge_note = $9, pain_triggers = $10
+     WHERE id = $1
+     RETURNING *`,
+    [
+      id,
+      input.evaluatorName ?? "",
+      input.evaluatedAt ?? "",
+      JSON.stringify(input.movements ?? {}),
+      input.coreNote ?? "",
+      input.squatNote ?? "",
+      input.overheadSquatNote ?? "",
+      input.pushupNote ?? "",
+      input.hipHingeNote ?? "",
+      JSON.stringify(input.painTriggers ?? []),
+    ],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function deleteAssessment(id: number): Promise<void> {
+  await query(`DELETE FROM assessments WHERE id = $1`, [id]);
+}
+
 /** 회원의 평가 이력을 최신순으로 반환한다(요약 목록용 — movements는 그대로 포함). */
 export async function listAssessmentsByMember(memberId: number): Promise<AssessmentRow[]> {
   const result = await query<AssessmentRow>(

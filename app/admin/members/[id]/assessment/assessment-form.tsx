@@ -10,6 +10,7 @@ import {
   type FunctionalTestKey,
   type MovementDef,
 } from "@/lib/assessment-movements";
+import type { AssessmentMovements, PainTriggerEntry } from "@/lib/db";
 
 interface MovementEntry {
   romPassive: string;
@@ -201,28 +202,62 @@ function Accordion({
   );
 }
 
+export interface AssessmentInitialData {
+  evaluatorName: string;
+  evaluatedAt: string;
+  movements: AssessmentMovements;
+  coreNote: string;
+  squatNote: string;
+  overheadSquatNote: string;
+  pushupNote: string;
+  hipHingeNote: string;
+  painTriggers: PainTriggerEntry[];
+}
+
 export function AssessmentForm({
   memberId,
   memberName,
   pastPainTriggerNotes,
+  assessmentId,
+  initialData,
 }: {
   memberId: number;
   memberName: string;
   pastPainTriggerNotes: string[];
+  assessmentId?: number;
+  initialData?: AssessmentInitialData;
 }) {
   const router = useRouter();
-  const [evaluatorName, setEvaluatorName] = useState("");
-  const [evaluatedAt, setEvaluatedAt] = useState(() => new Date().toISOString().slice(0, 10));
-  const [movements, setMovements] = useState<Record<string, MovementEntry>>({});
+  const isEditing = assessmentId != null;
+  const [evaluatorName, setEvaluatorName] = useState(initialData?.evaluatorName ?? "");
+  const [evaluatedAt, setEvaluatedAt] = useState(
+    () => initialData?.evaluatedAt || new Date().toISOString().slice(0, 10),
+  );
+  const [movements, setMovements] = useState<Record<string, MovementEntry>>(
+    () => initialData?.movements ?? {},
+  );
   const [openRegions, setOpenRegions] = useState<Set<string>>(
     () => new Set([ASSESSMENT_REGIONS[0].key]),
   );
   const [functionalOpen, setFunctionalOpen] = useState(false);
-  const [functionalNotes, setFunctionalNotes] =
-    useState<Record<FunctionalTestKey, string>>(EMPTY_FUNCTIONAL_NOTES);
-  const [painTriggers, setPainTriggers] = useState<PainTriggerFormEntry[]>([
-    { note: "", painScale: null },
-  ]);
+  const [functionalNotes, setFunctionalNotes] = useState<Record<FunctionalTestKey, string>>(
+    () =>
+      initialData
+        ? {
+            core: initialData.coreNote,
+            squat: initialData.squatNote,
+            overheadSquat: initialData.overheadSquatNote,
+            pushup: initialData.pushupNote,
+            hipHinge: initialData.hipHingeNote,
+          }
+        : EMPTY_FUNCTIONAL_NOTES,
+  );
+  const [painTriggers, setPainTriggers] = useState<PainTriggerFormEntry[]>(
+    () =>
+      initialData && initialData.painTriggers.length > 0
+        ? initialData.painTriggers
+        : [{ note: "", painScale: null }],
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -265,8 +300,11 @@ export function AssessmentForm({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/members/${memberId}/assessments`, {
-        method: "POST",
+      const url = isEditing
+        ? `/api/admin/members/${memberId}/assessments/${assessmentId}`
+        : `/api/admin/members/${memberId}/assessments`;
+      const res = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           evaluatorName,
@@ -285,7 +323,11 @@ export function AssessmentForm({
         setError(data.error ?? "저장에 실패했어요.");
         return;
       }
-      router.push(`/admin/members/${memberId}/assessment`);
+      router.push(
+        isEditing
+          ? `/admin/members/${memberId}/assessment/${assessmentId}`
+          : `/admin/members/${memberId}/assessment`,
+      );
     } catch {
       setError("네트워크 오류가 발생했어요.");
     } finally {
@@ -298,7 +340,7 @@ export function AssessmentForm({
       <div className="flex items-start justify-between mb-6 no-print">
         <div>
           <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Assessment</p>
-          <h1 className="font-display text-2xl">신체 평가지 작성</h1>
+          <h1 className="font-display text-2xl">{isEditing ? "신체 평가지 수정" : "신체 평가지 작성"}</h1>
         </div>
         <div className="flex gap-2">
           <button
@@ -431,7 +473,7 @@ export function AssessmentForm({
           disabled={submitting}
           className="flex-1 rounded-full bg-ink text-white py-2.5 text-sm font-medium hover:bg-coral transition disabled:opacity-50"
         >
-          {submitting ? "저장 중..." : "평가 저장하기"}
+          {submitting ? "저장 중..." : isEditing ? "수정 저장하기" : "평가 저장하기"}
         </button>
       </div>
     </div>
