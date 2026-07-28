@@ -1,8 +1,11 @@
 import { query } from "./db";
-import type { IntakeQuestionnaireRow } from "./db";
+import type { IntakeQuestionnaireRow, PainMovementEntry } from "./db";
 
 export interface UpsertIntakeQuestionnaireInput {
   memberId: number;
+  intakeName: string;
+  age: number | null;
+  phone: string;
   stanceLeg: string;
   legCross: string;
   sleepPosition: string;
@@ -16,10 +19,7 @@ export interface UpsertIntakeQuestionnaireInput {
   painOnsetPeriod: string;
   painOnsetType: string;
   painMoi: string;
-  painTriggerMovements: string[];
-  painNrsBest: number | null;
-  painNrsWorst: number | null;
-  painNrsCurrent: number | null;
+  painMovements: PainMovementEntry[];
   painCycleSituation: string;
   painCycleMorning: string;
   painCycleNoon: string;
@@ -53,10 +53,10 @@ export async function upsertIntakeQuestionnaire(
 ): Promise<IntakeQuestionnaireRow> {
   const result = await query<IntakeQuestionnaireRow>(
     `INSERT INTO intake_questionnaires (
-       member_id, stance_leg, leg_cross, sleep_position, frequent_movement,
+       member_id, intake_name, age, phone,
+       stance_leg, leg_cross, sleep_position, frequent_movement,
        sleep_hours, sleep_quality, stress_level, drinking, smoking, other_notes,
-       pain_onset_period, pain_onset_type, pain_moi, pain_trigger_movements,
-       pain_nrs_best, pain_nrs_worst, pain_nrs_current,
+       pain_onset_period, pain_onset_type, pain_moi, pain_movements,
        pain_cycle_situation, pain_cycle_morning, pain_cycle_noon, pain_cycle_evening, pain_cycle_night,
        pain_characteristics, pain_characteristics_other,
        improve_factors, worsen_factors, perceived_cause, post_pain_action,
@@ -66,6 +66,9 @@ export async function upsertIntakeQuestionnaire(
        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33, now()
      )
      ON CONFLICT (member_id) DO UPDATE SET
+       intake_name = EXCLUDED.intake_name,
+       age = EXCLUDED.age,
+       phone = EXCLUDED.phone,
        stance_leg = EXCLUDED.stance_leg,
        leg_cross = EXCLUDED.leg_cross,
        sleep_position = EXCLUDED.sleep_position,
@@ -79,10 +82,7 @@ export async function upsertIntakeQuestionnaire(
        pain_onset_period = EXCLUDED.pain_onset_period,
        pain_onset_type = EXCLUDED.pain_onset_type,
        pain_moi = EXCLUDED.pain_moi,
-       pain_trigger_movements = EXCLUDED.pain_trigger_movements,
-       pain_nrs_best = EXCLUDED.pain_nrs_best,
-       pain_nrs_worst = EXCLUDED.pain_nrs_worst,
-       pain_nrs_current = EXCLUDED.pain_nrs_current,
+       pain_movements = EXCLUDED.pain_movements,
        pain_cycle_situation = EXCLUDED.pain_cycle_situation,
        pain_cycle_morning = EXCLUDED.pain_cycle_morning,
        pain_cycle_noon = EXCLUDED.pain_cycle_noon,
@@ -102,6 +102,9 @@ export async function upsertIntakeQuestionnaire(
      RETURNING *`,
     [
       input.memberId,
+      input.intakeName,
+      input.age,
+      input.phone,
       input.stanceLeg,
       input.legCross,
       input.sleepPosition,
@@ -115,10 +118,7 @@ export async function upsertIntakeQuestionnaire(
       input.painOnsetPeriod,
       input.painOnsetType,
       input.painMoi,
-      input.painTriggerMovements,
-      input.painNrsBest,
-      input.painNrsWorst,
-      input.painNrsCurrent,
+      JSON.stringify(input.painMovements),
       input.painCycleSituation,
       input.painCycleMorning,
       input.painCycleNoon,

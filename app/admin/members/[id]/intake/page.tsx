@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
-import { IntakeForm, type IntakeFormState } from "./intake-form";
+import { IntakeForm } from "./intake-form";
+import { EMPTY_INTAKE_FORM_STATE, type IntakeFormState } from "./intake-form-state";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
@@ -28,8 +29,11 @@ export default async function IntakeQuestionnairePage({
   }
 
   const intake = await getIntakeQuestionnaireByMember(idNum);
-  const initialData: IntakeFormState | undefined = intake
+  const initialData: IntakeFormState = intake
     ? {
+        intakeName: intake.intake_name,
+        age: intake.age,
+        phone: intake.phone,
         stanceLeg: intake.stance_leg,
         legCross: intake.leg_cross,
         sleepPosition: intake.sleep_position,
@@ -43,11 +47,10 @@ export default async function IntakeQuestionnairePage({
         painOnsetPeriod: intake.pain_onset_period,
         painOnsetType: intake.pain_onset_type,
         painMoi: intake.pain_moi,
-        painTriggerMovements:
-          intake.pain_trigger_movements.length > 0 ? intake.pain_trigger_movements : [""],
-        painNrsBest: intake.pain_nrs_best,
-        painNrsWorst: intake.pain_nrs_worst,
-        painNrsCurrent: intake.pain_nrs_current,
+        painMovements:
+          intake.pain_movements.length > 0
+            ? intake.pain_movements
+            : [{ movement: "", nrsBest: null, nrsWorst: null, nrsCurrent: null }],
         painCycleSituation: intake.pain_cycle_situation,
         painCycleMorning: intake.pain_cycle_morning,
         painCycleNoon: intake.pain_cycle_noon,
@@ -64,7 +67,7 @@ export default async function IntakeQuestionnairePage({
         majorComplaint: intake.major_complaint,
         minorComplaint: intake.minor_complaint,
       }
-    : undefined;
+    : { ...EMPTY_INTAKE_FORM_STATE, intakeName: member.name, phone: member.phone };
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">

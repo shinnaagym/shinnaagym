@@ -195,6 +195,9 @@ function ensureSchema(): Promise<void> {
         CREATE TABLE IF NOT EXISTS intake_questionnaires (
           id SERIAL PRIMARY KEY,
           member_id INTEGER NOT NULL UNIQUE REFERENCES members(id) ON DELETE CASCADE,
+          intake_name TEXT NOT NULL DEFAULT '',
+          age INTEGER,
+          phone TEXT NOT NULL DEFAULT '',
           stance_leg TEXT NOT NULL DEFAULT '',
           leg_cross TEXT NOT NULL DEFAULT '',
           sleep_position TEXT NOT NULL DEFAULT '',
@@ -208,10 +211,7 @@ function ensureSchema(): Promise<void> {
           pain_onset_period TEXT NOT NULL DEFAULT '',
           pain_onset_type TEXT NOT NULL DEFAULT '',
           pain_moi TEXT NOT NULL DEFAULT '',
-          pain_trigger_movements TEXT[] NOT NULL DEFAULT '{}',
-          pain_nrs_best INTEGER,
-          pain_nrs_worst INTEGER,
-          pain_nrs_current INTEGER,
+          pain_movements JSONB NOT NULL DEFAULT '[]'::jsonb,
           pain_cycle_situation TEXT NOT NULL DEFAULT '',
           pain_cycle_morning TEXT NOT NULL DEFAULT '',
           pain_cycle_noon TEXT NOT NULL DEFAULT '',
@@ -260,6 +260,10 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS exercise_performance JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS sleep_hours NUMERIC;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS pain_trigger_movements TEXT[] NOT NULL DEFAULT '{}';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS intake_name TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS age INTEGER;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS pain_movements JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -423,9 +427,19 @@ export interface AssessmentRow {
   created_at: string;
 }
 
+export interface PainMovementEntry {
+  movement: string;
+  nrsBest: number | null;
+  nrsWorst: number | null;
+  nrsCurrent: number | null;
+}
+
 export interface IntakeQuestionnaireRow {
   id: number;
   member_id: number;
+  intake_name: string;
+  age: number | null;
+  phone: string;
   stance_leg: string;
   leg_cross: string;
   sleep_position: string;
@@ -439,10 +453,7 @@ export interface IntakeQuestionnaireRow {
   pain_onset_period: string;
   pain_onset_type: string;
   pain_moi: string;
-  pain_trigger_movements: string[];
-  pain_nrs_best: number | null;
-  pain_nrs_worst: number | null;
-  pain_nrs_current: number | null;
+  pain_movements: PainMovementEntry[];
   pain_cycle_situation: string;
   pain_cycle_morning: string;
   pain_cycle_noon: string;

@@ -14,76 +14,10 @@ import {
 } from "@/lib/intake-questionnaire";
 import { NRS_PAIN_OPTIONS } from "@/lib/assessment-movements";
 import { PrintButton } from "@/app/components/PrintButton";
+import type { PainMovementEntry } from "@/lib/db";
+import { EMPTY_INTAKE_FORM_STATE, EMPTY_PAIN_MOVEMENT, type IntakeFormState } from "./intake-form-state";
 
-export interface IntakeFormState {
-  stanceLeg: string;
-  legCross: string;
-  sleepPosition: string;
-  frequentMovement: string;
-  sleepHours: number | null;
-  sleepQuality: string;
-  stressLevel: string;
-  drinking: boolean;
-  smoking: boolean;
-  otherNotes: string;
-  painOnsetPeriod: string;
-  painOnsetType: string;
-  painMoi: string;
-  painTriggerMovements: string[];
-  painNrsBest: number | null;
-  painNrsWorst: number | null;
-  painNrsCurrent: number | null;
-  painCycleSituation: string;
-  painCycleMorning: string;
-  painCycleNoon: string;
-  painCycleEvening: string;
-  painCycleNight: string;
-  painCharacteristics: string[];
-  painCharacteristicsOther: string;
-  improveFactors: string;
-  worsenFactors: string;
-  perceivedCause: string;
-  postPainAction: string;
-  pastSamePainHistory: string;
-  pastTreatment: string;
-  majorComplaint: string;
-  minorComplaint: string;
-}
-
-export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
-  stanceLeg: "",
-  legCross: "",
-  sleepPosition: "",
-  frequentMovement: "",
-  sleepHours: null,
-  sleepQuality: "",
-  stressLevel: "",
-  drinking: false,
-  smoking: false,
-  otherNotes: "",
-  painOnsetPeriod: "",
-  painOnsetType: "",
-  painMoi: "",
-  painTriggerMovements: [""],
-  painNrsBest: null,
-  painNrsWorst: null,
-  painNrsCurrent: null,
-  painCycleSituation: "",
-  painCycleMorning: "",
-  painCycleNoon: "",
-  painCycleEvening: "",
-  painCycleNight: "",
-  painCharacteristics: [],
-  painCharacteristicsOther: "",
-  improveFactors: "",
-  worsenFactors: "",
-  perceivedCause: "",
-  postPainAction: "",
-  pastSamePainHistory: "",
-  pastTreatment: "",
-  majorComplaint: "",
-  minorComplaint: "",
-};
+export type { IntakeFormState } from "./intake-form-state";
 
 function pillClass(active: boolean): string {
   return [
@@ -177,30 +111,46 @@ function PainCycleToggle({
   );
 }
 
-function PainTriggerMovementRow({
-  value,
+function PainMovementRow({
+  entry,
   onChange,
   onRemove,
 }: {
-  value: string;
-  onChange: (v: string) => void;
+  entry: PainMovementEntry;
+  onChange: (patch: Partial<PainMovementEntry>) => void;
   onRemove: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 mb-2">
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="예: 계단 내려갈 때"
-        className={textareaClass() + " flex-1"}
-      />
-      <button
-        type="button"
-        onClick={onRemove}
-        className="text-xs text-coral hover:opacity-70 whitespace-nowrap"
-      >
-        삭제
-      </button>
+    <div className="rounded-xl border border-line/60 px-3 py-3 mb-3">
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          value={entry.movement}
+          onChange={(e) => onChange({ movement: e.target.value })}
+          placeholder="예: 계단 내려갈 때"
+          className={textareaClass() + " flex-1"}
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-xs text-coral hover:opacity-70 whitespace-nowrap"
+        >
+          삭제
+        </button>
+      </div>
+      <div className="space-y-2">
+        <div>
+          <p className="text-xs text-ink/40 mb-1">좋을 때</p>
+          <NrsPills value={entry.nrsBest} onChange={(v) => onChange({ nrsBest: v })} />
+        </div>
+        <div>
+          <p className="text-xs text-ink/40 mb-1">나쁠 때</p>
+          <NrsPills value={entry.nrsWorst} onChange={(v) => onChange({ nrsWorst: v })} />
+        </div>
+        <div>
+          <p className="text-xs text-ink/40 mb-1">현재</p>
+          <NrsPills value={entry.nrsCurrent} onChange={(v) => onChange({ nrsCurrent: v })} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -253,18 +203,18 @@ export function IntakeForm({
     });
   }
 
-  function updatePainTriggerMovement(index: number, value: string) {
+  function updatePainMovement(index: number, entryPatch: Partial<PainMovementEntry>) {
     patch({
-      painTriggerMovements: form.painTriggerMovements.map((v, i) => (i === index ? value : v)),
+      painMovements: form.painMovements.map((e, i) => (i === index ? { ...e, ...entryPatch } : e)),
     });
   }
 
-  function addPainTriggerMovement() {
-    patch({ painTriggerMovements: [...form.painTriggerMovements, ""] });
+  function addPainMovement() {
+    patch({ painMovements: [...form.painMovements, { ...EMPTY_PAIN_MOVEMENT }] });
   }
 
-  function removePainTriggerMovement(index: number) {
-    patch({ painTriggerMovements: form.painTriggerMovements.filter((_, i) => i !== index) });
+  function removePainMovement(index: number) {
+    patch({ painMovements: form.painMovements.filter((_, i) => i !== index) });
   }
 
   async function handleSubmit() {
@@ -317,6 +267,33 @@ export function IntakeForm({
       </div>
 
       <SectionCard title="기본정보">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <Field label="이름">
+            <input
+              value={form.intakeName}
+              onChange={(e) => patch({ intakeName: e.target.value })}
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
+          </Field>
+          <Field label="나이">
+            <input
+              type="number"
+              min="0"
+              max="120"
+              value={form.age ?? ""}
+              onChange={(e) => patch({ age: e.target.value === "" ? null : Number(e.target.value) })}
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
+          </Field>
+          <Field label="연락처">
+            <input
+              value={form.phone}
+              onChange={(e) => patch({ phone: e.target.value })}
+              placeholder="010-0000-0000"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
+          </Field>
+        </div>
         <Field label="짝다리">
           <RadioPills options={STANCE_LEG_OPTIONS} value={form.stanceLeg} onChange={(v) => patch({ stanceLeg: v })} />
         </Field>
@@ -430,32 +407,25 @@ export function IntakeForm({
       </SectionCard>
 
       <SectionCard title="통증의 강도 (NRS)">
-        <Field label="통증 나타나는 동작">
-          {form.painTriggerMovements.map((v, i) => (
-            <PainTriggerMovementRow
-              key={i}
-              value={v}
-              onChange={(nv) => updatePainTriggerMovement(i, nv)}
-              onRemove={() => removePainTriggerMovement(i)}
-            />
-          ))}
-          <button
-            type="button"
-            onClick={addPainTriggerMovement}
-            className="rounded-full border border-coral text-coral px-3 py-1.5 text-xs font-medium hover:bg-coral/5 transition"
-          >
-            + 추가
-          </button>
-        </Field>
-        <Field label="좋을 때">
-          <NrsPills value={form.painNrsBest} onChange={(v) => patch({ painNrsBest: v })} />
-        </Field>
-        <Field label="나쁠 때">
-          <NrsPills value={form.painNrsWorst} onChange={(v) => patch({ painNrsWorst: v })} />
-        </Field>
-        <Field label="현재">
-          <NrsPills value={form.painNrsCurrent} onChange={(v) => patch({ painNrsCurrent: v })} />
-        </Field>
+        <p className="text-xs text-ink/50 mb-3">
+          통증 나타나는 동작을 추가할 때마다 그 동작의 통증 척도(좋을 때/나쁠 때/현재)를 함께
+          기록해주세요.
+        </p>
+        {form.painMovements.map((entry, i) => (
+          <PainMovementRow
+            key={i}
+            entry={entry}
+            onChange={(p) => updatePainMovement(i, p)}
+            onRemove={() => removePainMovement(i)}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={addPainMovement}
+          className="rounded-full border border-coral text-coral px-3 py-1.5 text-xs font-medium hover:bg-coral/5 transition"
+        >
+          + 추가
+        </button>
       </SectionCard>
 
       <SectionCard title="통증의 주기">
@@ -574,9 +544,9 @@ export function IntakeForm({
         </div>
       </SectionCard>
 
-      <SectionCard title="Chief Complaint">
+      <SectionCard title="주요 호소(부위)">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Major complain">
+          <Field label="1순위">
             <textarea
               value={form.majorComplaint}
               onChange={(e) => patch({ majorComplaint: e.target.value })}
@@ -584,7 +554,7 @@ export function IntakeForm({
               className={textareaClass()}
             />
           </Field>
-          <Field label="Minor complain">
+          <Field label="2순위">
             <textarea
               value={form.minorComplaint}
               onChange={(e) => patch({ minorComplaint: e.target.value })}

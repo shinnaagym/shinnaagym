@@ -7,6 +7,7 @@ import {
   PAIN_ONSET_TYPE_OPTIONS,
   PAIN_CHARACTERISTIC_OPTIONS,
 } from "./intake-questionnaire";
+import type { PainMovementEntry } from "./db";
 
 function optionValues(options: readonly { value: string }[]): Set<string> {
   return new Set<string>([...options.map((o) => o.value), ""]);
@@ -25,12 +26,8 @@ function str(raw: unknown): string {
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-function strArray(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter((v): v is string => typeof v === "string")
-    .map((v) => v.trim())
-    .filter((v) => v.length > 0);
+function age(raw: unknown): number | null {
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 0 && raw <= 120 ? raw : null;
 }
 
 function enumVal(raw: unknown, valid: Set<string>): string {
@@ -54,7 +51,26 @@ function characteristics(raw: unknown): string[] {
   return raw.filter((v): v is string => typeof v === "string" && VALID_CHARACTERISTIC_KEYS.has(v));
 }
 
+function painMovements(raw: unknown): PainMovementEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const entries: PainMovementEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const movement = str(record.movement);
+    const nrsBest = nrs(record.nrsBest);
+    const nrsWorst = nrs(record.nrsWorst);
+    const nrsCurrent = nrs(record.nrsCurrent);
+    if (!movement && nrsBest == null && nrsWorst == null && nrsCurrent == null) continue;
+    entries.push({ movement, nrsBest, nrsWorst, nrsCurrent });
+  }
+  return entries;
+}
+
 export interface ParsedIntakeInput {
+  intakeName: string;
+  age: number | null;
+  phone: string;
   stanceLeg: string;
   legCross: string;
   sleepPosition: string;
@@ -68,10 +84,7 @@ export interface ParsedIntakeInput {
   painOnsetPeriod: string;
   painOnsetType: string;
   painMoi: string;
-  painTriggerMovements: string[];
-  painNrsBest: number | null;
-  painNrsWorst: number | null;
-  painNrsCurrent: number | null;
+  painMovements: PainMovementEntry[];
   painCycleSituation: string;
   painCycleMorning: string;
   painCycleNoon: string;
@@ -91,6 +104,9 @@ export interface ParsedIntakeInput {
 
 export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIntakeInput {
   return {
+    intakeName: str(body?.intakeName),
+    age: age(body?.age),
+    phone: str(body?.phone),
     stanceLeg: enumVal(body?.stanceLeg, VALID_STANCE_LEG),
     legCross: enumVal(body?.legCross, VALID_LEG_CROSS),
     sleepPosition: enumVal(body?.sleepPosition, VALID_SLEEP_POSITION),
@@ -104,10 +120,7 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     painOnsetPeriod: str(body?.painOnsetPeriod),
     painOnsetType: enumVal(body?.painOnsetType, VALID_PAIN_ONSET_TYPE),
     painMoi: str(body?.painMoi),
-    painTriggerMovements: strArray(body?.painTriggerMovements),
-    painNrsBest: nrs(body?.painNrsBest),
-    painNrsWorst: nrs(body?.painNrsWorst),
-    painNrsCurrent: nrs(body?.painNrsCurrent),
+    painMovements: painMovements(body?.painMovements),
     painCycleSituation: str(body?.painCycleSituation),
     painCycleMorning: enumVal(body?.painCycleMorning, VALID_PAIN_CYCLE_DIRECTION),
     painCycleNoon: enumVal(body?.painCycleNoon, VALID_PAIN_CYCLE_DIRECTION),
