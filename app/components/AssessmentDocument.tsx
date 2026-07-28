@@ -3,6 +3,18 @@ import {
   FUNCTIONAL_TESTS,
   MMT_STRENGTH_LABELS,
 } from "@/lib/assessment-movements";
+import {
+  ODI_ITEMS,
+  NDI_ITEMS,
+  QUICKDASH_ITEMS,
+  KOOS12_ITEMS,
+  FAAM_ADL_ITEMS,
+  FAAM_SPORTS_ITEMS,
+  computeOdiNdiScore,
+  computeQuickDashScore,
+  computeKoos12Score,
+  computeFaamScore,
+} from "@/lib/prom-instruments";
 import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
 
 export interface AssessmentDocumentData {
@@ -16,6 +28,49 @@ export interface AssessmentDocumentData {
   hip_hinge_note: string;
   painTriggers: PainTriggerEntry[];
   exercisePerformance: ExercisePerformanceEntry[];
+  odi_answers: Record<string, number>;
+  ndi_answers: Record<string, number>;
+  quickdash_answers: Record<string, number>;
+  koos12_answers: Record<string, number>;
+  faam_adl_answers: Record<string, number>;
+  faam_sports_answers: Record<string, number>;
+  nprs_rest: number | null;
+  nprs_activity: number | null;
+  functional_test_pain_free: Record<string, boolean>;
+  hop_test_lsi: number | null;
+  cmj_lsi: number | null;
+  hamstring_lsi: number | null;
+  asymptomatic_loading_weeks: number | null;
+}
+
+interface PromSummary {
+  title: string;
+  score: number | null;
+  unit: string;
+  answeredCount: number;
+  totalCount: number;
+}
+
+function promSummary(
+  title: string,
+  items: readonly { key: string }[],
+  answers: Record<string, number>,
+  score: number | null,
+  unit: string,
+): PromSummary {
+  return {
+    title,
+    score,
+    unit,
+    answeredCount: items.filter((i) => typeof answers[i.key] === "number").length,
+    totalCount: items.length,
+  };
+}
+
+function criterionIcon(status: "pass" | "fail" | "unknown"): string {
+  if (status === "pass") return "✅";
+  if (status === "fail") return "⚠️";
+  return "–";
 }
 
 type NoteField =
@@ -39,10 +94,119 @@ const FUNCTIONAL_NOTE_FIELDS: Record<string, NoteField> = {
 export function AssessmentDocument({
   memberName,
   assessment,
+  startBackScore,
 }: {
   memberName: string;
   assessment: AssessmentDocumentData;
+  startBackScore?: number | null;
 }) {
+  const odiScore = computeOdiNdiScore(assessment.odi_answers);
+  const ndiScore = computeOdiNdiScore(assessment.ndi_answers);
+  const quickdashScore = computeQuickDashScore(assessment.quickdash_answers);
+  const koos12Score = computeKoos12Score(assessment.koos12_answers);
+  const faamAdlScore = computeFaamScore(assessment.faam_adl_answers);
+  const faamSportsScore = computeFaamScore(assessment.faam_sports_answers);
+
+  const promSummaries: PromSummary[] = [
+    promSummary("ODI (요추 기능장애)", ODI_ITEMS, assessment.odi_answers, odiScore, "%"),
+    promSummary("NDI (경추 기능장애)", NDI_ITEMS, assessment.ndi_answers, ndiScore, "%"),
+    promSummary("QuickDASH (상지 기능장애)", QUICKDASH_ITEMS, assessment.quickdash_answers, quickdashScore, ""),
+    promSummary("KOOS-12 (무릎)", KOOS12_ITEMS, assessment.koos12_answers, koos12Score, ""),
+    promSummary("FAAM ADL (발·발목 일상)", FAAM_ADL_ITEMS, assessment.faam_adl_answers, faamAdlScore, "%"),
+    promSummary("FAAM 스포츠", FAAM_SPORTS_ITEMS, assessment.faam_sports_answers, faamSportsScore, "%"),
+  ].filter((s) => s.answeredCount > 0);
+
+  const functionalTestsPainFreeCount = FUNCTIONAL_TESTS.filter(
+    (t) => assessment.functional_test_pain_free[t.key],
+  ).length;
+  const functionalTestsAllPainFree = FUNCTIONAL_TESTS.every(
+    (t) => assessment.functional_test_pain_free[t.key],
+  );
+
+  const performanceCriteria: { label: string; value: string; status: "pass" | "fail" | "unknown" }[] = [
+    {
+      label: "NRS 통증(안정 시) ≤ 1",
+      value: assessment.nprs_rest == null ? "미입력" : `${assessment.nprs_rest}/10`,
+      status: assessment.nprs_rest == null ? "unknown" : assessment.nprs_rest <= 1 ? "pass" : "fail",
+    },
+    {
+      label: "NRS 통증(활동 중) ≤ 3",
+      value: assessment.nprs_activity == null ? "미입력" : `${assessment.nprs_activity}/10`,
+      status:
+        assessment.nprs_activity == null ? "unknown" : assessment.nprs_activity <= 3 ? "pass" : "fail",
+    },
+    {
+      label: "ODI ≤ 20%",
+      value: odiScore == null ? "미입력" : `${odiScore}%`,
+      status: odiScore == null ? "unknown" : odiScore <= 20 ? "pass" : "fail",
+    },
+    {
+      label: "NDI ≤ 15%",
+      value: ndiScore == null ? "미입력" : `${ndiScore}%`,
+      status: ndiScore == null ? "unknown" : ndiScore <= 15 ? "pass" : "fail",
+    },
+    {
+      label: "QuickDASH ≤ 15",
+      value: quickdashScore == null ? "미입력" : `${quickdashScore}`,
+      status: quickdashScore == null ? "unknown" : quickdashScore <= 15 ? "pass" : "fail",
+    },
+    {
+      label: "KOOS-12 ≥ 80",
+      value: koos12Score == null ? "미입력" : `${koos12Score}`,
+      status: koos12Score == null ? "unknown" : koos12Score >= 80 ? "pass" : "fail",
+    },
+    {
+      label: "FAAM ADL ≥ 90%",
+      value: faamAdlScore == null ? "미입력" : `${faamAdlScore}%`,
+      status: faamAdlScore == null ? "unknown" : faamAdlScore >= 90 ? "pass" : "fail",
+    },
+    {
+      label: "FAAM 스포츠 ≥ 80%",
+      value: faamSportsScore == null ? "미입력" : `${faamSportsScore}%`,
+      status: faamSportsScore == null ? "unknown" : faamSportsScore >= 80 ? "pass" : "fail",
+    },
+    {
+      label: "STarT Back(초진) 총점 ≤ 3",
+      value: startBackScore == null ? "문진표 미입력" : `${startBackScore}점`,
+      status: startBackScore == null ? "unknown" : startBackScore <= 3 ? "pass" : "fail",
+    },
+    {
+      label: "기능적 움직임 검사 5개 모두 무통",
+      value: `${functionalTestsPainFreeCount}/${FUNCTIONAL_TESTS.length}`,
+      status: functionalTestsPainFreeCount === 0 ? "unknown" : functionalTestsAllPainFree ? "pass" : "fail",
+    },
+    {
+      label: "홉 테스트 LSI ≥ 90%",
+      value: assessment.hop_test_lsi == null ? "미입력" : `${assessment.hop_test_lsi}%`,
+      status:
+        assessment.hop_test_lsi == null ? "unknown" : assessment.hop_test_lsi >= 90 ? "pass" : "fail",
+    },
+    {
+      label: "CMJ(수직 점프) LSI ≥ 90%",
+      value: assessment.cmj_lsi == null ? "미입력" : `${assessment.cmj_lsi}%`,
+      status: assessment.cmj_lsi == null ? "unknown" : assessment.cmj_lsi >= 90 ? "pass" : "fail",
+    },
+    {
+      label: "햄스트링 근력 LSI ≥ 90%",
+      value: assessment.hamstring_lsi == null ? "미입력" : `${assessment.hamstring_lsi}%`,
+      status:
+        assessment.hamstring_lsi == null ? "unknown" : assessment.hamstring_lsi >= 90 ? "pass" : "fail",
+    },
+    {
+      label: "무증상 점진 부하 유지 ≥ 4주",
+      value:
+        assessment.asymptomatic_loading_weeks == null
+          ? "미입력"
+          : `${assessment.asymptomatic_loading_weeks}주`,
+      status:
+        assessment.asymptomatic_loading_weeks == null
+          ? "unknown"
+          : assessment.asymptomatic_loading_weeks >= 4
+            ? "pass"
+            : "fail",
+    },
+  ];
+
   return (
     <>
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">Assessment</p>
@@ -147,6 +311,53 @@ export function AssessmentDocument({
             ))}
           </div>
         )}
+      </section>
+
+      {(assessment.nprs_rest != null || assessment.nprs_activity != null) && (
+        <section className="mb-8">
+          <h2 className="font-display text-lg mb-3">NRS 통증 척도</h2>
+          <div className="rounded-2xl border border-line divide-y divide-line/60 text-sm sm:divide-y-0 sm:grid sm:grid-cols-2">
+            <div className="px-4 py-3 sm:border-r sm:border-line/60">
+              <p className="text-xs text-ink/40 mb-0.5">안정 시</p>
+              <p>{assessment.nprs_rest != null ? `${assessment.nprs_rest} / 10` : "-"}</p>
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-xs text-ink/40 mb-0.5">활동 중</p>
+              <p>{assessment.nprs_activity != null ? `${assessment.nprs_activity} / 10` : "-"}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {promSummaries.length > 0 && (
+        <section className="mb-8">
+          <h2 className="font-display text-lg mb-3">표준 설문(PROM)</h2>
+          <div className="rounded-2xl border border-line divide-y divide-line/60 text-sm">
+            {promSummaries.map((s) => (
+              <div key={s.title} className="px-4 py-3 flex items-center justify-between gap-3">
+                <p>{s.title}</p>
+                <p className="font-display text-lg whitespace-nowrap">
+                  {s.score != null ? `${s.score}${s.unit}` : `응답 ${s.answeredCount}/${s.totalCount}`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="mb-8">
+        <h2 className="font-display text-lg mb-3">퍼포먼스 단계 전환 기준</h2>
+        <div className="rounded-2xl border border-line divide-y divide-line/60 text-sm">
+          {performanceCriteria.map((c) => (
+            <div key={c.label} className="px-4 py-2.5 flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                <span>{criterionIcon(c.status)}</span>
+                {c.label}
+              </span>
+              <span className="text-ink/50">{c.value}</span>
+            </div>
+          ))}
+        </div>
       </section>
 
       <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm space-y-1">

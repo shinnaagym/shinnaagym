@@ -37,6 +37,7 @@ export interface IntakeFormState {
   pastTreatment: string;
   majorComplaint: string;
   minorComplaint: string;
+  startbackAnswers: Record<string, number>;
 }
 
 export const EMPTY_PAIN_MOVEMENT: PainMovementEntry = {
@@ -83,4 +84,5 @@ export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
   pastTreatment: "",
   majorComplaint: "",
   minorComplaint: "",
+  startbackAnswers: {},
 };

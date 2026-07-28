@@ -39,6 +39,7 @@ export interface UpsertIntakeQuestionnaireInput {
   pastTreatment: string;
   majorComplaint: string;
   minorComplaint: string;
+  startbackAnswers: Record<string, number>;
 }
 
 export async function getIntakeQuestionnaireByMember(
@@ -65,10 +66,11 @@ export async function upsertIntakeQuestionnaire(
        pain_cycle_situation, pain_cycle_morning, pain_cycle_noon, pain_cycle_evening, pain_cycle_night,
        pain_characteristics, pain_characteristics_other,
        improve_factors, worsen_factors, perceived_cause, post_pain_action,
-       past_same_pain_history, past_treatment, major_complaint, minor_complaint, updated_at
+       past_same_pain_history, past_treatment, major_complaint, minor_complaint,
+       startback_answers, updated_at
      ) VALUES (
        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-       $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37, now()
+       $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38, now()
      )
      ON CONFLICT (member_id) DO UPDATE SET
        intake_name = EXCLUDED.intake_name,
@@ -107,6 +109,7 @@ export async function upsertIntakeQuestionnaire(
        past_treatment = EXCLUDED.past_treatment,
        major_complaint = EXCLUDED.major_complaint,
        minor_complaint = EXCLUDED.minor_complaint,
+       startback_answers = EXCLUDED.startback_answers,
        updated_at = now()
      RETURNING *`,
     [
@@ -147,6 +150,7 @@ export async function upsertIntakeQuestionnaire(
       input.pastTreatment,
       input.majorComplaint,
       input.minorComplaint,
+      JSON.stringify(input.startbackAnswers),
     ],
   );
   return result.rows[0];

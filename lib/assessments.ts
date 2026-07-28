@@ -13,6 +13,19 @@ export interface CreateAssessmentInput {
   hipHingeNote?: string;
   painTriggers?: PainTriggerEntry[];
   exercisePerformance?: ExercisePerformanceEntry[];
+  odiAnswers?: Record<string, number>;
+  ndiAnswers?: Record<string, number>;
+  quickdashAnswers?: Record<string, number>;
+  koos12Answers?: Record<string, number>;
+  faamAdlAnswers?: Record<string, number>;
+  faamSportsAnswers?: Record<string, number>;
+  nprsRest?: number | null;
+  nprsActivity?: number | null;
+  functionalTestPainFree?: Record<string, boolean>;
+  hopTestLsi?: number | null;
+  cmjLsi?: number | null;
+  hamstringLsi?: number | null;
+  asymptomaticLoadingWeeks?: number | null;
 }
 
 export async function createAssessment(input: CreateAssessmentInput): Promise<AssessmentRow> {
@@ -20,8 +33,12 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
     `INSERT INTO assessments (
        member_id, evaluator_name, evaluated_at, movements,
        core_note, squat_note, overhead_squat_note, pushup_note, hip_hinge_note,
-       pain_triggers, exercise_performance
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       pain_triggers, exercise_performance,
+       odi_answers, ndi_answers, quickdash_answers, koos12_answers,
+       faam_adl_answers, faam_sports_answers, nprs_rest, nprs_activity,
+       functional_test_pain_free, hop_test_lsi, cmj_lsi, hamstring_lsi,
+       asymptomatic_loading_weeks
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
      RETURNING *`,
     [
       input.memberId,
@@ -35,6 +52,19 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
       input.hipHingeNote ?? "",
       JSON.stringify(input.painTriggers ?? []),
       JSON.stringify(input.exercisePerformance ?? []),
+      JSON.stringify(input.odiAnswers ?? {}),
+      JSON.stringify(input.ndiAnswers ?? {}),
+      JSON.stringify(input.quickdashAnswers ?? {}),
+      JSON.stringify(input.koos12Answers ?? {}),
+      JSON.stringify(input.faamAdlAnswers ?? {}),
+      JSON.stringify(input.faamSportsAnswers ?? {}),
+      input.nprsRest ?? null,
+      input.nprsActivity ?? null,
+      JSON.stringify(input.functionalTestPainFree ?? {}),
+      input.hopTestLsi ?? null,
+      input.cmjLsi ?? null,
+      input.hamstringLsi ?? null,
+      input.asymptomaticLoadingWeeks ?? null,
     ],
   );
   return result.rows[0];
@@ -51,6 +81,19 @@ export interface UpdateAssessmentInput {
   hipHingeNote?: string;
   painTriggers?: PainTriggerEntry[];
   exercisePerformance?: ExercisePerformanceEntry[];
+  odiAnswers?: Record<string, number>;
+  ndiAnswers?: Record<string, number>;
+  quickdashAnswers?: Record<string, number>;
+  koos12Answers?: Record<string, number>;
+  faamAdlAnswers?: Record<string, number>;
+  faamSportsAnswers?: Record<string, number>;
+  nprsRest?: number | null;
+  nprsActivity?: number | null;
+  functionalTestPainFree?: Record<string, boolean>;
+  hopTestLsi?: number | null;
+  cmjLsi?: number | null;
+  hamstringLsi?: number | null;
+  asymptomaticLoadingWeeks?: number | null;
 }
 
 export async function updateAssessment(
@@ -62,7 +105,11 @@ export async function updateAssessment(
        evaluator_name = $2, evaluated_at = $3, movements = $4,
        core_note = $5, squat_note = $6, overhead_squat_note = $7,
        pushup_note = $8, hip_hinge_note = $9, pain_triggers = $10,
-       exercise_performance = $11
+       exercise_performance = $11,
+       odi_answers = $12, ndi_answers = $13, quickdash_answers = $14, koos12_answers = $15,
+       faam_adl_answers = $16, faam_sports_answers = $17, nprs_rest = $18, nprs_activity = $19,
+       functional_test_pain_free = $20, hop_test_lsi = $21, cmj_lsi = $22, hamstring_lsi = $23,
+       asymptomatic_loading_weeks = $24
      WHERE id = $1
      RETURNING *`,
     [
@@ -77,6 +124,19 @@ export async function updateAssessment(
       input.hipHingeNote ?? "",
       JSON.stringify(input.painTriggers ?? []),
       JSON.stringify(input.exercisePerformance ?? []),
+      JSON.stringify(input.odiAnswers ?? {}),
+      JSON.stringify(input.ndiAnswers ?? {}),
+      JSON.stringify(input.quickdashAnswers ?? {}),
+      JSON.stringify(input.koos12Answers ?? {}),
+      JSON.stringify(input.faamAdlAnswers ?? {}),
+      JSON.stringify(input.faamSportsAnswers ?? {}),
+      input.nprsRest ?? null,
+      input.nprsActivity ?? null,
+      JSON.stringify(input.functionalTestPainFree ?? {}),
+      input.hopTestLsi ?? null,
+      input.cmjLsi ?? null,
+      input.hamstringLsi ?? null,
+      input.asymptomaticLoadingWeeks ?? null,
     ],
   );
   return result.rows[0] ?? null;

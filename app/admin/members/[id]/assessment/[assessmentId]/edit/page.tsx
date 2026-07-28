@@ -6,6 +6,8 @@ import {
   getPainTriggerEntries,
   listAssessmentsByMember,
 } from "@/lib/assessments";
+import { getIntakeQuestionnaireByMember } from "@/lib/intake";
+import { computeStartBackScore } from "@/lib/prom-instruments";
 import { AssessmentForm } from "../../assessment-form";
 
 export default async function EditAssessmentPage({
@@ -30,6 +32,11 @@ export default async function EditAssessmentPage({
   if (!assessment || assessment.member_id !== idNum) {
     notFound();
   }
+
+  const intake = await getIntakeQuestionnaireByMember(idNum);
+  const startBackScore = intake
+    ? computeStartBackScore(intake.startback_answers)?.total ?? null
+    : null;
 
   const pastAssessments = await listAssessmentsByMember(idNum);
   const pastPainTriggerNotes = Array.from(
@@ -57,6 +64,7 @@ export default async function EditAssessmentPage({
         pastPainTriggerNotes={pastPainTriggerNotes}
         pastExercises={pastExercises}
         assessmentId={assessmentIdNum}
+        startBackScore={startBackScore}
         initialData={{
           evaluatorName: assessment.evaluator_name,
           evaluatedAt: assessment.evaluated_at,
@@ -68,6 +76,19 @@ export default async function EditAssessmentPage({
           hipHingeNote: assessment.hip_hinge_note,
           painTriggers: getPainTriggerEntries(assessment),
           exercisePerformance: assessment.exercise_performance,
+          odiAnswers: assessment.odi_answers,
+          ndiAnswers: assessment.ndi_answers,
+          quickdashAnswers: assessment.quickdash_answers,
+          koos12Answers: assessment.koos12_answers,
+          faamAdlAnswers: assessment.faam_adl_answers,
+          faamSportsAnswers: assessment.faam_sports_answers,
+          nprsRest: assessment.nprs_rest,
+          nprsActivity: assessment.nprs_activity,
+          functionalTestPainFree: assessment.functional_test_pain_free,
+          hopTestLsi: assessment.hop_test_lsi,
+          cmjLsi: assessment.cmj_lsi,
+          hamstringLsi: assessment.hamstring_lsi,
+          asymptomaticLoadingWeeks: assessment.asymptomatic_loading_weeks,
         }}
       />
     </div>

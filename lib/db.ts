@@ -1,4 +1,10 @@
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, types, type QueryResultRow } from "pg";
+
+// pg는 NUMERIC(OID 1700)을 정밀도 손실 방지를 위해 기본적으로 문자열로 반환한다.
+// 이 앱의 NUMERIC 컬럼(sleep_hours, LSI, 부하 유지 기간 등)은 전부 소수 몇 자리
+// 수준의 일반 숫자라 정밀도 손실 우려가 없으므로, number로 파싱해 TS 타입과
+// 실제 런타임 값이 일치하도록 한다.
+types.setTypeParser(1700, (value: string) => (value === null ? null : parseFloat(value)));
 
 // Vercel Storage(Neon) 연동은 스토리지 이름이 접두사로 붙은 환경변수
 // (예: `내프로젝트명_POSTGRES_URL`)를 만들기도 해서, 표준 이름이 없으면
@@ -167,6 +173,19 @@ function ensureSchema(): Promise<void> {
           pain_scale INTEGER,
           pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb,
           exercise_performance JSONB NOT NULL DEFAULT '[]'::jsonb,
+          odi_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          ndi_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          quickdash_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          koos12_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          faam_adl_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          faam_sports_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          nprs_rest INTEGER,
+          nprs_activity INTEGER,
+          functional_test_pain_free JSONB NOT NULL DEFAULT '{}'::jsonb,
+          hop_test_lsi NUMERIC,
+          cmj_lsi NUMERIC,
+          hamstring_lsi NUMERIC,
+          asymptomatic_loading_weeks NUMERIC,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
@@ -231,6 +250,7 @@ function ensureSchema(): Promise<void> {
           past_treatment TEXT NOT NULL DEFAULT '',
           major_complaint TEXT NOT NULL DEFAULT '',
           minor_complaint TEXT NOT NULL DEFAULT '',
+          startback_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -262,6 +282,19 @@ function ensureSchema(): Promise<void> {
           ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS exercise_performance JSONB NOT NULL DEFAULT '[]'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS odi_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS ndi_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS quickdash_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS koos12_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS faam_adl_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS faam_sports_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS nprs_rest INTEGER;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS nprs_activity INTEGER;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS functional_test_pain_free JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS hop_test_lsi NUMERIC;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS cmj_lsi NUMERIC;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS hamstring_lsi NUMERIC;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS asymptomatic_loading_weeks NUMERIC;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS sleep_hours NUMERIC;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS pain_trigger_movements TEXT[] NOT NULL DEFAULT '{}';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS intake_name TEXT NOT NULL DEFAULT '';
@@ -272,6 +305,7 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS visit_channel_referrer_name TEXT NOT NULL DEFAULT '';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS exercise_purposes TEXT[] NOT NULL DEFAULT '{}';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS exercise_purpose_other TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS startback_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -432,6 +466,19 @@ export interface AssessmentRow {
   pain_scale: number | null;
   pain_triggers: PainTriggerEntry[];
   exercise_performance: ExercisePerformanceEntry[];
+  odi_answers: Record<string, number>;
+  ndi_answers: Record<string, number>;
+  quickdash_answers: Record<string, number>;
+  koos12_answers: Record<string, number>;
+  faam_adl_answers: Record<string, number>;
+  faam_sports_answers: Record<string, number>;
+  nprs_rest: number | null;
+  nprs_activity: number | null;
+  functional_test_pain_free: Record<string, boolean>;
+  hop_test_lsi: number | null;
+  cmj_lsi: number | null;
+  hamstring_lsi: number | null;
+  asymptomatic_loading_weeks: number | null;
   created_at: string;
 }
 
@@ -481,6 +528,7 @@ export interface IntakeQuestionnaireRow {
   past_treatment: string;
   major_complaint: string;
   minor_complaint: string;
+  startback_answers: Record<string, number>;
   created_at: string;
   updated_at: string;
 }

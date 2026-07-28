@@ -10,6 +10,19 @@ import {
   type FunctionalTestKey,
   type MovementDef,
 } from "@/lib/assessment-movements";
+import {
+  ODI_ITEMS,
+  NDI_ITEMS,
+  QUICKDASH_ITEMS,
+  KOOS12_ITEMS,
+  FAAM_ADL_ITEMS,
+  FAAM_SPORTS_ITEMS,
+  computeOdiNdiScore,
+  computeQuickDashScore,
+  computeKoos12Score,
+  computeFaamScore,
+  type PromItem,
+} from "@/lib/prom-instruments";
 import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
 
 interface MovementEntry {
@@ -228,6 +241,99 @@ function MovementRow({
   );
 }
 
+function NrsPills({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {NRS_PAIN_OPTIONS.map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(value === Number(n) ? null : Number(n))}
+          className={[
+            "h-8 w-8 rounded-full border text-xs font-medium transition",
+            value === Number(n) ? "bg-coral text-white border-coral" : "border-line text-ink/60 hover:bg-bone",
+          ].join(" ")}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PromItemRow({
+  item,
+  value,
+  onChange,
+}: {
+  item: PromItem;
+  value: number | undefined;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="px-4 py-2.5 border-t border-line/50 first:border-t-0">
+      <label className="block text-sm mb-1.5">{item.title}</label>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass() + " bg-white"}
+      >
+        <option value="" disabled>
+          선택
+        </option>
+        {item.options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function PromAccordion({
+  title,
+  scoreLabel,
+  items,
+  answers,
+  onAnswer,
+  isOpen,
+  onToggle,
+}: {
+  title: string;
+  scoreLabel: string | null;
+  items: readonly PromItem[];
+  answers: Record<string, number>;
+  onAnswer: (key: string, value: number) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Accordion label={scoreLabel ? `${title} — ${scoreLabel}` : title} isOpen={isOpen} onToggle={onToggle}>
+      {items.map((item) => (
+        <PromItemRow
+          key={item.key}
+          item={item}
+          value={answers[item.key]}
+          onChange={(v) => onAnswer(item.key, v)}
+        />
+      ))}
+    </Accordion>
+  );
+}
+
+interface Criterion {
+  label: string;
+  value: string;
+  status: "pass" | "fail" | "unknown";
+}
+
+function criterionIcon(status: Criterion["status"]): string {
+  if (status === "pass") return "✅";
+  if (status === "fail") return "⚠️";
+  return "–";
+}
+
 function Accordion({
   label,
   isOpen,
@@ -265,6 +371,19 @@ export interface AssessmentInitialData {
   hipHingeNote: string;
   painTriggers: PainTriggerEntry[];
   exercisePerformance: ExercisePerformanceEntry[];
+  odiAnswers: Record<string, number>;
+  ndiAnswers: Record<string, number>;
+  quickdashAnswers: Record<string, number>;
+  koos12Answers: Record<string, number>;
+  faamAdlAnswers: Record<string, number>;
+  faamSportsAnswers: Record<string, number>;
+  nprsRest: number | null;
+  nprsActivity: number | null;
+  functionalTestPainFree: Record<string, boolean>;
+  hopTestLsi: number | null;
+  cmjLsi: number | null;
+  hamstringLsi: number | null;
+  asymptomaticLoadingWeeks: number | null;
 }
 
 export function AssessmentForm({
@@ -274,6 +393,7 @@ export function AssessmentForm({
   pastExercises,
   assessmentId,
   initialData,
+  startBackScore,
 }: {
   memberId: number;
   memberName: string;
@@ -281,6 +401,7 @@ export function AssessmentForm({
   pastExercises: string[];
   assessmentId?: number;
   initialData?: AssessmentInitialData;
+  startBackScore?: number | null;
 }) {
   const router = useRouter();
   const isEditing = assessmentId != null;
@@ -319,8 +440,134 @@ export function AssessmentForm({
         ? initialData.exercisePerformance
         : [{ exercise: "", note: "" }],
   );
+  const [odiAnswers, setOdiAnswers] = useState<Record<string, number>>(
+    () => initialData?.odiAnswers ?? {},
+  );
+  const [ndiAnswers, setNdiAnswers] = useState<Record<string, number>>(
+    () => initialData?.ndiAnswers ?? {},
+  );
+  const [quickdashAnswers, setQuickdashAnswers] = useState<Record<string, number>>(
+    () => initialData?.quickdashAnswers ?? {},
+  );
+  const [koos12Answers, setKoos12Answers] = useState<Record<string, number>>(
+    () => initialData?.koos12Answers ?? {},
+  );
+  const [faamAdlAnswers, setFaamAdlAnswers] = useState<Record<string, number>>(
+    () => initialData?.faamAdlAnswers ?? {},
+  );
+  const [faamSportsAnswers, setFaamSportsAnswers] = useState<Record<string, number>>(
+    () => initialData?.faamSportsAnswers ?? {},
+  );
+  const [nprsRest, setNprsRest] = useState<number | null>(initialData?.nprsRest ?? null);
+  const [nprsActivity, setNprsActivity] = useState<number | null>(initialData?.nprsActivity ?? null);
+  const [functionalTestPainFree, setFunctionalTestPainFree] = useState<Record<string, boolean>>(
+    () => initialData?.functionalTestPainFree ?? {},
+  );
+  const [hopTestLsi, setHopTestLsi] = useState<number | null>(initialData?.hopTestLsi ?? null);
+  const [cmjLsi, setCmjLsi] = useState<number | null>(initialData?.cmjLsi ?? null);
+  const [hamstringLsi, setHamstringLsi] = useState<number | null>(initialData?.hamstringLsi ?? null);
+  const [asymptomaticLoadingWeeks, setAsymptomaticLoadingWeeks] = useState<number | null>(
+    initialData?.asymptomaticLoadingWeeks ?? null,
+  );
+  const [openExtra, setOpenExtra] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function toggleExtra(key: string) {
+    setOpenExtra((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const odiScore = computeOdiNdiScore(odiAnswers);
+  const ndiScore = computeOdiNdiScore(ndiAnswers);
+  const quickdashScore = computeQuickDashScore(quickdashAnswers);
+  const koos12Score = computeKoos12Score(koos12Answers);
+  const faamAdlScore = computeFaamScore(faamAdlAnswers);
+  const faamSportsScore = computeFaamScore(faamSportsAnswers);
+
+  const functionalTestsAllPainFree = FUNCTIONAL_TESTS.every((t) => functionalTestPainFree[t.key]);
+  const functionalTestsPainFreeCount = FUNCTIONAL_TESTS.filter((t) => functionalTestPainFree[t.key]).length;
+
+  const performanceCriteria: Criterion[] = [
+    {
+      label: "NRS 통증(안정 시) ≤ 1",
+      value: nprsRest == null ? "미입력" : `${nprsRest}/10`,
+      status: nprsRest == null ? "unknown" : nprsRest <= 1 ? "pass" : "fail",
+    },
+    {
+      label: "NRS 통증(활동 중) ≤ 3",
+      value: nprsActivity == null ? "미입력" : `${nprsActivity}/10`,
+      status: nprsActivity == null ? "unknown" : nprsActivity <= 3 ? "pass" : "fail",
+    },
+    {
+      label: "ODI(요추 기능장애) ≤ 20%",
+      value: odiScore == null ? "미입력" : `${odiScore}%`,
+      status: odiScore == null ? "unknown" : odiScore <= 20 ? "pass" : "fail",
+    },
+    {
+      label: "NDI(경추 기능장애) ≤ 15%",
+      value: ndiScore == null ? "미입력" : `${ndiScore}%`,
+      status: ndiScore == null ? "unknown" : ndiScore <= 15 ? "pass" : "fail",
+    },
+    {
+      label: "QuickDASH(상지 기능장애) ≤ 15",
+      value: quickdashScore == null ? "미입력" : `${quickdashScore}`,
+      status: quickdashScore == null ? "unknown" : quickdashScore <= 15 ? "pass" : "fail",
+    },
+    {
+      label: "KOOS-12(무릎) ≥ 80",
+      value: koos12Score == null ? "미입력" : `${koos12Score}`,
+      status: koos12Score == null ? "unknown" : koos12Score >= 80 ? "pass" : "fail",
+    },
+    {
+      label: "FAAM ADL(발·발목 일상) ≥ 90%",
+      value: faamAdlScore == null ? "미입력" : `${faamAdlScore}%`,
+      status: faamAdlScore == null ? "unknown" : faamAdlScore >= 90 ? "pass" : "fail",
+    },
+    {
+      label: "FAAM 스포츠 ≥ 80%",
+      value: faamSportsScore == null ? "미입력" : `${faamSportsScore}%`,
+      status: faamSportsScore == null ? "unknown" : faamSportsScore >= 80 ? "pass" : "fail",
+    },
+    {
+      label: "STarT Back(초진) 총점 ≤ 3",
+      value: startBackScore == null ? "문진표 미입력" : `${startBackScore}점`,
+      status: startBackScore == null ? "unknown" : startBackScore <= 3 ? "pass" : "fail",
+    },
+    {
+      label: "기능적 움직임 검사 5개 모두 무통",
+      value: `${functionalTestsPainFreeCount}/${FUNCTIONAL_TESTS.length}`,
+      status: functionalTestsPainFreeCount === 0 ? "unknown" : functionalTestsAllPainFree ? "pass" : "fail",
+    },
+    {
+      label: "홉 테스트 LSI ≥ 90%",
+      value: hopTestLsi == null ? "미입력" : `${hopTestLsi}%`,
+      status: hopTestLsi == null ? "unknown" : hopTestLsi >= 90 ? "pass" : "fail",
+    },
+    {
+      label: "CMJ(수직 점프) LSI ≥ 90%",
+      value: cmjLsi == null ? "미입력" : `${cmjLsi}%`,
+      status: cmjLsi == null ? "unknown" : cmjLsi >= 90 ? "pass" : "fail",
+    },
+    {
+      label: "햄스트링 근력 LSI ≥ 90%",
+      value: hamstringLsi == null ? "미입력" : `${hamstringLsi}%`,
+      status: hamstringLsi == null ? "unknown" : hamstringLsi >= 90 ? "pass" : "fail",
+    },
+    {
+      label: "무증상 점진 부하 유지 ≥ 4주",
+      value: asymptomaticLoadingWeeks == null ? "미입력" : `${asymptomaticLoadingWeeks}주`,
+      status:
+        asymptomaticLoadingWeeks == null ? "unknown" : asymptomaticLoadingWeeks >= 4 ? "pass" : "fail",
+    },
+  ];
+  const failedCriteria = performanceCriteria.filter((c) => c.status === "fail").length;
+  const unknownCriteria = performanceCriteria.filter((c) => c.status === "unknown").length;
+  const passedCriteria = performanceCriteria.length - failedCriteria - unknownCriteria;
 
   function toggleRegion(key: string) {
     setOpenRegions((prev) => {
@@ -359,14 +606,18 @@ export function AssessmentForm({
     setExercisePerformance((prev) => prev.filter((_, i) => i !== index));
   }
 
+  const PROM_KEYS = ["odi", "ndi", "quickdash", "koos12", "faamAdl", "faamSports"];
+
   function expandAll() {
     setOpenRegions(new Set(ASSESSMENT_REGIONS.map((r) => r.key)));
     setFunctionalOpen(true);
+    setOpenExtra(new Set(PROM_KEYS));
   }
 
   function collapseAll() {
     setOpenRegions(new Set());
     setFunctionalOpen(false);
+    setOpenExtra(new Set());
   }
 
   async function handleSubmit() {
@@ -390,6 +641,19 @@ export function AssessmentForm({
           hipHingeNote: functionalNotes.hipHinge,
           painTriggers,
           exercisePerformance,
+          odiAnswers,
+          ndiAnswers,
+          quickdashAnswers,
+          koos12Answers,
+          faamAdlAnswers,
+          faamSportsAnswers,
+          nprsRest,
+          nprsActivity,
+          functionalTestPainFree,
+          hopTestLsi,
+          cmjLsi,
+          hamstringLsi,
+          asymptomaticLoadingWeeks,
         }),
       });
       if (!res.ok) {
@@ -493,7 +757,19 @@ export function AssessmentForm({
         <div className="divide-y divide-line/50">
           {FUNCTIONAL_TESTS.map((test) => (
             <div key={test.key} className="px-4 py-3">
-              <label className="block text-sm font-medium mb-1.5">{test.label}</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium">{test.label}</label>
+                <label className="flex items-center gap-1.5 text-xs text-ink/60">
+                  <input
+                    type="checkbox"
+                    checked={functionalTestPainFree[test.key] ?? false}
+                    onChange={(e) =>
+                      setFunctionalTestPainFree((prev) => ({ ...prev, [test.key]: e.target.checked }))
+                    }
+                  />
+                  무통
+                </label>
+              </div>
               <textarea
                 value={functionalNotes[test.key]}
                 onChange={(e) =>
@@ -552,6 +828,166 @@ export function AssessmentForm({
         >
           + 운동 수행능력 추가
         </button>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-3">
+        <h2 className="font-display text-lg mb-1">NRS 통증 척도</h2>
+        <p className="text-xs text-ink/50 mb-3">안정 시와 활동 중의 통증을 각각 0~10으로 기록해주세요.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs text-ink/40 mb-1.5">안정 시</label>
+            <NrsPills value={nprsRest} onChange={setNprsRest} />
+          </div>
+          <div>
+            <label className="block text-xs text-ink/40 mb-1.5">활동 중</label>
+            <NrsPills value={nprsActivity} onChange={setNprsActivity} />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-white px-5 py-4 mt-3 mb-3">
+        <h2 className="font-display text-lg mb-1">표준 설문(PROM)</h2>
+        <p className="text-xs text-ink/50">
+          해당 부위 문제가 있는 회원에게만 필요한 설문만 작성해주세요. 아래 문항은 공식 원문을 그대로
+          옮긴 것이 아니라 이해하기 쉽게 재구성한 것으로, 점수는 참고용입니다.
+        </p>
+      </div>
+      <PromAccordion
+        title="ODI (요추 기능장애)"
+        scoreLabel={odiScore != null ? `${odiScore}%` : null}
+        items={ODI_ITEMS}
+        answers={odiAnswers}
+        onAnswer={(key, v) => setOdiAnswers((prev) => ({ ...prev, [key]: v }))}
+        isOpen={openExtra.has("odi")}
+        onToggle={() => toggleExtra("odi")}
+      />
+      <PromAccordion
+        title="NDI (경추 기능장애)"
+        scoreLabel={ndiScore != null ? `${ndiScore}%` : null}
+        items={NDI_ITEMS}
+        answers={ndiAnswers}
+        onAnswer={(key, v) => setNdiAnswers((prev) => ({ ...prev, [key]: v }))}
+        isOpen={openExtra.has("ndi")}
+        onToggle={() => toggleExtra("ndi")}
+      />
+      <PromAccordion
+        title="QuickDASH (상지 기능장애)"
+        scoreLabel={quickdashScore != null ? `${quickdashScore}` : null}
+        items={QUICKDASH_ITEMS}
+        answers={quickdashAnswers}
+        onAnswer={(key, v) => setQuickdashAnswers((prev) => ({ ...prev, [key]: v }))}
+        isOpen={openExtra.has("quickdash")}
+        onToggle={() => toggleExtra("quickdash")}
+      />
+      <PromAccordion
+        title="KOOS-12 (무릎)"
+        scoreLabel={koos12Score != null ? `${koos12Score}` : null}
+        items={KOOS12_ITEMS}
+        answers={koos12Answers}
+        onAnswer={(key, v) => setKoos12Answers((prev) => ({ ...prev, [key]: v }))}
+        isOpen={openExtra.has("koos12")}
+        onToggle={() => toggleExtra("koos12")}
+      />
+      <PromAccordion
+        title="FAAM ADL (발·발목 일상)"
+        scoreLabel={faamAdlScore != null ? `${faamAdlScore}%` : null}
+        items={FAAM_ADL_ITEMS}
+        answers={faamAdlAnswers}
+        onAnswer={(key, v) => setFaamAdlAnswers((prev) => ({ ...prev, [key]: v }))}
+        isOpen={openExtra.has("faamAdl")}
+        onToggle={() => toggleExtra("faamAdl")}
+      />
+      <PromAccordion
+        title="FAAM 스포츠"
+        scoreLabel={faamSportsScore != null ? `${faamSportsScore}%` : null}
+        items={FAAM_SPORTS_ITEMS}
+        answers={faamSportsAnswers}
+        onAnswer={(key, v) => setFaamSportsAnswers((prev) => ({ ...prev, [key]: v }))}
+        isOpen={openExtra.has("faamSports")}
+        onToggle={() => toggleExtra("faamSports")}
+      />
+
+      <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-3">
+        <h2 className="font-display text-lg mb-3">체력 테스트 · 부하 유지 기간</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs text-ink/40 mb-1">홉 테스트 LSI (%)</label>
+            <input
+              type="number"
+              value={hopTestLsi ?? ""}
+              onChange={(e) => setHopTestLsi(e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="예: 92"
+              className={inputClass()}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-ink/40 mb-1">CMJ(수직 점프) LSI (%)</label>
+            <input
+              type="number"
+              value={cmjLsi ?? ""}
+              onChange={(e) => setCmjLsi(e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="예: 92"
+              className={inputClass()}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-ink/40 mb-1">햄스트링 근력 LSI (%)</label>
+            <input
+              type="number"
+              value={hamstringLsi ?? ""}
+              onChange={(e) => setHamstringLsi(e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="예: 92"
+              className={inputClass()}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-ink/40 mb-1">무증상 점진 부하 유지 기간(주)</label>
+            <input
+              type="number"
+              value={asymptomaticLoadingWeeks ?? ""}
+              onChange={(e) =>
+                setAsymptomaticLoadingWeeks(e.target.value === "" ? null : Number(e.target.value))
+              }
+              placeholder="예: 4"
+              className={inputClass()}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-8">
+        <h2 className="font-display text-lg mb-1">퍼포먼스 단계 전환 기준</h2>
+        <p className="text-xs text-ink/50 mb-3">
+          재활 단계에서 퍼포먼스(운동수행) 단계로 넘어가도 되는지 확인하는 체크리스트입니다. 미입력
+          항목은 판단에서 제외됩니다.
+        </p>
+        <div
+          className={[
+            "rounded-xl px-4 py-2.5 text-sm font-medium mb-3",
+            failedCriteria > 0
+              ? "bg-coral/10 text-coral"
+              : unknownCriteria > 0
+                ? "bg-bone text-ink/60"
+                : "bg-green-50 text-green-700",
+          ].join(" ")}
+        >
+          {failedCriteria > 0
+            ? `충족 ${passedCriteria} · 미충족 ${failedCriteria} · 미입력 ${unknownCriteria}`
+            : unknownCriteria > 0
+              ? `충족 ${passedCriteria} · 미입력 ${unknownCriteria} (전체 입력 시 재확인)`
+              : "✅ 전환 기준 모두 충족"}
+        </div>
+        <ul className="divide-y divide-line/50">
+          {performanceCriteria.map((c) => (
+            <li key={c.label} className="flex items-center justify-between py-2 text-sm">
+              <span className="flex items-center gap-2">
+                <span>{criterionIcon(c.status)}</span>
+                {c.label}
+              </span>
+              <span className="text-ink/50">{c.value}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {error && <p className="text-sm text-coral mb-3 no-print">{error}</p>}

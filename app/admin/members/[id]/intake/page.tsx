@@ -70,6 +70,7 @@ export default async function IntakeQuestionnairePage({
         pastTreatment: intake.past_treatment,
         majorComplaint: intake.major_complaint,
         minorComplaint: intake.minor_complaint,
+        startbackAnswers: intake.startback_answers,
       }
     : { ...EMPTY_INTAKE_FORM_STATE, intakeName: member.name, phone: member.phone };
 

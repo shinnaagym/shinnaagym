@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { getAssessmentById, updateAssessment, deleteAssessment } from "@/lib/assessments";
-import { parseExercisePerformance, parseMovements, parsePainTriggers } from "@/lib/assessment-validation";
+import { parseAssessmentInput } from "@/lib/assessment-validation";
 
 export async function GET(
   _req: NextRequest,
@@ -41,45 +41,10 @@ export async function PATCH(
     return NextResponse.json({ error: "평가 기록을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const body = (await req.json().catch(() => null)) as
-    | {
-        evaluatorName?: unknown;
-        evaluatedAt?: unknown;
-        movements?: unknown;
-        coreNote?: unknown;
-        squatNote?: unknown;
-        overheadSquatNote?: unknown;
-        pushupNote?: unknown;
-        hipHingeNote?: unknown;
-        painTriggers?: unknown;
-        exercisePerformance?: unknown;
-      }
-    | null;
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  const parsed = parseAssessmentInput(body);
 
-  const evaluatorName = typeof body?.evaluatorName === "string" ? body.evaluatorName.trim() : "";
-  const evaluatedAt = typeof body?.evaluatedAt === "string" ? body.evaluatedAt.trim() : "";
-  const movements = parseMovements(body?.movements);
-  const coreNote = typeof body?.coreNote === "string" ? body.coreNote.trim() : "";
-  const squatNote = typeof body?.squatNote === "string" ? body.squatNote.trim() : "";
-  const overheadSquatNote =
-    typeof body?.overheadSquatNote === "string" ? body.overheadSquatNote.trim() : "";
-  const pushupNote = typeof body?.pushupNote === "string" ? body.pushupNote.trim() : "";
-  const hipHingeNote = typeof body?.hipHingeNote === "string" ? body.hipHingeNote.trim() : "";
-  const painTriggers = parsePainTriggers(body?.painTriggers);
-  const exercisePerformance = parseExercisePerformance(body?.exercisePerformance);
-
-  const assessment = await updateAssessment(assessmentIdNum, {
-    evaluatorName,
-    evaluatedAt,
-    movements,
-    coreNote,
-    squatNote,
-    overheadSquatNote,
-    pushupNote,
-    hipHingeNote,
-    painTriggers,
-    exercisePerformance,
-  });
+  const assessment = await updateAssessment(assessmentIdNum, parsed);
 
   return NextResponse.json({ assessment });
 }
