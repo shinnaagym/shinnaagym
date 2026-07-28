@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ASSESSMENT_REGIONS,
@@ -58,16 +58,18 @@ interface PainTriggerFormEntry {
   painScale: number | null;
 }
 
-function PainTriggerRow({
+const PainTriggerRow = memo(function PainTriggerRow({
+  index,
   entry,
   pastNotes,
   onChange,
   onRemove,
 }: {
+  index: number;
   entry: PainTriggerFormEntry;
   pastNotes: string[];
-  onChange: (patch: Partial<PainTriggerFormEntry>) => void;
-  onRemove: () => void;
+  onChange: (index: number, patch: Partial<PainTriggerFormEntry>) => void;
+  onRemove: (index: number) => void;
 }) {
   return (
     <div className="rounded-xl border border-line/60 px-3 py-3 mb-3">
@@ -75,7 +77,7 @@ function PainTriggerRow({
         <label className="text-xs text-ink/40">동작 설명</label>
         <button
           type="button"
-          onClick={onRemove}
+          onClick={() => onRemove(index)}
           className="text-xs text-coral hover:opacity-70"
         >
           삭제
@@ -85,7 +87,7 @@ function PainTriggerRow({
         <select
           value=""
           onChange={(e) => {
-            if (e.target.value) onChange({ note: e.target.value });
+            if (e.target.value) onChange(index, { note: e.target.value });
           }}
           className={inputClass() + " bg-white mb-2"}
         >
@@ -99,7 +101,7 @@ function PainTriggerRow({
       )}
       <input
         value={entry.note}
-        onChange={(e) => onChange({ note: e.target.value })}
+        onChange={(e) => onChange(index, { note: e.target.value })}
         placeholder="예: 계단 내려갈 때 무릎 안쪽 통증"
         className={inputClass() + " mb-2"}
       />
@@ -109,7 +111,7 @@ function PainTriggerRow({
           <button
             key={n}
             type="button"
-            onClick={() => onChange({ painScale: Number(n) })}
+            onClick={() => onChange(index, { painScale: Number(n) })}
             className={[
               "h-8 w-8 rounded-full border text-xs font-medium transition",
               entry.painScale === Number(n)
@@ -123,24 +125,26 @@ function PainTriggerRow({
       </div>
     </div>
   );
-}
+});
 
-function ExercisePerformanceRow({
+const ExercisePerformanceRow = memo(function ExercisePerformanceRow({
+  index,
   entry,
   pastExercises,
   onChange,
   onRemove,
 }: {
+  index: number;
   entry: ExercisePerformanceEntry;
   pastExercises: string[];
-  onChange: (patch: Partial<ExercisePerformanceEntry>) => void;
-  onRemove: () => void;
+  onChange: (index: number, patch: Partial<ExercisePerformanceEntry>) => void;
+  onRemove: (index: number) => void;
 }) {
   return (
     <div className="rounded-xl border border-line/60 px-3 py-3 mb-3">
       <div className="flex items-center justify-between gap-2 mb-2">
         <label className="text-xs text-ink/40">운동</label>
-        <button type="button" onClick={onRemove} className="text-xs text-coral hover:opacity-70">
+        <button type="button" onClick={() => onRemove(index)} className="text-xs text-coral hover:opacity-70">
           삭제
         </button>
       </div>
@@ -148,7 +152,7 @@ function ExercisePerformanceRow({
         <select
           value=""
           onChange={(e) => {
-            if (e.target.value) onChange({ exercise: e.target.value });
+            if (e.target.value) onChange(index, { exercise: e.target.value });
           }}
           className={inputClass() + " bg-white mb-2"}
         >
@@ -162,29 +166,29 @@ function ExercisePerformanceRow({
       )}
       <input
         value={entry.exercise}
-        onChange={(e) => onChange({ exercise: e.target.value })}
+        onChange={(e) => onChange(index, { exercise: e.target.value })}
         placeholder="예: 한 발 점프"
         className={inputClass() + " mb-2"}
       />
       <label className="block text-xs text-ink/40 mb-1.5">메모 (수행능력)</label>
       <input
         value={entry.note}
-        onChange={(e) => onChange({ note: e.target.value })}
+        onChange={(e) => onChange(index, { note: e.target.value })}
         placeholder="예: 60bpm으로 45회 수행 가능"
         className={inputClass()}
       />
     </div>
   );
-}
+});
 
-function MovementRow({
+const MovementRow = memo(function MovementRow({
   movement,
   entry,
   onChange,
 }: {
   movement: MovementDef;
   entry: MovementEntry;
-  onChange: (patch: Partial<MovementEntry>) => void;
+  onChange: (id: string, patch: Partial<MovementEntry>) => void;
 }) {
   return (
     <div className="border-t border-line/50 px-3 py-3 sm:grid sm:grid-cols-[1fr_0.55fr_0.55fr_88px_88px_1.1fr] sm:items-center sm:gap-2 sm:py-2">
@@ -194,13 +198,13 @@ function MovementRow({
       <div className="grid grid-cols-2 gap-2 sm:contents">
         <input
           value={entry.romPassive}
-          onChange={(e) => onChange({ romPassive: e.target.value })}
+          onChange={(e) => onChange(movement.id, { romPassive: e.target.value })}
           placeholder="가동범위(수동)"
           className={inputClass()}
         />
         <input
           value={entry.romActive}
-          onChange={(e) => onChange({ romActive: e.target.value })}
+          onChange={(e) => onChange(movement.id, { romActive: e.target.value })}
           placeholder="가동범위(능동)"
           className={inputClass()}
         />
@@ -208,7 +212,7 @@ function MovementRow({
       <div className="grid grid-cols-2 gap-2 mt-2 sm:contents sm:mt-0">
         <select
           value={entry.strength}
-          onChange={(e) => onChange({ strength: e.target.value })}
+          onChange={(e) => onChange(movement.id, { strength: e.target.value })}
           className={inputClass() + " bg-white"}
         >
           <option value="">근력</option>
@@ -220,7 +224,7 @@ function MovementRow({
         </select>
         <select
           value={entry.painScale}
-          onChange={(e) => onChange({ painScale: e.target.value })}
+          onChange={(e) => onChange(movement.id, { painScale: e.target.value })}
           className={inputClass() + " bg-white"}
         >
           <option value="">통증</option>
@@ -233,13 +237,13 @@ function MovementRow({
       </div>
       <input
         value={entry.compensation}
-        onChange={(e) => onChange({ compensation: e.target.value })}
+        onChange={(e) => onChange(movement.id, { compensation: e.target.value })}
         placeholder="보상패턴"
         className={inputClass() + " mt-2 sm:mt-0"}
       />
     </div>
   );
-}
+});
 
 function NrsPills({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
   return (
@@ -261,21 +265,21 @@ function NrsPills({ value, onChange }: { value: number | null; onChange: (v: num
   );
 }
 
-function PromItemRow({
+const PromItemRow = memo(function PromItemRow({
   item,
   value,
-  onChange,
+  onAnswer,
 }: {
   item: PromItem;
   value: number | undefined;
-  onChange: (v: number) => void;
+  onAnswer: (key: string, value: number) => void;
 }) {
   return (
     <div className="px-4 py-2.5 border-t border-line/50 first:border-t-0">
       <label className="block text-sm mb-1.5">{item.title}</label>
       <select
         value={value ?? ""}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => onAnswer(item.key, Number(e.target.value))}
         className={inputClass() + " bg-white"}
       >
         <option value="" disabled>
@@ -289,15 +293,16 @@ function PromItemRow({
       </select>
     </div>
   );
-}
+});
 
-function PromAccordion({
+const PromAccordion = memo(function PromAccordion({
   title,
   scoreLabel,
   items,
   answers,
   onAnswer,
   isOpen,
+  toggleKey,
   onToggle,
 }: {
   title: string;
@@ -306,21 +311,21 @@ function PromAccordion({
   answers: Record<string, number>;
   onAnswer: (key: string, value: number) => void;
   isOpen: boolean;
-  onToggle: () => void;
+  toggleKey: string;
+  onToggle: (key: string) => void;
 }) {
   return (
-    <Accordion label={scoreLabel ? `${title} — ${scoreLabel}` : title} isOpen={isOpen} onToggle={onToggle}>
+    <Accordion
+      label={scoreLabel ? `${title} — ${scoreLabel}` : title}
+      isOpen={isOpen}
+      onToggle={() => onToggle(toggleKey)}
+    >
       {items.map((item) => (
-        <PromItemRow
-          key={item.key}
-          item={item}
-          value={answers[item.key]}
-          onChange={(v) => onAnswer(item.key, v)}
-        />
+        <PromItemRow key={item.key} item={item} value={answers[item.key]} onAnswer={onAnswer} />
       ))}
     </Accordion>
   );
-}
+});
 
 interface Criterion {
   label: string;
@@ -473,14 +478,39 @@ export function AssessmentForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  function toggleExtra(key: string) {
+  const toggleExtra = useCallback((key: string) => {
     setOpenExtra((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  }
+  }, []);
+
+  const setOdiAnswer = useCallback(
+    (key: string, v: number) => setOdiAnswers((prev) => ({ ...prev, [key]: v })),
+    [],
+  );
+  const setNdiAnswer = useCallback(
+    (key: string, v: number) => setNdiAnswers((prev) => ({ ...prev, [key]: v })),
+    [],
+  );
+  const setQuickdashAnswer = useCallback(
+    (key: string, v: number) => setQuickdashAnswers((prev) => ({ ...prev, [key]: v })),
+    [],
+  );
+  const setKoos12Answer = useCallback(
+    (key: string, v: number) => setKoos12Answers((prev) => ({ ...prev, [key]: v })),
+    [],
+  );
+  const setFaamAdlAnswer = useCallback(
+    (key: string, v: number) => setFaamAdlAnswers((prev) => ({ ...prev, [key]: v })),
+    [],
+  );
+  const setFaamSportsAnswer = useCallback(
+    (key: string, v: number) => setFaamSportsAnswers((prev) => ({ ...prev, [key]: v })),
+    [],
+  );
 
   const odiScore = computeOdiNdiScore(odiAnswers);
   const ndiScore = computeOdiNdiScore(ndiAnswers);
@@ -569,42 +599,45 @@ export function AssessmentForm({
   const unknownCriteria = performanceCriteria.filter((c) => c.status === "unknown").length;
   const passedCriteria = performanceCriteria.length - failedCriteria - unknownCriteria;
 
-  function toggleRegion(key: string) {
+  const toggleRegion = useCallback((key: string) => {
     setOpenRegions((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  }
+  }, []);
 
-  function updateMovement(id: string, patch: Partial<MovementEntry>) {
+  const updateMovement = useCallback((id: string, patch: Partial<MovementEntry>) => {
     setMovements((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY_ENTRY), ...patch } }));
-  }
+  }, []);
 
-  function updatePainTrigger(index: number, patch: Partial<PainTriggerFormEntry>) {
+  const updatePainTrigger = useCallback((index: number, patch: Partial<PainTriggerFormEntry>) => {
     setPainTriggers((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
-  }
+  }, []);
 
   function addPainTrigger() {
     setPainTriggers((prev) => [...prev, { note: "", painScale: null }]);
   }
 
-  function removePainTrigger(index: number) {
+  const removePainTrigger = useCallback((index: number) => {
     setPainTriggers((prev) => prev.filter((_, i) => i !== index));
-  }
+  }, []);
 
-  function updateExercisePerformance(index: number, patch: Partial<ExercisePerformanceEntry>) {
-    setExercisePerformance((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
-  }
+  const updateExercisePerformance = useCallback(
+    (index: number, patch: Partial<ExercisePerformanceEntry>) => {
+      setExercisePerformance((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+    },
+    [],
+  );
 
   function addExercisePerformance() {
     setExercisePerformance((prev) => [...prev, { exercise: "", note: "" }]);
   }
 
-  function removeExercisePerformance(index: number) {
+  const removeExercisePerformance = useCallback((index: number) => {
     setExercisePerformance((prev) => prev.filter((_, i) => i !== index));
-  }
+  }, []);
 
   const PROM_KEYS = ["odi", "ndi", "quickdash", "koos12", "faamAdl", "faamSports"];
 
@@ -743,7 +776,7 @@ export function AssessmentForm({
               key={movement.id}
               movement={movement}
               entry={movements[movement.id] ?? EMPTY_ENTRY}
-              onChange={(patch) => updateMovement(movement.id, patch)}
+              onChange={updateMovement}
             />
           ))}
         </Accordion>
@@ -792,10 +825,11 @@ export function AssessmentForm({
         {painTriggers.map((entry, i) => (
           <PainTriggerRow
             key={i}
+            index={i}
             entry={entry}
             pastNotes={pastPainTriggerNotes}
-            onChange={(patch) => updatePainTrigger(i, patch)}
-            onRemove={() => removePainTrigger(i)}
+            onChange={updatePainTrigger}
+            onRemove={removePainTrigger}
           />
         ))}
         <button
@@ -815,10 +849,11 @@ export function AssessmentForm({
         {exercisePerformance.map((entry, i) => (
           <ExercisePerformanceRow
             key={i}
+            index={i}
             entry={entry}
             pastExercises={pastExercises}
-            onChange={(patch) => updateExercisePerformance(i, patch)}
-            onRemove={() => removeExercisePerformance(i)}
+            onChange={updateExercisePerformance}
+            onRemove={removeExercisePerformance}
           />
         ))}
         <button
@@ -857,54 +892,60 @@ export function AssessmentForm({
         scoreLabel={odiScore != null ? `${odiScore}%` : null}
         items={ODI_ITEMS}
         answers={odiAnswers}
-        onAnswer={(key, v) => setOdiAnswers((prev) => ({ ...prev, [key]: v }))}
+        onAnswer={setOdiAnswer}
         isOpen={openExtra.has("odi")}
-        onToggle={() => toggleExtra("odi")}
+        toggleKey="odi"
+        onToggle={toggleExtra}
       />
       <PromAccordion
         title="NDI (경추 기능장애)"
         scoreLabel={ndiScore != null ? `${ndiScore}%` : null}
         items={NDI_ITEMS}
         answers={ndiAnswers}
-        onAnswer={(key, v) => setNdiAnswers((prev) => ({ ...prev, [key]: v }))}
+        onAnswer={setNdiAnswer}
         isOpen={openExtra.has("ndi")}
-        onToggle={() => toggleExtra("ndi")}
+        toggleKey="ndi"
+        onToggle={toggleExtra}
       />
       <PromAccordion
         title="QuickDASH (상지 기능장애)"
         scoreLabel={quickdashScore != null ? `${quickdashScore}` : null}
         items={QUICKDASH_ITEMS}
         answers={quickdashAnswers}
-        onAnswer={(key, v) => setQuickdashAnswers((prev) => ({ ...prev, [key]: v }))}
+        onAnswer={setQuickdashAnswer}
         isOpen={openExtra.has("quickdash")}
-        onToggle={() => toggleExtra("quickdash")}
+        toggleKey="quickdash"
+        onToggle={toggleExtra}
       />
       <PromAccordion
         title="KOOS-12 (무릎)"
         scoreLabel={koos12Score != null ? `${koos12Score}` : null}
         items={KOOS12_ITEMS}
         answers={koos12Answers}
-        onAnswer={(key, v) => setKoos12Answers((prev) => ({ ...prev, [key]: v }))}
+        onAnswer={setKoos12Answer}
         isOpen={openExtra.has("koos12")}
-        onToggle={() => toggleExtra("koos12")}
+        toggleKey="koos12"
+        onToggle={toggleExtra}
       />
       <PromAccordion
         title="FAAM ADL (발·발목 일상)"
         scoreLabel={faamAdlScore != null ? `${faamAdlScore}%` : null}
         items={FAAM_ADL_ITEMS}
         answers={faamAdlAnswers}
-        onAnswer={(key, v) => setFaamAdlAnswers((prev) => ({ ...prev, [key]: v }))}
+        onAnswer={setFaamAdlAnswer}
         isOpen={openExtra.has("faamAdl")}
-        onToggle={() => toggleExtra("faamAdl")}
+        toggleKey="faamAdl"
+        onToggle={toggleExtra}
       />
       <PromAccordion
         title="FAAM 스포츠"
         scoreLabel={faamSportsScore != null ? `${faamSportsScore}%` : null}
         items={FAAM_SPORTS_ITEMS}
         answers={faamSportsAnswers}
-        onAnswer={(key, v) => setFaamSportsAnswers((prev) => ({ ...prev, [key]: v }))}
+        onAnswer={setFaamSportsAnswer}
         isOpen={openExtra.has("faamSports")}
-        onToggle={() => toggleExtra("faamSports")}
+        toggleKey="faamSports"
+        onToggle={toggleExtra}
       />
 
       <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-3">
