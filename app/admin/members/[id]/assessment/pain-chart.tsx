@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ASSESSMENT_REGIONS, findMovementLabel } from "@/lib/assessment-movements";
-import type { AssessmentRow } from "@/lib/db";
+import type { AssessmentMovements, AssessmentRow } from "@/lib/db";
 
 const WIDTH = 640;
 const HEIGHT = 220;
@@ -40,6 +40,50 @@ function parsePainScale(raw: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+interface DayGroup {
+  dateKey: string;
+  movements: AssessmentMovements;
+  overall: number | null;
+  painTriggerNote: string;
+}
+
+// created_at은 DB 드라이버에 따라 Date 인스턴스로 올 수도, ISO 문자열로
+// 올 수도 있어 항상 Date로 감싸서 다룬다.
+function createdAtMs(a: AssessmentRow): number {
+  return new Date(a.created_at).getTime();
+}
+
+function dateKeyOf(a: AssessmentRow): string {
+  if (a.evaluated_at) return a.evaluated_at;
+  return new Date(a.created_at).toISOString().slice(0, 10);
+}
+
+// 같은 날짜에 평가가 여러 건 있으면(예: 회원마다 여러 번 재평가) X축에 날짜가
+// 중복 표시되지 않도록 날짜별로 묶는다. 같은 날짜에 겹치는 동작/전체 통증
+// 값이 있으면 나중에 작성된(created_at이 늦은) 값을 우선한다.
+function groupByDate(assessments: AssessmentRow[]): DayGroup[] {
+  const byDate = new Map<string, AssessmentRow[]>();
+  for (const a of assessments) {
+    const dateKey = dateKeyOf(a);
+    const list = byDate.get(dateKey) ?? [];
+    list.push(a);
+    byDate.set(dateKey, list);
+  }
+  const groups = Array.from(byDate.entries()).map(([dateKey, list]) => {
+    const sorted = [...list].sort((a, b) => createdAtMs(a) - createdAtMs(b));
+    const movements: AssessmentMovements = {};
+    let overall: number | null = null;
+    let painTriggerNote = "";
+    for (const a of sorted) {
+      Object.assign(movements, a.movements);
+      if (a.pain_scale != null) overall = a.pain_scale;
+      if (a.pain_trigger_note) painTriggerNote = a.pain_trigger_note;
+    }
+    return { dateKey, movements, overall, painTriggerNote };
+  });
+  return groups.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
 // 관리자 평가 이력 목록 위에 붙는 통증 척도 추이 그래프. 전체(맨 아래 통증 유발
 // 동작) 통증척도는 항상 표시하고, 드롭다운으로 특정 동작을 고르면 그 동작의
 // 통증척도를 두 번째 선으로 겹쳐 보여준다. 재평가 시 통증이 줄어드는지
@@ -48,18 +92,12 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
   const [movementId, setMovementId] = useState("");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
-  const chronological = useMemo(
-    () =>
-      [...assessments].sort((a, b) =>
-        (a.evaluated_at || a.created_at).localeCompare(b.evaluated_at || b.created_at),
-      ),
-    [assessments],
-  );
+  const dayGroups = useMemo(() => groupByDate(assessments), [assessments]);
 
   const movementOptions = useMemo(() => {
     const idsWithData = new Set<string>();
-    for (const a of chronological) {
-      for (const [id, entry] of Object.entries(a.movements)) {
+    for (const g of dayGroups) {
+      for (const [id, entry] of Object.entries(g.movements)) {
         if (entry.painScale) idsWithData.add(id);
       }
     }
@@ -71,21 +109,18 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
         if (!found) return { id, label: id };
         return { id, label: `${found.ko} (${shortRegionLabel(found.region)})` };
       });
-  }, [chronological]);
+  }, [dayGroups]);
 
-  if (chronological.length === 0) return null;
+  if (dayGroups.length === 0) return null;
 
-  const points: Point[] = chronological.map((a, i) => {
-    const rawDate = a.evaluated_at || a.created_at.slice(0, 10);
-    return {
-      key: i,
-      dateLabel: shortDateLabel(rawDate),
-      fullDate: rawDate,
-      overall: a.pain_scale,
-      movement: movementId ? parsePainScale(a.movements[movementId]?.painScale) : null,
-      painTriggerNote: a.pain_trigger_note,
-    };
-  });
+  const points: Point[] = dayGroups.map((g, i) => ({
+    key: i,
+    dateLabel: shortDateLabel(g.dateKey),
+    fullDate: g.dateKey,
+    overall: g.overall,
+    movement: movementId ? parsePainScale(g.movements[movementId]?.painScale) : null,
+    painTriggerNote: g.painTriggerNote,
+  }));
 
   const n = points.length;
   const plotWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
