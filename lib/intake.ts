@@ -52,6 +52,10 @@ export async function getIntakeQuestionnaireByMember(
   return result.rows[0] ?? null;
 }
 
+export async function deleteIntakeQuestionnaire(memberId: number): Promise<void> {
+  await query(`DELETE FROM intake_questionnaires WHERE member_id = $1`, [memberId]);
+}
+
 /** 초진 문진표가 이미 작성된 회원 id 집합 — 상단 탭 목록의 작성 여부 표시용. */
 export async function listIntakeMemberIds(): Promise<Set<number>> {
   const result = await query<{ member_id: number }>(

@@ -23,6 +23,26 @@ export function IntakeLanding({
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [removedIds, setRemovedIds] = useState<Set<number>>(new Set());
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  async function handleDelete(memberId: number, memberName: string) {
+    if (!window.confirm(`${memberName}님의 초진 문진표를 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setDeletingId(memberId);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}/intake`, { method: "DELETE" });
+      if (!res.ok) {
+        window.alert("삭제에 실패했어요.");
+        return;
+      }
+      setRemovedIds((prev) => new Set(prev).add(memberId));
+      router.refresh();
+    } catch {
+      window.alert("네트워크 오류가 발생했어요.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!search.trim()) return members;
@@ -106,27 +126,40 @@ export function IntakeLanding({
       ) : (
         <ul className="space-y-2">
           {filtered.map((m) => {
-            const done = doneIds.has(m.id);
+            const done = doneIds.has(m.id) && !removedIds.has(m.id);
             return (
-              <li key={m.id}>
+              <li
+                key={m.id}
+                className="flex items-center gap-2 rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3 hover:border-coral/40 transition"
+              >
                 <button
                   type="button"
                   onClick={() => router.push(`/admin/members/${m.id}/intake`)}
-                  className="w-full flex items-center justify-between rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3 text-left hover:border-coral/40 transition"
+                  className="flex-1 flex items-center justify-between text-left min-w-0"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium">{m.name}</p>
                     {m.phone && <p className="text-xs text-ink/40 mt-0.5">{m.phone}</p>}
                   </div>
                   <span
                     className={[
-                      "rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+                      "rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ml-2",
                       done ? "bg-sage/20 text-sage" : "bg-line/40 text-ink/50",
                     ].join(" ")}
                   >
                     {done ? "작성 완료" : "미작성"}
                   </span>
                 </button>
+                {done && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(m.id, m.name)}
+                    disabled={deletingId === m.id}
+                    className="text-xs text-coral hover:opacity-70 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {deletingId === m.id ? "삭제 중..." : "삭제"}
+                  </button>
+                )}
               </li>
             );
           })}
