@@ -52,6 +52,14 @@ export async function getIntakeQuestionnaireByMember(
   return result.rows[0] ?? null;
 }
 
+/** 초진 문진표가 이미 작성된 회원 id 집합 — 상단 탭 목록의 작성 여부 표시용. */
+export async function listIntakeMemberIds(): Promise<Set<number>> {
+  const result = await query<{ member_id: number }>(
+    `SELECT member_id FROM intake_questionnaires`,
+  );
+  return new Set(result.rows.map((r) => r.member_id));
+}
+
 /** 회원당 한 건만 존재하는 초진 문진표 — 작성/수정 모두 upsert로 처리한다. */
 export async function upsertIntakeQuestionnaire(
   input: UpsertIntakeQuestionnaireInput,

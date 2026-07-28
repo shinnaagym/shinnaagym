@@ -661,10 +661,20 @@ async function pickDefaultCoachId(): Promise<number | null> {
   return result.rows[0]?.id ?? null;
 }
 
+/** 연락처로 기존 회원을 조회한다(빈 연락처는 조회하지 않고 null). */
+export async function getMemberByPhone(phone: string): Promise<MemberRow | null> {
+  if (!phone.trim()) return null;
+  const result = await query<MemberRow>(
+    `SELECT * FROM members WHERE phone = $1 AND phone <> '' LIMIT 1`,
+    [phone.trim()],
+  );
+  return result.rows[0] ?? null;
+}
+
 /**
  * 연락처로 기존 회원을 찾고, 없으면 새로 만든다. 아직 패키지를 구매하지 않은
  * "상담 대기" 회원을 빠르게 찾거나 등록할 때 쓴다(사전예약 자동 연동, 관리자의
- * 수동 상담 예약 등).
+ * 수동 상담 예약, 초진 문진표/평가지 즉석 작성 등).
  */
 export async function findOrCreateMemberByPhone(input: {
   name: string;
@@ -672,13 +682,8 @@ export async function findOrCreateMemberByPhone(input: {
   coachId: number | null;
   notes?: string;
 }): Promise<MemberRow> {
-  if (input.phone.trim()) {
-    const existing = await query<MemberRow>(
-      `SELECT * FROM members WHERE phone = $1 AND phone <> '' LIMIT 1`,
-      [input.phone.trim()],
-    );
-    if (existing.rows[0]) return existing.rows[0];
-  }
+  const existing = await getMemberByPhone(input.phone);
+  if (existing) return existing;
   return createMember({
     name: input.name,
     phone: input.phone,

@@ -9,6 +9,8 @@ const TABS = [
   { href: "/admin/schedule", label: "스케줄" },
   { href: "/admin/members", label: "회원 관리" },
   { href: "/admin/reservations", label: "사전예약" },
+  { href: "/admin/intake", label: "초진 문진표" },
+  { href: "/admin/assessments", label: "평가지" },
   { href: "/admin/settings", label: "설정" },
 ];
 

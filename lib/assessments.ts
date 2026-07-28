@@ -146,6 +146,14 @@ export async function deleteAssessment(id: number): Promise<void> {
   await query(`DELETE FROM assessments WHERE id = $1`, [id]);
 }
 
+/** 회원별 평가 작성 건수 — 상단 탭 목록의 작성 여부/건수 표시용. */
+export async function listAssessmentCountsByMember(): Promise<Map<number, number>> {
+  const result = await query<{ member_id: number; count: string }>(
+    `SELECT member_id, COUNT(*) AS count FROM assessments GROUP BY member_id`,
+  );
+  return new Map(result.rows.map((r) => [r.member_id, Number(r.count)]));
+}
+
 /** 회원의 평가 이력을 최신순으로 반환한다(요약 목록용 — movements는 그대로 포함). */
 export async function listAssessmentsByMember(memberId: number): Promise<AssessmentRow[]> {
   const result = await query<AssessmentRow>(
