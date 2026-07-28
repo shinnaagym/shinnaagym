@@ -10,16 +10,27 @@ const PAD_LEFT = 28;
 const PAD_RIGHT = 16;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 28;
-const PAIN_TRIGGER_COLOR = "#e2734f";
-const MOVEMENT_COLOR = "#2a78d6";
 const GRID_TICKS = [0, 2, 4, 6, 8, 10];
 
-interface Point {
-  key: number;
-  dateLabel: string;
-  fullDate: string;
-  painTrigger: number | null;
-  movement: number | null;
+// 통증 유발 동작·체형 평가 동작 시리즈에 순서대로 배정하는 색상 팔레트.
+const SERIES_COLORS = [
+  "#e2734f",
+  "#2a78d6",
+  "#3fa796",
+  "#a35fd1",
+  "#c9a227",
+  "#d1477a",
+  "#5f8fd1",
+  "#7fae4d",
+  "#b06a3f",
+  "#7a6fd6",
+];
+
+interface Series {
+  key: string;
+  label: string;
+  color: string;
+  values: (number | null)[];
 }
 
 function shortDateLabel(raw: string): string {
@@ -86,22 +97,21 @@ function groupByDate(assessments: AssessmentRow[]): DayGroup[] {
   return groups.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 }
 
-// 관리자 평가 이력 목록 위에 붙는 통증 척도 추이 그래프. 드롭다운으로 이
-// 회원의 통증 유발 동작 문구(예: "계단 내려갈 때")를 고르면 그 문구의
-// 통증척도를 선 그래프로 보여주고, 부위별 동작을 골라 두 번째 선으로
-// 겹쳐볼 수도 있다. 재평가 시 통증이 줄어드는지 한눈에 확인하기 위한 용도.
+// 관리자 평가 이력 목록 위에 붙는 통증 척도 추이 그래프. 이 회원이 그동안
+// 기록한 모든 통증 유발 동작 문구와 부위별 동작을 각각 하나의 선으로 동시에
+// 겹쳐 보여준다. 같은 동작끼리는 데이터가 없는 날짜를 건너뛰고 선으로 이어
+// 그리며, 처음 렌더링될 때 선이 왼쪽에서 오른쪽으로 그려지는 애니메이션이
+// 재생된다. 재평가 시 통증이 줄어드는지 한눈에 확인하기 위한 용도.
 export function AssessmentPainChart({ assessments }: { assessments: AssessmentRow[] }) {
-  const [movementId, setMovementId] = useState("");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const dayGroups = useMemo(() => groupByDate(assessments), [assessments]);
 
-  // 최근 날짜에서 먼저 언급된 문구가 앞에 오도록 정렬 — 기본 선택값으로 쓰기 좋다.
-  const painTriggerOptions = useMemo(() => {
+  const painTriggerNotes = useMemo(() => {
     const seen = new Set<string>();
     const notes: string[] = [];
-    for (let i = dayGroups.length - 1; i >= 0; i--) {
-      for (const note of Object.keys(dayGroups[i].painTriggers)) {
+    for (const g of dayGroups) {
+      for (const note of Object.keys(g.painTriggers)) {
         if (!seen.has(note)) {
           seen.add(note);
           notes.push(note);
@@ -111,11 +121,7 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
     return notes;
   }, [dayGroups]);
 
-  const [selectedPainNote, setSelectedPainNote] = useState<string>(
-    () => painTriggerOptions[0] ?? "",
-  );
-
-  const movementOptions = useMemo(() => {
+  const movementIds = useMemo(() => {
     const idsWithData = new Set<string>();
     for (const g of dayGroups) {
       for (const [id, entry] of Object.entries(g.movements)) {
@@ -123,37 +129,42 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
       }
     }
     const order = ASSESSMENT_REGIONS.flatMap((r) => r.movements.map((m) => m.id));
-    return order
-      .filter((id) => idsWithData.has(id))
-      .map((id) => ({ id, label: movementLabelWithRegion(id) }));
+    return order.filter((id) => idsWithData.has(id));
   }, [dayGroups]);
 
   if (dayGroups.length === 0) return null;
 
-  const points: Point[] = dayGroups.map((g, i) => ({
-    key: i,
-    dateLabel: shortDateLabel(g.dateKey),
-    fullDate: g.dateKey,
-    painTrigger: selectedPainNote ? g.painTriggers[selectedPainNote] ?? null : null,
-    movement: movementId ? parsePainScale(g.movements[movementId]?.painScale) : null,
-  }));
+  const dateLabels = dayGroups.map((g) => shortDateLabel(g.dateKey));
+  const fullDates = dayGroups.map((g) => g.dateKey);
 
-  const n = points.length;
+  const series: Series[] = [
+    ...painTriggerNotes.map((note, i) => ({
+      key: `note:${note}`,
+      label: note,
+      color: SERIES_COLORS[i % SERIES_COLORS.length],
+      values: dayGroups.map((g) => g.painTriggers[note] ?? null),
+    })),
+    ...movementIds.map((id, i) => ({
+      key: `movement:${id}`,
+      label: movementLabelWithRegion(id),
+      color: SERIES_COLORS[(painTriggerNotes.length + i) % SERIES_COLORS.length],
+      values: dayGroups.map((g) => parsePainScale(g.movements[id]?.painScale)),
+    })),
+  ];
+
+  const n = dayGroups.length;
   const plotWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
   const plotHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
   const xStep = n > 1 ? plotWidth / (n - 1) : 0;
   const xAt = (i: number) => PAD_LEFT + (n > 1 ? i * xStep : plotWidth / 2);
   const yAt = (v: number) => PAD_TOP + plotHeight * (1 - v / 10);
 
-  function pathFor(key: "painTrigger" | "movement"): string {
+  // 데이터가 없는 날짜는 건너뛰고, 있는 점끼리만 이어서 하나의 연속된 선으로 그린다.
+  function pathFor(values: (number | null)[]): string {
     let d = "";
     let started = false;
-    points.forEach((p, i) => {
-      const v = p[key];
-      if (v == null) {
-        started = false;
-        return;
-      }
+    values.forEach((v, i) => {
+      if (v == null) return;
       d += `${started ? "L" : "M"}${xAt(i)},${yAt(v)} `;
       started = true;
     });
@@ -165,7 +176,7 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
     const relX = ((e.clientX - rect.left) / rect.width) * WIDTH;
     let nearest = 0;
     let best = Infinity;
-    points.forEach((_, i) => {
+    dateLabels.forEach((_, i) => {
       const dist = Math.abs(xAt(i) - relX);
       if (dist < best) {
         best = dist;
@@ -175,62 +186,33 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
     setHoverIndex(nearest);
   }
 
-  const hovered = hoverIndex != null ? points[hoverIndex] : null;
   const tooltipLeftPct = hoverIndex != null ? (xAt(hoverIndex) / WIDTH) * 100 : 0;
+  const hoveredValues =
+    hoverIndex != null
+      ? series
+          .map((s) => ({ label: s.label, color: s.color, value: s.values[hoverIndex!] }))
+          .filter((s) => s.value != null)
+      : [];
 
   return (
     <div className="rounded-2xl border border-line/60 bg-white shadow-sm px-5 py-4 mb-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
-        <p className="font-display text-base">통증 척도 추이</p>
-        <div className="flex gap-2 flex-wrap">
-          {painTriggerOptions.length > 0 && (
-            <select
-              value={selectedPainNote}
-              onChange={(e) => setSelectedPainNote(e.target.value)}
-              className="rounded-full border border-line bg-white px-3 py-1.5 text-xs outline-none max-w-[180px]"
-            >
-              <option value="">통증 유발 동작 선택 안 함</option>
-              {painTriggerOptions.map((note) => (
-                <option key={note} value={note}>
-                  {note}
-                </option>
-              ))}
-            </select>
-          )}
-          {movementOptions.length > 0 && (
-            <select
-              value={movementId}
-              onChange={(e) => setMovementId(e.target.value)}
-              className="rounded-full border border-line bg-white px-3 py-1.5 text-xs outline-none"
-            >
-              <option value="">동작 선택 안 함</option>
-              {movementOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
+      <style>{`
+        @keyframes pain-chart-draw {
+          to { stroke-dashoffset: 0; }
+        }
+      `}</style>
+      <p className="font-display text-base mb-2">통증 척도 추이</p>
 
-      <div className="flex items-center gap-4 mb-2 text-xs text-ink/60 flex-wrap">
-        {selectedPainNote && (
-          <span className="flex items-center gap-1.5">
-            <span
-              className="inline-block h-0.5 w-4"
-              style={{ backgroundColor: PAIN_TRIGGER_COLOR }}
-            />
-            {selectedPainNote}
-          </span>
-        )}
-        {movementId && (
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-4" style={{ backgroundColor: MOVEMENT_COLOR }} />
-            {movementOptions.find((o) => o.id === movementId)?.label}
-          </span>
-        )}
-      </div>
+      {series.length > 0 && (
+        <div className="flex items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-ink/60 flex-wrap">
+          {series.map((s) => (
+            <span key={s.key} className="flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-4" style={{ backgroundColor: s.color }} />
+              {s.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="relative">
         <svg
@@ -255,16 +237,9 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
             </g>
           ))}
 
-          {points.map((p, i) => (
-            <text
-              key={p.key}
-              x={xAt(i)}
-              y={HEIGHT - 8}
-              textAnchor="middle"
-              fontSize={9}
-              fill="#8a8578"
-            >
-              {p.dateLabel}
+          {dateLabels.map((label, i) => (
+            <text key={i} x={xAt(i)} y={HEIGHT - 8} textAnchor="middle" fontSize={9} fill="#8a8578">
+              {label}
             </text>
           ))}
 
@@ -279,67 +254,56 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
             />
           )}
 
-          {selectedPainNote && (
-            <>
+          {series.map((s, si) => (
+            <g key={s.key}>
               <path
-                d={pathFor("painTrigger")}
+                key={`${s.key}-${n}`}
+                d={pathFor(s.values)}
                 fill="none"
-                stroke={PAIN_TRIGGER_COLOR}
+                stroke={s.color}
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                pathLength={1}
+                style={{
+                  strokeDasharray: 1,
+                  strokeDashoffset: 1,
+                  animation: "pain-chart-draw 1.1s ease forwards",
+                  animationDelay: `${si * 0.15}s`,
+                }}
               />
-              {points.map(
-                (p, i) =>
-                  p.painTrigger != null && (
+              {s.values.map(
+                (v, i) =>
+                  v != null && (
                     <circle
-                      key={`p-${p.key}`}
+                      key={`${s.key}-pt-${i}`}
                       cx={xAt(i)}
-                      cy={yAt(p.painTrigger)}
+                      cy={yAt(v)}
                       r={4}
-                      fill={PAIN_TRIGGER_COLOR}
+                      fill={s.color}
                       stroke="#ffffff"
                       strokeWidth={2}
                     />
                   ),
               )}
-            </>
-          )}
-
-          {movementId && (
-            <>
-              <path d={pathFor("movement")} fill="none" stroke={MOVEMENT_COLOR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              {points.map(
-                (p, i) =>
-                  p.movement != null && (
-                    <circle key={`m-${p.key}`} cx={xAt(i)} cy={yAt(p.movement)} r={4} fill={MOVEMENT_COLOR} stroke="#ffffff" strokeWidth={2} />
-                  ),
-              )}
-            </>
-          )}
+            </g>
+          ))}
         </svg>
 
-        {hovered && (hovered.painTrigger != null || hovered.movement != null) && (
+        {hoverIndex != null && hoveredValues.length > 0 && (
           <div
             className="absolute top-0 -translate-x-1/2 rounded-lg border border-line bg-white shadow-md px-2.5 py-1.5 text-xs pointer-events-none w-max max-w-[220px]"
             style={{ left: `${tooltipLeftPct}%` }}
           >
-            <p className="text-ink/50 mb-0.5 whitespace-nowrap">{hovered.fullDate}</p>
-            {hovered.painTrigger != null && (
-              <p className="leading-snug break-words">
-                <span className="font-medium">{hovered.painTrigger}</span>
-                <span className="text-ink/50"> /10 {selectedPainNote}</span>
-              </p>
-            )}
-            {hovered.movement != null && (
-              <p className="whitespace-nowrap mt-0.5">
-                <span className="font-medium">{hovered.movement}</span>
-                <span className="text-ink/50">
-                  {" "}
-                  /10 {movementOptions.find((o) => o.id === movementId)?.label}
+            <p className="text-ink/50 mb-0.5 whitespace-nowrap">{fullDates[hoverIndex]}</p>
+            {hoveredValues.map((h) => (
+              <p key={h.label} className="leading-snug break-words">
+                <span className="font-medium" style={{ color: h.color }}>
+                  {h.value}/10
                 </span>
+                <span className="text-ink/50"> {h.label}</span>
               </p>
-            )}
+            ))}
           </div>
         )}
       </div>
