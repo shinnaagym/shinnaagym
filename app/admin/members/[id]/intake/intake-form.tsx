@@ -320,6 +320,16 @@ export function IntakeForm({
             />
           </Field>
         )}
+        {form.visitChannel === "other" && (
+          <Field label="기타 (직접 입력)">
+            <input
+              value={form.visitChannelOther}
+              onChange={(e) => patch({ visitChannelOther: e.target.value })}
+              placeholder="예: 엘리베이터 광고"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
+          </Field>
+        )}
         <Field label="운동 목적">
           <div className="flex flex-wrap gap-1.5 mb-2">
             {EXERCISE_PURPOSE_OPTIONS.map((opt) => (

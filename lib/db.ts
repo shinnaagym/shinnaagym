@@ -220,6 +220,7 @@ function ensureSchema(): Promise<void> {
           phone TEXT NOT NULL DEFAULT '',
           visit_channel TEXT NOT NULL DEFAULT '',
           visit_channel_referrer_name TEXT NOT NULL DEFAULT '',
+          visit_channel_other TEXT NOT NULL DEFAULT '',
           exercise_purposes TEXT[] NOT NULL DEFAULT '{}',
           exercise_purpose_other TEXT NOT NULL DEFAULT '',
           stance_leg TEXT NOT NULL DEFAULT '',
@@ -305,6 +306,7 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS pain_movements JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS visit_channel TEXT NOT NULL DEFAULT '';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS visit_channel_referrer_name TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS visit_channel_other TEXT NOT NULL DEFAULT '';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS exercise_purposes TEXT[] NOT NULL DEFAULT '{}';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS exercise_purpose_other TEXT NOT NULL DEFAULT '';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS startback_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
@@ -500,6 +502,7 @@ export interface IntakeQuestionnaireRow {
   phone: string;
   visit_channel: string;
   visit_channel_referrer_name: string;
+  visit_channel_other: string;
   exercise_purposes: string[];
   exercise_purpose_other: string;
   stance_leg: string;

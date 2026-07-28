@@ -9,8 +9,8 @@ import {
   listMemberSessions,
 } from "@/lib/schedule";
 import { getLatestContractByMember } from "@/lib/contracts";
-import { getLatestAssessmentByMember, getPainTriggerEntries } from "@/lib/assessments";
-import { movementLabelWithRegion } from "@/lib/assessment-movements";
+import { listAssessmentsByMember } from "@/lib/assessments";
+import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { koreaTodayKey } from "@/lib/date";
 
 // 담당 코치의 개인 연락처가 등록되지 않은 경우를 위한 기본(스튜디오) 문의 번호.
@@ -41,26 +41,18 @@ export default async function MyReservationPage({
     notFound();
   }
 
-  const [progress, sessions, availability, coaches, contract, assessment] = await Promise.all([
-    computeMemberProgress(member.id),
-    listMemberSessions(member.id),
-    member.coach_id
-      ? getCoachAvailability(member.coach_id, koreaTodayKey(), 14)
-      : Promise.resolve([]),
-    listCoaches(),
-    getLatestContractByMember(member.id),
-    getLatestAssessmentByMember(member.id),
-  ]);
-
-  const flaggedMovements = assessment
-    ? Object.entries(assessment.movements)
-        .filter(([, entry]) => entry.compensation.trim().length > 0)
-        .map(([movementId, entry]) => ({
-          label: movementLabelWithRegion(movementId),
-          compensation: entry.compensation,
-        }))
-    : [];
-  const painTriggers = assessment ? getPainTriggerEntries(assessment) : [];
+  const [progress, sessions, availability, coaches, contract, assessments, intake] =
+    await Promise.all([
+      computeMemberProgress(member.id),
+      listMemberSessions(member.id),
+      member.coach_id
+        ? getCoachAvailability(member.coach_id, koreaTodayKey(), 14)
+        : Promise.resolve([]),
+      listCoaches(),
+      getLatestContractByMember(member.id),
+      listAssessmentsByMember(member.id),
+      getIntakeQuestionnaireByMember(member.id),
+    ]);
 
   const contactPhone =
     coaches.find((c) => c.id === member.coach_id)?.phone.trim() || DEFAULT_STUDIO_PHONE;
@@ -120,35 +112,34 @@ export default async function MyReservationPage({
           </Link>
         )}
 
-        {assessment && (flaggedMovements.length > 0 || painTriggers.length > 0) && (
-          <div className="rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10">
-            <p className="font-display text-lg mb-3">🧍 체형 평가 요약</p>
-            {flaggedMovements.length > 0 && (
-              <div className="mb-3">
-                <p className="text-xs text-ink/40 mb-1.5">관찰된 보상 패턴</p>
-                <ul className="space-y-1 text-sm text-ink/70">
-                  {flaggedMovements.map((m, i) => (
-                    <li key={i}>
-                      <span className="font-medium text-ink">{m.label}</span> — {m.compensation}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {painTriggers.length > 0 && (
+        {intake && (
+          <Link
+            href={`/my/${token}/intake`}
+            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-4 hover:border-coral/40 transition"
+          >
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-ink/40 mb-1">통증 유발 동작</p>
-                <ul className="space-y-1 text-sm text-ink/70">
-                  {painTriggers.map((entry, i) => (
-                    <li key={i}>
-                      {entry.note}
-                      {entry.painScale != null && ` (통증 척도 ${entry.painScale}/10)`}
-                    </li>
-                  ))}
-                </ul>
+                <p className="font-display text-lg mb-1">📋 초진 문진표</p>
+                <p className="text-sm text-ink/60">내용 확인하기</p>
               </div>
-            )}
-          </div>
+              <span className="text-ink/30">→</span>
+            </div>
+          </Link>
+        )}
+
+        {assessments.length > 0 && (
+          <Link
+            href={`/my/${token}/assessment`}
+            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10 hover:border-coral/40 transition"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-display text-lg mb-1">🧍 신체 평가지</p>
+                <p className="text-sm text-ink/60">{assessments.length}건 · 내용 확인하기</p>
+              </div>
+              <span className="text-ink/30">→</span>
+            </div>
+          </Link>
         )}
 
         {progress.totalSessions > 0 && progress.remaining <= 3 && (

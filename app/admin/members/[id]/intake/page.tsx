@@ -36,6 +36,7 @@ export default async function IntakeQuestionnairePage({
         phone: intake.phone,
         visitChannel: intake.visit_channel,
         visitChannelReferrerName: intake.visit_channel_referrer_name,
+        visitChannelOther: intake.visit_channel_other,
         exercisePurposes: intake.exercise_purposes,
         exercisePurposeOther: intake.exercise_purpose_other,
         stanceLeg: intake.stance_leg,

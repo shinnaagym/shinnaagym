@@ -59,10 +59,21 @@ export default async function AdminDashboardPage({
   ]);
 
   const visitChannelTotal = Object.values(visitChannelCounts).reduce((a, b) => a + b, 0);
-  const visitChannelRows = VISIT_CHANNEL_OPTIONS.map((opt) => ({
-    label: opt.label,
-    count: visitChannelCounts[opt.value] ?? 0,
-  }));
+  const knownVisitChannelValues = new Set<string>(VISIT_CHANNEL_OPTIONS.map((opt) => opt.value));
+  const visitChannelFixedRows = VISIT_CHANNEL_OPTIONS.filter((opt) => opt.value !== "other").map(
+    (opt) => ({ label: opt.label, count: visitChannelCounts[opt.value] ?? 0 }),
+  );
+  // "기타"를 고르고 자유 입력을 남긴 경우, 그 텍스트 자체가 getVisitChannelCountsForMonth에서
+  // 이미 새 카테고리 키로 집계되어 있다 — 여기서는 알려진 값이 아닌 키를 전부 모아 동적으로 보여준다.
+  const customVisitChannelRows = Object.entries(visitChannelCounts)
+    .filter(([key]) => key !== "" && !knownVisitChannelValues.has(key))
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+  const visitChannelRows = [
+    ...visitChannelFixedRows,
+    { label: "기타", count: visitChannelCounts["other"] ?? 0 },
+    ...customVisitChannelRows,
+  ];
   const unknownVisitChannelCount = visitChannelCounts[""] ?? 0;
   const maxVisitChannelCount = Math.max(
     1,

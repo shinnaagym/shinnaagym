@@ -82,6 +82,7 @@ export interface ParsedIntakeInput {
   phone: string;
   visitChannel: string;
   visitChannelReferrerName: string;
+  visitChannelOther: string;
   exercisePurposes: string[];
   exercisePurposeOther: string;
   stanceLeg: string;
@@ -122,6 +123,7 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     phone: str(body?.phone),
     visitChannel: enumVal(body?.visitChannel, VALID_VISIT_CHANNEL),
     visitChannelReferrerName: str(body?.visitChannelReferrerName),
+    visitChannelOther: str(body?.visitChannelOther),
     exercisePurposes: exercisePurposes(body?.exercisePurposes),
     exercisePurposeOther: str(body?.exercisePurposeOther),
     stanceLeg: enumVal(body?.stanceLeg, VALID_STANCE_LEG),
