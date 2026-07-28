@@ -715,10 +715,13 @@ export async function linkPreReservationToSchedule(input: {
   const coachId = await pickDefaultCoachId();
   if (!coachId) return null; // 활성 코치가 없으면 연동을 건너뛴다.
 
+  // 회원의 담당 코치는 관리자가 직접 지정하기 전까지 미지정으로 둔다.
+  // coachId는 스케줄표에 임시로 잡아둘 칸(신종수 코치 시간표)을 고를 때만
+  // 쓰고, 회원 레코드 자체에는 저장하지 않는다.
   const member = await findOrCreateMemberByPhone({
     name: input.name,
     phone: input.phone,
-    coachId,
+    coachId: null,
     notes: "사전예약 폼을 통해 자동 등록됨",
   });
 

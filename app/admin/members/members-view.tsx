@@ -189,7 +189,7 @@ export function MembersView({
   const fixedSlots = initialFixedSlots;
   const activeCoaches = useMemo(() => coaches.filter((c) => c.active), [coaches]);
   const [search, setSearch] = useState("");
-  const [coachFilter, setCoachFilter] = useState<number | "all">("all");
+  const [coachFilter, setCoachFilter] = useState<number | "all" | "unassigned">("all");
   const [statusFilter, setStatusFilter] = useState<MemberStatus | "all">("active");
   const [showCreate, setShowCreate] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(null);
@@ -197,7 +197,11 @@ export function MembersView({
   const filtered = useMemo(() => {
     return members.filter((m) => {
       if (search && !m.name.includes(search)) return false;
-      if (coachFilter !== "all" && m.coach_id !== coachFilter) return false;
+      if (coachFilter === "unassigned") {
+        if (m.coach_id !== null) return false;
+      } else if (coachFilter !== "all" && m.coach_id !== coachFilter) {
+        return false;
+      }
       if (statusFilter !== "all" && m.status !== statusFilter) return false;
       return true;
     });
@@ -219,12 +223,14 @@ export function MembersView({
           />
           <select
             value={coachFilter}
-            onChange={(e) =>
-              setCoachFilter(e.target.value === "all" ? "all" : Number(e.target.value))
-            }
+            onChange={(e) => {
+              const v = e.target.value;
+              setCoachFilter(v === "all" ? "all" : v === "unassigned" ? "unassigned" : Number(v));
+            }}
             className="rounded-full border border-line bg-white px-4 py-2 text-sm outline-none"
           >
             <option value="all">담당 코치 전체</option>
+            <option value="unassigned">미지정</option>
             {coaches.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -445,7 +451,13 @@ export function MembersView({
       <FixedSlotSchedule
         fixedSlots={fixedSlots}
         coachFilter={coachFilter}
-        coachName={coachFilter === "all" ? null : coaches.find((c) => c.id === coachFilter)?.name ?? null}
+        coachName={
+          coachFilter === "all"
+            ? null
+            : coachFilter === "unassigned"
+              ? "미지정"
+              : coaches.find((c) => c.id === coachFilter)?.name ?? null
+        }
       />
 
       {showCreate && (
@@ -479,16 +491,16 @@ function FixedSlotSchedule({
   coachName,
 }: {
   fixedSlots: FixedSlotWithMember[];
-  coachFilter: number | "all";
+  coachFilter: number | "all" | "unassigned";
   coachName: string | null;
 }) {
-  const scopedSlots = useMemo(
-    () =>
-      coachFilter === "all"
-        ? fixedSlots
-        : fixedSlots.filter((slot) => slot.member_coach_id === coachFilter),
-    [fixedSlots, coachFilter],
-  );
+  const scopedSlots = useMemo(() => {
+    if (coachFilter === "all") return fixedSlots;
+    if (coachFilter === "unassigned") {
+      return fixedSlots.filter((slot) => slot.member_coach_id === null);
+    }
+    return fixedSlots.filter((slot) => slot.member_coach_id === coachFilter);
+  }, [fixedSlots, coachFilter]);
 
   const byCell = useMemo(() => {
     const map = new Map<string, string[]>();
