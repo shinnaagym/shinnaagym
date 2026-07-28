@@ -442,7 +442,11 @@ export function MembersView({
         </>
       )}
 
-      <FixedSlotSchedule fixedSlots={fixedSlots} />
+      <FixedSlotSchedule
+        fixedSlots={fixedSlots}
+        coachFilter={coachFilter}
+        coachName={coachFilter === "all" ? null : coaches.find((c) => c.id === coachFilter)?.name ?? null}
+      />
 
       {showCreate && (
         <CreateMemberModal
@@ -469,30 +473,48 @@ export function MembersView({
   );
 }
 
-function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }) {
+function FixedSlotSchedule({
+  fixedSlots,
+  coachFilter,
+  coachName,
+}: {
+  fixedSlots: FixedSlotWithMember[];
+  coachFilter: number | "all";
+  coachName: string | null;
+}) {
+  const scopedSlots = useMemo(
+    () =>
+      coachFilter === "all"
+        ? fixedSlots
+        : fixedSlots.filter((slot) => slot.member_coach_id === coachFilter),
+    [fixedSlots, coachFilter],
+  );
+
   const byCell = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const slot of fixedSlots) {
+    for (const slot of scopedSlots) {
       const key = `${slot.weekday}-${slot.hour}`;
       const names = map.get(key) ?? [];
       names.push(slot.member_name);
       map.set(key, names);
     }
     return map;
-  }, [fixedSlots]);
+  }, [scopedSlots]);
 
   const hourTotals = useMemo(() => {
     const totals = new Map<number, number>();
-    for (const slot of fixedSlots) {
+    for (const slot of scopedSlots) {
       totals.set(slot.hour, (totals.get(slot.hour) ?? 0) + 1);
     }
     return totals;
-  }, [fixedSlots]);
+  }, [scopedSlots]);
 
   return (
     <div className="mt-10">
       <div className="flex items-center gap-2 mb-1">
-        <p className="font-display text-lg">고정 회원 시간표</p>
+        <p className="font-display text-lg">
+          {coachName ? `${coachName} 코치 고정 회원 시간표` : "고정 회원 시간표"}
+        </p>
         <span className="text-xs text-ink/40">시간대별 고정 회원 배정 현황</span>
       </div>
       <p className="text-xs text-ink/40 mb-3">
