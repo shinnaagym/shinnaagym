@@ -687,7 +687,7 @@ function ContractFieldsFieldset({
           checked={privacyConsent}
           onChange={(e) => onPrivacyConsentChange(e.target.checked)}
         />
-        개인 정보 활용에 동의합니다.
+        개인정보(민감정보 포함) 수집·이용에 동의합니다.
       </label>
     </>
   );

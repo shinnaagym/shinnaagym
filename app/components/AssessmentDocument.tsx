@@ -46,10 +46,19 @@ export function AssessmentDocument({
     <>
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">Assessment</p>
       <h1 className="font-display text-3xl mb-1">신체 평가지</h1>
-      <p className="text-xs text-ink/50 mb-8">
+      <p className="text-xs text-ink/50 mb-4">
         회원 {memberName} · 평가일 {assessment.evaluated_at || "-"} · 담당 트레이너{" "}
         {assessment.evaluator_name || "-"}
       </p>
+
+      <div className="rounded-2xl border border-coral/30 bg-coral/5 px-5 py-4 text-xs text-ink/60 leading-relaxed mb-8">
+        <p className="font-medium text-ink mb-1">민감정보 처리 안내</p>
+        <p>
+          이 평가지에는 건강상태, 병력, 통증 부위·통증 척도 등 「개인정보 보호법」상 민감정보가
+          포함되어 있습니다. 해당 정보는 회원가입 계약서 제4조(민감정보 수집·이용 동의)에 따라
+          별도 동의를 받은 정보이며, 오직 회원 맞춤형 운동 프로그램 설계 목적으로만 사용됩니다.
+        </p>
+      </div>
 
       {ASSESSMENT_REGIONS.map((region) => (
         <section key={region.key} className="mb-8">
@@ -122,6 +131,11 @@ export function AssessmentDocument({
           </div>
         )}
       </section>
+
+      <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm space-y-1">
+        <p>신나아짐 본점 T. 010-6859-6114</p>
+        <p className="text-bone/70">개인정보 보호책임자 · 신종수 (T. 010-6859-6114)</p>
+      </div>
     </>
   );
 }

@@ -135,8 +135,10 @@ export function ContractDocument({
             <p>{purposeLabels.length > 0 ? purposeLabels.join(", ") : "-"}</p>
           </div>
           <div className="px-4 py-3">
-            <p className="text-xs text-ink/40 mb-0.5">개인 정보 활용 동의</p>
-            <p>{contract.privacy_consent ? "예" : "아니요"}</p>
+            <p className="text-xs text-ink/40 mb-0.5">
+              개인정보(민감정보 포함) 수집·이용 동의 <span className="text-ink/30">(제3·4조 참고)</span>
+            </p>
+            <p>{contract.privacy_consent ? "동의함" : "동의하지 않음"}</p>
           </div>
         </div>
       </section>
@@ -198,10 +200,97 @@ export function ContractDocument({
         </div>
       </section>
 
+      <section className="mb-10">
+        <h2 className="font-display text-lg mb-3">3. 개인정보 수집·이용 동의</h2>
+        <div className="text-sm text-ink/70 leading-relaxed space-y-3">
+          <div>
+            <p className="font-medium text-ink mb-1">수집 목적</p>
+            <p>
+              회원 관리(본인 확인, 예약·출석·회차 관리), 운동 처방 및 PT 프로그램 설계·제공,
+              계약의 체결 및 이행(회원권 등록·결제·양도·연기·환불 처리 등)을 위해 개인정보를
+              수집·이용합니다.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-ink mb-1">수집 항목</p>
+            <p>성명, 연락처, 주민등록번호(앞자리), 주소, 방문경로, 운동목표 등 본 계약서에 기재된 정보</p>
+          </div>
+          <div>
+            <p className="font-medium text-ink mb-1">보유 및 이용 기간</p>
+            <p>
+              회원 탈퇴일 또는 계약 종료일로부터 5년간 보관 후 파기합니다. 다만 관계 법령에 따라
+              별도 보관이 필요한 경우 해당 법령에서 정한 기간 동안 보관합니다.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-ink mb-1">동의 거부 권리 및 불이익 안내</p>
+            <p>
+              귀하는 위 개인정보 수집·이용에 동의를 거부할 권리가 있습니다. 다만 본 정보는 회원
+              등록 및 계약 이행을 위해 필수적인 정보로, 동의하지 않을 경우 회원 등록 및 PT 서비스
+              이용이 제한될 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="font-display text-lg mb-3">4. 민감정보(건강정보) 수집·이용 동의</h2>
+        <div className="rounded-2xl border border-coral/30 bg-coral/5 px-5 py-4 text-sm text-ink/70 leading-relaxed space-y-3">
+          <p>
+            신체 평가지 작성 과정에서 건강상태, 병력, 통증 부위·통증 척도 등{" "}
+            <span className="font-medium text-ink">
+              「개인정보 보호법」상 민감정보에 해당하는 정보
+            </span>
+            를 별도로 수집·이용합니다. 이는 위 제3조의 일반 개인정보 동의와 구분되는 별도 동의
+            사항입니다.
+          </p>
+          <div>
+            <p className="font-medium text-ink mb-1">이용 목적</p>
+            <p>
+              오직 회원 맞춤형 운동 프로그램 설계 및 부상 예방을 위한 트레이닝 지도 목적으로만
+              사용하며, 그 외의 목적으로는 이용하지 않습니다.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium text-ink mb-1">보유 및 이용 기간</p>
+            <p>제3조와 동일하게 회원 탈퇴일 또는 계약 종료일로부터 5년간 보관 후 파기합니다.</p>
+          </div>
+          <div>
+            <p className="font-medium text-ink mb-1">동의 거부 권리 및 불이익 안내</p>
+            <p>
+              귀하는 민감정보 수집·이용에 동의를 거부할 권리가 있습니다. 다만 동의하지 않을 경우
+              신체 상태를 고려한 신체 평가 및 맞춤형 PT 프로그램 제공이 제한될 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="font-display text-lg mb-3">5. 개인정보 보유 및 파기</h2>
+        <div className="text-sm text-ink/70 leading-relaxed space-y-3">
+          <p>
+            당사는 회원의 개인정보(민감정보 포함)를 외부 제3자에게 제공하지 않습니다. 담당 코치
+            변경·대체 등으로 소속 트레이너 간 정보가 공유되는 경우에도 이는 위 이용 목적 범위
+            내에서 신나아짐 소속 직원만 열람하는 내부 이용에 한합니다.
+          </p>
+          <p>
+            회원 탈퇴 시 또는 계약 종료 시, 관계 법령에 따른 별도 보관 의무가 없는 한 5년간
+            보관한 뒤 지체 없이 파기합니다. 전자 파일 형태의 정보는 복구할 수 없는 방법으로
+            영구 삭제하며, 서면 형태의 정보는 분쇄 또는 소각합니다.
+          </p>
+        </div>
+      </section>
+
+      <p className="text-sm text-ink/70 leading-relaxed mb-4">
+        본 계약서에 서명함으로써 위 1~5의 회원 정보, 회원 약관, 개인정보 수집·이용 동의, 민감정보
+        수집·이용 동의, 개인정보 보유·파기 안내를 모두 확인하고 동의하였음을 인정합니다.
+      </p>
+
       <section className="mb-10">{children}</section>
 
-      <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm">
+      <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm space-y-1">
         <p>신나아짐 본점 T. 010-6859-6114</p>
+        <p className="text-bone/70">개인정보 보호책임자 · 신종수 (T. 010-6859-6114)</p>
       </div>
     </>
   );
