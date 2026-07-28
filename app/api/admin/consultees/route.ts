@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "이름을 입력해주세요." }, { status: 400 });
   }
   const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
+  if (!phone) {
+    return NextResponse.json({ error: "연락처를 입력해주세요." }, { status: 400 });
+  }
 
   const member = await findOrCreateMemberByPhone({
     name,

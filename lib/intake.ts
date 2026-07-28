@@ -59,6 +59,26 @@ export async function listIntakeMemberIds(): Promise<Set<number>> {
   return new Set(result.rows.map((r) => r.member_id));
 }
 
+/**
+ * 해당 월(YYYY-MM)에 처음 문진표를 작성한(=상담하러 온) 회원들의 방문 경로별
+ * 인원수. 대시보드의 월별 방문 경로 통계용.
+ */
+export async function getVisitChannelCountsForMonth(
+  yearMonth: string,
+): Promise<Record<string, number>> {
+  const result = await query<{ visit_channel: string; count: string }>(
+    `SELECT visit_channel, COUNT(*) as count FROM intake_questionnaires
+     WHERE to_char(created_at, 'YYYY-MM') = $1
+     GROUP BY visit_channel`,
+    [yearMonth],
+  );
+  const counts: Record<string, number> = {};
+  for (const row of result.rows) {
+    counts[row.visit_channel] = Number(row.count);
+  }
+  return counts;
+}
+
 /** 회원당 한 건만 존재하는 초진 문진표 — 작성/수정 모두 upsert로 처리한다. */
 export async function upsertIntakeQuestionnaire(
   input: UpsertIntakeQuestionnaireInput,

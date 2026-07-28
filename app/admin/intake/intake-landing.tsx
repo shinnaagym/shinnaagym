@@ -32,8 +32,13 @@ export function IntakeLanding({
 
   async function handleCreate() {
     const trimmedName = name.trim();
+    const trimmedPhone = phone.trim();
     if (!trimmedName) {
       setError("이름을 입력해주세요.");
+      return;
+    }
+    if (!trimmedPhone) {
+      setError("연락처를 입력해주세요.");
       return;
     }
     setSubmitting(true);
@@ -42,7 +47,7 @@ export function IntakeLanding({
       const res = await fetch("/api/admin/consultees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmedName, phone: phone.trim() }),
+        body: JSON.stringify({ name: trimmedName, phone: trimmedPhone }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -72,7 +77,7 @@ export function IntakeLanding({
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="연락처 (선택)"
+            placeholder="연락처 *"
             className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
           />
           <button

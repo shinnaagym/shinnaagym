@@ -9,6 +9,8 @@ import {
   listNewRegistrations,
   listPackagePurchases,
 } from "@/lib/schedule";
+import { getVisitChannelCountsForMonth } from "@/lib/intake";
+import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
 
 const TREND_MONTHS = 6;
 
@@ -47,13 +49,26 @@ export default async function AdminDashboardPage({
   const { month } = await searchParams;
   const monthKey = month && isValidMonthKey(month) ? month : koreaCurrentMonthKey();
 
-  const [overview, coachReports, trend, newRegs, purchases] = await Promise.all([
+  const [overview, coachReports, trend, newRegs, purchases, visitChannelCounts] = await Promise.all([
     getDashboardOverview(monthKey),
     getCoachMonthlyReports(monthKey),
     getMonthlyTrend(monthKey, TREND_MONTHS),
     listNewRegistrations(monthKey),
     listPackagePurchases(monthKey),
+    getVisitChannelCountsForMonth(monthKey),
   ]);
+
+  const visitChannelTotal = Object.values(visitChannelCounts).reduce((a, b) => a + b, 0);
+  const visitChannelRows = VISIT_CHANNEL_OPTIONS.map((opt) => ({
+    label: opt.label,
+    count: visitChannelCounts[opt.value] ?? 0,
+  }));
+  const unknownVisitChannelCount = visitChannelCounts[""] ?? 0;
+  const maxVisitChannelCount = Math.max(
+    1,
+    ...visitChannelRows.map((r) => r.count),
+    unknownVisitChannelCount,
+  );
 
   const maxRevenue = Math.max(1, ...trend.map((t) => t.revenue));
   const maxSessions = Math.max(1, ...trend.map((t) => t.completedSessions));
@@ -230,6 +245,45 @@ export default async function AdminDashboardPage({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* 이번 달 방문 경로 (초진 문진표 기준) */}
+          <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-6">
+            <p className="text-sm font-medium mb-3">
+              이번 달 방문 경로 <span className="text-xs text-ink/40 font-normal">초진 문진표 기준 · 총 {visitChannelTotal}건</span>
+            </p>
+            {visitChannelTotal === 0 ? (
+              <p className="text-sm text-ink/40">이번 달 작성된 문진표가 없어요.</p>
+            ) : (
+              <div className="space-y-2">
+                {visitChannelRows.map((row) => (
+                  <div key={row.label} className="flex items-center gap-3">
+                    <span className="w-16 shrink-0 text-xs text-ink/60">{row.label}</span>
+                    <div className="flex-1 h-4 rounded-full bg-bone overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-coral/70"
+                        style={{ width: `${(row.count / maxVisitChannelCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-8 shrink-0 text-right text-xs text-ink/70">{row.count}</span>
+                  </div>
+                ))}
+                {unknownVisitChannelCount > 0 && (
+                  <div className="flex items-center gap-3">
+                    <span className="w-16 shrink-0 text-xs text-ink/40">미입력</span>
+                    <div className="flex-1 h-4 rounded-full bg-bone overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-line"
+                        style={{ width: `${(unknownVisitChannelCount / maxVisitChannelCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-8 shrink-0 text-right text-xs text-ink/40">
+                      {unknownVisitChannelCount}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid lg:grid-cols-2 gap-4">
