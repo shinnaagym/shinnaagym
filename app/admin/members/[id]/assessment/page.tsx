@@ -74,6 +74,7 @@ export default async function AssessmentHistoryPage({
           {assessments.map((a) => {
             const flagged = flaggedMovementSummaries(a);
             const painTriggers = getPainTriggerEntries(a);
+            const exercisePerformance = a.exercise_performance;
             const maxPain = painTriggers.reduce<number | null>(
               (max, e) => (e.painScale != null && (max == null || e.painScale > max) ? e.painScale : max),
               null,
@@ -96,7 +97,7 @@ export default async function AssessmentHistoryPage({
                     </div>
                     <span className="text-ink/30">→</span>
                   </div>
-                  {(flagged.length > 0 || painTriggers.length > 0) && (
+                  {(flagged.length > 0 || painTriggers.length > 0 || exercisePerformance.length > 0) && (
                     <div className="mt-3 pt-3 border-t border-line/50 space-y-1 text-sm text-ink/70">
                       {flagged.map((line, i) => (
                         <p key={i}>{line}</p>
@@ -105,6 +106,12 @@ export default async function AssessmentHistoryPage({
                         <p key={i}>
                           통증 유발 동작 — {entry.note || "-"}
                           {entry.painScale != null && ` · ${entry.painScale}/10`}
+                        </p>
+                      ))}
+                      {exercisePerformance.map((entry, i) => (
+                        <p key={i}>
+                          운동 수행능력 — {entry.exercise || "-"}
+                          {entry.note && ` · ${entry.note}`}
                         </p>
                       ))}
                     </div>
