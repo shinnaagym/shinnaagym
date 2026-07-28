@@ -93,7 +93,7 @@ function GoldenBellBadge() {
   return (
     <span
       title="재등록 골든타임 — 잔여 3회 이하"
-      className="rounded-full bg-gold/15 text-gold px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
+      className="rounded-full bg-gold/15 text-gold-deep px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
     >
       🔔 골든벨
     </span>

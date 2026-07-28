@@ -47,7 +47,7 @@ export default async function MyReservationPage({
       computeMemberProgress(member.id),
       listMemberSessions(member.id),
       member.coach_id
-        ? getCoachAvailability(member.coach_id, koreaTodayKey(), 14)
+        ? getCoachAvailability(member.coach_id, koreaTodayKey(), 7)
         : Promise.resolve([]),
       listCoaches(),
       getLatestContractByMember(member.id),
@@ -185,7 +185,7 @@ export default async function MyReservationPage({
         <section className="mb-12">
           <h2 className="font-display text-xl mb-1">담당 선생님 가능 시간</h2>
           <p className="text-xs text-ink/50 mb-4">
-            앞으로 2주간의 시간표예요. 다른 회원님의 예약 내용은 표시되지 않아요.
+            앞으로 1주간의 시간표예요. 다른 회원님의 예약 내용은 표시되지 않아요.
           </p>
           <div className="space-y-2">
             {availability.map((day) => (

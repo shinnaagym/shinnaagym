@@ -138,7 +138,7 @@ export default async function AdminDashboardPage({
               >
                 <p className="text-xs text-ink/50 mb-2">{card.label}</p>
                 <p
-                  className={`text-lg sm:text-2xl font-semibold ${card.accent ? "text-gold" : "text-ink"}`}
+                  className={`text-lg sm:text-2xl font-semibold ${card.accent ? "text-gold-deep" : "text-ink"}`}
                 >
                   {card.value}
                 </p>
@@ -202,7 +202,7 @@ export default async function AdminDashboardPage({
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium">{r.coachName}</span>
-                  <span className="text-gold font-semibold">{formatWon(r.revenue)}</span>
+                  <span className="text-gold-deep font-semibold">{formatWon(r.revenue)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 text-xs text-ink/60">
                   <span>담당 {r.memberCount}명</span>
@@ -241,7 +241,7 @@ export default async function AdminDashboardPage({
                     <td className="px-5 py-3 text-ink/70">{r.memberCount}명</td>
                     <td className="px-5 py-3 text-ink/70">{r.completedSessions}회</td>
                     <td className="px-5 py-3 text-ink/70">{r.noShowCount}회</td>
-                    <td className="px-5 py-3 text-gold font-medium">{formatWon(r.revenue)}</td>
+                    <td className="px-5 py-3 text-gold-deep font-medium">{formatWon(r.revenue)}</td>
                     <td className="px-5 py-3 text-ink/70">{formatRate(r.reRegistrationRate)}</td>
                     <td className="px-5 py-3 text-ink/70">{r.consultationCount}명</td>
                     <td className="px-5 py-3 text-ink/70">{formatRate(r.consultationSuccessRate)}</td>
@@ -336,7 +336,7 @@ export default async function AdminDashboardPage({
                           <td className="py-2 pr-2 text-ink/50 whitespace-nowrap">
                             {p.totalSessions}회
                           </td>
-                          <td className="py-2 pr-2 text-gold font-medium whitespace-nowrap">
+                          <td className="py-2 pr-2 text-gold-deep font-medium whitespace-nowrap">
                             {formatWon(p.price)}
                           </td>
                           <td className="py-2 whitespace-nowrap">

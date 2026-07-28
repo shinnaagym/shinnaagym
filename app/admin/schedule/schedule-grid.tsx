@@ -55,7 +55,7 @@ const STATUS_LABEL: Record<SessionStatus, string> = {
 // 신나아짐 브랜드 톤(골드·세이지·코랄 + 보조 색)에서 파생한 코치 색상 팔레트.
 // Tailwind 기본 rainbow 팔레트 대신 브랜드와 어울리는 톤만 순환시킨다.
 const COACH_COLOR_PALETTE: Array<{ header: string; headerText: string; accent: string }> = [
-  { header: "bg-gold/15", headerText: "text-gold", accent: "border-l-gold" },
+  { header: "bg-gold/15", headerText: "text-gold-deep", accent: "border-l-gold" },
   { header: "bg-sage/20", headerText: "text-[#3f6357]", accent: "border-l-sage" },
   { header: "bg-coral/12", headerText: "text-[#a84a2c]", accent: "border-l-coral" },
   { header: "bg-[#e6ecec]", headerText: "text-[#3d5a5c]", accent: "border-l-[#8fadaf]" },
