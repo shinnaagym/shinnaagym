@@ -200,6 +200,8 @@ function ensureSchema(): Promise<void> {
           phone TEXT NOT NULL DEFAULT '',
           visit_channel TEXT NOT NULL DEFAULT '',
           visit_channel_referrer_name TEXT NOT NULL DEFAULT '',
+          exercise_purposes TEXT[] NOT NULL DEFAULT '{}',
+          exercise_purpose_other TEXT NOT NULL DEFAULT '',
           stance_leg TEXT NOT NULL DEFAULT '',
           leg_cross TEXT NOT NULL DEFAULT '',
           sleep_position TEXT NOT NULL DEFAULT '',
@@ -268,6 +270,8 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS pain_movements JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS visit_channel TEXT NOT NULL DEFAULT '';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS visit_channel_referrer_name TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS exercise_purposes TEXT[] NOT NULL DEFAULT '{}';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS exercise_purpose_other TEXT NOT NULL DEFAULT '';
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -446,6 +450,8 @@ export interface IntakeQuestionnaireRow {
   phone: string;
   visit_channel: string;
   visit_channel_referrer_name: string;
+  exercise_purposes: string[];
+  exercise_purpose_other: string;
   stance_leg: string;
   leg_cross: string;
   sleep_position: string;

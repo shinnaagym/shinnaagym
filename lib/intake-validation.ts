@@ -7,6 +7,7 @@ import {
   PAIN_ONSET_TYPE_OPTIONS,
   PAIN_CHARACTERISTIC_OPTIONS,
   VISIT_CHANNEL_OPTIONS,
+  EXERCISE_PURPOSE_OPTIONS,
 } from "./intake-questionnaire";
 import type { PainMovementEntry } from "./db";
 
@@ -23,6 +24,7 @@ const VALID_PAIN_ONSET_TYPE = optionValues(PAIN_ONSET_TYPE_OPTIONS);
 const VALID_VISIT_CHANNEL = optionValues(VISIT_CHANNEL_OPTIONS);
 const VALID_PAIN_CYCLE_DIRECTION = new Set(["up", "down", ""]);
 const VALID_CHARACTERISTIC_KEYS = new Set<string>(PAIN_CHARACTERISTIC_OPTIONS.map((o) => o.key));
+const VALID_EXERCISE_PURPOSE_KEYS = new Set<string>(EXERCISE_PURPOSE_OPTIONS.map((o) => o.key));
 
 function str(raw: unknown): string {
   return typeof raw === "string" ? raw.trim() : "";
@@ -53,6 +55,11 @@ function characteristics(raw: unknown): string[] {
   return raw.filter((v): v is string => typeof v === "string" && VALID_CHARACTERISTIC_KEYS.has(v));
 }
 
+function exercisePurposes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string" && VALID_EXERCISE_PURPOSE_KEYS.has(v));
+}
+
 function painMovements(raw: unknown): PainMovementEntry[] {
   if (!Array.isArray(raw)) return [];
   const entries: PainMovementEntry[] = [];
@@ -75,6 +82,8 @@ export interface ParsedIntakeInput {
   phone: string;
   visitChannel: string;
   visitChannelReferrerName: string;
+  exercisePurposes: string[];
+  exercisePurposeOther: string;
   stanceLeg: string;
   legCross: string;
   sleepPosition: string;
@@ -113,6 +122,8 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     phone: str(body?.phone),
     visitChannel: enumVal(body?.visitChannel, VALID_VISIT_CHANNEL),
     visitChannelReferrerName: str(body?.visitChannelReferrerName),
+    exercisePurposes: exercisePurposes(body?.exercisePurposes),
+    exercisePurposeOther: str(body?.exercisePurposeOther),
     stanceLeg: enumVal(body?.stanceLeg, VALID_STANCE_LEG),
     legCross: enumVal(body?.legCross, VALID_LEG_CROSS),
     sleepPosition: enumVal(body?.sleepPosition, VALID_SLEEP_POSITION),

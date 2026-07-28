@@ -8,6 +8,8 @@ export interface UpsertIntakeQuestionnaireInput {
   phone: string;
   visitChannel: string;
   visitChannelReferrerName: string;
+  exercisePurposes: string[];
+  exercisePurposeOther: string;
   stanceLeg: string;
   legCross: string;
   sleepPosition: string;
@@ -56,6 +58,7 @@ export async function upsertIntakeQuestionnaire(
   const result = await query<IntakeQuestionnaireRow>(
     `INSERT INTO intake_questionnaires (
        member_id, intake_name, age, phone, visit_channel, visit_channel_referrer_name,
+       exercise_purposes, exercise_purpose_other,
        stance_leg, leg_cross, sleep_position, frequent_movement,
        sleep_hours, sleep_quality, stress_level, drinking, smoking, other_notes,
        pain_onset_period, pain_onset_type, pain_moi, pain_movements,
@@ -65,7 +68,7 @@ export async function upsertIntakeQuestionnaire(
        past_same_pain_history, past_treatment, major_complaint, minor_complaint, updated_at
      ) VALUES (
        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-       $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35, now()
+       $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37, now()
      )
      ON CONFLICT (member_id) DO UPDATE SET
        intake_name = EXCLUDED.intake_name,
@@ -73,6 +76,8 @@ export async function upsertIntakeQuestionnaire(
        phone = EXCLUDED.phone,
        visit_channel = EXCLUDED.visit_channel,
        visit_channel_referrer_name = EXCLUDED.visit_channel_referrer_name,
+       exercise_purposes = EXCLUDED.exercise_purposes,
+       exercise_purpose_other = EXCLUDED.exercise_purpose_other,
        stance_leg = EXCLUDED.stance_leg,
        leg_cross = EXCLUDED.leg_cross,
        sleep_position = EXCLUDED.sleep_position,
@@ -111,6 +116,8 @@ export async function upsertIntakeQuestionnaire(
       input.phone,
       input.visitChannel,
       input.visitChannelReferrerName,
+      input.exercisePurposes,
+      input.exercisePurposeOther,
       input.stanceLeg,
       input.legCross,
       input.sleepPosition,

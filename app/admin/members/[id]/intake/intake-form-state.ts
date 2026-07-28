@@ -6,6 +6,8 @@ export interface IntakeFormState {
   phone: string;
   visitChannel: string;
   visitChannelReferrerName: string;
+  exercisePurposes: string[];
+  exercisePurposeOther: string;
   stanceLeg: string;
   legCross: string;
   sleepPosition: string;
@@ -50,6 +52,8 @@ export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
   phone: "",
   visitChannel: "",
   visitChannelReferrerName: "",
+  exercisePurposes: [],
+  exercisePurposeOther: "",
   stanceLeg: "",
   legCross: "",
   sleepPosition: "",

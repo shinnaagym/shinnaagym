@@ -1,5 +1,14 @@
 // 신규 회원 초진 문진표 구조 정의. 종이 문진표의 항목 순서·구성을 그대로 따른다.
 
+export const EXERCISE_PURPOSE_OPTIONS = [
+  { key: "rehab", label: "재활" },
+  { key: "posture", label: "체형교정" },
+  { key: "diet", label: "다이어트" },
+  { key: "learning", label: "운동 배우기" },
+  { key: "strength", label: "근력 증가" },
+  { key: "growth", label: "키성장" },
+] as const;
+
 export const VISIT_CHANNEL_OPTIONS = [
   { value: "blog", label: "블로그" },
   { value: "danggeun", label: "당근" },

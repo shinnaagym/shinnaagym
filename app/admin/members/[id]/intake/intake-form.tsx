@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  EXERCISE_PURPOSE_OPTIONS,
   VISIT_CHANNEL_OPTIONS,
   STANCE_LEG_OPTIONS,
   LEG_CROSS_OPTIONS,
@@ -204,6 +205,14 @@ export function IntakeForm({
     });
   }
 
+  function toggleExercisePurpose(key: string) {
+    patch({
+      exercisePurposes: form.exercisePurposes.includes(key)
+        ? form.exercisePurposes.filter((k) => k !== key)
+        : [...form.exercisePurposes, key],
+    });
+  }
+
   function updatePainMovement(index: number, entryPatch: Partial<PainMovementEntry>) {
     patch({
       painMovements: form.painMovements.map((e, i) => (i === index ? { ...e, ...entryPatch } : e)),
@@ -311,6 +320,26 @@ export function IntakeForm({
             />
           </Field>
         )}
+        <Field label="운동 목적">
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {EXERCISE_PURPOSE_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => toggleExercisePurpose(opt.key)}
+                className={pillClass(form.exercisePurposes.includes(opt.key))}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <input
+            value={form.exercisePurposeOther}
+            onChange={(e) => patch({ exercisePurposeOther: e.target.value })}
+            placeholder="기타"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+          />
+        </Field>
       </SectionCard>
 
       <SectionCard title="통증의 발생 과정 (MOI)">
