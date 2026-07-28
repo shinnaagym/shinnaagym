@@ -192,6 +192,46 @@ function ensureSchema(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
+        CREATE TABLE IF NOT EXISTS intake_questionnaires (
+          id SERIAL PRIMARY KEY,
+          member_id INTEGER NOT NULL UNIQUE REFERENCES members(id) ON DELETE CASCADE,
+          stance_leg TEXT NOT NULL DEFAULT '',
+          leg_cross TEXT NOT NULL DEFAULT '',
+          sleep_position TEXT NOT NULL DEFAULT '',
+          frequent_movement TEXT NOT NULL DEFAULT '',
+          sleep_amount TEXT NOT NULL DEFAULT '',
+          sleep_quality TEXT NOT NULL DEFAULT '',
+          stress_level TEXT NOT NULL DEFAULT '',
+          drinking BOOLEAN NOT NULL DEFAULT false,
+          smoking BOOLEAN NOT NULL DEFAULT false,
+          other_notes TEXT NOT NULL DEFAULT '',
+          pain_onset_period TEXT NOT NULL DEFAULT '',
+          pain_onset_type TEXT NOT NULL DEFAULT '',
+          pain_moi TEXT NOT NULL DEFAULT '',
+          pain_progress_note TEXT NOT NULL DEFAULT '',
+          pain_nrs_best INTEGER,
+          pain_nrs_worst INTEGER,
+          pain_nrs_current INTEGER,
+          pain_persistence TEXT NOT NULL DEFAULT '',
+          pain_cycle_situation TEXT NOT NULL DEFAULT '',
+          pain_cycle_morning TEXT NOT NULL DEFAULT '',
+          pain_cycle_noon TEXT NOT NULL DEFAULT '',
+          pain_cycle_evening TEXT NOT NULL DEFAULT '',
+          pain_cycle_night TEXT NOT NULL DEFAULT '',
+          pain_characteristics JSONB NOT NULL DEFAULT '[]'::jsonb,
+          pain_characteristics_other TEXT NOT NULL DEFAULT '',
+          improve_factors TEXT NOT NULL DEFAULT '',
+          worsen_factors TEXT NOT NULL DEFAULT '',
+          perceived_cause TEXT NOT NULL DEFAULT '',
+          post_pain_action TEXT NOT NULL DEFAULT '',
+          past_same_pain_history TEXT NOT NULL DEFAULT '',
+          past_treatment TEXT NOT NULL DEFAULT '',
+          major_complaint TEXT NOT NULL DEFAULT '',
+          minor_complaint TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -380,6 +420,46 @@ export interface AssessmentRow {
   pain_triggers: PainTriggerEntry[];
   exercise_performance: ExercisePerformanceEntry[];
   created_at: string;
+}
+
+export interface IntakeQuestionnaireRow {
+  id: number;
+  member_id: number;
+  stance_leg: string;
+  leg_cross: string;
+  sleep_position: string;
+  frequent_movement: string;
+  sleep_amount: string;
+  sleep_quality: string;
+  stress_level: string;
+  drinking: boolean;
+  smoking: boolean;
+  other_notes: string;
+  pain_onset_period: string;
+  pain_onset_type: string;
+  pain_moi: string;
+  pain_progress_note: string;
+  pain_nrs_best: number | null;
+  pain_nrs_worst: number | null;
+  pain_nrs_current: number | null;
+  pain_persistence: string;
+  pain_cycle_situation: string;
+  pain_cycle_morning: string;
+  pain_cycle_noon: string;
+  pain_cycle_evening: string;
+  pain_cycle_night: string;
+  pain_characteristics: string[];
+  pain_characteristics_other: string;
+  improve_factors: string;
+  worsen_factors: string;
+  perceived_cause: string;
+  post_pain_action: string;
+  past_same_pain_history: string;
+  past_treatment: string;
+  major_complaint: string;
+  minor_complaint: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export type SessionStatus = "reserved" | "completed" | "no_show" | "cancelled";

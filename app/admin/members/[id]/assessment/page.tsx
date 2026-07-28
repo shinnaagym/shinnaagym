@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { movementLabelWithRegion } from "@/lib/assessment-movements";
 import { AssessmentPainChart } from "./pain-chart";
 import { DeleteAssessmentButton } from "@/app/components/DeleteAssessmentButton";
@@ -46,7 +47,10 @@ export default async function AssessmentHistoryPage({
     notFound();
   }
 
-  const assessments = await listAssessmentsByMember(idNum);
+  const [assessments, intake] = await Promise.all([
+    listAssessmentsByMember(idNum),
+    getIntakeQuestionnaireByMember(idNum),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -62,6 +66,19 @@ export default async function AssessmentHistoryPage({
           + 새 평가 작성
         </Link>
       </div>
+
+      <Link
+        href={`/admin/members/${idNum}/intake`}
+        className="flex items-center justify-between rounded-2xl border border-line bg-white/60 px-5 py-4 mb-4 hover:border-coral/40 transition"
+      >
+        <div>
+          <p className="font-medium">📋 초진 문진표</p>
+          <p className="text-xs text-ink/50 mt-0.5">
+            {intake ? "작성 완료 · 내용 확인/수정" : "아직 작성되지 않았어요 · 작성하기"}
+          </p>
+        </div>
+        <span className="text-ink/30">→</span>
+      </Link>
 
       {assessments.length === 0 ? (
         <div className="rounded-2xl bg-white border border-line/60 px-5 py-10 text-center text-ink/40">
