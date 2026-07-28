@@ -10,10 +10,12 @@ import {
   KOOS12_ITEMS,
   FAAM_ADL_ITEMS,
   FAAM_SPORTS_ITEMS,
+  STARTBACK_ITEMS,
   computeOdiNdiScore,
   computeQuickDashScore,
   computeKoos12Score,
   computeFaamScore,
+  computeStartBackScore,
 } from "@/lib/prom-instruments";
 import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
 
@@ -41,6 +43,7 @@ export interface AssessmentDocumentData {
   cmj_lsi: number | null;
   hamstring_lsi: number | null;
   asymptomatic_loading_weeks: number | null;
+  startback_answers: Record<string, number>;
 }
 
 interface PromSummary {
@@ -94,11 +97,9 @@ const FUNCTIONAL_NOTE_FIELDS: Record<string, NoteField> = {
 export function AssessmentDocument({
   memberName,
   assessment,
-  startBackScore,
 }: {
   memberName: string;
   assessment: AssessmentDocumentData;
-  startBackScore?: number | null;
 }) {
   const odiScore = computeOdiNdiScore(assessment.odi_answers);
   const ndiScore = computeOdiNdiScore(assessment.ndi_answers);
@@ -106,6 +107,7 @@ export function AssessmentDocument({
   const koos12Score = computeKoos12Score(assessment.koos12_answers);
   const faamAdlScore = computeFaamScore(assessment.faam_adl_answers);
   const faamSportsScore = computeFaamScore(assessment.faam_sports_answers);
+  const startBackScore = computeStartBackScore(assessment.startback_answers);
 
   const promSummaries: PromSummary[] = [
     promSummary("ODI (요추 기능장애)", ODI_ITEMS, assessment.odi_answers, odiScore, "%"),
@@ -115,6 +117,15 @@ export function AssessmentDocument({
     promSummary("FAAM ADL (발·발목 일상)", FAAM_ADL_ITEMS, assessment.faam_adl_answers, faamAdlScore, "%"),
     promSummary("FAAM 스포츠", FAAM_SPORTS_ITEMS, assessment.faam_sports_answers, faamSportsScore, "%"),
   ].filter((s) => s.answeredCount > 0);
+  if (startBackScore) {
+    promSummaries.push({
+      title: "STarT Back (요통 위험군)",
+      score: startBackScore.total,
+      unit: `/9 · ${startBackScore.riskLabel}`,
+      answeredCount: STARTBACK_ITEMS.length,
+      totalCount: STARTBACK_ITEMS.length,
+    });
+  }
 
   const functionalTestsPainFreeCount = FUNCTIONAL_TESTS.filter(
     (t) => assessment.functional_test_pain_free[t.key],
@@ -166,9 +177,9 @@ export function AssessmentDocument({
       status: faamSportsScore == null ? "unknown" : faamSportsScore >= 80 ? "pass" : "fail",
     },
     {
-      label: "STarT Back(초진) 총점 ≤ 3",
-      value: startBackScore == null ? "문진표 미입력" : `${startBackScore}점`,
-      status: startBackScore == null ? "unknown" : startBackScore <= 3 ? "pass" : "fail",
+      label: "STarT Back 총점 ≤ 3",
+      value: startBackScore == null ? "미입력" : `${startBackScore.total}점`,
+      status: startBackScore == null ? "unknown" : startBackScore.total <= 3 ? "pass" : "fail",
     },
     {
       label: "기능적 움직임 검사 5개 모두 무통",

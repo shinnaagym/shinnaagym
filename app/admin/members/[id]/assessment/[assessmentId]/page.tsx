@@ -3,8 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { getAssessmentById, getPainTriggerEntries } from "@/lib/assessments";
-import { getIntakeQuestionnaireByMember } from "@/lib/intake";
-import { computeStartBackScore } from "@/lib/prom-instruments";
 import { AssessmentDocument } from "@/app/components/AssessmentDocument";
 import { PrintButton } from "@/app/components/PrintButton";
 import { DeleteAssessmentButton } from "@/app/components/DeleteAssessmentButton";
@@ -31,11 +29,6 @@ export default async function AssessmentDetailPage({
   if (!assessment || assessment.member_id !== idNum) {
     notFound();
   }
-  const intake = await getIntakeQuestionnaireByMember(idNum);
-  const startBackScore = intake
-    ? computeStartBackScore(intake.startback_answers)?.total ?? null
-    : null;
-
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
       <div className="flex items-center justify-between mb-6 no-print">
@@ -59,7 +52,6 @@ export default async function AssessmentDetailPage({
       </div>
       <AssessmentDocument
         memberName={member.name}
-        startBackScore={startBackScore}
         assessment={{
           ...assessment,
           painTriggers: getPainTriggerEntries(assessment),

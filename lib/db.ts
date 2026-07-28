@@ -186,6 +186,7 @@ function ensureSchema(): Promise<void> {
           cmj_lsi NUMERIC,
           hamstring_lsi NUMERIC,
           asymptomatic_loading_weeks NUMERIC,
+          startback_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
@@ -295,6 +296,7 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS cmj_lsi NUMERIC;
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS hamstring_lsi NUMERIC;
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS asymptomatic_loading_weeks NUMERIC;
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS startback_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS sleep_hours NUMERIC;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS pain_trigger_movements TEXT[] NOT NULL DEFAULT '{}';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS intake_name TEXT NOT NULL DEFAULT '';
@@ -479,6 +481,7 @@ export interface AssessmentRow {
   cmj_lsi: number | null;
   hamstring_lsi: number | null;
   asymptomatic_loading_weeks: number | null;
+  startback_answers: Record<string, number>;
   created_at: string;
 }
 
@@ -528,7 +531,6 @@ export interface IntakeQuestionnaireRow {
   past_treatment: string;
   major_complaint: string;
   minor_complaint: string;
-  startback_answers: Record<string, number>;
   created_at: string;
   updated_at: string;
 }

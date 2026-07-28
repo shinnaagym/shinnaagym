@@ -59,12 +59,10 @@ export default async function AssessmentHistoryPage({
           <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Assessment</p>
           <h1 className="font-display text-2xl">{member.name}님의 체형 평가 이력</h1>
         </div>
-        <Link
-          href={`/admin/members/${idNum}/assessment/new`}
-          className="rounded-full bg-coral text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition whitespace-nowrap"
-        >
-          + 새 평가 작성
-        </Link>
+        <div className="text-sm text-ink/50 text-right">
+          {intake?.age != null && <p>나이 {intake.age}세</p>}
+          {member.phone && <p>{member.phone}</p>}
+        </div>
       </div>
 
       <Link
@@ -78,6 +76,13 @@ export default async function AssessmentHistoryPage({
           </p>
         </div>
         <span className="text-ink/30">→</span>
+      </Link>
+
+      <Link
+        href={`/admin/members/${idNum}/assessment/new`}
+        className="block text-center rounded-full bg-coral text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition mb-6"
+      >
+        + 새 평가 작성
       </Link>
 
       {assessments.length === 0 ? (

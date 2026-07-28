@@ -15,7 +15,6 @@ import {
   PAIN_CHARACTERISTIC_OPTIONS,
 } from "@/lib/intake-questionnaire";
 import { NRS_PAIN_OPTIONS } from "@/lib/assessment-movements";
-import { STARTBACK_ITEMS, computeStartBackScore } from "@/lib/prom-instruments";
 import { PrintButton } from "@/app/components/PrintButton";
 import type { PainMovementEntry } from "@/lib/db";
 import { EMPTY_INTAKE_FORM_STATE, EMPTY_PAIN_MOVEMENT, type IntakeFormState } from "./intake-form-state";
@@ -189,7 +188,6 @@ export function IntakeForm({
 }) {
   const router = useRouter();
   const [form, setForm] = useState<IntakeFormState>(initialData ?? EMPTY_INTAKE_FORM_STATE);
-  const startBackScore = computeStartBackScore(form.startbackAnswers);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -213,10 +211,6 @@ export function IntakeForm({
         ? form.exercisePurposes.filter((k) => k !== key)
         : [...form.exercisePurposes, key],
     });
-  }
-
-  function updateStartback(key: string, value: number) {
-    patch({ startbackAnswers: { ...form.startbackAnswers, [key]: value } });
   }
 
   function updatePainMovement(index: number, entryPatch: Partial<PainMovementEntry>) {
@@ -597,37 +591,6 @@ export function IntakeForm({
             />
           </Field>
         </div>
-      </SectionCard>
-
-      <SectionCard title="STarT Back 선별 검사 (요통 위험군 분류)">
-        <p className="text-xs text-ink/50 mb-3">
-          아래 문항은 공식 원문을 그대로 옮긴 것이 아니라 이해하기 쉽게 재구성한 것으로, 점수는
-          참고용입니다. 요통이 있는 회원에게만 작성해주세요.
-        </p>
-        <div className="space-y-3 mb-3">
-          {STARTBACK_ITEMS.map((item) => (
-            <Field key={item.key} label={item.title}>
-              <div className="flex flex-wrap gap-1.5">
-                {item.options.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => updateStartback(item.key, opt.value)}
-                    className={pillClass(form.startbackAnswers[item.key] === opt.value)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </Field>
-          ))}
-        </div>
-        {startBackScore && (
-          <div className="rounded-xl bg-bone px-4 py-3 text-sm">
-            총점 {startBackScore.total}/9 · 심리사회 하위척도 {startBackScore.subscale}/5 ·{" "}
-            <span className="font-medium">{startBackScore.riskLabel}</span>
-          </div>
-        )}
       </SectionCard>
 
       <SectionCard title="주요 호소(부위)">

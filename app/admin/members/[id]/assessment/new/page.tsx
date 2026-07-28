@@ -2,8 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
-import { getIntakeQuestionnaireByMember } from "@/lib/intake";
-import { computeStartBackScore } from "@/lib/prom-instruments";
 import { AssessmentForm } from "../assessment-form";
 
 export default async function NewAssessmentPage({
@@ -23,11 +21,6 @@ export default async function NewAssessmentPage({
   if (!member) {
     notFound();
   }
-
-  const intake = await getIntakeQuestionnaireByMember(idNum);
-  const startBackScore = intake
-    ? computeStartBackScore(intake.startback_answers)?.total ?? null
-    : null;
 
   const pastAssessments = await listAssessmentsByMember(idNum);
   const pastPainTriggerNotes = Array.from(
@@ -54,7 +47,6 @@ export default async function NewAssessmentPage({
         memberName={member.name}
         pastPainTriggerNotes={pastPainTriggerNotes}
         pastExercises={pastExercises}
-        startBackScore={startBackScore}
       />
     </div>
   );

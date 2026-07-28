@@ -17,10 +17,12 @@ import {
   KOOS12_ITEMS,
   FAAM_ADL_ITEMS,
   FAAM_SPORTS_ITEMS,
+  STARTBACK_ITEMS,
   computeOdiNdiScore,
   computeQuickDashScore,
   computeKoos12Score,
   computeFaamScore,
+  computeStartBackScore,
   type PromItem,
 } from "@/lib/prom-instruments";
 import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
@@ -389,6 +391,7 @@ export interface AssessmentInitialData {
   cmjLsi: number | null;
   hamstringLsi: number | null;
   asymptomaticLoadingWeeks: number | null;
+  startbackAnswers: Record<string, number>;
 }
 
 export function AssessmentForm({
@@ -398,7 +401,6 @@ export function AssessmentForm({
   pastExercises,
   assessmentId,
   initialData,
-  startBackScore,
 }: {
   memberId: number;
   memberName: string;
@@ -406,7 +408,6 @@ export function AssessmentForm({
   pastExercises: string[];
   assessmentId?: number;
   initialData?: AssessmentInitialData;
-  startBackScore?: number | null;
 }) {
   const router = useRouter();
   const isEditing = assessmentId != null;
@@ -417,9 +418,7 @@ export function AssessmentForm({
   const [movements, setMovements] = useState<Record<string, MovementEntry>>(
     () => initialData?.movements ?? {},
   );
-  const [openRegions, setOpenRegions] = useState<Set<string>>(
-    () => new Set([ASSESSMENT_REGIONS[0].key]),
-  );
+  const [openRegions, setOpenRegions] = useState<Set<string>>(() => new Set());
   const [functionalOpen, setFunctionalOpen] = useState(false);
   const [functionalNotes, setFunctionalNotes] = useState<Record<FunctionalTestKey, string>>(
     () =>
@@ -474,6 +473,9 @@ export function AssessmentForm({
   const [asymptomaticLoadingWeeks, setAsymptomaticLoadingWeeks] = useState<number | null>(
     initialData?.asymptomaticLoadingWeeks ?? null,
   );
+  const [startbackAnswers, setStartbackAnswers] = useState<Record<string, number>>(
+    () => initialData?.startbackAnswers ?? {},
+  );
   const [openExtra, setOpenExtra] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -511,6 +513,10 @@ export function AssessmentForm({
     (key: string, v: number) => setFaamSportsAnswers((prev) => ({ ...prev, [key]: v })),
     [],
   );
+  const setStartbackAnswer = useCallback(
+    (key: string, v: number) => setStartbackAnswers((prev) => ({ ...prev, [key]: v })),
+    [],
+  );
 
   const odiScore = computeOdiNdiScore(odiAnswers);
   const ndiScore = computeOdiNdiScore(ndiAnswers);
@@ -518,6 +524,7 @@ export function AssessmentForm({
   const koos12Score = computeKoos12Score(koos12Answers);
   const faamAdlScore = computeFaamScore(faamAdlAnswers);
   const faamSportsScore = computeFaamScore(faamSportsAnswers);
+  const startBackScore = computeStartBackScore(startbackAnswers);
 
   const functionalTestsAllPainFree = FUNCTIONAL_TESTS.every((t) => functionalTestPainFree[t.key]);
   const functionalTestsPainFreeCount = FUNCTIONAL_TESTS.filter((t) => functionalTestPainFree[t.key]).length;
@@ -564,9 +571,9 @@ export function AssessmentForm({
       status: faamSportsScore == null ? "unknown" : faamSportsScore >= 80 ? "pass" : "fail",
     },
     {
-      label: "STarT Back(초진) 총점 ≤ 3",
-      value: startBackScore == null ? "문진표 미입력" : `${startBackScore}점`,
-      status: startBackScore == null ? "unknown" : startBackScore <= 3 ? "pass" : "fail",
+      label: "STarT Back 총점 ≤ 3",
+      value: startBackScore == null ? "미입력" : `${startBackScore.total}점`,
+      status: startBackScore == null ? "unknown" : startBackScore.total <= 3 ? "pass" : "fail",
     },
     {
       label: "기능적 움직임 검사 5개 모두 무통",
@@ -639,7 +646,7 @@ export function AssessmentForm({
     setExercisePerformance((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const PROM_KEYS = ["odi", "ndi", "quickdash", "koos12", "faamAdl", "faamSports"];
+  const PROM_KEYS = ["odi", "ndi", "quickdash", "koos12", "faamAdl", "faamSports", "startback", "fitness"];
 
   function expandAll() {
     setOpenRegions(new Set(ASSESSMENT_REGIONS.map((r) => r.key)));
@@ -687,6 +694,7 @@ export function AssessmentForm({
           cmjLsi,
           hamstringLsi,
           asymptomaticLoadingWeeks,
+          startbackAnswers,
         }),
       });
       if (!res.ok) {
@@ -947,10 +955,23 @@ export function AssessmentForm({
         toggleKey="faamSports"
         onToggle={toggleExtra}
       />
+      <PromAccordion
+        title="STarT Back (요통 위험군 분류)"
+        scoreLabel={startBackScore != null ? `${startBackScore.total}/9 · ${startBackScore.riskLabel}` : null}
+        items={STARTBACK_ITEMS}
+        answers={startbackAnswers}
+        onAnswer={setStartbackAnswer}
+        isOpen={openExtra.has("startback")}
+        toggleKey="startback"
+        onToggle={toggleExtra}
+      />
 
-      <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-3">
-        <h2 className="font-display text-lg mb-3">체력 테스트 · 부하 유지 기간</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+      <Accordion
+        label="체력 테스트 · 부하 유지 기간"
+        isOpen={openExtra.has("fitness")}
+        onToggle={() => toggleExtra("fitness")}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4 py-4">
           <div>
             <label className="block text-xs text-ink/40 mb-1">홉 테스트 LSI (%)</label>
             <input
@@ -994,7 +1015,7 @@ export function AssessmentForm({
             />
           </div>
         </div>
-      </div>
+      </Accordion>
 
       <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-8">
         <h2 className="font-display text-lg mb-1">퍼포먼스 단계 전환 기준</h2>

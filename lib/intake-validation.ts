@@ -9,7 +9,6 @@ import {
   VISIT_CHANNEL_OPTIONS,
   EXERCISE_PURPOSE_OPTIONS,
 } from "./intake-questionnaire";
-import { STARTBACK_ITEMS } from "./prom-instruments";
 import type { PainMovementEntry } from "./db";
 
 function optionValues(options: readonly { value: string }[]): Set<string> {
@@ -59,20 +58,6 @@ function characteristics(raw: unknown): string[] {
 function exercisePurposes(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((v): v is string => typeof v === "string" && VALID_EXERCISE_PURPOSE_KEYS.has(v));
-}
-
-function startbackAnswers(raw: unknown): Record<string, number> {
-  const answers: Record<string, number> = {};
-  if (!raw || typeof raw !== "object") return answers;
-  const record = raw as Record<string, unknown>;
-  for (const item of STARTBACK_ITEMS) {
-    const value = record[item.key];
-    if (typeof value !== "number") continue;
-    if (item.options.some((opt) => opt.value === value)) {
-      answers[item.key] = value;
-    }
-  }
-  return answers;
 }
 
 function painMovements(raw: unknown): PainMovementEntry[] {
@@ -128,7 +113,6 @@ export interface ParsedIntakeInput {
   pastTreatment: string;
   majorComplaint: string;
   minorComplaint: string;
-  startbackAnswers: Record<string, number>;
 }
 
 export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIntakeInput {
@@ -169,6 +153,5 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     pastTreatment: str(body?.pastTreatment),
     majorComplaint: str(body?.majorComplaint),
     minorComplaint: str(body?.minorComplaint),
-    startbackAnswers: startbackAnswers(body?.startbackAnswers),
   };
 }

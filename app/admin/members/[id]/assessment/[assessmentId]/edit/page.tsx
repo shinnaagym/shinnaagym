@@ -6,8 +6,6 @@ import {
   getPainTriggerEntries,
   listAssessmentsByMember,
 } from "@/lib/assessments";
-import { getIntakeQuestionnaireByMember } from "@/lib/intake";
-import { computeStartBackScore } from "@/lib/prom-instruments";
 import { AssessmentForm } from "../../assessment-form";
 
 export default async function EditAssessmentPage({
@@ -32,11 +30,6 @@ export default async function EditAssessmentPage({
   if (!assessment || assessment.member_id !== idNum) {
     notFound();
   }
-
-  const intake = await getIntakeQuestionnaireByMember(idNum);
-  const startBackScore = intake
-    ? computeStartBackScore(intake.startback_answers)?.total ?? null
-    : null;
 
   const pastAssessments = await listAssessmentsByMember(idNum);
   const pastPainTriggerNotes = Array.from(
@@ -64,7 +57,6 @@ export default async function EditAssessmentPage({
         pastPainTriggerNotes={pastPainTriggerNotes}
         pastExercises={pastExercises}
         assessmentId={assessmentIdNum}
-        startBackScore={startBackScore}
         initialData={{
           evaluatorName: assessment.evaluator_name,
           evaluatedAt: assessment.evaluated_at,
@@ -89,6 +81,7 @@ export default async function EditAssessmentPage({
           cmjLsi: assessment.cmj_lsi,
           hamstringLsi: assessment.hamstring_lsi,
           asymptomaticLoadingWeeks: assessment.asymptomatic_loading_weeks,
+          startbackAnswers: assessment.startback_answers,
         }}
       />
     </div>

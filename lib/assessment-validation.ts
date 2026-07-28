@@ -11,6 +11,7 @@ import {
   NDI_ITEMS,
   ODI_ITEMS,
   QUICKDASH_ITEMS,
+  STARTBACK_ITEMS,
   type PromItem,
 } from "./prom-instruments";
 import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "./db";
@@ -104,6 +105,8 @@ export const parseFaamAdlAnswers = (raw: unknown): Record<string, number> =>
   parsePromAnswers(raw, FAAM_ADL_ITEMS);
 export const parseFaamSportsAnswers = (raw: unknown): Record<string, number> =>
   parsePromAnswers(raw, FAAM_SPORTS_ITEMS);
+export const parseStartbackAnswers = (raw: unknown): Record<string, number> =>
+  parsePromAnswers(raw, STARTBACK_ITEMS);
 
 /** 0~10 사이의 정수 NRS 값만 허용, 그 외에는 null. */
 export function parseNprsValue(raw: unknown): number | null {
@@ -157,6 +160,7 @@ export interface ParsedAssessmentInput {
   cmjLsi: number | null;
   hamstringLsi: number | null;
   asymptomaticLoadingWeeks: number | null;
+  startbackAnswers: Record<string, number>;
 }
 
 /** 평가지 작성/수정 API의 요청 본문을 공통으로 파싱한다(POST/PATCH에서 공유). */
@@ -185,5 +189,6 @@ export function parseAssessmentInput(body: Record<string, unknown> | null): Pars
     cmjLsi: parseLsiValue(body?.cmjLsi),
     hamstringLsi: parseLsiValue(body?.hamstringLsi),
     asymptomaticLoadingWeeks: parseAsymptomaticLoadingWeeks(body?.asymptomaticLoadingWeeks),
+    startbackAnswers: parseStartbackAnswers(body?.startbackAnswers),
   };
 }

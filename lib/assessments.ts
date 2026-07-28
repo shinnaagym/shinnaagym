@@ -26,6 +26,7 @@ export interface CreateAssessmentInput {
   cmjLsi?: number | null;
   hamstringLsi?: number | null;
   asymptomaticLoadingWeeks?: number | null;
+  startbackAnswers?: Record<string, number>;
 }
 
 export async function createAssessment(input: CreateAssessmentInput): Promise<AssessmentRow> {
@@ -37,8 +38,8 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
        odi_answers, ndi_answers, quickdash_answers, koos12_answers,
        faam_adl_answers, faam_sports_answers, nprs_rest, nprs_activity,
        functional_test_pain_free, hop_test_lsi, cmj_lsi, hamstring_lsi,
-       asymptomatic_loading_weeks
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+       asymptomatic_loading_weeks, startback_answers
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
      RETURNING *`,
     [
       input.memberId,
@@ -65,6 +66,7 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
       input.cmjLsi ?? null,
       input.hamstringLsi ?? null,
       input.asymptomaticLoadingWeeks ?? null,
+      JSON.stringify(input.startbackAnswers ?? {}),
     ],
   );
   return result.rows[0];
@@ -94,6 +96,7 @@ export interface UpdateAssessmentInput {
   cmjLsi?: number | null;
   hamstringLsi?: number | null;
   asymptomaticLoadingWeeks?: number | null;
+  startbackAnswers?: Record<string, number>;
 }
 
 export async function updateAssessment(
@@ -109,7 +112,7 @@ export async function updateAssessment(
        odi_answers = $12, ndi_answers = $13, quickdash_answers = $14, koos12_answers = $15,
        faam_adl_answers = $16, faam_sports_answers = $17, nprs_rest = $18, nprs_activity = $19,
        functional_test_pain_free = $20, hop_test_lsi = $21, cmj_lsi = $22, hamstring_lsi = $23,
-       asymptomatic_loading_weeks = $24
+       asymptomatic_loading_weeks = $24, startback_answers = $25
      WHERE id = $1
      RETURNING *`,
     [
@@ -137,6 +140,7 @@ export async function updateAssessment(
       input.cmjLsi ?? null,
       input.hamstringLsi ?? null,
       input.asymptomaticLoadingWeeks ?? null,
+      JSON.stringify(input.startbackAnswers ?? {}),
     ],
   );
   return result.rows[0] ?? null;
