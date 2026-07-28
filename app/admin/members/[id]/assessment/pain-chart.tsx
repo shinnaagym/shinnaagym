@@ -11,6 +11,8 @@ const PAD_RIGHT = 16;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 28;
 const GRID_TICKS = [0, 2, 4, 6, 8, 10];
+// 같은 날짜에 여러 동작의 점수가 정확히 겹칠 때 서로 구분되도록 주는 픽셀 단위 간격.
+const OVERLAP_JITTER_PX = 4;
 
 // 통증 유발 동작·체형 평가 동작 시리즈에 순서대로 배정하는 색상 팔레트.
 const SERIES_COLORS = [
@@ -159,13 +161,35 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
   const xAt = (i: number) => PAD_LEFT + (n > 1 ? i * xStep : plotWidth / 2);
   const yAt = (v: number) => PAD_TOP + plotHeight * (1 - v / 10);
 
+  // 같은 날짜에 두 개 이상의 시리즈가 정확히 같은 점수를 가지면 그리는 좌표가
+  // 완전히 겹쳐 하나만 보이므로, 겹치는 시리즈끼리 좌우 대칭으로 살짝 띄운
+  // y좌표를 시리즈×날짜별로 미리 계산해둔다.
+  const yPixels: number[][] = series.map(() => new Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    const groupsByValue = new Map<number, number[]>();
+    series.forEach((s, si) => {
+      const v = s.values[i];
+      if (v == null) return;
+      const seriesIdxs = groupsByValue.get(v) ?? [];
+      seriesIdxs.push(si);
+      groupsByValue.set(v, seriesIdxs);
+    });
+    for (const [v, seriesIdxs] of groupsByValue) {
+      const baseY = yAt(v);
+      const count = seriesIdxs.length;
+      seriesIdxs.forEach((si, k) => {
+        yPixels[si][i] = baseY + (k - (count - 1) / 2) * OVERLAP_JITTER_PX;
+      });
+    }
+  }
+
   // 데이터가 없는 날짜는 건너뛰고, 있는 점끼리만 이어서 하나의 연속된 선으로 그린다.
-  function pathFor(values: (number | null)[]): string {
+  function pathFor(si: number): string {
     let d = "";
     let started = false;
-    values.forEach((v, i) => {
+    series[si].values.forEach((v, i) => {
       if (v == null) return;
-      d += `${started ? "L" : "M"}${xAt(i)},${yAt(v)} `;
+      d += `${started ? "L" : "M"}${xAt(i)},${yPixels[si][i]} `;
       started = true;
     });
     return d.trim();
@@ -258,7 +282,7 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
             <g key={s.key}>
               <path
                 key={`${s.key}-${n}`}
-                d={pathFor(s.values)}
+                d={pathFor(si)}
                 fill="none"
                 stroke={s.color}
                 strokeWidth={2}
@@ -278,7 +302,7 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
                     <circle
                       key={`${s.key}-pt-${i}`}
                       cx={xAt(i)}
-                      cy={yAt(v)}
+                      cy={yPixels[si][i]}
                       r={4}
                       fill={s.color}
                       stroke="#ffffff"
