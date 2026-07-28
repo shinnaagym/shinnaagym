@@ -242,7 +242,7 @@ export function IntakeForm({
         return;
       }
       setSaved(true);
-      router.refresh();
+      router.back();
     } catch {
       setError("네트워크 오류가 발생했어요.");
     } finally {
