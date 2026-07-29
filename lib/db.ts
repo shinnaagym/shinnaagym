@@ -272,6 +272,12 @@ function ensureSchema(): Promise<void> {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
+        CREATE TABLE IF NOT EXISTS schedule_memos (
+          id SERIAL PRIMARY KEY,
+          content TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -594,4 +600,10 @@ export interface NoticeRow {
   content: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ScheduleMemoRow {
+  id: number;
+  content: string;
+  created_at: string;
 }

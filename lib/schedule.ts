@@ -806,6 +806,8 @@ export interface CoachMonthlyReport {
   coachName: string;
   memberCount: number;
   completedSessions: number;
+  completedSessions1on1: number;
+  completedSessions2on1: number;
   noShowCount: number;
   revenue: number;
   reRegisteredCount: number;
@@ -831,9 +833,17 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
          GROUP BY m.coach_id`,
         [yearMonth],
       ),
-      query<{ coach_id: number; completed: string; no_show: string }>(
+      query<{
+        coach_id: number;
+        completed: string;
+        completed_1on1: string;
+        completed_2on1: string;
+        no_show: string;
+      }>(
         `SELECT coach_id,
            COUNT(*) FILTER (WHERE status IN ('completed', 'no_show')) as completed,
+           COUNT(*) FILTER (WHERE status IN ('completed', 'no_show') AND pt_type = '1:1') as completed_1on1,
+           COUNT(*) FILTER (WHERE status IN ('completed', 'no_show') AND pt_type = '2:1') as completed_2on1,
            COUNT(*) FILTER (WHERE status = 'no_show') as no_show
          FROM class_sessions
          WHERE entry_type = 'session'
@@ -877,6 +887,12 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
   const sessionsMap = new Map(
     sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed ?? 0)]),
   );
+  const sessions1on1Map = new Map(
+    sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed_1on1 ?? 0)]),
+  );
+  const sessions2on1Map = new Map(
+    sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed_2on1 ?? 0)]),
+  );
   const noShowMap = new Map(sessionsResult.rows.map((r) => [r.coach_id, Number(r.no_show ?? 0)]));
   const memberStatsMap = new Map(memberStatsResult.rows.map((r) => [r.coach_id, r]));
   const consultationMap = new Map(consultationResult.rows.map((r) => [r.coach_id, r]));
@@ -894,6 +910,8 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
       coachName: coach.name,
       memberCount: Number(stats?.member_count ?? 0),
       completedSessions: sessionsMap.get(coach.id) ?? 0,
+      completedSessions1on1: sessions1on1Map.get(coach.id) ?? 0,
+      completedSessions2on1: sessions2on1Map.get(coach.id) ?? 0,
       noShowCount: noShowMap.get(coach.id) ?? 0,
       revenue: revenueMap.get(coach.id) ?? 0,
       reRegisteredCount: reRegistered,
@@ -985,9 +1003,10 @@ export interface MonthlyTrendPoint {
   month: string; // YYYY-MM
   revenue: number;
   completedSessions: number;
+  consultationCount: number;
 }
 
-/** endYearMonth 기준 최근 `months`개월 치 매출·완료세션 추이 (차트용). */
+/** endYearMonth 기준 최근 `months`개월 치 매출·완료세션·상담수 추이 (차트용). */
 export async function getMonthlyTrend(
   endYearMonth: string,
   months: number,
@@ -998,7 +1017,7 @@ export async function getMonthlyTrend(
     monthKeys.push(addMonthsToKey(endYearMonth, -i));
   }
 
-  const [revenueResult, sessionResult] = await Promise.all([
+  const [revenueResult, sessionResult, consultationResult] = await Promise.all([
     query<{ month: string; revenue: string }>(
       `SELECT to_char(purchased_at, 'YYYY-MM') as month, SUM(price) as revenue
        FROM packages
@@ -1014,15 +1033,27 @@ export async function getMonthlyTrend(
        GROUP BY month`,
       [monthKeys],
     ),
+    query<{ month: string; count: string }>(
+      `SELECT LEFT(session_date, 7) as month, COUNT(*) as count
+       FROM class_sessions
+       WHERE entry_type = 'consultation' AND status <> 'cancelled'
+         AND LEFT(session_date, 7) = ANY($1)
+       GROUP BY month`,
+      [monthKeys],
+    ),
   ]);
 
   const revenueMap = new Map(revenueResult.rows.map((r) => [r.month, Number(r.revenue ?? 0)]));
   const sessionMap = new Map(sessionResult.rows.map((r) => [r.month, Number(r.completed ?? 0)]));
+  const consultationMap = new Map(
+    consultationResult.rows.map((r) => [r.month, Number(r.count ?? 0)]),
+  );
 
   return monthKeys.map((month) => ({
     month,
     revenue: revenueMap.get(month) ?? 0,
     completedSessions: sessionMap.get(month) ?? 0,
+    consultationCount: consultationMap.get(month) ?? 0,
   }));
 }
 

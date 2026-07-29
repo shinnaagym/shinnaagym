@@ -9,6 +9,7 @@ import {
   listMembersWithProgress,
   listSessionsInRange,
 } from "@/lib/schedule";
+import { listScheduleMemos } from "@/lib/schedule-memos";
 import { ScheduleGrid } from "./schedule-grid";
 
 export default async function AdminSchedulePage({
@@ -28,13 +29,14 @@ export default async function AdminSchedulePage({
 
   const monthKey = koreaCurrentMonthKey();
 
-  const [coaches, members, sessions, dayHours, holidays, coachStats] = await Promise.all([
+  const [coaches, members, sessions, dayHours, holidays, coachStats, memos] = await Promise.all([
     listCoaches(),
     listMembersWithProgress(),
     listSessionsInRange(weekStart, weekEnd),
     getDayHoursForRange(dateKeys),
     listHolidays(),
     getAllCoachScheduleStats(monthKey, weekStart, weekEnd),
+    listScheduleMemos(),
   ]);
 
   const holidayMap = Object.fromEntries(
@@ -56,6 +58,7 @@ export default async function AdminSchedulePage({
         dayHours={dayHours}
         holidayMap={holidayMap}
         coachStats={Object.fromEntries(coachStats)}
+        initialMemos={memos}
       />
     </div>
   );

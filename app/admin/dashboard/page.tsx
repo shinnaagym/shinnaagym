@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { addMonthsToKey, isValidMonthKey, koreaCurrentMonthKey } from "@/lib/date";
+import { isValidMonthKey, koreaCurrentMonthKey } from "@/lib/date";
 import {
   getCoachMonthlyReports,
   getDashboardOverview,
@@ -11,6 +10,7 @@ import {
 } from "@/lib/schedule";
 import { getVisitChannelCountsForMonth } from "@/lib/intake";
 import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
+import { DashboardMonthPicker } from "./month-picker";
 
 const TREND_MONTHS = 6;
 
@@ -83,6 +83,7 @@ export default async function AdminDashboardPage({
 
   const maxRevenue = Math.max(1, ...trend.map((t) => t.revenue));
   const maxSessions = Math.max(1, ...trend.map((t) => t.completedSessions));
+  const maxConsultations = Math.max(1, ...trend.map((t) => t.consultationCount));
 
   const newRegByCoach = new Map<string, string[]>();
   for (const r of newRegs) {
@@ -105,29 +106,10 @@ export default async function AdminDashboardPage({
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* 월 네비게이션 */}
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/admin/dashboard?month=${addMonthsToKey(monthKey, -1)}`}
-                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
-              >
-                ‹ 이전 달
-              </Link>
-              <Link
-                href="/admin/dashboard"
-                className="rounded-full bg-ink text-white px-4 py-1.5 text-sm hover:bg-coral transition"
-              >
-                이번 달
-              </Link>
-              <Link
-                href={`/admin/dashboard?month=${addMonthsToKey(monthKey, 1)}`}
-                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
-              >
-                다음 달 ›
-              </Link>
-            </div>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-3">
             <p className="font-display text-lg">{formatMonthLabel(monthKey)}</p>
           </div>
+          <DashboardMonthPicker monthKey={monthKey} />
 
           {/* KPI 카드 */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -147,7 +129,7 @@ export default async function AdminDashboardPage({
           </div>
 
           {/* 월별 추이 차트 */}
-          <div className="grid sm:grid-cols-2 gap-4 mb-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
               <p className="text-sm font-medium mb-4">
                 월별 결제액 <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
@@ -191,6 +173,30 @@ export default async function AdminDashboardPage({
                 ))}
               </div>
             </div>
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+              <p className="text-sm font-medium mb-4">
+                월별 상담수{" "}
+                <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
+              </p>
+              <div className="flex items-end gap-2 h-36">
+                {trend.map((t) => (
+                  <div key={t.month} className="flex-1 flex flex-col items-center gap-1.5">
+                    <p className="text-[10px] text-ink/50 h-3">
+                      {t.consultationCount > 0 ? t.consultationCount : ""}
+                    </p>
+                    <div
+                      className={`w-full rounded-t-md transition-all ${
+                        t.month === monthKey ? "bg-coral" : "bg-coral/30"
+                      }`}
+                      style={{
+                        height: `${Math.max(4, (t.consultationCount / maxConsultations) * 100)}px`,
+                      }}
+                    />
+                    <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* 트레이너별 성과 — 모바일 카드 */}
@@ -206,7 +212,9 @@ export default async function AdminDashboardPage({
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 text-xs text-ink/60">
                   <span>담당 {r.memberCount}명</span>
-                  <span>완료 {r.completedSessions}회</span>
+                  <span>
+                    완료 1:1 {r.completedSessions1on1}회 · 2:1 {r.completedSessions2on1}회
+                  </span>
                   <span>노쇼 {r.noShowCount}회</span>
                   <span>재등록율 {formatRate(r.reRegistrationRate)}</span>
                   <span>월 상담수 {r.consultationCount}명</span>
@@ -221,12 +229,13 @@ export default async function AdminDashboardPage({
 
           {/* 트레이너별 성과 — 데스크톱 표 */}
           <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-6">
-            <table className="w-full text-sm min-w-[820px]">
+            <table className="w-full text-sm min-w-[900px]">
               <thead>
                 <tr className="text-left text-ink/50 text-xs border-b border-line/60">
                   <th className="px-5 py-3 font-medium">코치</th>
                   <th className="px-5 py-3 font-medium">담당 회원</th>
-                  <th className="px-5 py-3 font-medium">완료 세션</th>
+                  <th className="px-5 py-3 font-medium">완료 1:1</th>
+                  <th className="px-5 py-3 font-medium">완료 2:1</th>
                   <th className="px-5 py-3 font-medium">노쇼</th>
                   <th className="px-5 py-3 font-medium">매출</th>
                   <th className="px-5 py-3 font-medium">재등록율</th>
@@ -239,7 +248,8 @@ export default async function AdminDashboardPage({
                   <tr key={r.coachId} className="border-b border-line/40 last:border-0">
                     <td className="px-5 py-3 font-medium">{r.coachName}</td>
                     <td className="px-5 py-3 text-ink/70">{r.memberCount}명</td>
-                    <td className="px-5 py-3 text-ink/70">{r.completedSessions}회</td>
+                    <td className="px-5 py-3 text-ink/70">{r.completedSessions1on1}회</td>
+                    <td className="px-5 py-3 text-ink/70">{r.completedSessions2on1}회</td>
                     <td className="px-5 py-3 text-ink/70">{r.noShowCount}회</td>
                     <td className="px-5 py-3 text-gold-deep font-medium">{formatWon(r.revenue)}</td>
                     <td className="px-5 py-3 text-ink/70">{formatRate(r.reRegistrationRate)}</td>
@@ -249,7 +259,7 @@ export default async function AdminDashboardPage({
                 ))}
                 {coachReports.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-5 py-10 text-center text-ink/40">
+                    <td colSpan={9} className="px-5 py-10 text-center text-ink/40">
                       코치가 없어요.
                     </td>
                   </tr>

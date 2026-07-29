@@ -4,9 +4,10 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { addDaysToKey, mondayOfWeek } from "@/lib/date";
-import type { CoachRow, PtType, SessionEntryType, SessionStatus } from "@/lib/db";
+import type { CoachRow, PtType, ScheduleMemoRow, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { CoachScheduleStats, MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
+import { ScheduleMemoPad } from "./schedule-memo-pad";
 
 type SessionWithMember = {
   id: number;
@@ -185,6 +186,7 @@ export function ScheduleGrid({
   dayHours,
   holidayMap,
   coachStats,
+  initialMemos,
 }: {
   weekStart: string;
   dateKeys: string[];
@@ -195,6 +197,7 @@ export function ScheduleGrid({
   dayHours: Record<string, DayHours>;
   holidayMap: Record<string, string>;
   coachStats: Record<number, CoachScheduleStats>;
+  initialMemos: ScheduleMemoRow[];
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
@@ -261,26 +264,6 @@ export function ScheduleGrid({
   }, [sessions]);
 
   const selectedDate = dateKeys[selectedDayIdx];
-
-  /** 선택한 날짜의 코치별 PT(1:1)/2:1/상담 카운트 (하단 요약 표용. 개인 일정·수업 불가는 제외). */
-  const dailySummary = useMemo(() => {
-    const map = new Map<number, { pt: number; pair: number; consultation: number }>();
-    for (const coach of visibleCoaches) {
-      map.set(coach.id, { pt: 0, pair: 0, consultation: 0 });
-    }
-    for (const s of sessions) {
-      if (s.session_date !== selectedDate) continue;
-      const counts = map.get(s.coach_id);
-      if (!counts) continue;
-      if (s.entry_type === "session") {
-        if (s.pt_type === "2:1") counts.pair += 1;
-        else counts.pt += 1;
-      } else if (s.entry_type === "consultation") {
-        counts.consultation += 1;
-      }
-    }
-    return map;
-  }, [sessions, selectedDate, visibleCoaches]);
 
   /** 코치 한 명을 필터로 골랐을 때(주간 보기) 이번 주 전체의 PT/2:1/상담 합계. */
   const weeklySummary = useMemo(() => {
@@ -691,58 +674,12 @@ export function ScheduleGrid({
               </div>
             </div>
 
-            {/* 오늘의 코치별 요약 */}
-            <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
-              <table
-                className="w-full text-sm"
-                style={{ minWidth: `${gridMinWidth}px` }}
-              >
-                <thead>
-                  <tr className="text-left text-ink/50 text-xs border-b border-line/60">
-                    <th className="px-3 py-2 font-medium">구분</th>
-                    {visibleCoaches.map((c) => (
-                      <th key={c.id} className="px-3 py-2 font-medium text-center">
-                        {c.name}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(
-                    [
-                      ["pt", "PT"],
-                      ["pair", "2:1"],
-                      ["consultation", "상담"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <tr key={key} className="border-b border-line/40 last:border-0">
-                      <td className="px-3 py-2 text-ink/60">{label}</td>
-                      {visibleCoaches.map((c) => (
-                        <td key={c.id} className="px-3 py-2 text-center text-ink/70">
-                          {dailySummary.get(c.id)?.[key] ?? 0}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  <tr className="font-medium">
-                    <td className="px-3 py-2">총합</td>
-                    {visibleCoaches.map((c) => {
-                      const counts = dailySummary.get(c.id);
-                      const sum = counts ? counts.pt + counts.pair + counts.consultation : 0;
-                      return (
-                        <td key={c.id} className="px-3 py-2 text-center">
-                          {sum}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </>
         );
       })()
       )}
+
+      <ScheduleMemoPad initialMemos={initialMemos} />
 
       {createTarget && (
         <CreateSessionModal
