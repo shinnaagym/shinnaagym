@@ -87,24 +87,24 @@ export function IntakeLanding({
     <div>
       <div className="rounded-2xl border border-coral/30 bg-coral/5 px-5 py-4 mb-6">
         <h2 className="font-display text-base mb-3">+ 새 상담자 등록</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="이름"
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+            className="flex-1 min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
           />
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="연락처 *"
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+            className="flex-1 min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
           />
           <button
             type="button"
             onClick={handleCreate}
             disabled={submitting}
-            className="rounded-lg bg-coral text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition disabled:opacity-50 whitespace-nowrap"
+            className="shrink-0 whitespace-nowrap rounded-lg bg-coral text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
           >
             {submitting ? "등록 중..." : "문진표 작성 시작"}
           </button>

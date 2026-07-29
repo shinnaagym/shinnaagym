@@ -555,6 +555,56 @@ async function autoCompletePastSessions(): Promise<void> {
   );
 }
 
+export interface CoachScheduleStats {
+  monthPt: number;
+  monthPair: number;
+  weekPt: number;
+  weekPair: number;
+  monthConsultation: number;
+  monthNoShow: number;
+}
+
+/** 스케줄표에서 코치 한 명을 선택했을 때 KPI 카드에 쓰는 코치별 통계(이번 달/이번 주). */
+export async function getAllCoachScheduleStats(
+  monthKey: string,
+  weekStart: string,
+  weekEnd: string,
+): Promise<Map<number, CoachScheduleStats>> {
+  await autoCompletePastSessions();
+  const result = await query<{
+    coach_id: number;
+    month_pt: string;
+    month_pair: string;
+    week_pt: string;
+    week_pair: string;
+    month_consultation: string;
+    month_no_show: string;
+  }>(
+    `SELECT coach_id,
+       COUNT(*) FILTER (WHERE entry_type = 'session' AND pt_type = '1:1' AND status <> 'cancelled' AND LEFT(session_date, 7) = $1) as month_pt,
+       COUNT(*) FILTER (WHERE entry_type = 'session' AND pt_type = '2:1' AND status <> 'cancelled' AND LEFT(session_date, 7) = $1) as month_pair,
+       COUNT(*) FILTER (WHERE entry_type = 'session' AND pt_type = '1:1' AND status <> 'cancelled' AND session_date >= $2 AND session_date <= $3) as week_pt,
+       COUNT(*) FILTER (WHERE entry_type = 'session' AND pt_type = '2:1' AND status <> 'cancelled' AND session_date >= $2 AND session_date <= $3) as week_pair,
+       COUNT(*) FILTER (WHERE entry_type = 'consultation' AND status <> 'cancelled' AND LEFT(session_date, 7) = $1) as month_consultation,
+       COUNT(*) FILTER (WHERE status = 'no_show' AND LEFT(session_date, 7) = $1) as month_no_show
+     FROM class_sessions
+     GROUP BY coach_id`,
+    [monthKey, weekStart, weekEnd],
+  );
+  const map = new Map<number, CoachScheduleStats>();
+  for (const row of result.rows) {
+    map.set(row.coach_id, {
+      monthPt: Number(row.month_pt),
+      monthPair: Number(row.month_pair),
+      weekPt: Number(row.week_pt),
+      weekPair: Number(row.week_pair),
+      monthConsultation: Number(row.month_consultation),
+      monthNoShow: Number(row.month_no_show),
+    });
+  }
+  return map;
+}
+
 export async function listSessionsInRange(
   fromKey: string,
   toKey: string,

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { addDaysToKey, mondayOfWeek } from "@/lib/date";
 import type { CoachRow, PtType, SessionEntryType, SessionStatus } from "@/lib/db";
-import type { MemberWithProgress } from "@/lib/schedule";
+import type { CoachScheduleStats, MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
 
 type SessionWithMember = {
@@ -184,6 +184,7 @@ export function ScheduleGrid({
   initialSessions,
   dayHours,
   holidayMap,
+  coachStats,
 }: {
   weekStart: string;
   dateKeys: string[];
@@ -193,6 +194,7 @@ export function ScheduleGrid({
   initialSessions: SessionWithMember[];
   dayHours: Record<string, DayHours>;
   holidayMap: Record<string, string>;
+  coachStats: Record<number, CoachScheduleStats>;
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
@@ -351,20 +353,52 @@ export function ScheduleGrid({
 
   return (
     <div>
-      {/* KPI 카드 */}
+      {/* KPI 카드 — 코치를 한 명 선택하면 그 코치의 이번 달/이번 주 통계로 바뀐다. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: "이번 주 전체 세션", value: weekStats.total, color: "text-ink" },
-          { label: "예약", value: weekStats.reserved, color: "text-coral" },
-          { label: "완료", value: weekStats.completed, color: "text-sage" },
-          { label: "노쇼", value: weekStats.noShow, color: "text-red-500" },
-        ].map((card) => (
+        {(singleCoach
+          ? (() => {
+              const stats = coachStats[singleCoach.id];
+              return [
+                {
+                  label: "이번 달 수업수",
+                  value: (stats?.monthPt ?? 0) + (stats?.monthPair ?? 0),
+                  detail: `1:1 ${stats?.monthPt ?? 0}회 · 2:1 ${stats?.monthPair ?? 0}회`,
+                  color: "text-ink",
+                },
+                {
+                  label: "이번 주 수업수",
+                  value: (stats?.weekPt ?? 0) + (stats?.weekPair ?? 0),
+                  detail: `1:1 ${stats?.weekPt ?? 0}회 · 2:1 ${stats?.weekPair ?? 0}회`,
+                  color: "text-coral",
+                },
+                {
+                  label: "이번달 상담수",
+                  value: stats?.monthConsultation ?? 0,
+                  detail: null,
+                  color: "text-sage",
+                },
+                {
+                  label: "이번달 노쇼",
+                  value: stats?.monthNoShow ?? 0,
+                  detail: null,
+                  color: "text-red-500",
+                },
+              ];
+            })()
+          : [
+              { label: "이번 주 전체 세션", value: weekStats.total, detail: null, color: "text-ink" },
+              { label: "예약", value: weekStats.reserved, detail: null, color: "text-coral" },
+              { label: "완료", value: weekStats.completed, detail: null, color: "text-sage" },
+              { label: "노쇼", value: weekStats.noShow, detail: null, color: "text-red-500" },
+            ]
+        ).map((card) => (
           <div
             key={card.label}
             className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4"
           >
             <p className="text-xs text-ink/50 mb-2">{card.label}</p>
             <p className={`text-2xl font-semibold ${card.color}`}>{card.value}</p>
+            {card.detail && <p className="text-xs text-ink/40 mt-1">{card.detail}</p>}
           </div>
         ))}
       </div>

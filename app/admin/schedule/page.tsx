@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
+import { addDaysToKey, koreaCurrentMonthKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import {
+  getAllCoachScheduleStats,
   getDayHoursForRange,
   listCoaches,
   listHolidays,
@@ -25,12 +26,15 @@ export default async function AdminSchedulePage({
   const dateKeys = Array.from({ length: 7 }, (_, i) => addDaysToKey(weekStart, i));
   const weekEnd = dateKeys[6];
 
-  const [coaches, members, sessions, dayHours, holidays] = await Promise.all([
+  const monthKey = koreaCurrentMonthKey();
+
+  const [coaches, members, sessions, dayHours, holidays, coachStats] = await Promise.all([
     listCoaches(),
     listMembersWithProgress(),
     listSessionsInRange(weekStart, weekEnd),
     getDayHoursForRange(dateKeys),
     listHolidays(),
+    getAllCoachScheduleStats(monthKey, weekStart, weekEnd),
   ]);
 
   const holidayMap = Object.fromEntries(
@@ -51,6 +55,7 @@ export default async function AdminSchedulePage({
         initialSessions={sessions}
         dayHours={dayHours}
         holidayMap={holidayMap}
+        coachStats={Object.fromEntries(coachStats)}
       />
     </div>
   );
