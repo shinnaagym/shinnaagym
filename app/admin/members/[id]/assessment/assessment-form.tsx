@@ -23,8 +23,8 @@ import {
   computeKoos12Score,
   computeFaamScore,
   computeStartBackScore,
-  type PromItem,
 } from "@/lib/prom-instruments";
+import { Accordion, PromAccordion } from "@/app/components/PromAccordion";
 import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
 
 interface MovementEntry {
@@ -247,68 +247,6 @@ const MovementRow = memo(function MovementRow({
   );
 });
 
-const PromItemRow = memo(function PromItemRow({
-  item,
-  value,
-  onAnswer,
-}: {
-  item: PromItem;
-  value: number | undefined;
-  onAnswer: (key: string, value: number) => void;
-}) {
-  return (
-    <div className="px-4 py-2.5 border-t border-line/50 first:border-t-0">
-      <label className="block text-sm mb-1.5">{item.title}</label>
-      <select
-        value={value ?? ""}
-        onChange={(e) => onAnswer(item.key, Number(e.target.value))}
-        className={inputClass() + " bg-white"}
-      >
-        <option value="" disabled>
-          선택
-        </option>
-        {item.options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-});
-
-const PromAccordion = memo(function PromAccordion({
-  title,
-  scoreLabel,
-  items,
-  answers,
-  onAnswer,
-  isOpen,
-  toggleKey,
-  onToggle,
-}: {
-  title: string;
-  scoreLabel: string | null;
-  items: readonly PromItem[];
-  answers: Record<string, number>;
-  onAnswer: (key: string, value: number) => void;
-  isOpen: boolean;
-  toggleKey: string;
-  onToggle: (key: string) => void;
-}) {
-  return (
-    <Accordion
-      label={scoreLabel ? `${title} — ${scoreLabel}` : title}
-      isOpen={isOpen}
-      onToggle={() => onToggle(toggleKey)}
-    >
-      {items.map((item) => (
-        <PromItemRow key={item.key} item={item} value={answers[item.key]} onAnswer={onAnswer} />
-      ))}
-    </Accordion>
-  );
-});
-
 interface Criterion {
   label: string;
   value: string;
@@ -319,32 +257,6 @@ function criterionIcon(status: Criterion["status"]): string {
   if (status === "pass") return "✅";
   if (status === "fail") return "⚠️";
   return "–";
-}
-
-function Accordion({
-  label,
-  isOpen,
-  onToggle,
-  children,
-}: {
-  label: string;
-  isOpen: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-line bg-white overflow-hidden mb-3">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="no-print w-full flex items-center justify-between px-4 py-3 text-left font-display text-base hover:bg-bone/40 transition"
-      >
-        <span>{label}</span>
-        <span className="text-ink/40">{isOpen ? "▲" : "▼"}</span>
-      </button>
-      <div className={isOpen ? "block" : "hidden print:block"}>{children}</div>
-    </div>
-  );
 }
 
 export interface AssessmentInitialData {

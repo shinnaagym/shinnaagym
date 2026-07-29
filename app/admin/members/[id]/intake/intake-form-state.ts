@@ -38,6 +38,13 @@ export interface IntakeFormState {
   pastTreatment: string;
   majorComplaint: string;
   minorComplaint: string;
+  odiAnswers: Record<string, number>;
+  ndiAnswers: Record<string, number>;
+  quickdashAnswers: Record<string, number>;
+  koos12Answers: Record<string, number>;
+  faamAdlAnswers: Record<string, number>;
+  faamSportsAnswers: Record<string, number>;
+  startbackAnswers: Record<string, number>;
 }
 
 export const EMPTY_PAIN_MOVEMENT: PainMovementEntry = {
@@ -85,4 +92,11 @@ export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
   pastTreatment: "",
   majorComplaint: "",
   minorComplaint: "",
+  odiAnswers: {},
+  ndiAnswers: {},
+  quickdashAnswers: {},
+  koos12Answers: {},
+  faamAdlAnswers: {},
+  faamSportsAnswers: {},
+  startbackAnswers: {},
 };

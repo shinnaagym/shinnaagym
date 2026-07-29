@@ -253,6 +253,12 @@ function ensureSchema(): Promise<void> {
           major_complaint TEXT NOT NULL DEFAULT '',
           minor_complaint TEXT NOT NULL DEFAULT '',
           startback_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          odi_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          ndi_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          quickdash_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          koos12_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          faam_adl_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          faam_sports_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -319,6 +325,12 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS exercise_purposes TEXT[] NOT NULL DEFAULT '{}';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS exercise_purpose_other TEXT NOT NULL DEFAULT '';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS startback_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS odi_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS ndi_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS quickdash_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS koos12_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS faam_adl_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS faam_sports_answers JSONB NOT NULL DEFAULT '{}'::jsonb;
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
@@ -543,6 +555,13 @@ export interface IntakeQuestionnaireRow {
   past_treatment: string;
   major_complaint: string;
   minor_complaint: string;
+  startback_answers: Record<string, number>;
+  odi_answers: Record<string, number>;
+  ndi_answers: Record<string, number>;
+  quickdash_answers: Record<string, number>;
+  koos12_answers: Record<string, number>;
+  faam_adl_answers: Record<string, number>;
+  faam_sports_answers: Record<string, number>;
   created_at: string;
   updated_at: string;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   EXERCISE_PURPOSE_OPTIONS,
@@ -15,6 +15,21 @@ import {
   PAIN_CHARACTERISTIC_OPTIONS,
 } from "@/lib/intake-questionnaire";
 import { NRS_PAIN_OPTIONS } from "@/lib/assessment-movements";
+import {
+  ODI_ITEMS,
+  NDI_ITEMS,
+  QUICKDASH_ITEMS,
+  KOOS12_ITEMS,
+  FAAM_ADL_ITEMS,
+  FAAM_SPORTS_ITEMS,
+  STARTBACK_ITEMS,
+  computeOdiNdiScore,
+  computeQuickDashScore,
+  computeKoos12Score,
+  computeFaamScore,
+  computeStartBackScore,
+} from "@/lib/prom-instruments";
+import { PromAccordion } from "@/app/components/PromAccordion";
 import { PrintButton } from "@/app/components/PrintButton";
 import type { PainMovementEntry } from "@/lib/db";
 import { EMPTY_INTAKE_FORM_STATE, EMPTY_PAIN_MOVEMENT, type IntakeFormState } from "./intake-form-state";
@@ -175,6 +190,32 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
+interface PainRegionDef {
+  key: string;
+  label: string;
+  promKeys: string[];
+}
+
+const PAIN_REGIONS: PainRegionDef[] = [
+  { key: "lumbar", label: "요추 / 허리", promKeys: ["odi", "startback"] },
+  { key: "cervical", label: "경추 / 목", promKeys: ["ndi"] },
+  { key: "shoulder", label: "어깨 / 상지", promKeys: ["quickdash"] },
+  { key: "knee", label: "무릎", promKeys: ["koos12"] },
+  { key: "ankleFoot", label: "발 / 발목", promKeys: ["faamAdl", "faamSports"] },
+];
+
+/** 이미 값이 입력된 PROM이 있으면 그에 대응하는 통증 부위를 처음부터 선택된 상태로 보여준다. */
+function initialRegionsFromAnswers(data: IntakeFormState): Set<string> {
+  const hasAnswers = (a: Record<string, number>) => Object.keys(a).length > 0;
+  const regions = new Set<string>();
+  if (hasAnswers(data.odiAnswers) || hasAnswers(data.startbackAnswers)) regions.add("lumbar");
+  if (hasAnswers(data.ndiAnswers)) regions.add("cervical");
+  if (hasAnswers(data.quickdashAnswers)) regions.add("shoulder");
+  if (hasAnswers(data.koos12Answers)) regions.add("knee");
+  if (hasAnswers(data.faamAdlAnswers) || hasAnswers(data.faamSportsAnswers)) regions.add("ankleFoot");
+  return regions;
+}
+
 export function IntakeForm({
   memberId,
   memberName,
@@ -191,11 +232,71 @@ export function IntakeForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [selectedRegions, setSelectedRegions] = useState<Set<string>>(() =>
+    initialRegionsFromAnswers(initialData ?? EMPTY_INTAKE_FORM_STATE),
+  );
+  const [openProm, setOpenProm] = useState<Set<string>>(new Set());
 
   function patch(p: Partial<IntakeFormState>) {
     setSaved(false);
     setForm((prev) => ({ ...prev, ...p }));
   }
+
+  function togglePainRegion(key: string) {
+    setSelectedRegions((prev) => {
+      const next = new Set(prev);
+      const region = PAIN_REGIONS.find((r) => r.key === key);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+        if (region) setOpenProm((prevOpen) => new Set([...prevOpen, ...region.promKeys]));
+      }
+      return next;
+    });
+  }
+
+  function togglePromOpen(key: string) {
+    setOpenProm((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const visiblePromKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const region of PAIN_REGIONS) {
+      if (selectedRegions.has(region.key)) {
+        for (const k of region.promKeys) keys.add(k);
+      }
+    }
+    return keys;
+  }, [selectedRegions]);
+
+  const odiScore = computeOdiNdiScore(form.odiAnswers);
+  const ndiScore = computeOdiNdiScore(form.ndiAnswers);
+  const quickdashScore = computeQuickDashScore(form.quickdashAnswers);
+  const koos12Score = computeKoos12Score(form.koos12Answers);
+  const faamAdlScore = computeFaamScore(form.faamAdlAnswers);
+  const faamSportsScore = computeFaamScore(form.faamSportsAnswers);
+  const startBackScore = computeStartBackScore(form.startbackAnswers);
+
+  const setOdiAnswer = (key: string, v: number) =>
+    patch({ odiAnswers: { ...form.odiAnswers, [key]: v } });
+  const setNdiAnswer = (key: string, v: number) =>
+    patch({ ndiAnswers: { ...form.ndiAnswers, [key]: v } });
+  const setQuickdashAnswer = (key: string, v: number) =>
+    patch({ quickdashAnswers: { ...form.quickdashAnswers, [key]: v } });
+  const setKoos12Answer = (key: string, v: number) =>
+    patch({ koos12Answers: { ...form.koos12Answers, [key]: v } });
+  const setFaamAdlAnswer = (key: string, v: number) =>
+    patch({ faamAdlAnswers: { ...form.faamAdlAnswers, [key]: v } });
+  const setFaamSportsAnswer = (key: string, v: number) =>
+    patch({ faamSportsAnswers: { ...form.faamSportsAnswers, [key]: v } });
+  const setStartbackAnswer = (key: string, v: number) =>
+    patch({ startbackAnswers: { ...form.startbackAnswers, [key]: v } });
 
   function toggleCharacteristic(key: string) {
     patch({
@@ -624,7 +725,119 @@ export function IntakeForm({
         </div>
       </SectionCard>
 
-      <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm space-y-1 mb-6">
+      <SectionCard title="표준 설문(PROM)">
+        <p className="text-xs text-ink/50 mb-4">
+          통증이 있는 부위를 선택하면 그에 맞는 설문이 아래에 열립니다. 아래 문항은 공식 원문을
+          그대로 옮긴 것이 아니라 이해하기 쉽게 재구성한 것으로, 점수는 참고용입니다.
+        </p>
+        <div className="grid grid-cols-2 gap-2 mb-1">
+          {PAIN_REGIONS.map((region) => (
+            <button
+              key={region.key}
+              type="button"
+              onClick={() => togglePainRegion(region.key)}
+              className={[
+                "rounded-lg border px-3 py-2.5 text-sm font-medium transition",
+                region.key === "ankleFoot" ? "col-span-2" : "",
+                selectedRegions.has(region.key)
+                  ? "bg-coral text-white border-coral"
+                  : "border-line text-ink/70 hover:bg-bone",
+              ].join(" ")}
+            >
+              {region.label}
+            </button>
+          ))}
+        </div>
+      </SectionCard>
+
+      {visiblePromKeys.has("odi") && (
+        <PromAccordion
+          title="ODI (요추 기능장애)"
+          scoreLabel={odiScore != null ? `${odiScore}%` : null}
+          items={ODI_ITEMS}
+          answers={form.odiAnswers}
+          onAnswer={setOdiAnswer}
+          isOpen={openProm.has("odi")}
+          toggleKey="odi"
+          onToggle={togglePromOpen}
+        />
+      )}
+      {visiblePromKeys.has("ndi") && (
+        <PromAccordion
+          title="NDI (경추 기능장애)"
+          scoreLabel={ndiScore != null ? `${ndiScore}%` : null}
+          items={NDI_ITEMS}
+          answers={form.ndiAnswers}
+          onAnswer={setNdiAnswer}
+          isOpen={openProm.has("ndi")}
+          toggleKey="ndi"
+          onToggle={togglePromOpen}
+        />
+      )}
+      {visiblePromKeys.has("quickdash") && (
+        <PromAccordion
+          title="QuickDASH (상지 기능장애)"
+          scoreLabel={quickdashScore != null ? `${quickdashScore}` : null}
+          items={QUICKDASH_ITEMS}
+          answers={form.quickdashAnswers}
+          onAnswer={setQuickdashAnswer}
+          isOpen={openProm.has("quickdash")}
+          toggleKey="quickdash"
+          onToggle={togglePromOpen}
+        />
+      )}
+      {visiblePromKeys.has("koos12") && (
+        <PromAccordion
+          title="KOOS-12 (무릎)"
+          scoreLabel={koos12Score != null ? `${koos12Score}` : null}
+          items={KOOS12_ITEMS}
+          answers={form.koos12Answers}
+          onAnswer={setKoos12Answer}
+          isOpen={openProm.has("koos12")}
+          toggleKey="koos12"
+          onToggle={togglePromOpen}
+        />
+      )}
+      {visiblePromKeys.has("faamAdl") && (
+        <PromAccordion
+          title="FAAM ADL (발·발목 일상)"
+          scoreLabel={faamAdlScore != null ? `${faamAdlScore}%` : null}
+          items={FAAM_ADL_ITEMS}
+          answers={form.faamAdlAnswers}
+          onAnswer={setFaamAdlAnswer}
+          isOpen={openProm.has("faamAdl")}
+          toggleKey="faamAdl"
+          onToggle={togglePromOpen}
+        />
+      )}
+      {visiblePromKeys.has("faamSports") && (
+        <PromAccordion
+          title="FAAM 스포츠"
+          scoreLabel={faamSportsScore != null ? `${faamSportsScore}%` : null}
+          items={FAAM_SPORTS_ITEMS}
+          answers={form.faamSportsAnswers}
+          onAnswer={setFaamSportsAnswer}
+          isOpen={openProm.has("faamSports")}
+          toggleKey="faamSports"
+          onToggle={togglePromOpen}
+        />
+      )}
+      {visiblePromKeys.has("startback") && (
+        <PromAccordion
+          title="STarT Back (요통 위험군 분류)"
+          scoreLabel={
+            startBackScore != null ? `${startBackScore.total}/9 · ${startBackScore.riskLabel}` : null
+          }
+          items={STARTBACK_ITEMS}
+          answers={form.startbackAnswers}
+          onAnswer={setStartbackAnswer}
+          isOpen={openProm.has("startback")}
+          toggleKey="startback"
+          onToggle={togglePromOpen}
+        />
+      )}
+
+      <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm space-y-1 mb-6 mt-3">
         <p>신나아짐 본점 T. 010-6859-6114</p>
         <p className="text-bone/70">개인정보 보호책임자 · 신종수 (T. 010-6859-6114)</p>
       </div>

@@ -71,6 +71,13 @@ export default async function IntakeQuestionnairePage({
         pastTreatment: intake.past_treatment,
         majorComplaint: intake.major_complaint,
         minorComplaint: intake.minor_complaint,
+        odiAnswers: intake.odi_answers,
+        ndiAnswers: intake.ndi_answers,
+        quickdashAnswers: intake.quickdash_answers,
+        koos12Answers: intake.koos12_answers,
+        faamAdlAnswers: intake.faam_adl_answers,
+        faamSportsAnswers: intake.faam_sports_answers,
+        startbackAnswers: intake.startback_answers,
       }
     : { ...EMPTY_INTAKE_FORM_STATE, intakeName: member.name, phone: member.phone };
 

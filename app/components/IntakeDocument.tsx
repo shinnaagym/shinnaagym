@@ -10,7 +10,45 @@ import {
   PAIN_CYCLE_PERIODS,
   PAIN_CHARACTERISTIC_OPTIONS,
 } from "@/lib/intake-questionnaire";
+import {
+  ODI_ITEMS,
+  NDI_ITEMS,
+  QUICKDASH_ITEMS,
+  KOOS12_ITEMS,
+  FAAM_ADL_ITEMS,
+  FAAM_SPORTS_ITEMS,
+  STARTBACK_ITEMS,
+  computeOdiNdiScore,
+  computeQuickDashScore,
+  computeKoos12Score,
+  computeFaamScore,
+  computeStartBackScore,
+} from "@/lib/prom-instruments";
 import type { IntakeQuestionnaireRow } from "@/lib/db";
+
+interface PromSummary {
+  title: string;
+  score: number | null;
+  unit: string;
+  answeredCount: number;
+  totalCount: number;
+}
+
+function promSummary(
+  title: string,
+  items: readonly { key: string }[],
+  answers: Record<string, number>,
+  score: number | null,
+  unit: string,
+): PromSummary {
+  return {
+    title,
+    score,
+    unit,
+    answeredCount: items.filter((i) => typeof answers[i.key] === "number").length,
+    totalCount: items.length,
+  };
+}
 
 function labelOf(options: readonly { value: string; label: string }[], value: string): string {
   return options.find((o) => o.value === value)?.label || "-";
@@ -65,6 +103,32 @@ export function IntakeDocument({
       : intake.visit_channel === "other" && intake.visit_channel_other
         ? ` (${intake.visit_channel_other})`
         : "";
+
+  const odiScore = computeOdiNdiScore(intake.odi_answers);
+  const ndiScore = computeOdiNdiScore(intake.ndi_answers);
+  const quickdashScore = computeQuickDashScore(intake.quickdash_answers);
+  const koos12Score = computeKoos12Score(intake.koos12_answers);
+  const faamAdlScore = computeFaamScore(intake.faam_adl_answers);
+  const faamSportsScore = computeFaamScore(intake.faam_sports_answers);
+  const startBackScore = computeStartBackScore(intake.startback_answers);
+
+  const promSummaries: PromSummary[] = [
+    promSummary("ODI (요추 기능장애)", ODI_ITEMS, intake.odi_answers, odiScore, "%"),
+    promSummary("NDI (경추 기능장애)", NDI_ITEMS, intake.ndi_answers, ndiScore, "%"),
+    promSummary("QuickDASH (상지 기능장애)", QUICKDASH_ITEMS, intake.quickdash_answers, quickdashScore, ""),
+    promSummary("KOOS-12 (무릎)", KOOS12_ITEMS, intake.koos12_answers, koos12Score, ""),
+    promSummary("FAAM ADL (발·발목 일상)", FAAM_ADL_ITEMS, intake.faam_adl_answers, faamAdlScore, "%"),
+    promSummary("FAAM 스포츠", FAAM_SPORTS_ITEMS, intake.faam_sports_answers, faamSportsScore, "%"),
+  ].filter((s) => s.answeredCount > 0);
+  if (startBackScore) {
+    promSummaries.push({
+      title: "STarT Back (요통 위험군)",
+      score: startBackScore.total,
+      unit: `/9 · ${startBackScore.riskLabel}`,
+      answeredCount: STARTBACK_ITEMS.length,
+      totalCount: STARTBACK_ITEMS.length,
+    });
+  }
 
   return (
     <>
@@ -192,6 +256,22 @@ export function IntakeDocument({
           <Field label="2순위">{intake.minor_complaint || "-"}</Field>
         </div>
       </Section>
+
+      {promSummaries.length > 0 && (
+        <section className="mb-4">
+          <h2 className="font-display text-lg mb-3">표준 설문(PROM)</h2>
+          <div className="rounded-2xl border border-line divide-y divide-line/60 text-sm">
+            {promSummaries.map((s) => (
+              <div key={s.title} className="px-4 py-3 flex items-center justify-between gap-3">
+                <p>{s.title}</p>
+                <p className="font-display text-lg whitespace-nowrap">
+                  {s.score != null ? `${s.score}${s.unit}` : `응답 ${s.answeredCount}/${s.totalCount}`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm space-y-1">
         <p>신나아짐 본점 T. 010-6859-6114</p>

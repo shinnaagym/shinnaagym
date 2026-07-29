@@ -9,6 +9,16 @@ import {
   VISIT_CHANNEL_OPTIONS,
   EXERCISE_PURPOSE_OPTIONS,
 } from "./intake-questionnaire";
+import {
+  ODI_ITEMS,
+  NDI_ITEMS,
+  QUICKDASH_ITEMS,
+  KOOS12_ITEMS,
+  FAAM_ADL_ITEMS,
+  FAAM_SPORTS_ITEMS,
+  STARTBACK_ITEMS,
+  type PromItem,
+} from "./prom-instruments";
 import type { PainMovementEntry } from "./db";
 
 function optionValues(options: readonly { value: string }[]): Set<string> {
@@ -58,6 +68,21 @@ function characteristics(raw: unknown): string[] {
 function exercisePurposes(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((v): v is string => typeof v === "string" && VALID_EXERCISE_PURPOSE_KEYS.has(v));
+}
+
+/** PROM 문항 답변 맵 공통 검증: 알려진 문항 key만, 해당 문항의 옵션 value 범위 내 숫자만 허용. */
+function parsePromAnswers(raw: unknown, items: readonly PromItem[]): Record<string, number> {
+  const answers: Record<string, number> = {};
+  if (!raw || typeof raw !== "object") return answers;
+  const record = raw as Record<string, unknown>;
+  for (const item of items) {
+    const value = record[item.key];
+    if (typeof value !== "number") continue;
+    if (item.options.some((opt) => opt.value === value)) {
+      answers[item.key] = value;
+    }
+  }
+  return answers;
 }
 
 function painMovements(raw: unknown): PainMovementEntry[] {
@@ -114,6 +139,13 @@ export interface ParsedIntakeInput {
   pastTreatment: string;
   majorComplaint: string;
   minorComplaint: string;
+  odiAnswers: Record<string, number>;
+  ndiAnswers: Record<string, number>;
+  quickdashAnswers: Record<string, number>;
+  koos12Answers: Record<string, number>;
+  faamAdlAnswers: Record<string, number>;
+  faamSportsAnswers: Record<string, number>;
+  startbackAnswers: Record<string, number>;
 }
 
 export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIntakeInput {
@@ -155,5 +187,12 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     pastTreatment: str(body?.pastTreatment),
     majorComplaint: str(body?.majorComplaint),
     minorComplaint: str(body?.minorComplaint),
+    odiAnswers: parsePromAnswers(body?.odiAnswers, ODI_ITEMS),
+    ndiAnswers: parsePromAnswers(body?.ndiAnswers, NDI_ITEMS),
+    quickdashAnswers: parsePromAnswers(body?.quickdashAnswers, QUICKDASH_ITEMS),
+    koos12Answers: parsePromAnswers(body?.koos12Answers, KOOS12_ITEMS),
+    faamAdlAnswers: parsePromAnswers(body?.faamAdlAnswers, FAAM_ADL_ITEMS),
+    faamSportsAnswers: parsePromAnswers(body?.faamSportsAnswers, FAAM_SPORTS_ITEMS),
+    startbackAnswers: parsePromAnswers(body?.startbackAnswers, STARTBACK_ITEMS),
   };
 }
