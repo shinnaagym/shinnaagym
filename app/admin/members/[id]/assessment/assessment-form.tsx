@@ -835,6 +835,19 @@ export function AssessmentForm({
         isOpen={openExtra.has("quickdash")}
         toggleKey="quickdash"
         onToggle={toggleExtra}
+        statusMessage={
+          quickdashScore == null
+            ? null
+            : quickdashScore <= 15
+              ? {
+                  met: true,
+                  text: `QuickDASH ${quickdashScore}점 — 전환 기준(≤15) 충족, 퍼포먼스 단계로 전환할 수 있는 상태예요.`,
+                }
+              : {
+                  met: false,
+                  text: `QuickDASH ${quickdashScore}점 — 전환 기준(≤15) 미충족, 아직 통증 관리·재활 단계가 필요해요.`,
+                }
+        }
       />
       <PromAccordion
         title="KOOS-12 (무릎)"

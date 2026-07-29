@@ -13,6 +13,7 @@ export interface CreateContractInput {
   address?: string;
   visitChannel?: VisitChannel;
   visitChannelReferrerName?: string;
+  visitChannelOther?: string;
   purposes?: string[];
   purposeOther?: string;
   optionNote?: string;
@@ -25,8 +26,8 @@ export async function createContract(input: CreateContractInput): Promise<Contra
     `INSERT INTO contracts (
        member_id, entry_type, pt_type, total_sessions, price, payment_method,
        rrn_front_encrypted, address, visit_channel, visit_channel_referrer_name,
-       purposes, purpose_other, option_note, start_date, privacy_consent
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       visit_channel_other, purposes, purpose_other, option_note, start_date, privacy_consent
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING *`,
     [
       input.memberId,
@@ -39,6 +40,7 @@ export async function createContract(input: CreateContractInput): Promise<Contra
       input.address ?? "",
       input.visitChannel ?? "",
       input.visitChannelReferrerName ?? "",
+      input.visitChannelOther ?? "",
       input.purposes ?? [],
       input.purposeOther ?? "",
       input.optionNote ?? "",

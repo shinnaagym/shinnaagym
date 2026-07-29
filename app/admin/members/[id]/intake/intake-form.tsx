@@ -453,7 +453,7 @@ export function IntakeForm({
         </Field>
       </SectionCard>
 
-      <SectionCard title="통증의 발생 과정 (MOI)">
+      <SectionCard title="상담 내용">
         <textarea
           value={form.painMoi}
           onChange={(e) => patch({ painMoi: e.target.value })}

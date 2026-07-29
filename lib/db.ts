@@ -342,6 +342,7 @@ function ensureSchema(): Promise<void> {
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
             ALTER TABLE members ADD COLUMN IF NOT EXISTS improvement_direction TEXT NOT NULL DEFAULT '';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_updated_at TIMESTAMPTZ;
+            ALTER TABLE contracts ADD COLUMN IF NOT EXISTS visit_channel_other TEXT NOT NULL DEFAULT '';
 
             -- class_sessions/packages는 매일 계속 쌓이는 테이블인데 PK 외 인덱스가 전혀 없어서,
             -- 데이터가 늘어날수록 스케줄표·대시보드·재등록 관리의 거의 모든 조회가 매번 전체
@@ -468,6 +469,7 @@ export interface ContractRow {
   address: string;
   visit_channel: VisitChannel;
   visit_channel_referrer_name: string;
+  visit_channel_other: string;
   purposes: string[];
   purpose_other: string;
   option_note: string;

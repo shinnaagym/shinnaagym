@@ -351,12 +351,28 @@ export function ExercisePerformanceChart({
       )}
 
       <div className="flex items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-ink/60 flex-wrap">
-        {series.map((s) => (
-          <span key={s.name} className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-4" style={{ backgroundColor: s.color }} />
-            {s.name}
-          </span>
-        ))}
+        {series.map((s) => {
+          const points = s.values.filter((v): v is ExercisePoint => v != null);
+          const first = points[0];
+          const last = points[points.length - 1];
+          const showChange = first != null && last != null && first !== last;
+          return (
+            <span key={s.name} className="flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-4" style={{ backgroundColor: s.color }} />
+              {s.name}
+              {showChange && (
+                <span className="text-ink/50">
+                  {first.e1rm}kg →{" "}
+                  <span
+                    className={last.e1rm > first.e1rm ? "text-sage font-medium" : "text-ink/60"}
+                  >
+                    {last.e1rm}kg
+                  </span>
+                </span>
+              )}
+            </span>
+          );
+        })}
       </div>
 
       <div className="relative">

@@ -68,6 +68,7 @@ export async function POST(
         address?: unknown;
         visitChannel?: unknown;
         visitChannelReferrerName?: unknown;
+        visitChannelOther?: unknown;
         purposes?: unknown;
         purposeOther?: unknown;
         optionNote?: unknown;
@@ -87,6 +88,8 @@ export async function POST(
     typeof body?.visitChannelReferrerName === "string"
       ? body.visitChannelReferrerName.trim()
       : "";
+  const visitChannelOther =
+    typeof body?.visitChannelOther === "string" ? body.visitChannelOther.trim() : "";
   const purposes = Array.isArray(body?.purposes)
     ? body.purposes.filter((p): p is string => typeof p === "string")
     : [];
@@ -106,6 +109,7 @@ export async function POST(
     address,
     visitChannel,
     visitChannelReferrerName,
+    visitChannelOther,
     purposes,
     purposeOther,
     optionNote,

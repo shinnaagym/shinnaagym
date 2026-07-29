@@ -68,6 +68,7 @@ export const PromAccordion = memo(function PromAccordion({
   isOpen,
   toggleKey,
   onToggle,
+  statusMessage,
 }: {
   title: string;
   scoreLabel: string | null;
@@ -77,6 +78,8 @@ export const PromAccordion = memo(function PromAccordion({
   isOpen: boolean;
   toggleKey: string;
   onToggle: (key: string) => void;
+  /** 퍼포먼스 단계 전환 기준 충족 여부를 설명하는 안내 문구 — 점수가 있을 때만 표시한다. */
+  statusMessage?: { text: string; met: boolean } | null;
 }) {
   return (
     <Accordion
@@ -84,6 +87,17 @@ export const PromAccordion = memo(function PromAccordion({
       isOpen={isOpen}
       onToggle={() => onToggle(toggleKey)}
     >
+      {statusMessage && (
+        <p
+          className={[
+            "px-4 py-2.5 text-sm border-b border-line/50",
+            statusMessage.met ? "bg-green-50 text-green-700" : "bg-coral/10 text-coral",
+          ].join(" ")}
+        >
+          {statusMessage.met ? "✅ " : "⚠️ "}
+          {statusMessage.text}
+        </p>
+      )}
       {items.map((item) => (
         <PromItemRow key={item.key} item={item} value={answers[item.key]} onAnswer={onAnswer} />
       ))}

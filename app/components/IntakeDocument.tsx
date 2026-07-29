@@ -160,7 +160,7 @@ export function IntakeDocument({
         </Field>
       </Section>
 
-      <Section title="통증의 발생 과정 (MOI)">
+      <Section title="상담 내용">
         <Field label="서술">{intake.pain_moi || "-"}</Field>
       </Section>
 

@@ -33,6 +33,7 @@ export interface ContractDocumentData {
   address: string;
   visit_channel: VisitChannel;
   visit_channel_referrer_name: string;
+  visit_channel_other: string;
   purposes: string[];
   purpose_other: string;
   option_note: string;
@@ -63,7 +64,9 @@ export function ContractDocument({
   const visitChannelLabel = contract.visit_channel
     ? contract.visit_channel === "referral" && contract.visit_channel_referrer_name
       ? `지인 (${contract.visit_channel_referrer_name})`
-      : VISIT_CHANNEL_LABELS[contract.visit_channel]
+      : contract.visit_channel === "other" && contract.visit_channel_other
+        ? `기타 (${contract.visit_channel_other})`
+        : VISIT_CHANNEL_LABELS[contract.visit_channel]
     : "-";
 
   return (

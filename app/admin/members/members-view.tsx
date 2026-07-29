@@ -623,6 +623,8 @@ function ContractFieldsFieldset({
   onVisitChannelChange,
   visitChannelReferrerName,
   onVisitChannelReferrerNameChange,
+  visitChannelOther,
+  onVisitChannelOtherChange,
   purposes,
   onTogglePurpose,
   purposeOther,
@@ -643,6 +645,8 @@ function ContractFieldsFieldset({
   onVisitChannelChange: (v: VisitChannel) => void;
   visitChannelReferrerName: string;
   onVisitChannelReferrerNameChange: (v: string) => void;
+  visitChannelOther: string;
+  onVisitChannelOtherChange: (v: string) => void;
   purposes: string[];
   onTogglePurpose: (v: string) => void;
   purposeOther: string;
@@ -700,6 +704,14 @@ function ContractFieldsFieldset({
                 value={visitChannelReferrerName}
                 onChange={(e) => onVisitChannelReferrerNameChange(e.target.value)}
                 placeholder="소개해주신 분 이름"
+                className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            )}
+            {visitChannel === "other" && (
+              <input
+                value={visitChannelOther}
+                onChange={(e) => onVisitChannelOtherChange(e.target.value)}
+                placeholder="경로를 입력해주세요"
                 className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
               />
             )}
@@ -788,6 +800,7 @@ function CreateMemberModal({
   const [address, setAddress] = useState("");
   const [visitChannel, setVisitChannel] = useState<VisitChannel>("");
   const [visitChannelReferrerName, setVisitChannelReferrerName] = useState("");
+  const [visitChannelOther, setVisitChannelOther] = useState("");
   const [purposes, setPurposes] = useState<string[]>([]);
   const [purposeOther, setPurposeOther] = useState("");
   const [optionNote, setOptionNote] = useState("");
@@ -830,6 +843,7 @@ function CreateMemberModal({
           address,
           visitChannel,
           visitChannelReferrerName,
+          visitChannelOther,
           purposes,
           purposeOther,
           optionNote,
@@ -946,6 +960,8 @@ function CreateMemberModal({
             onVisitChannelChange={setVisitChannel}
             visitChannelReferrerName={visitChannelReferrerName}
             onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
+            visitChannelOther={visitChannelOther}
+            onVisitChannelOtherChange={setVisitChannelOther}
             purposes={purposes}
             onTogglePurpose={togglePurpose}
             purposeOther={purposeOther}
@@ -988,6 +1004,7 @@ function WriteContractModal({
   const [address, setAddress] = useState("");
   const [visitChannel, setVisitChannel] = useState<VisitChannel>("");
   const [visitChannelReferrerName, setVisitChannelReferrerName] = useState("");
+  const [visitChannelOther, setVisitChannelOther] = useState("");
   const [purposes, setPurposes] = useState<string[]>([]);
   const [purposeOther, setPurposeOther] = useState("");
   const [optionNote, setOptionNote] = useState("");
@@ -1014,6 +1031,7 @@ function WriteContractModal({
           address,
           visitChannel,
           visitChannelReferrerName,
+          visitChannelOther,
           purposes,
           purposeOther,
           optionNote,
@@ -1053,6 +1071,8 @@ function WriteContractModal({
           onVisitChannelChange={setVisitChannel}
           visitChannelReferrerName={visitChannelReferrerName}
           onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
+          visitChannelOther={visitChannelOther}
+          onVisitChannelOtherChange={setVisitChannelOther}
           purposes={purposes}
           onTogglePurpose={togglePurpose}
           purposeOther={purposeOther}
