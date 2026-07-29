@@ -17,6 +17,7 @@ import {
   computeFaamScore,
   computeStartBackScore,
 } from "@/lib/prom-instruments";
+import { computeE1rm } from "@/lib/exercise-performance";
 import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
 
 export interface AssessmentDocumentData {
@@ -303,12 +304,22 @@ export function AssessmentDocument({
           <div className="rounded-2xl border border-line px-4 py-4 text-sm text-ink/50">-</div>
         ) : (
           <div className="rounded-2xl border border-line divide-y divide-line/60 text-sm">
-            {assessment.exercisePerformance.map((entry, i) => (
-              <div key={i} className="px-4 py-3">
-                <p className="font-medium text-ink">{entry.exercise || "-"}</p>
-                <p className="text-ink/70">{entry.note || "-"}</p>
-              </div>
-            ))}
+            {assessment.exercisePerformance.map((entry, i) => {
+              const e1rm = computeE1rm(entry.weight, entry.reps);
+              return (
+                <div key={i} className="px-4 py-3">
+                  <p className="font-medium text-ink">{entry.exercise || "-"}</p>
+                  {entry.note && <p className="text-ink/70">{entry.note}</p>}
+                  {entry.weight != null && entry.reps != null && (
+                    <p className="text-ink/60 text-xs mt-1">
+                      탑세트 {entry.weight}kg × {entry.reps}회
+                      {entry.rpe != null && ` · RPE ${entry.rpe}`}
+                      {e1rm != null && ` · e1RM ${e1rm}kg`}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

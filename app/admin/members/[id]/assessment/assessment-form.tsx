@@ -177,8 +177,55 @@ const ExercisePerformanceRow = memo(function ExercisePerformanceRow({
         value={entry.note}
         onChange={(e) => onChange(index, { note: e.target.value })}
         placeholder="예: 60bpm으로 45회 수행 가능"
-        className={inputClass()}
+        className={inputClass() + " mb-2"}
       />
+      <label className="block text-xs text-ink/40 mb-1.5">
+        탑세트 (무게·횟수·RPE) — 기록하면 e1RM 그래프에 반영돼요
+      </label>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            value={entry.weight ?? ""}
+            onChange={(e) =>
+              onChange(index, { weight: e.target.value === "" ? null : Number(e.target.value) })
+            }
+            placeholder="무게(kg)"
+            className={inputClass()}
+          />
+        </div>
+        <div>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={entry.reps ?? ""}
+            onChange={(e) =>
+              onChange(index, { reps: e.target.value === "" ? null : Number(e.target.value) })
+            }
+            placeholder="횟수"
+            className={inputClass()}
+          />
+        </div>
+        <div>
+          <select
+            value={entry.rpe ?? ""}
+            onChange={(e) =>
+              onChange(index, { rpe: e.target.value === "" ? null : Number(e.target.value) })
+            }
+            className={inputClass() + " bg-white"}
+          >
+            <option value="">RPE</option>
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
+              <option key={v} value={v}>
+                RPE {v}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
     </div>
   );
 });
@@ -332,7 +379,7 @@ export function AssessmentForm({
     () =>
       initialData && initialData.exercisePerformance.length > 0
         ? initialData.exercisePerformance
-        : [{ exercise: "", note: "" }],
+        : [{ exercise: "", note: "", weight: null, reps: null, rpe: null }],
   );
   const [odiAnswers, setOdiAnswers] = useState<Record<string, number>>(
     () => initialData?.odiAnswers ?? {},
@@ -517,7 +564,10 @@ export function AssessmentForm({
   );
 
   function addExercisePerformance() {
-    setExercisePerformance((prev) => [...prev, { exercise: "", note: "" }]);
+    setExercisePerformance((prev) => [
+      ...prev,
+      { exercise: "", note: "", weight: null, reps: null, rpe: null },
+    ]);
   }
 
   const removeExercisePerformance = useCallback((index: number) => {

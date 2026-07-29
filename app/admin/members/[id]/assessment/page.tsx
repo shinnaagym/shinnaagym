@@ -6,6 +6,7 @@ import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessment
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { movementLabelWithRegion } from "@/lib/assessment-movements";
 import { AssessmentPainChart } from "./pain-chart";
+import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { DeleteAssessmentButton } from "@/app/components/DeleteAssessmentButton";
 import type { AssessmentRow } from "@/lib/db";
 
@@ -92,6 +93,7 @@ export default async function AssessmentHistoryPage({
       ) : (
         <>
         <AssessmentPainChart assessments={assessments} />
+        <ExercisePerformanceChart assessments={assessments} />
         <ul className="space-y-2">
           {assessments.map((a) => {
             const flagged = flaggedMovementSummaries(a);

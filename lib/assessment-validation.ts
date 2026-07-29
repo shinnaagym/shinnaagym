@@ -66,6 +66,14 @@ export function parsePainTriggers(raw: unknown): PainTriggerEntry[] {
   return entries;
 }
 
+function positiveNumber(raw: unknown, max: number): number | null {
+  return typeof raw === "number" && Number.isFinite(raw) && raw > 0 && raw <= max ? raw : null;
+}
+
+function rpeValue(raw: unknown): number | null {
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 10 ? raw : null;
+}
+
 export function parseExercisePerformance(raw: unknown): ExercisePerformanceEntry[] {
   if (!Array.isArray(raw)) return [];
   const entries: ExercisePerformanceEntry[] = [];
@@ -74,8 +82,11 @@ export function parseExercisePerformance(raw: unknown): ExercisePerformanceEntry
     const record = item as Record<string, unknown>;
     const exercise = typeof record.exercise === "string" ? record.exercise.trim() : "";
     const note = typeof record.note === "string" ? record.note.trim() : "";
-    if (!exercise && !note) continue;
-    entries.push({ exercise, note });
+    const weight = positiveNumber(record.weight, 500);
+    const reps = positiveNumber(record.reps, 100);
+    const rpe = rpeValue(record.rpe);
+    if (!exercise && !note && weight == null && reps == null && rpe == null) continue;
+    entries.push({ exercise, note, weight, reps, rpe });
   }
   return entries;
 }

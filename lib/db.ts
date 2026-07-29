@@ -473,6 +473,9 @@ export interface PainTriggerEntry {
 export interface ExercisePerformanceEntry {
   exercise: string;
   note: string;
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
 }
 
 export interface AssessmentRow {
