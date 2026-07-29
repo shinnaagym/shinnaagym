@@ -92,8 +92,8 @@ export default async function AssessmentHistoryPage({
         </div>
       ) : (
         <>
-        <AssessmentPainChart assessments={assessments} />
-        <ExercisePerformanceChart assessments={assessments} />
+        <AssessmentPainChart assessments={assessments} memberId={idNum} />
+        <ExercisePerformanceChart assessments={assessments} memberId={idNum} />
         <ul className="space-y-2">
           {assessments.map((a) => {
             const flagged = flaggedMovementSummaries(a);

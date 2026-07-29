@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { computeE1rm } from "@/lib/exercise-performance";
+import { koreaTodayKey } from "@/lib/date";
 import type { AssessmentRow } from "@/lib/db";
 
 const WIDTH = 640;
@@ -86,8 +88,119 @@ function buildExerciseSeries(assessments: AssessmentRow[]): Map<string, Exercise
   return result;
 }
 
-function SingleExerciseChart({ name, points }: { name: string; points: ExercisePoint[] }) {
+/** 운동 하나의 차트 카드에 붙는 "빠른 기록 추가" 폼 — 관리자 화면에서 memberId가 있을 때만 노출된다. */
+function QuickAddExerciseForm({ memberId, name, onDone }: { memberId: number; name: string; onDone: () => void }) {
+  const router = useRouter();
+  const [date, setDate] = useState(() => koreaTodayKey());
+  const [weight, setWeight] = useState("");
+  const [reps, setReps] = useState("");
+  const [rpe, setRpe] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    const weightNum = Number(weight);
+    const repsNum = Number(reps);
+    if (!weightNum || !repsNum) {
+      setError("무게와 횟수를 입력해주세요.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}/assessments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evaluatedAt: date,
+          exercisePerformance: [
+            { exercise: name, note: "", weight: weightNum, reps: repsNum, rpe: rpe ? Number(rpe) : null },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "저장에 실패했어요.");
+        return;
+      }
+      router.refresh();
+      onDone();
+    } catch {
+      setError("네트워크 오류가 발생했어요.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-line/50">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        />
+        <input
+          type="number"
+          inputMode="decimal"
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          placeholder="무게(kg)"
+          className="w-24 rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        />
+        <input
+          type="number"
+          inputMode="numeric"
+          value={reps}
+          onChange={(e) => setReps(e.target.value)}
+          placeholder="횟수"
+          className="w-20 rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        />
+        <select
+          value={rpe}
+          onChange={(e) => setRpe(e.target.value)}
+          className="rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        >
+          <option value="">RPE(선택)</option>
+          {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="rounded-full bg-coral text-white px-4 py-1.5 text-sm hover:opacity-90 transition disabled:opacity-50"
+        >
+          저장
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="rounded-full border border-line px-4 py-1.5 text-sm hover:border-coral/40 transition"
+        >
+          취소
+        </button>
+      </div>
+      {error && <p className="text-sm text-coral mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
+function SingleExerciseChart({
+  name,
+  points,
+  memberId,
+}: {
+  name: string;
+  points: ExercisePoint[];
+  memberId?: number;
+}) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const n = points.length;
   const values = points.map((p) => p.e1rm);
@@ -136,12 +249,23 @@ function SingleExerciseChart({ name, points }: { name: string; points: ExerciseP
           to { stroke-dashoffset: 0; }
         }
       `}</style>
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-1 gap-2">
         <p className="font-display text-base">{name}</p>
-        <p className="text-xs text-ink/50">
-          {first.e1rm}kg → <span className={trendUp ? "text-sage font-medium" : ""}>{last.e1rm}kg</span>{" "}
-          (e1RM)
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-ink/50 whitespace-nowrap">
+            {first.e1rm}kg → <span className={trendUp ? "text-sage font-medium" : ""}>{last.e1rm}kg</span>{" "}
+            (e1RM)
+          </p>
+          {memberId != null && !showAddForm && (
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
+            >
+              + 기록추가
+            </button>
+          )}
+        </div>
       </div>
       <p className="text-[11px] text-ink/40 mb-2">
         점 크기·색이 진할수록(코랄) 그날 힘들었던 세트, 연할수록(세이지) 가볍게 든 세트예요.
@@ -235,6 +359,10 @@ function SingleExerciseChart({ name, points }: { name: string; points: ExerciseP
           </div>
         )}
       </div>
+
+      {memberId != null && showAddForm && (
+        <QuickAddExerciseForm memberId={memberId} name={name} onDone={() => setShowAddForm(false)} />
+      )}
     </div>
   );
 }
@@ -244,7 +372,13 @@ function SingleExerciseChart({ name, points }: { name: string; points: ExerciseP
 // 올라간다 = 강해지고 있다"만 보면 되도록 종목마다 그래프를 하나씩 분리해
 // 단순하게 그린다. RPE는 점 크기와 색으로 표현해 "더 가벼운 느낌으로 더
 // 무거운 무게를 든다"는 변화를 함께 보여준다.
-export function ExercisePerformanceChart({ assessments }: { assessments: AssessmentRow[] }) {
+export function ExercisePerformanceChart({
+  assessments,
+  memberId,
+}: {
+  assessments: AssessmentRow[];
+  memberId?: number;
+}) {
   const series = useMemo(() => buildExerciseSeries(assessments), [assessments]);
   const entries = Array.from(series.entries()).filter(([, points]) => points.length > 0);
 
@@ -254,7 +388,7 @@ export function ExercisePerformanceChart({ assessments }: { assessments: Assessm
     <div className="mb-4">
       <p className="font-display text-base mb-2">운동 수행능력 추이 (e1RM)</p>
       {entries.map(([name, points]) => (
-        <SingleExerciseChart key={name} name={name} points={points} />
+        <SingleExerciseChart key={name} name={name} points={points} memberId={memberId} />
       ))}
     </div>
   );

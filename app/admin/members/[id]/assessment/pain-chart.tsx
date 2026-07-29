@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ASSESSMENT_REGIONS, movementLabelWithRegion } from "@/lib/assessment-movements";
+import { useRouter } from "next/navigation";
+import { ASSESSMENT_REGIONS, NRS_PAIN_OPTIONS, movementLabelWithRegion } from "@/lib/assessment-movements";
+import { koreaTodayKey } from "@/lib/date";
 import type { AssessmentMovements, AssessmentRow, PainTriggerEntry } from "@/lib/db";
 
 const WIDTH = 640;
@@ -99,13 +101,126 @@ function groupByDate(assessments: AssessmentRow[]): DayGroup[] {
   return groups.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 }
 
+/** 통증 척도 추이 그래프에 붙는 "빠른 기록 추가" 폼 — 이미 추적 중인 동작 중 하나를 골라 오늘 날짜의 통증 점수만 새로 기록한다. */
+function QuickAddPainForm({
+  memberId,
+  seriesOptions,
+  onDone,
+}: {
+  memberId: number;
+  seriesOptions: { key: string; label: string }[];
+  onDone: () => void;
+}) {
+  const router = useRouter();
+  const [seriesKey, setSeriesKey] = useState(seriesOptions[0]?.key ?? "");
+  const [date, setDate] = useState(() => koreaTodayKey());
+  const [painScale, setPainScale] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    if (!seriesKey || painScale === "") {
+      setError("동작과 통증 점수를 선택해주세요.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = { evaluatedAt: date };
+      if (seriesKey.startsWith("note:")) {
+        body.painTriggers = [{ note: seriesKey.slice(5), painScale: Number(painScale) }];
+      } else {
+        const movementId = seriesKey.slice("movement:".length);
+        body.movements = {
+          [movementId]: { romPassive: "", romActive: "", strength: "", painScale, compensation: "" },
+        };
+      }
+      const res = await fetch(`/api/admin/members/${memberId}/assessments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "저장에 실패했어요.");
+        return;
+      }
+      router.refresh();
+      onDone();
+    } catch {
+      setError("네트워크 오류가 발생했어요.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mb-3 pb-3 border-b border-line/50">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={seriesKey}
+          onChange={(e) => setSeriesKey(e.target.value)}
+          className="rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral max-w-[220px]"
+        >
+          {seriesOptions.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        />
+        <select
+          value={painScale}
+          onChange={(e) => setPainScale(e.target.value)}
+          className="rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        >
+          <option value="">통증(0~10)</option>
+          {NRS_PAIN_OPTIONS.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="rounded-full bg-coral text-white px-4 py-1.5 text-sm hover:opacity-90 transition disabled:opacity-50"
+        >
+          저장
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="rounded-full border border-line px-4 py-1.5 text-sm hover:border-coral/40 transition"
+        >
+          취소
+        </button>
+      </div>
+      {error && <p className="text-sm text-coral mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
 // 관리자 평가 이력 목록 위에 붙는 통증 척도 추이 그래프. 이 회원이 그동안
 // 기록한 모든 통증 유발 동작 문구와 부위별 동작을 각각 하나의 선으로 동시에
 // 겹쳐 보여준다. 같은 동작끼리는 데이터가 없는 날짜를 건너뛰고 선으로 이어
 // 그리며, 처음 렌더링될 때 선이 왼쪽에서 오른쪽으로 그려지는 애니메이션이
 // 재생된다. 재평가 시 통증이 줄어드는지 한눈에 확인하기 위한 용도.
-export function AssessmentPainChart({ assessments }: { assessments: AssessmentRow[] }) {
+export function AssessmentPainChart({
+  assessments,
+  memberId,
+}: {
+  assessments: AssessmentRow[];
+  memberId?: number;
+}) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const dayGroups = useMemo(() => groupByDate(assessments), [assessments]);
 
@@ -225,7 +340,26 @@ export function AssessmentPainChart({ assessments }: { assessments: AssessmentRo
           to { stroke-dashoffset: 0; }
         }
       `}</style>
-      <p className="font-display text-base mb-2">통증 척도 추이</p>
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <p className="font-display text-base">통증 척도 추이</p>
+        {memberId != null && series.length > 0 && !showAddForm && (
+          <button
+            type="button"
+            onClick={() => setShowAddForm(true)}
+            className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
+          >
+            + 기록추가
+          </button>
+        )}
+      </div>
+
+      {memberId != null && showAddForm && series.length > 0 && (
+        <QuickAddPainForm
+          memberId={memberId}
+          seriesOptions={series.map((s) => ({ key: s.key, label: s.label }))}
+          onDone={() => setShowAddForm(false)}
+        />
+      )}
 
       {series.length > 0 && (
         <div className="flex items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-ink/60 flex-wrap">
