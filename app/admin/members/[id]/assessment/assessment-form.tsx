@@ -247,26 +247,6 @@ const MovementRow = memo(function MovementRow({
   );
 });
 
-function NrsPills({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {NRS_PAIN_OPTIONS.map((n) => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onChange(value === Number(n) ? null : Number(n))}
-          className={[
-            "h-8 w-8 rounded-full border text-xs font-medium transition",
-            value === Number(n) ? "bg-coral text-white border-coral" : "border-line text-ink/60 hover:bg-bone",
-          ].join(" ")}
-        >
-          {n}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 const PromItemRow = memo(function PromItemRow({
   item,
   value,
@@ -384,8 +364,6 @@ export interface AssessmentInitialData {
   koos12Answers: Record<string, number>;
   faamAdlAnswers: Record<string, number>;
   faamSportsAnswers: Record<string, number>;
-  nprsRest: number | null;
-  nprsActivity: number | null;
   functionalTestPainFree: Record<string, boolean>;
   hopTestLsi: number | null;
   cmjLsi: number | null;
@@ -462,8 +440,6 @@ export function AssessmentForm({
   const [faamSportsAnswers, setFaamSportsAnswers] = useState<Record<string, number>>(
     () => initialData?.faamSportsAnswers ?? {},
   );
-  const [nprsRest, setNprsRest] = useState<number | null>(initialData?.nprsRest ?? null);
-  const [nprsActivity, setNprsActivity] = useState<number | null>(initialData?.nprsActivity ?? null);
   const [functionalTestPainFree, setFunctionalTestPainFree] = useState<Record<string, boolean>>(
     () => initialData?.functionalTestPainFree ?? {},
   );
@@ -530,16 +506,6 @@ export function AssessmentForm({
   const functionalTestsPainFreeCount = FUNCTIONAL_TESTS.filter((t) => functionalTestPainFree[t.key]).length;
 
   const performanceCriteria: Criterion[] = [
-    {
-      label: "NRS 통증(안정 시) ≤ 1",
-      value: nprsRest == null ? "미입력" : `${nprsRest}/10`,
-      status: nprsRest == null ? "unknown" : nprsRest <= 1 ? "pass" : "fail",
-    },
-    {
-      label: "NRS 통증(활동 중) ≤ 3",
-      value: nprsActivity == null ? "미입력" : `${nprsActivity}/10`,
-      status: nprsActivity == null ? "unknown" : nprsActivity <= 3 ? "pass" : "fail",
-    },
     {
       label: "ODI(요추 기능장애) ≤ 20%",
       value: odiScore == null ? "미입력" : `${odiScore}%`,
@@ -687,8 +653,6 @@ export function AssessmentForm({
           koos12Answers,
           faamAdlAnswers,
           faamSportsAnswers,
-          nprsRest,
-          nprsActivity,
           functionalTestPainFree,
           hopTestLsi,
           cmjLsi,
@@ -871,21 +835,6 @@ export function AssessmentForm({
         >
           + 운동 수행능력 추가
         </button>
-      </div>
-
-      <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-3">
-        <h2 className="font-display text-lg mb-1">NRS 통증 척도</h2>
-        <p className="text-xs text-ink/50 mb-3">안정 시와 활동 중의 통증을 각각 0~10으로 기록해주세요.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs text-ink/40 mb-1.5">안정 시</label>
-            <NrsPills value={nprsRest} onChange={setNprsRest} />
-          </div>
-          <div>
-            <label className="block text-xs text-ink/40 mb-1.5">활동 중</label>
-            <NrsPills value={nprsActivity} onChange={setNprsActivity} />
-          </div>
-        </div>
       </div>
 
       <div className="rounded-2xl border border-line bg-white px-5 py-4 mt-3 mb-3">

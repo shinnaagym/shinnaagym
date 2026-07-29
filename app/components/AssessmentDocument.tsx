@@ -136,17 +136,6 @@ export function AssessmentDocument({
 
   const performanceCriteria: { label: string; value: string; status: "pass" | "fail" | "unknown" }[] = [
     {
-      label: "NRS 통증(안정 시) ≤ 1",
-      value: assessment.nprs_rest == null ? "미입력" : `${assessment.nprs_rest}/10`,
-      status: assessment.nprs_rest == null ? "unknown" : assessment.nprs_rest <= 1 ? "pass" : "fail",
-    },
-    {
-      label: "NRS 통증(활동 중) ≤ 3",
-      value: assessment.nprs_activity == null ? "미입력" : `${assessment.nprs_activity}/10`,
-      status:
-        assessment.nprs_activity == null ? "unknown" : assessment.nprs_activity <= 3 ? "pass" : "fail",
-    },
-    {
       label: "ODI ≤ 20%",
       value: odiScore == null ? "미입력" : `${odiScore}%`,
       status: odiScore == null ? "unknown" : odiScore <= 20 ? "pass" : "fail",

@@ -108,11 +108,6 @@ export const parseFaamSportsAnswers = (raw: unknown): Record<string, number> =>
 export const parseStartbackAnswers = (raw: unknown): Record<string, number> =>
   parsePromAnswers(raw, STARTBACK_ITEMS);
 
-/** 0~10 사이의 정수 NRS 값만 허용, 그 외에는 null. */
-export function parseNprsValue(raw: unknown): number | null {
-  return typeof raw === "number" && Number.isInteger(raw) && raw >= 0 && raw <= 10 ? raw : null;
-}
-
 /** 5개 기능적 움직임 검사(코어/스쿼트/오버헤드스쿼트/푸쉬업/힙힌지)의 "무통" 여부 맵. */
 export function parseFunctionalTestPainFree(raw: unknown): Record<string, boolean> {
   const result: Record<string, boolean> = {};
@@ -153,8 +148,6 @@ export interface ParsedAssessmentInput {
   koos12Answers: Record<string, number>;
   faamAdlAnswers: Record<string, number>;
   faamSportsAnswers: Record<string, number>;
-  nprsRest: number | null;
-  nprsActivity: number | null;
   functionalTestPainFree: Record<string, boolean>;
   hopTestLsi: number | null;
   cmjLsi: number | null;
@@ -182,8 +175,6 @@ export function parseAssessmentInput(body: Record<string, unknown> | null): Pars
     koos12Answers: parseKoos12Answers(body?.koos12Answers),
     faamAdlAnswers: parseFaamAdlAnswers(body?.faamAdlAnswers),
     faamSportsAnswers: parseFaamSportsAnswers(body?.faamSportsAnswers),
-    nprsRest: parseNprsValue(body?.nprsRest),
-    nprsActivity: parseNprsValue(body?.nprsActivity),
     functionalTestPainFree: parseFunctionalTestPainFree(body?.functionalTestPainFree),
     hopTestLsi: parseLsiValue(body?.hopTestLsi),
     cmjLsi: parseLsiValue(body?.cmjLsi),

@@ -74,8 +74,6 @@ export default async function EditAssessmentPage({
           koos12Answers: assessment.koos12_answers,
           faamAdlAnswers: assessment.faam_adl_answers,
           faamSportsAnswers: assessment.faam_sports_answers,
-          nprsRest: assessment.nprs_rest,
-          nprsActivity: assessment.nprs_activity,
           functionalTestPainFree: assessment.functional_test_pain_free,
           hopTestLsi: assessment.hop_test_lsi,
           cmjLsi: assessment.cmj_lsi,
