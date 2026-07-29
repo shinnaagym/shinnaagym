@@ -275,10 +275,13 @@ export function MembersView({
               const low = !expired && remaining > 0 && remaining <= 3;
               const goldenBell = m.status === "active" && m.total_sessions > 0 && remaining <= 3;
               return (
-                <button
+                <div
                   key={m.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setDetailId(m.id)}
-                  className="text-left rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3.5 active:bg-bone/40 transition"
+                  onKeyDown={(e) => e.key === "Enter" && setDetailId(m.id)}
+                  className="text-left rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3.5 active:bg-bone/40 transition cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="font-medium flex items-center gap-1.5 flex-wrap">
@@ -287,16 +290,25 @@ export function MembersView({
                       {goldenBell && <GoldenBellBadge />}
                       {m.referrer && <ReferrerBadge referrer={m.referrer} />}
                     </span>
-                    <span
-                      className={[
-                        "rounded-full px-2.5 py-0.5 text-xs shrink-0",
-                        m.status === "active"
-                          ? "bg-sage/20 text-sage"
-                          : "bg-line/40 text-ink/50",
-                      ].join(" ")}
-                    >
-                      {m.status === "active" ? "활성" : "비활성"}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Link
+                        href={`/admin/members/${m.id}/assessment`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
+                      >
+                        평가 기록
+                      </Link>
+                      <span
+                        className={[
+                          "rounded-full px-2.5 py-0.5 text-xs shrink-0",
+                          m.status === "active"
+                            ? "bg-sage/20 text-sage"
+                            : "bg-line/40 text-ink/50",
+                        ].join(" ")}
+                      >
+                        {m.status === "active" ? "활성" : "비활성"}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex-1 h-1.5 rounded-full bg-line/60 overflow-hidden">
@@ -337,7 +349,7 @@ export function MembersView({
                     </span>
                     <span className="text-ink/50">다음주 수업 예약</span>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -377,6 +389,13 @@ export function MembersView({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {m.name}
                           {m.referrer && <ReferrerBadge referrer={m.referrer} />}
+                          <Link
+                            href={`/admin/members/${m.id}/assessment`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
+                          >
+                            평가 기록
+                          </Link>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-ink/70">{coachName}</td>
@@ -1441,7 +1460,7 @@ function MemberDetailModal({
             href={`/admin/members/${memberId}/assessment`}
             className="rounded-full border border-coral text-coral px-2.5 py-0.5 text-xs font-medium hover:bg-coral/5 transition whitespace-nowrap"
           >
-            {data.assessmentSummary.count > 0 ? "이력 보기" : "+ 평가 작성"}
+            {data.assessmentSummary.count > 0 ? "평가 기록" : "+ 평가 작성"}
           </Link>
         </div>
 

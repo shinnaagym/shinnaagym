@@ -135,6 +135,7 @@ export interface MemberInput {
   availableTimes?: string;
   followupStatus?: string;
   followupMemo?: string;
+  improvementDirection?: string;
 }
 
 export async function createMember(input: MemberInput): Promise<MemberRow> {
@@ -193,6 +194,10 @@ export async function updateMember(
   if (input.followupMemo !== undefined) {
     fields.push(`followup_memo = $${++i}`);
     values.push(input.followupMemo);
+  }
+  if (input.improvementDirection !== undefined) {
+    fields.push(`improvement_direction = $${++i}`);
+    values.push(input.improvementDirection);
   }
   if (input.status !== undefined) {
     fields.push(`status = $${++i}`);

@@ -172,7 +172,7 @@ function SessionCellButton({
 
 function formatWeekLabel(dateKeys: string[]) {
   const [, m1, d1] = dateKeys[0].split("-");
-  const [, m2, d2] = dateKeys[6].split("-");
+  const [, m2, d2] = dateKeys[dateKeys.length - 1].split("-");
   return `${Number(m1)}.${Number(d1)} - ${Number(m2)}.${Number(d2)}`;
 }
 
@@ -285,7 +285,7 @@ export function ScheduleGrid({
   }, [sessions, visibleCoaches]);
 
   async function refreshSessions() {
-    const weekEnd = dateKeys[6];
+    const weekEnd = dateKeys[dateKeys.length - 1];
     const res = await fetch(`/api/admin/sessions?from=${weekStart}&to=${weekEnd}`);
     if (res.ok) {
       const data = await res.json();
@@ -458,6 +458,8 @@ export function ScheduleGrid({
           );
         })}
       </div>
+
+      <ScheduleMemoPad initialMemos={initialMemos} />
 
       {/* 코치를 한 명만 선택하면 요일 탭과 무관하게 그 코치의 이번 주 전체를 한 번에 보여준다. */}
       {singleCoach ? (
@@ -678,8 +680,6 @@ export function ScheduleGrid({
         );
       })()
       )}
-
-      <ScheduleMemoPad initialMemos={initialMemos} />
 
       {createTarget && (
         <CreateSessionModal

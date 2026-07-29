@@ -72,6 +72,7 @@ export async function PATCH(
         availableTimes?: unknown;
         followupStatus?: unknown;
         followupMemo?: unknown;
+        improvementDirection?: unknown;
         status?: unknown;
       }
     | null;
@@ -101,6 +102,10 @@ export async function PATCH(
         : undefined,
     followupMemo:
       typeof body.followupMemo === "string" ? body.followupMemo.trim() : undefined,
+    improvementDirection:
+      typeof body.improvementDirection === "string"
+        ? body.improvementDirection.trim()
+        : undefined,
     status:
       body.status === "active" || body.status === "inactive"
         ? (body.status as MemberStatus)

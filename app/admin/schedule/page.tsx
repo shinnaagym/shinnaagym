@@ -24,8 +24,9 @@ export default async function AdminSchedulePage({
   const { week } = await searchParams;
   const today = koreaTodayKey();
   const weekStart = mondayOfWeek(week && /^\d{4}-\d{2}-\d{2}$/.test(week) ? week : today);
-  const dateKeys = Array.from({ length: 7 }, (_, i) => addDaysToKey(weekStart, i));
-  const weekEnd = dateKeys[6];
+  // 스튜디오가 항상 휴무인 일요일은 스케줄표에서 완전히 제외 — 월~토 6일만 다룬다.
+  const dateKeys = Array.from({ length: 6 }, (_, i) => addDaysToKey(weekStart, i));
+  const weekEnd = dateKeys[dateKeys.length - 1];
 
   const monthKey = koreaCurrentMonthKey();
 

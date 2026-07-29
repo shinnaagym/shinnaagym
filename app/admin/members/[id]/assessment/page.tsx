@@ -8,6 +8,7 @@ import { movementLabelWithRegion } from "@/lib/assessment-movements";
 import { AssessmentPainChart } from "./pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { DeleteAssessmentButton } from "@/app/components/DeleteAssessmentButton";
+import { ImprovementDirectionNote } from "./improvement-direction-note";
 import type { AssessmentRow } from "@/lib/db";
 
 function formatDateTime(iso: string): string {
@@ -85,6 +86,8 @@ export default async function AssessmentHistoryPage({
       >
         + 새 평가 작성
       </Link>
+
+      <ImprovementDirectionNote memberId={idNum} initialValue={member.improvement_direction} />
 
       {assessments.length === 0 ? (
         <div className="rounded-2xl bg-white border border-line/60 px-5 py-10 text-center text-ink/40">
