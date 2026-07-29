@@ -346,6 +346,7 @@ export interface FixedSlotBackfillResult {
   slot: FixedSlotRow;
   created: number;
   skippedDates: string[];
+  createdSessionIds: number[];
 }
 
 /**
@@ -370,7 +371,7 @@ export async function addFixedSlotWithBackfill(
 
   const unallocated = await getUnallocatedSessionCount(memberId);
   if (unallocated <= 0) {
-    return { slot, created: 0, skippedDates: [] };
+    return { slot, created: 0, skippedDates: [], createdSessionIds: [] };
   }
 
   const ptType = await getLatestPtType(memberId);
@@ -385,13 +386,14 @@ export async function addFixedSlotWithBackfill(
 
   let created = 0;
   const skippedDates: string[] = [];
+  const createdSessionIds: number[] = [];
   const MAX_ATTEMPTS = 104; // 최대 2년치까지만 시도(무한 루프 방지)
   let attempts = 0;
 
   while (created < unallocated && attempts < MAX_ATTEMPTS) {
     attempts += 1;
     try {
-      await createSession({
+      const createdSession = await createSession({
         memberId,
         coachId: member.coach_id,
         date: candidateDate,
@@ -399,6 +401,7 @@ export async function addFixedSlotWithBackfill(
         entryType: "session",
         ptType,
       });
+      createdSessionIds.push(createdSession.id);
       created += 1;
     } catch (err: unknown) {
       if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === UNIQUE_VIOLATION) {
@@ -410,7 +413,7 @@ export async function addFixedSlotWithBackfill(
     candidateDate = addDaysToKey(candidateDate, 7);
   }
 
-  return { slot, created, skippedDates };
+  return { slot, created, skippedDates, createdSessionIds };
 }
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {

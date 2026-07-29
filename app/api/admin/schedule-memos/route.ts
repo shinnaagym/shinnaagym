@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { createScheduleMemo, listScheduleMemos } from "@/lib/schedule-memos";
+import { recordUndo } from "@/lib/undo";
 
 export async function GET() {
   if (!(await isAdminAuthed())) {
@@ -20,5 +21,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "메모 내용을 입력해주세요." }, { status: 400 });
   }
   const memo = await createScheduleMemo(content);
+  await recordUndo("메모 추가", [{ op: "delete", table: "schedule_memos", id: memo.id }]);
   return NextResponse.json({ memo }, { status: 201 });
 }

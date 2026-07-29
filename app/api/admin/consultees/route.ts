@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
-import { findOrCreateMemberByPhone } from "@/lib/schedule";
+import { findOrCreateMemberByPhone, getMemberByPhone } from "@/lib/schedule";
+import { recordUndo } from "@/lib/undo";
 
 /**
  * 아직 정식 등록(패키지·계약서) 전인 상담자를 이름+연락처만으로 빠르게
@@ -24,12 +25,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "연락처를 입력해주세요." }, { status: 400 });
   }
 
+  const existing = await getMemberByPhone(phone);
   const member = await findOrCreateMemberByPhone({
     name,
     phone,
     coachId: null,
     notes: "초진 문진표/평가지 작성을 위해 상담자로 등록됨",
   });
+
+  if (!existing) {
+    await recordUndo(`${name} 상담자 등록`, [{ op: "delete", table: "members", id: member.id }]);
+  }
 
   return NextResponse.json({ member });
 }

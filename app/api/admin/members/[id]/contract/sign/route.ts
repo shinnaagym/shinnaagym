@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { getLatestContractByMember, signContract } from "@/lib/contracts";
+import { recordUndo } from "@/lib/undo";
 
 export async function POST(
   req: NextRequest,
@@ -31,5 +32,13 @@ export async function POST(
   }
 
   const signed = await signContract(contract.id, signatureDataUrl);
+  await recordUndo("계약서 서명", [
+    {
+      op: "update",
+      table: "contracts",
+      id: contract.id,
+      data: { signature_data_url: null, signed_at: null },
+    },
+  ]);
   return NextResponse.json({ contract: signed });
 }

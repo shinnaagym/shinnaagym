@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -19,11 +20,30 @@ const TABS = [
 export function AdminNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const [undoing, setUndoing] = useState(false);
 
   async function handleLogout() {
     await fetch("/api/admin/logout", { method: "POST" });
     router.replace("/admin");
     router.refresh();
+  }
+
+  // 직전에 실행한 저장/등록/삭제 동작을 실제로 되돌린다(단순 화면 이동이 아니라
+  // 방금 만든 예약·회원·결제 내역 등을 취소해 이전 상태로 복원한다).
+  async function handleUndo() {
+    setUndoing(true);
+    try {
+      const res = await fetch("/api/admin/undo", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error ?? "되돌릴 작업이 없어요.");
+        return;
+      }
+      alert(`"${data.description}" 작업을 취소했어요.`);
+      window.location.reload();
+    } finally {
+      setUndoing(false);
+    }
   }
 
   return (
@@ -54,8 +74,9 @@ export function AdminNav() {
         </nav>
 
         <button
-          onClick={() => router.back()}
-          className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition"
+          onClick={handleUndo}
+          disabled={undoing}
+          className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition disabled:opacity-50"
         >
           ← 뒤로가기
         </button>

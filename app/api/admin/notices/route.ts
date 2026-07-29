@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { createNotice, listNotices } from "@/lib/notices";
+import { recordUndo } from "@/lib/undo";
 import type { NoticeCategory } from "@/lib/db";
 
 const VALID_CATEGORIES = new Set<NoticeCategory>(["notice", "event"]);
@@ -30,5 +31,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "제목을 입력해주세요." }, { status: 400 });
   }
   const notice = await createNotice(category as NoticeCategory, title, content);
+  await recordUndo(`"${title}" 공지 작성`, [{ op: "delete", table: "notices", id: notice.id }]);
   return NextResponse.json({ notice }, { status: 201 });
 }

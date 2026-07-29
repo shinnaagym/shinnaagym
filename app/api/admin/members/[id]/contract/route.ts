@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById, listPackages } from "@/lib/schedule";
 import { createContract, getLatestContractByMember } from "@/lib/contracts";
+import { recordUndo } from "@/lib/undo";
 import type { VisitChannel } from "@/lib/db";
 
 const VALID_VISIT_CHANNELS: VisitChannel[] = [
@@ -107,7 +108,7 @@ export async function POST(
   const startDate = typeof body?.startDate === "string" ? body.startDate.trim() : "";
   const privacyConsent = body?.privacyConsent === true;
 
-  await createContract({
+  const contract = await createContract({
     memberId: idNum,
     entryType: "new",
     ptType: latestPackage.pt_type,
@@ -125,6 +126,10 @@ export async function POST(
     startDate,
     privacyConsent,
   });
+
+  await recordUndo(`${member.name} 계약서 작성`, [
+    { op: "delete", table: "contracts", id: contract.id },
+  ]);
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

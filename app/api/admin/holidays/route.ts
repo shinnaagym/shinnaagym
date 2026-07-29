@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { addHoliday, listHolidays, removeHoliday } from "@/lib/schedule";
 import { isValidDateKey } from "@/lib/date";
+import { query } from "@/lib/db";
+import { recordUndo } from "@/lib/undo";
+
+interface HolidayRow {
+  holiday_date: string;
+  name: string;
+}
 
 export async function GET() {
   if (!(await isAdminAuthed())) {
@@ -23,7 +30,19 @@ export async function POST(req: NextRequest) {
   if (!isValidDateKey(date) || !name) {
     return NextResponse.json({ error: "날짜와 이름을 올바르게 입력해주세요." }, { status: 400 });
   }
+  const before = (
+    await query<HolidayRow>(`SELECT * FROM holidays WHERE holiday_date = $1`, [date])
+  ).rows[0];
   await addHoliday(date, name);
+  if (before) {
+    await recordUndo(`${date} 공휴일 이름 수정`, [
+      { op: "update", table: "holidays", id: date, idColumn: "holiday_date", data: { name: before.name } },
+    ]);
+  } else {
+    await recordUndo(`${date} 공휴일 등록`, [
+      { op: "delete", table: "holidays", id: date, idColumn: "holiday_date" },
+    ]);
+  }
   return NextResponse.json({ ok: true }, { status: 201 });
 }
 
@@ -35,6 +54,12 @@ export async function DELETE(req: NextRequest) {
   if (!date || !isValidDateKey(date)) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
+  const before = (
+    await query<HolidayRow>(`SELECT * FROM holidays WHERE holiday_date = $1`, [date])
+  ).rows[0];
   await removeHoliday(date);
+  if (before) {
+    await recordUndo(`${date} 공휴일 삭제`, [{ op: "insert", table: "holidays", data: before }]);
+  }
   return NextResponse.json({ ok: true });
 }

@@ -278,6 +278,18 @@ function ensureSchema(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
+        -- 관리자 화면 상단 "뒤로가기" 버튼의 실행취소(undo) 기능이 쓰는 로그.
+        -- 각 행은 사용자가 실행한 저장/등록/삭제 동작 하나를 되돌리는 데 필요한
+        -- 역연산(ops)을 통째로 담아, 여러 테이블에 걸친 동작(예: 신규 회원 등록 시
+        -- 회원+패키지+계약서 동시 생성)도 한 번의 "뒤로가기"로 함께 되돌릴 수 있게 한다.
+        CREATE TABLE IF NOT EXISTS undo_log (
+          id SERIAL PRIMARY KEY,
+          description TEXT NOT NULL,
+          ops JSONB NOT NULL,
+          undone BOOLEAN NOT NULL DEFAULT false,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -356,6 +368,7 @@ function ensureSchema(): Promise<void> {
             CREATE INDEX IF NOT EXISTS idx_packages_purchased_at ON packages(purchased_at);
             CREATE INDEX IF NOT EXISTS idx_assessments_member_id ON assessments(member_id);
             CREATE INDEX IF NOT EXISTS idx_contracts_member_id ON contracts(member_id);
+            CREATE INDEX IF NOT EXISTS idx_undo_log_pending ON undo_log(created_at DESC) WHERE undone = false;
             `,
           ),
           getPool().query(

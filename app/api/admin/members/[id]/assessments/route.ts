@@ -3,6 +3,7 @@ import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { createAssessment, listAssessmentsByMember } from "@/lib/assessments";
 import { parseAssessmentInput } from "@/lib/assessment-validation";
+import { recordUndo } from "@/lib/undo";
 
 export async function GET(
   _req: NextRequest,
@@ -41,6 +42,10 @@ export async function POST(
   const parsed = parseAssessmentInput(body);
 
   const assessment = await createAssessment({ memberId: idNum, ...parsed });
+
+  await recordUndo(`${member.name} 체형평가 작성`, [
+    { op: "delete", table: "assessments", id: assessment.id },
+  ]);
 
   return NextResponse.json({ assessment }, { status: 201 });
 }
