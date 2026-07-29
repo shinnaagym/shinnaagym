@@ -54,6 +54,13 @@ export function AdminNav() {
         </nav>
 
         <button
+          onClick={() => router.back()}
+          className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition"
+        >
+          ← 뒤로가기
+        </button>
+
+        <button
           onClick={handleLogout}
           className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition"
         >
