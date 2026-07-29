@@ -48,7 +48,7 @@ export default async function MyReservationPage({
       computeMemberProgress(member.id),
       listMemberSessions(member.id),
       member.coach_id
-        ? getCoachAvailability(member.coach_id, koreaTodayKey(), 7)
+        ? getCoachAvailability(member.coach_id, koreaTodayKey(), 14)
         : Promise.resolve([]),
       listCoaches(),
       getLatestContractByMember(member.id),
@@ -80,6 +80,22 @@ export default async function MyReservationPage({
         <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">My Reservation</p>
         <h1 className="font-display text-3xl mb-8">{member.name}님의 예약</h1>
 
+        {progress.totalSessions > 0 && progress.remaining <= 3 && (
+          <div className="rounded-2xl bg-gold/10 border border-gold/30 px-6 py-5 mb-10">
+            <p className="font-display text-lg mb-2">🔔 재등록 골든타임</p>
+            <p className="text-sm text-ink/70 leading-relaxed mb-4">
+              잔여 세션이 얼마 남지 않았어요. 지금 재등록하시면 재등록 할인 5%와 50분 마사지
+              1회를 무료로 드려요!
+            </p>
+            <a
+              href={`tel:${contactPhone}`}
+              className="inline-block rounded-full bg-gold text-white px-5 py-2.5 text-sm font-medium hover:opacity-90 transition"
+            >
+              🔔 지금 재등록 문의하기 · {contactPhone}
+            </a>
+          </div>
+        )}
+
         <div className="rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10">
           <p className="text-sm text-ink/60 mb-1">진행 / 잔여</p>
           <p className="text-2xl font-display">
@@ -95,30 +111,6 @@ export default async function MyReservationPage({
             <AssessmentPainChart assessments={assessments} />
             <ExercisePerformanceChart assessments={assessments} />
           </>
-        )}
-
-        {contract && (
-          <Link
-            href={`/my/${token}/contract`}
-            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10 hover:border-coral/40 transition"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-display text-lg mb-1">📄 계약서</p>
-                <p className="text-sm text-ink/60">
-                  {contract.signed_at ? "서명 완료 · 내용 확인하기" : "서명이 필요해요"}
-                </p>
-              </div>
-              <span
-                className={[
-                  "rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap",
-                  contract.signed_at ? "bg-sage/20 text-sage" : "bg-coral/10 text-coral",
-                ].join(" ")}
-              >
-                {contract.signed_at ? "서명완료" : "서명대기"}
-              </span>
-            </div>
-          </Link>
         )}
 
         {intake && (
@@ -151,22 +143,6 @@ export default async function MyReservationPage({
           </Link>
         )}
 
-        {progress.totalSessions > 0 && progress.remaining <= 3 && (
-          <div className="rounded-2xl bg-gold/10 border border-gold/30 px-6 py-5 mb-12">
-            <p className="font-display text-lg mb-2">🔔 재등록 골든타임</p>
-            <p className="text-sm text-ink/70 leading-relaxed mb-4">
-              잔여 세션이 얼마 남지 않았어요. 지금 재등록하시면 재등록 할인 5%와 50분 마사지
-              1회를 무료로 드려요!
-            </p>
-            <a
-              href={`tel:${contactPhone}`}
-              className="inline-block rounded-full bg-gold text-white px-5 py-2.5 text-sm font-medium hover:opacity-90 transition"
-            >
-              🔔 지금 재등록 문의하기 · {contactPhone}
-            </a>
-          </div>
-        )}
-
         <section className="mb-12">
           <h2 className="font-display text-xl mb-4">다가오는 예약</h2>
           {upcoming.length === 0 ? (
@@ -191,7 +167,7 @@ export default async function MyReservationPage({
         <section className="mb-12">
           <h2 className="font-display text-xl mb-1">담당 선생님 가능 시간</h2>
           <p className="text-xs text-ink/50 mb-4">
-            앞으로 1주간의 시간표예요. 다른 회원님의 예약 내용은 표시되지 않아요.
+            앞으로 2주간(다음 주까지)의 시간표예요. 다른 회원님의 예약 내용은 표시되지 않아요.
           </p>
           <div className="space-y-2">
             {availability.map((day) => (
@@ -243,6 +219,30 @@ export default async function MyReservationPage({
               ))}
             </ul>
           </section>
+        )}
+
+        {contract && (
+          <Link
+            href={`/my/${token}/contract`}
+            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10 hover:border-coral/40 transition"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-display text-lg mb-1">📄 계약서</p>
+                <p className="text-sm text-ink/60">
+                  {contract.signed_at ? "서명 완료 · 내용 확인하기" : "서명이 필요해요"}
+                </p>
+              </div>
+              <span
+                className={[
+                  "rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap",
+                  contract.signed_at ? "bg-sage/20 text-sage" : "bg-coral/10 text-coral",
+                ].join(" ")}
+              >
+                {contract.signed_at ? "서명완료" : "서명대기"}
+              </span>
+            </div>
+          </Link>
         )}
 
         <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm leading-relaxed">

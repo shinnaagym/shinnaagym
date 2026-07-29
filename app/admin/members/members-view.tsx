@@ -33,6 +33,8 @@ const FIXED_SLOT_CAPACITY = 3;
 const VISIT_CHANNEL_OPTIONS: Array<{ value: VisitChannel; label: string }> = [
   { value: "naver", label: "네이버" },
   { value: "instagram", label: "인스타" },
+  { value: "danggeun", label: "당근" },
+  { value: "cafe", label: "카페" },
   { value: "flyer", label: "외부 홍보물" },
   { value: "referral", label: "지인" },
   { value: "other", label: "기타" },
@@ -1338,6 +1340,27 @@ function MemberDetailModal({
         setError(d.error ?? "저장에 실패했습니다.");
         return;
       }
+
+      // 결제·패키지 이력의 횟수를 입력해둔 채로 하단 저장 버튼을 눌러도(별도로
+      // "+ 재등록/패키지 추가"를 누르지 않아도) 결제 내역이 함께 저장되도록 한다.
+      if (addSessions && Number(addSessions) >= 1) {
+        const pkgRes = await fetch(`/api/admin/members/${memberId}/packages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            totalSessions: Number(addSessions),
+            price: Number(addPrice || 0),
+            ptType: addPtType,
+            paymentMethod: addPaymentMethod,
+          }),
+        });
+        if (!pkgRes.ok) {
+          const d = await pkgRes.json().catch(() => ({}));
+          setError(d.error ?? "결제 내역 저장에 실패했습니다.");
+          return;
+        }
+      }
+
       onChanged();
       onClose();
     } finally {

@@ -6,7 +6,16 @@ import type { PaymentMethod, PtType, VisitChannel } from "@/lib/db";
 
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 const VALID_PAYMENT_METHODS: PaymentMethod[] = ["card", "transfer"];
-const VALID_VISIT_CHANNELS: VisitChannel[] = ["naver", "instagram", "flyer", "referral", "other", ""];
+const VALID_VISIT_CHANNELS: VisitChannel[] = [
+  "naver",
+  "instagram",
+  "danggeun",
+  "cafe",
+  "flyer",
+  "referral",
+  "other",
+  "",
+];
 
 export async function GET() {
   if (!(await isAdminAuthed())) {

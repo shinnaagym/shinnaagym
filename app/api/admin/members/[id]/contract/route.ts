@@ -4,7 +4,16 @@ import { getMemberById, listPackages } from "@/lib/schedule";
 import { createContract, getLatestContractByMember } from "@/lib/contracts";
 import type { VisitChannel } from "@/lib/db";
 
-const VALID_VISIT_CHANNELS: VisitChannel[] = ["naver", "instagram", "flyer", "referral", "other", ""];
+const VALID_VISIT_CHANNELS: VisitChannel[] = [
+  "naver",
+  "instagram",
+  "danggeun",
+  "cafe",
+  "flyer",
+  "referral",
+  "other",
+  "",
+];
 
 export async function GET(
   _req: NextRequest,

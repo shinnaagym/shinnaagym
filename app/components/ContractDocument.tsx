@@ -4,6 +4,8 @@ import { PURPOSE_LABELS } from "@/lib/constants";
 const VISIT_CHANNEL_LABELS: Record<string, string> = {
   naver: "네이버",
   instagram: "인스타",
+  danggeun: "당근",
+  cafe: "카페",
   flyer: "외부 홍보물",
   referral: "지인",
   other: "기타",

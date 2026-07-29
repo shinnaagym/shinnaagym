@@ -455,7 +455,15 @@ export interface FixedSlotRow {
 }
 
 export type ContractEntryType = "new" | "renewal";
-export type VisitChannel = "naver" | "instagram" | "flyer" | "referral" | "other" | "";
+export type VisitChannel =
+  | "naver"
+  | "instagram"
+  | "danggeun"
+  | "cafe"
+  | "flyer"
+  | "referral"
+  | "other"
+  | "";
 
 export interface ContractRow {
   id: number;
