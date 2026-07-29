@@ -255,13 +255,29 @@ export function ScheduleGrid({
     return map;
   }, [sessions]);
 
-  const weekStats = useMemo(() => {
-    const total = sessions.length;
-    const completed = sessions.filter((s) => s.status === "completed").length;
-    const noShow = sessions.filter((s) => s.status === "no_show").length;
-    const reserved = sessions.filter((s) => s.status === "reserved").length;
-    return { total, completed, noShow, reserved };
-  }, [sessions]);
+  /** "코치 전체"를 볼 때 KPI 카드에 쓰는, 전체 코치 합산 통계(이번 달/이번 주). */
+  const totalStats = useMemo(() => {
+    return Object.values(coachStats).reduce(
+      (acc, s) => ({
+        monthPt: acc.monthPt + s.monthPt,
+        monthPair: acc.monthPair + s.monthPair,
+        weekPt: acc.weekPt + s.weekPt,
+        weekPair: acc.weekPair + s.weekPair,
+        monthConsultation: acc.monthConsultation + s.monthConsultation,
+        monthNoShowSession: acc.monthNoShowSession + s.monthNoShowSession,
+        monthNoShowConsultation: acc.monthNoShowConsultation + s.monthNoShowConsultation,
+      }),
+      {
+        monthPt: 0,
+        monthPair: 0,
+        weekPt: 0,
+        weekPair: 0,
+        monthConsultation: 0,
+        monthNoShowSession: 0,
+        monthNoShowConsultation: 0,
+      },
+    );
+  }, [coachStats]);
 
   const selectedDate = dateKeys[selectedDayIdx];
 
@@ -336,45 +352,37 @@ export function ScheduleGrid({
 
   return (
     <div>
-      {/* KPI 카드 — 코치를 한 명 선택하면 그 코치의 이번 달/이번 주 통계로 바뀐다. */}
+      {/* KPI 카드 — 코치를 한 명 선택하면 그 코치의, "코치 전체"면 전체 합산 이번 달/이번 주 통계를 보여준다. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        {(singleCoach
-          ? (() => {
-              const stats = coachStats[singleCoach.id];
-              return [
-                {
-                  label: "이번 달 수업수",
-                  value: (stats?.monthPt ?? 0) + (stats?.monthPair ?? 0),
-                  detail: `1:1 ${stats?.monthPt ?? 0}회 · 2:1 ${stats?.monthPair ?? 0}회`,
-                  color: "text-ink",
-                },
-                {
-                  label: "이번 주 수업수",
-                  value: (stats?.weekPt ?? 0) + (stats?.weekPair ?? 0),
-                  detail: `1:1 ${stats?.weekPt ?? 0}회 · 2:1 ${stats?.weekPair ?? 0}회`,
-                  color: "text-coral",
-                },
-                {
-                  label: "이번달 상담수",
-                  value: stats?.monthConsultation ?? 0,
-                  detail: null,
-                  color: "text-sage",
-                },
-                {
-                  label: "이번달 노쇼",
-                  value: stats?.monthNoShow ?? 0,
-                  detail: null,
-                  color: "text-red-500",
-                },
-              ];
-            })()
-          : [
-              { label: "이번 주 전체 세션", value: weekStats.total, detail: null, color: "text-ink" },
-              { label: "예약", value: weekStats.reserved, detail: null, color: "text-coral" },
-              { label: "완료", value: weekStats.completed, detail: null, color: "text-sage" },
-              { label: "노쇼", value: weekStats.noShow, detail: null, color: "text-red-500" },
-            ]
-        ).map((card) => (
+        {(() => {
+          const stats = singleCoach ? coachStats[singleCoach.id] : totalStats;
+          return [
+            {
+              label: "이번 달 수업수",
+              value: (stats?.monthPt ?? 0) + (stats?.monthPair ?? 0),
+              detail: `1:1 ${stats?.monthPt ?? 0}회 · 2:1 ${stats?.monthPair ?? 0}회`,
+              color: "text-ink",
+            },
+            {
+              label: "이번 주 수업수",
+              value: (stats?.weekPt ?? 0) + (stats?.weekPair ?? 0),
+              detail: `1:1 ${stats?.weekPt ?? 0}회 · 2:1 ${stats?.weekPair ?? 0}회`,
+              color: "text-coral",
+            },
+            {
+              label: "이번달 상담수",
+              value: stats?.monthConsultation ?? 0,
+              detail: null,
+              color: "text-sage",
+            },
+            {
+              label: "이번달 노쇼",
+              value: (stats?.monthNoShowSession ?? 0) + (stats?.monthNoShowConsultation ?? 0),
+              detail: `PT ${stats?.monthNoShowSession ?? 0}회 · 상담 ${stats?.monthNoShowConsultation ?? 0}회`,
+              color: "text-red-500",
+            },
+          ];
+        })().map((card) => (
           <div
             key={card.label}
             className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4"

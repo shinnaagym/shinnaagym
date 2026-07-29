@@ -567,7 +567,8 @@ export interface CoachScheduleStats {
   weekPt: number;
   weekPair: number;
   monthConsultation: number;
-  monthNoShow: number;
+  monthNoShowSession: number;
+  monthNoShowConsultation: number;
 }
 
 /** 스케줄표에서 코치 한 명을 선택했을 때 KPI 카드에 쓰는 코치별 통계(이번 달/이번 주). */
@@ -584,15 +585,17 @@ export async function getAllCoachScheduleStats(
     week_pt: string;
     week_pair: string;
     month_consultation: string;
-    month_no_show: string;
+    month_no_show_session: string;
+    month_no_show_consultation: string;
   }>(
     `SELECT coach_id,
        COUNT(*) FILTER (WHERE entry_type = 'session' AND pt_type = '1:1' AND status <> 'cancelled' AND LEFT(session_date, 7) = $1) as month_pt,
        COUNT(*) FILTER (WHERE entry_type = 'session' AND pt_type = '2:1' AND status <> 'cancelled' AND LEFT(session_date, 7) = $1) as month_pair,
        COUNT(*) FILTER (WHERE entry_type = 'session' AND pt_type = '1:1' AND status <> 'cancelled' AND session_date >= $2 AND session_date <= $3) as week_pt,
        COUNT(*) FILTER (WHERE entry_type = 'session' AND pt_type = '2:1' AND status <> 'cancelled' AND session_date >= $2 AND session_date <= $3) as week_pair,
-       COUNT(*) FILTER (WHERE entry_type = 'consultation' AND status <> 'cancelled' AND LEFT(session_date, 7) = $1) as month_consultation,
-       COUNT(*) FILTER (WHERE status = 'no_show' AND LEFT(session_date, 7) = $1) as month_no_show
+       COUNT(*) FILTER (WHERE entry_type = 'consultation' AND status NOT IN ('cancelled', 'no_show') AND LEFT(session_date, 7) = $1) as month_consultation,
+       COUNT(*) FILTER (WHERE entry_type = 'session' AND status = 'no_show' AND LEFT(session_date, 7) = $1) as month_no_show_session,
+       COUNT(*) FILTER (WHERE entry_type = 'consultation' AND status = 'no_show' AND LEFT(session_date, 7) = $1) as month_no_show_consultation
      FROM class_sessions
      GROUP BY coach_id`,
     [monthKey, weekStart, weekEnd],
@@ -605,7 +608,8 @@ export async function getAllCoachScheduleStats(
       weekPt: Number(row.week_pt),
       weekPair: Number(row.week_pair),
       monthConsultation: Number(row.month_consultation),
-      monthNoShow: Number(row.month_no_show),
+      monthNoShowSession: Number(row.month_no_show_session),
+      monthNoShowConsultation: Number(row.month_no_show_consultation),
     });
   }
   return map;
@@ -881,7 +885,7 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
              WHERE EXISTS (SELECT 1 FROM packages p WHERE p.member_id = cs.member_id)
            ) as success_count
          FROM class_sessions cs
-         WHERE cs.entry_type = 'consultation' AND cs.status <> 'cancelled'
+         WHERE cs.entry_type = 'consultation' AND cs.status NOT IN ('cancelled', 'no_show')
            AND cs.member_id IS NOT NULL
            AND LEFT(cs.session_date, 7) = $1
          GROUP BY cs.coach_id`,
@@ -979,7 +983,7 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
       ),
       query<{ count: string }>(
         `SELECT COUNT(*) as count FROM class_sessions
-         WHERE entry_type = 'consultation' AND status <> 'cancelled'
+         WHERE entry_type = 'consultation' AND status NOT IN ('cancelled', 'no_show')
            AND LEFT(session_date, 7) = $1`,
         [yearMonth],
       ),
@@ -1042,7 +1046,7 @@ export async function getMonthlyTrend(
     query<{ month: string; count: string }>(
       `SELECT LEFT(session_date, 7) as month, COUNT(*) as count
        FROM class_sessions
-       WHERE entry_type = 'consultation' AND status <> 'cancelled'
+       WHERE entry_type = 'consultation' AND status NOT IN ('cancelled', 'no_show')
          AND LEFT(session_date, 7) = ANY($1)
        GROUP BY month`,
       [monthKeys],
