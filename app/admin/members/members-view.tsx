@@ -183,11 +183,13 @@ export function MembersView({
   coaches,
   initialFixedSlots,
   initialOpenId,
+  initialShowContractView,
 }: {
   initialMembers: MemberWithProgress[];
   coaches: CoachRow[];
   initialFixedSlots: FixedSlotWithMember[];
   initialOpenId?: number | null;
+  initialShowContractView?: boolean;
 }) {
   const members = initialMembers;
   const fixedSlots = initialFixedSlots;
@@ -487,9 +489,10 @@ export function MembersView({
         <CreateMemberModal
           coaches={activeCoaches}
           onClose={() => setShowCreate(false)}
-          onCreated={() => {
-            setShowCreate(false);
-            refresh();
+          onCreated={(memberId) => {
+            // 등록을 마치자마자 방금 만든 계약서를 바로 확인할 수 있도록 상세
+            // 모달 + 계약서 보기를 연 상태로 이동한다.
+            window.location.href = `/admin/members?open=${memberId}&contract=1`;
           }}
         />
       )}
@@ -507,6 +510,7 @@ export function MembersView({
               fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
               onClose={() => setDetailId(null)}
               onChanged={refresh}
+              initialShowContractView={initialShowContractView}
             />
           );
         })()}
@@ -751,7 +755,7 @@ function ContractFieldsFieldset({
             type="date"
             value={startDate}
             onChange={(e) => onStartDateChange(e.target.value)}
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            className="w-full min-w-0 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
           />
         </Field>
         <Field label="옵션">
@@ -782,7 +786,7 @@ function CreateMemberModal({
 }: {
   coaches: CoachRow[];
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (memberId: number) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -858,7 +862,7 @@ function CreateMemberModal({
         setError(data.error ?? "등록에 실패했습니다.");
         return;
       }
-      onCreated();
+      onCreated(data.member.id);
     } catch {
       setError("네트워크 오류가 발생했습니다.");
     } finally {
@@ -1193,6 +1197,7 @@ function MemberDetailModal({
   fixedSlots,
   onClose,
   onChanged,
+  initialShowContractView,
 }: {
   memberId: number;
   initialMember: MemberWithProgress;
@@ -1201,13 +1206,14 @@ function MemberDetailModal({
   fixedSlots: FixedSlotWithMember[];
   onClose: () => void;
   onChanged: () => void;
+  initialShowContractView?: boolean;
 }) {
   const [newSlotWeekday, setNewSlotWeekday] = useState(0);
   const [newSlotHour, setNewSlotHour] = useState(SCHEDULE_HOUR_ROWS[0]);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [savingSlot, setSavingSlot] = useState(false);
   const [showWriteContract, setShowWriteContract] = useState(false);
-  const [showContractView, setShowContractView] = useState(false);
+  const [showContractView, setShowContractView] = useState(!!initialShowContractView);
 
   async function addSlot() {
     if (!data?.member.coach_id) {
@@ -1863,7 +1869,7 @@ function MemberDetailModal({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="block text-sm font-medium mb-1.5">{label}</label>
       {children}
     </div>

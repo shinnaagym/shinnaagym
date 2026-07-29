@@ -7,14 +7,15 @@ import { MembersView } from "./members-view";
 export default async function AdminMembersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ open?: string }>;
+  searchParams: Promise<{ open?: string; contract?: string }>;
 }) {
   if (!(await isAdminAuthed())) {
     redirect("/admin");
   }
 
-  const { open } = await searchParams;
+  const { open, contract } = await searchParams;
   const openId = open && /^\d+$/.test(open) ? Number(open) : null;
+  const openContractView = contract === "1";
 
   const thisWeekMonday = mondayOfWeek(koreaTodayKey());
   const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
@@ -33,6 +34,7 @@ export default async function AdminMembersPage({
         coaches={coaches}
         initialFixedSlots={fixedSlots}
         initialOpenId={openId}
+        initialShowContractView={openContractView}
       />
     </div>
   );
