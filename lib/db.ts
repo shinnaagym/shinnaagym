@@ -342,6 +342,19 @@ function ensureSchema(): Promise<void> {
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
             ALTER TABLE members ADD COLUMN IF NOT EXISTS improvement_direction TEXT NOT NULL DEFAULT '';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_updated_at TIMESTAMPTZ;
+
+            -- class_sessions/packages는 매일 계속 쌓이는 테이블인데 PK 외 인덱스가 전혀 없어서,
+            -- 데이터가 늘어날수록 스케줄표·대시보드·재등록 관리의 거의 모든 조회가 매번 전체
+            -- 테이블을 훑는 시퀀셜 스캔이 되어 갈수록 느려졌다(체감상 "버퍼링"). 실제 조회 조건
+            -- (member_id 조인, 날짜 범위, LEFT(session_date,7)/to_char(purchased_at,'YYYY-MM')
+            -- 월 집계)에 맞춰 인덱스를 추가한다.
+            CREATE INDEX IF NOT EXISTS idx_class_sessions_member_id ON class_sessions(member_id);
+            CREATE INDEX IF NOT EXISTS idx_class_sessions_session_date ON class_sessions(session_date);
+            CREATE INDEX IF NOT EXISTS idx_class_sessions_month ON class_sessions((LEFT(session_date, 7)));
+            CREATE INDEX IF NOT EXISTS idx_packages_member_id ON packages(member_id);
+            CREATE INDEX IF NOT EXISTS idx_packages_purchased_at ON packages(purchased_at);
+            CREATE INDEX IF NOT EXISTS idx_assessments_member_id ON assessments(member_id);
+            CREATE INDEX IF NOT EXISTS idx_contracts_member_id ON contracts(member_id);
             `,
           ),
           getPool().query(

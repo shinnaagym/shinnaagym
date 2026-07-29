@@ -21,11 +21,13 @@ export default async function AssessmentDetailPage({
   if (!Number.isInteger(idNum) || !Number.isInteger(assessmentIdNum)) {
     notFound();
   }
-  const member = await getMemberById(idNum);
+  const [member, assessment] = await Promise.all([
+    getMemberById(idNum),
+    getAssessmentById(assessmentIdNum),
+  ]);
   if (!member) {
     notFound();
   }
-  const assessment = await getAssessmentById(assessmentIdNum);
   if (!assessment || assessment.member_id !== idNum) {
     notFound();
   }

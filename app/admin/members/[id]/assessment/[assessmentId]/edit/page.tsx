@@ -22,16 +22,17 @@ export default async function EditAssessmentPage({
   if (!Number.isInteger(idNum) || !Number.isInteger(assessmentIdNum)) {
     notFound();
   }
-  const member = await getMemberById(idNum);
+  const [member, assessment, pastAssessments] = await Promise.all([
+    getMemberById(idNum),
+    getAssessmentById(assessmentIdNum),
+    listAssessmentsByMember(idNum),
+  ]);
   if (!member) {
     notFound();
   }
-  const assessment = await getAssessmentById(assessmentIdNum);
   if (!assessment || assessment.member_id !== idNum) {
     notFound();
   }
-
-  const pastAssessments = await listAssessmentsByMember(idNum);
   const pastPainTriggerNotes = Array.from(
     new Set(
       pastAssessments

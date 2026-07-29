@@ -492,16 +492,22 @@ export function MembersView({
         />
       )}
 
-      {detailId && (
-        <MemberDetailModal
-          memberId={detailId}
-          coaches={coaches}
-          activeCoaches={activeCoaches}
-          fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
-          onClose={() => setDetailId(null)}
-          onChanged={refresh}
-        />
-      )}
+      {detailId &&
+        (() => {
+          const detailMember = members.find((m) => m.id === detailId);
+          if (!detailMember) return null;
+          return (
+            <MemberDetailModal
+              memberId={detailId}
+              initialMember={detailMember}
+              coaches={coaches}
+              activeCoaches={activeCoaches}
+              fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
+              onClose={() => setDetailId(null)}
+              onChanged={refresh}
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -1159,6 +1165,7 @@ function ContractViewModal({
 
 function MemberDetailModal({
   memberId,
+  initialMember,
   coaches,
   activeCoaches,
   fixedSlots,
@@ -1166,6 +1173,7 @@ function MemberDetailModal({
   onChanged,
 }: {
   memberId: number;
+  initialMember: MemberWithProgress;
   coaches: CoachRow[];
   activeCoaches: CoachRow[];
   fixedSlots: FixedSlotWithMember[];
@@ -1218,6 +1226,9 @@ function MemberDetailModal({
     await fetch(`/api/admin/fixed-slots/${id}`, { method: "DELETE" });
     onChanged();
   }
+  // 목록에서 이미 알고 있는 회원 기본 정보(이름·연락처·담당·상태·소개자·가능시간·메모·개인
+  // 예약 링크)는 곧바로 채워 넣어, 모달을 열자마자 편집 폼이 보이게 한다. 목록에는 없는
+  // 패키지·세션·계약서·평가 기록 요약만 아래 useEffect의 백그라운드 조회로 채운다.
   const [data, setData] = useState<{
     member: MemberDetail;
     progress: { totalSessions: number; doneCount: number; remaining: number };
@@ -1225,7 +1236,19 @@ function MemberDetailModal({
     sessions: SessionSummary[];
     contract: { id: number; entryType: string; signedAt: string | null } | null;
     assessmentSummary: { count: number; latestAt: string | null };
-  } | null>(null);
+  }>({
+    member: initialMember,
+    progress: {
+      totalSessions: initialMember.total_sessions,
+      doneCount: initialMember.done_count,
+      remaining: initialMember.total_sessions - initialMember.done_count,
+    },
+    packages: [],
+    sessions: [],
+    contract: null,
+    assessmentSummary: { count: 0, latestAt: null },
+  });
+  const [detailLoading, setDetailLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [addSessions, setAddSessions] = useState("");
   const [addPrice, setAddPrice] = useState("");
@@ -1234,14 +1257,14 @@ function MemberDetailModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // 편집 폼 상태
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [coachId, setCoachId] = useState<number | "">("");
-  const [status, setStatus] = useState<MemberStatus>("active");
-  const [referrer, setReferrer] = useState("");
-  const [availableTimes, setAvailableTimes] = useState("");
-  const [notes, setNotes] = useState("");
+  // 편집 폼 상태 — 이미 목록에 있는 값으로 즉시 초기화한다.
+  const [name, setName] = useState(initialMember.name);
+  const [phone, setPhone] = useState(initialMember.phone);
+  const [coachId, setCoachId] = useState<number | "">(initialMember.coach_id ?? "");
+  const [status, setStatus] = useState<MemberStatus>(initialMember.status);
+  const [referrer, setReferrer] = useState(initialMember.referrer);
+  const [availableTimes, setAvailableTimes] = useState(initialMember.available_times);
+  const [notes, setNotes] = useState(initialMember.notes);
 
   const [editingPkgId, setEditingPkgId] = useState<number | null>(null);
   const [editTotal, setEditTotal] = useState("");
@@ -1250,32 +1273,15 @@ function MemberDetailModal({
   const [editPtType, setEditPtType] = useState<PtType>("1:1");
   const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>("card");
 
-  function loadFrom(member: MemberDetail) {
-    setName(member.name);
-    setPhone(member.phone);
-    setCoachId(member.coach_id ?? "");
-    setStatus(member.status);
-    setReferrer(member.referrer);
-    setAvailableTimes(member.available_times);
-    setNotes(member.notes);
-  }
-
+  // 이름/연락처 등 편집 폼 값은 이미 목록에서 받은 값으로 채워둔 상태라 여기서 다시 덮어쓰지
+  // 않는다(관리자가 응답이 오기 전에 입력을 시작했다면 그 값을 유지하기 위함) — 패키지·세션·
+  // 계약서·평가 기록 요약만 이 응답으로 채운다.
   useEffect(() => {
     fetch(`/api/admin/members/${memberId}`)
       .then((res) => res.json())
-      .then((d) => {
-        setData(d);
-        loadFrom(d.member);
-      });
+      .then((d) => setData(d))
+      .finally(() => setDetailLoading(false));
   }, [memberId]);
-
-  if (!data) {
-    return (
-      <ModalShell title="불러오는 중..." onClose={onClose}>
-        <p className="text-sm text-ink/50">잠시만 기다려주세요.</p>
-      </ModalShell>
-    );
-  }
 
   const link =
     typeof window !== "undefined" ? `${window.location.origin}/my/${data.member.token}` : "";
@@ -1454,9 +1460,11 @@ function MemberDetailModal({
         <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm flex items-center justify-between gap-2">
           <span>
             체형 평가{" "}
-            {data.assessmentSummary.count > 0
-              ? `${data.assessmentSummary.count}건 · 최근 ${data.assessmentSummary.latestAt}`
-              : "기록 없음"}
+            {detailLoading
+              ? "불러오는 중..."
+              : data.assessmentSummary.count > 0
+                ? `${data.assessmentSummary.count}건 · 최근 ${data.assessmentSummary.latestAt}`
+                : "기록 없음"}
           </span>
           <Link
             href={`/admin/members/${memberId}/assessment`}
@@ -1799,7 +1807,7 @@ function MemberDetailModal({
         onClose={() => setShowContractView(false)}
         onSigned={() =>
           setData((prev) =>
-            prev && prev.contract
+            prev.contract
               ? { ...prev, contract: { ...prev.contract, signedAt: new Date().toISOString() } }
               : prev,
           )

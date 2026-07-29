@@ -44,15 +44,14 @@ export default async function AssessmentHistoryPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const member = await getMemberById(idNum);
-  if (!member) {
-    notFound();
-  }
-
-  const [assessments, intake] = await Promise.all([
+  const [member, assessments, intake] = await Promise.all([
+    getMemberById(idNum),
     listAssessmentsByMember(idNum),
     getIntakeQuestionnaireByMember(idNum),
   ]);
+  if (!member) {
+    notFound();
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">

@@ -17,12 +17,13 @@ export default async function NewAssessmentPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const member = await getMemberById(idNum);
+  const [member, pastAssessments] = await Promise.all([
+    getMemberById(idNum),
+    listAssessmentsByMember(idNum),
+  ]);
   if (!member) {
     notFound();
   }
-
-  const pastAssessments = await listAssessmentsByMember(idNum);
   const pastPainTriggerNotes = Array.from(
     new Set(
       pastAssessments

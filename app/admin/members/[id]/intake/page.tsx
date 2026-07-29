@@ -23,12 +23,14 @@ export default async function IntakeQuestionnairePage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const member = await getMemberById(idNum);
+  const [member, intake] = await Promise.all([
+    getMemberById(idNum),
+    getIntakeQuestionnaireByMember(idNum),
+  ]);
   if (!member) {
     notFound();
   }
 
-  const intake = await getIntakeQuestionnaireByMember(idNum);
   const initialData: IntakeFormState = intake
     ? {
         intakeName: intake.intake_name,
