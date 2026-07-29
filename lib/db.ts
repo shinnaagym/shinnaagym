@@ -257,6 +257,15 @@ function ensureSchema(): Promise<void> {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
+        CREATE TABLE IF NOT EXISTS notices (
+          id SERIAL PRIMARY KEY,
+          category TEXT NOT NULL DEFAULT 'notice', -- 'notice' | 'event'
+          title TEXT NOT NULL,
+          content TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -552,4 +561,15 @@ export interface ClassSessionRow {
   entry_type: SessionEntryType;
   pt_type: PtType;
   created_at: string;
+}
+
+export type NoticeCategory = "notice" | "event";
+
+export interface NoticeRow {
+  id: number;
+  category: NoticeCategory;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
 }
