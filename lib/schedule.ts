@@ -613,7 +613,14 @@ export async function createSession(input: {
 
 export async function updateSession(
   id: number,
-  input: { status?: SessionStatus; memo?: string; coachId?: number; ptType?: PtType },
+  input: {
+    status?: SessionStatus;
+    memo?: string;
+    coachId?: number;
+    ptType?: PtType;
+    sessionDate?: string;
+    sessionHour?: number;
+  },
 ): Promise<void> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -634,6 +641,14 @@ export async function updateSession(
   if (input.ptType !== undefined) {
     fields.push(`pt_type = $${++i}`);
     values.push(input.ptType);
+  }
+  if (input.sessionDate !== undefined) {
+    fields.push(`session_date = $${++i}`);
+    values.push(input.sessionDate);
+  }
+  if (input.sessionHour !== undefined) {
+    fields.push(`session_hour = $${++i}`);
+    values.push(input.sessionHour);
   }
   if (fields.length === 0) return;
 

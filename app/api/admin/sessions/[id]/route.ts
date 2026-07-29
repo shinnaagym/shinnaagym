@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { deleteSession, updateSession } from "@/lib/schedule";
+import { isValidDateKey } from "@/lib/date";
 import type { PtType, SessionStatus } from "@/lib/db";
 
 const VALID_STATUSES: SessionStatus[] = ["reserved", "completed", "no_show", "cancelled"];
@@ -19,7 +20,14 @@ export async function PATCH(
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
   const body = (await req.json().catch(() => null)) as
-    | { status?: unknown; memo?: unknown; coachId?: unknown; ptType?: unknown }
+    | {
+        status?: unknown;
+        memo?: unknown;
+        coachId?: unknown;
+        ptType?: unknown;
+        date?: unknown;
+        hour?: unknown;
+      }
     | null;
 
   const status =
@@ -35,8 +43,20 @@ export async function PATCH(
     typeof body?.ptType === "string" && VALID_PT_TYPES.includes(body.ptType as PtType)
       ? (body.ptType as PtType)
       : undefined;
+  const sessionDate =
+    typeof body?.date === "string" && isValidDateKey(body.date) ? body.date : undefined;
+  const sessionHour =
+    typeof body?.hour === "number" && Number.isInteger(body.hour) ? body.hour : undefined;
 
-  await updateSession(idNum, { status, memo, coachId, ptType });
+  try {
+    await updateSession(idNum, { status, memo, coachId, ptType, sessionDate, sessionHour });
+  } catch (err: unknown) {
+    if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505") {
+      return NextResponse.json({ error: "이미 일정이 있는 시간이에요." }, { status: 409 });
+    }
+    console.error(err);
+    return NextResponse.json({ error: "이동 중 오류가 발생했습니다." }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }
 

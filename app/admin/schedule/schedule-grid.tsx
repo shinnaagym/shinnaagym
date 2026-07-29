@@ -104,6 +104,71 @@ function progressLabel(session: SessionWithMember): string | null {
   return `${session.ordinal ?? "-"}/${total}`;
 }
 
+function SessionCellButton({
+  session,
+  goldenBellMemberIds,
+  onEdit,
+  onCreate,
+}: {
+  session: SessionWithMember | undefined;
+  goldenBellMemberIds: Set<number>;
+  onEdit: (session: SessionWithMember) => void;
+  onCreate: () => void;
+}) {
+  if (!session) {
+    return (
+      <button
+        onClick={onCreate}
+        className="w-full rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-xs text-ink/30 hover:text-coral hover:border-coral transition truncate"
+      >
+        + 추가
+      </button>
+    );
+  }
+  return (
+    <button
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", String(session.id));
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onClick={() => onEdit(session)}
+      className={[
+        "w-full rounded-lg border px-2 py-1.5 text-left text-xs transition hover:shadow-sm cursor-grab active:cursor-grabbing",
+        entryStyle(session),
+      ].join(" ")}
+    >
+      {isSimpleEntry(session) ? (
+        <span className="font-medium block truncate">
+          {entryIcon(session)}
+          {entryMainLabel(session)}
+        </span>
+      ) : (
+        <>
+          <span className="font-medium block truncate">
+            {entryIcon(session)}
+            {session.member_name}
+            {progressLabel(session) && (
+              <span className="ml-1 font-normal opacity-70">{progressLabel(session)}</span>
+            )}
+            {session.entry_type === "session" &&
+              session.member_id !== null &&
+              goldenBellMemberIds.has(session.member_id) && (
+                <span className="ml-1" title="재등록 골든타임 — 잔여 3회 이하">
+                  🔔
+                </span>
+              )}
+          </span>
+          <span className="block text-[10px] opacity-70">{STATUS_LABEL[session.status]}</span>
+          {session.memo && (
+            <span className="block text-[10px] opacity-60 truncate">{session.memo}</span>
+          )}
+        </>
+      )}
+    </button>
+  );
+}
+
 function formatWeekLabel(dateKeys: string[]) {
   const [, m1, d1] = dateKeys[0].split("-");
   const [, m2, d2] = dateKeys[6].split("-");
@@ -153,6 +218,9 @@ export function ScheduleGrid({
   const effectiveCoaches = coaches.length > 0 ? coaches : [];
   const visibleCoaches =
     coachFilter === "all" ? effectiveCoaches : effectiveCoaches.filter((c) => c.id === coachFilter);
+  /** 코치를 한 명만 선택하면 요일 탭 대신 그 코치의 이번 주 전체를 한 화면에 보여준다. */
+  const singleCoach =
+    coachFilter !== "all" ? (effectiveCoaches.find((c) => c.id === coachFilter) ?? null) : null;
 
   /** 코치별 색상은 전체 코치 목록 기준 순서로 고정해, 필터링해도 같은 코치는 항상 같은 색을 쓴다. */
   const coachColorMap = useMemo(() => {
@@ -212,6 +280,25 @@ export function ScheduleGrid({
     return map;
   }, [sessions, selectedDate, visibleCoaches]);
 
+  /** 코치 한 명을 필터로 골랐을 때(주간 보기) 이번 주 전체의 PT/2:1/상담 합계. */
+  const weeklySummary = useMemo(() => {
+    const map = new Map<number, { pt: number; pair: number; consultation: number }>();
+    for (const coach of visibleCoaches) {
+      map.set(coach.id, { pt: 0, pair: 0, consultation: 0 });
+    }
+    for (const s of sessions) {
+      const counts = map.get(s.coach_id);
+      if (!counts) continue;
+      if (s.entry_type === "session") {
+        if (s.pt_type === "2:1") counts.pair += 1;
+        else counts.pt += 1;
+      } else if (s.entry_type === "consultation") {
+        counts.consultation += 1;
+      }
+    }
+    return map;
+  }, [sessions, visibleCoaches]);
+
   async function refreshSessions() {
     const weekEnd = dateKeys[6];
     const res = await fetch(`/api/admin/sessions?from=${weekStart}&to=${weekEnd}`);
@@ -219,6 +306,38 @@ export function ScheduleGrid({
       const data = await res.json();
       setSessions(data.sessions ?? []);
     }
+  }
+
+  /** 일정 pill을 드래그해서 다른 시간/코치 칸에 놓으면 그 칸으로 이동시킨다. */
+  async function handleDropOnCell(
+    e: React.DragEvent,
+    targetDate: string,
+    targetHour: number,
+    targetCoachId: number,
+  ) {
+    e.preventDefault();
+    const sessionId = Number(e.dataTransfer.getData("text/plain"));
+    if (!Number.isInteger(sessionId)) return;
+
+    const existing = sessionMap.get(`${targetDate}-${targetCoachId}-${targetHour}`);
+    if (existing?.id === sessionId) return;
+    if (existing) {
+      alert("이미 일정이 있는 시간이에요.");
+      return;
+    }
+
+    setLoading(true);
+    const res = await fetch(`/api/admin/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: targetDate, hour: targetHour, coachId: targetCoachId }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "이동 중 오류가 발생했습니다.");
+    }
+    await refreshSessions();
+    setLoading(false);
   }
 
   function goWeek(offsetDays: number) {
@@ -323,8 +442,125 @@ export function ScheduleGrid({
         })}
       </div>
 
-      {/* 선택한 날짜 — 코치를 세로 컬럼으로 나열하는 스케줄표 */}
-      {(() => {
+      {/* 코치를 한 명만 선택하면 요일 탭과 무관하게 그 코치의 이번 주 전체를 한 번에 보여준다. */}
+      {singleCoach ? (
+        <>
+          <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-4">
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: `64px repeat(${dateKeys.length}, minmax(100px, 1fr))`,
+                minWidth: `${64 + dateKeys.length * 110}px`,
+              }}
+            >
+              <div className="col-span-full border-b border-line/60 bg-bone/50 px-3 py-2.5 text-center">
+                <p className="font-display text-sm">
+                  {singleCoach.name} 코치 · 이번 주 전체 ({formatWeekLabel(dateKeys)})
+                </p>
+              </div>
+
+              <div className="border-b border-line/40 bg-bone/30" />
+              {dateKeys.map((d, i) => {
+                const isToday = d === today;
+                const closed = dayHours[d]?.closed;
+                return (
+                  <div
+                    key={d}
+                    className={[
+                      "border-b border-line/40 px-2 py-2 text-center",
+                      isToday ? "bg-coral/10" : "bg-bone/30",
+                    ].join(" ")}
+                  >
+                    <p className="text-xs font-medium truncate">
+                      {WEEKDAY_LABELS[i]} {Number(d.split("-")[2])}
+                    </p>
+                    {closed && <p className="text-[9px] text-ink/30">휴무</p>}
+                    {holidayMap[d] && !closed && (
+                      <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
+                    )}
+                  </div>
+                );
+              })}
+
+              {SCHEDULE_HOUR_ROWS.map((hour) => (
+                <Fragment key={hour}>
+                  <div className="border-b border-line/40 px-2 py-2 text-xs text-ink/50 text-right">
+                    {hour}:00
+                  </div>
+                  {dateKeys.map((d) => {
+                    const dh = dayHours[d];
+                    const withinHours = !!dh && !dh.closed && hour >= dh.start && hour < dh.end;
+                    const session = sessionMap.get(`${d}-${singleCoach.id}-${hour}`);
+                    return (
+                      <div
+                        key={d}
+                        className="border-b border-line/40 p-1"
+                        onDragOver={withinHours ? (e) => e.preventDefault() : undefined}
+                        onDrop={
+                          withinHours
+                            ? (e) => handleDropOnCell(e, d, hour, singleCoach.id)
+                            : undefined
+                        }
+                      >
+                        {withinHours ? (
+                          <SessionCellButton
+                            session={session}
+                            goldenBellMemberIds={goldenBellMemberIds}
+                            onEdit={setEditTarget}
+                            onCreate={() => setCreateTarget({ date: d, hour, coachId: singleCoach.id })}
+                          />
+                        ) : (
+                          <div className="w-full rounded-lg px-2 py-1.5 text-center text-[11px] text-ink/15">
+                            ·
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-ink/50 text-xs border-b border-line/60">
+                  <th className="px-3 py-2 font-medium">이번 주 구분</th>
+                  <th className="px-3 py-2 font-medium text-center">{singleCoach.name}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(
+                  [
+                    ["pt", "PT"],
+                    ["pair", "2:1"],
+                    ["consultation", "상담"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <tr key={key} className="border-b border-line/40 last:border-0">
+                    <td className="px-3 py-2 text-ink/60">{label}</td>
+                    <td className="px-3 py-2 text-center text-ink/70">
+                      {weeklySummary.get(singleCoach.id)?.[key] ?? 0}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="font-medium">
+                  <td className="px-3 py-2">총합</td>
+                  <td className="px-3 py-2 text-center">
+                    {(() => {
+                      const counts = weeklySummary.get(singleCoach.id);
+                      return counts ? counts.pt + counts.pair + counts.consultation : 0;
+                    })()}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+      /* 선택한 날짜 — 코치를 세로 컬럼으로 나열하는 스케줄표 */
+      (() => {
         const date = selectedDate;
         const hours = dayHours[date];
         const holidayName = holidayMap[date];
@@ -404,57 +640,15 @@ export function ScheduleGrid({
                             "border-b border-l-4 border-line/40 p-1",
                             palette?.accent ?? "",
                           ].join(" ")}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => handleDropOnCell(e, date, hour, coach.id)}
                         >
-                          {session ? (
-                            <button
-                              onClick={() => setEditTarget(session)}
-                              className={[
-                                "w-full rounded-lg border px-2 py-1.5 text-left text-xs transition hover:shadow-sm",
-                                entryStyle(session),
-                              ].join(" ")}
-                            >
-                              {isSimpleEntry(session) ? (
-                                <span className="font-medium block truncate">
-                                  {entryIcon(session)}
-                                  {entryMainLabel(session)}
-                                </span>
-                              ) : (
-                                <>
-                                  <span className="font-medium block truncate">
-                                    {entryIcon(session)}
-                                    {session.member_name}
-                                    {progressLabel(session) && (
-                                      <span className="ml-1 font-normal opacity-70">
-                                        {progressLabel(session)}
-                                      </span>
-                                    )}
-                                    {session.entry_type === "session" &&
-                                      session.member_id !== null &&
-                                      goldenBellMemberIds.has(session.member_id) && (
-                                        <span className="ml-1" title="재등록 골든타임 — 잔여 3회 이하">
-                                          🔔
-                                        </span>
-                                      )}
-                                  </span>
-                                  <span className="block text-[10px] opacity-70">
-                                    {STATUS_LABEL[session.status]}
-                                  </span>
-                                  {session.memo && (
-                                    <span className="block text-[10px] opacity-60 truncate">
-                                      {session.memo}
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setCreateTarget({ date, hour, coachId: coach.id })}
-                              className="w-full rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-xs text-ink/30 hover:text-coral hover:border-coral transition truncate"
-                            >
-                              + 추가
-                            </button>
-                          )}
+                          <SessionCellButton
+                            session={session}
+                            goldenBellMemberIds={goldenBellMemberIds}
+                            onEdit={setEditTarget}
+                            onCreate={() => setCreateTarget({ date, hour, coachId: coach.id })}
+                          />
                         </div>
                       );
                     })}
@@ -513,12 +707,14 @@ export function ScheduleGrid({
             </div>
           </>
         );
-      })()}
+      })()
+      )}
 
       {createTarget && (
         <CreateSessionModal
           date={createTarget.date}
           hour={createTarget.hour}
+          maxHour={dayHours[createTarget.date]?.end ?? createTarget.hour + 1}
           coachId={createTarget.coachId}
           coaches={effectiveCoaches}
           members={members}
@@ -565,6 +761,7 @@ const NEW_CONTACT = "__new__";
 function CreateSessionModal({
   date,
   hour,
+  maxHour,
   coachId,
   coaches,
   members,
@@ -573,6 +770,7 @@ function CreateSessionModal({
 }: {
   date: string;
   hour: number;
+  maxHour: number;
   coachId: number;
   coaches: CoachRow[];
   members: MemberWithProgress[];
@@ -588,10 +786,17 @@ function CreateSessionModal({
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [memo, setMemo] = useState("");
+  const [endHour, setEndHour] = useState(hour + 1);
   const [weekdays, setWeekdays] = useState<Set<number>>(new Set());
   const [duration, setDuration] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const endHourOptions = Array.from(
+    { length: Math.max(0, maxHour - hour) },
+    (_, i) => hour + 1 + i,
+  );
+  const hoursInRange = Array.from({ length: endHour - hour }, (_, i) => hour + i);
 
   function switchCategory(next: SessionEntryType) {
     setCategory(next);
@@ -654,45 +859,48 @@ function CreateSessionModal({
     }
 
     const occurrences = computeOccurrences();
+    const hoursToCreate = category === "memo" || category === "blocked" ? hoursInRange : [hour];
     setSubmitting(true);
 
     let resolvedMemberId = typeof memberId === "number" ? memberId : undefined;
-    const results: Array<{ date: string; ok: boolean; error?: string }> = [];
+    const results: Array<{ date: string; hour: number; ok: boolean; error?: string }> = [];
 
     try {
       for (const occDate of occurrences) {
-        const body: Record<string, unknown> = {
-          entryType: category,
-          coachId: selectedCoachId,
-          date: occDate,
-          hour,
-          memo,
-        };
-        if (category === "session") {
-          body.memberId = resolvedMemberId;
-          body.ptType = ptType;
-        } else if (category === "consultation") {
-          if (resolvedMemberId) {
+        for (const occHour of hoursToCreate) {
+          const body: Record<string, unknown> = {
+            entryType: category,
+            coachId: selectedCoachId,
+            date: occDate,
+            hour: occHour,
+            memo,
+          };
+          if (category === "session") {
             body.memberId = resolvedMemberId;
-          } else {
-            body.newName = newName;
-            body.newPhone = newPhone;
+            body.ptType = ptType;
+          } else if (category === "consultation") {
+            if (resolvedMemberId) {
+              body.memberId = resolvedMemberId;
+            } else {
+              body.newName = newName;
+              body.newPhone = newPhone;
+            }
           }
-        }
 
-        const res = await fetch("/api/admin/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          results.push({ date: occDate, ok: true });
-          if (category === "consultation" && !resolvedMemberId && data.session?.member_id) {
-            resolvedMemberId = data.session.member_id;
+          const res = await fetch("/api/admin/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            results.push({ date: occDate, hour: occHour, ok: true });
+            if (category === "consultation" && !resolvedMemberId && data.session?.member_id) {
+              resolvedMemberId = data.session.member_id;
+            }
+          } else {
+            results.push({ date: occDate, hour: occHour, ok: false, error: data.error });
           }
-        } else {
-          results.push({ date: occDate, ok: false, error: data.error });
         }
       }
     } catch {
@@ -704,7 +912,7 @@ function CreateSessionModal({
     setSubmitting(false);
     const failCount = results.filter((r) => !r.ok).length;
 
-    if (occurrences.length === 1) {
+    if (results.length === 1) {
       if (failCount > 0) {
         setError(results[0].error ?? "등록에 실패했습니다.");
         return;
@@ -717,7 +925,7 @@ function CreateSessionModal({
     if (failCount > 0) {
       const failDates = results
         .filter((r) => !r.ok)
-        .map((r) => `${r.date}(${r.error ?? "실패"})`)
+        .map((r) => `${r.date} ${r.hour}:00(${r.error ?? "실패"})`)
         .join(", ");
       alert(`${successCount}건 등록 완료, ${failCount}건 실패\n${failDates}`);
     } else {
@@ -897,6 +1105,26 @@ function CreateSessionModal({
             />
             <p className="text-xs text-ink/40 mt-1.5">
               해당 시간에 예약이 들어오지 않도록 막아둡니다.
+            </p>
+          </div>
+        )}
+
+        {(category === "memo" || category === "blocked") && endHourOptions.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">종료 시간</label>
+            <select
+              value={endHour}
+              onChange={(e) => setEndHour(Number(e.target.value))}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            >
+              {endHourOptions.map((eh) => (
+                <option key={eh} value={eh}>
+                  {eh}:00
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-ink/40 mt-1.5">
+              {hour}:00부터 {endHour}:00 전까지 시간대를 한 번에 등록합니다.
             </p>
           </div>
         )}
