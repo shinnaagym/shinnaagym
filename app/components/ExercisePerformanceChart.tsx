@@ -7,15 +7,27 @@ import { koreaTodayKey } from "@/lib/date";
 import type { AssessmentRow } from "@/lib/db";
 
 const WIDTH = 640;
-const HEIGHT = 180;
+const HEIGHT = 220;
 const PAD_LEFT = 36;
 const PAD_RIGHT = 16;
-const PAD_TOP = 20;
+const PAD_TOP = 16;
 const PAD_BOTTOM = 28;
-const MIN_RADIUS = 3.5;
-const MAX_RADIUS = 9;
-const LOW_RPE_COLOR = { r: 0x3f, g: 0xa7, b: 0x96 }; // sage — 가볍게 든 느낌
-const HIGH_RPE_COLOR = { r: 0xe2, g: 0x73, b: 0x4f }; // coral — 최대 근접 느낌
+// 같은 날짜에 여러 운동의 e1RM이 정확히 겹칠 때 서로 구분되도록 주는 픽셀 단위 간격.
+const OVERLAP_JITTER_PX = 4;
+
+// 통증 척도 그래프와 동일한 팔레트 — 운동 종목별 시리즈에 순서대로 배정한다.
+const SERIES_COLORS = [
+  "#9c7238",
+  "#2a78d6",
+  "#3fa796",
+  "#e2734f",
+  "#a35fd1",
+  "#c9a227",
+  "#d1477a",
+  "#5f8fd1",
+  "#7fae4d",
+  "#7a6fd6",
+];
 
 function shortDateLabel(raw: string): string {
   const [, m, d] = raw.split("-");
@@ -32,65 +44,62 @@ function dateKeyOf(a: AssessmentRow): string {
 }
 
 interface ExercisePoint {
-  dateKey: string;
   e1rm: number;
   weight: number;
   reps: number;
   rpe: number | null;
 }
 
-/** RPE 1~10을 반지름 3.5~9px로 선형 변환 — RPE가 높을수록(힘들수록) 점이 커진다. */
-function radiusForRpe(rpe: number | null): number {
-  if (rpe == null) return MIN_RADIUS;
-  const t = Math.max(0, Math.min(1, (rpe - 1) / 9));
-  return MIN_RADIUS + t * (MAX_RADIUS - MIN_RADIUS);
+interface DayGroup {
+  dateKey: string;
+  byExercise: Record<string, ExercisePoint>;
 }
 
-/** RPE 1~10을 sage(가벼움) → coral(최대 근접) 그라데이션 색으로 변환. */
-function colorForRpe(rpe: number | null): string {
-  if (rpe == null) return "#8a8578";
-  const t = Math.max(0, Math.min(1, (rpe - 1) / 9));
-  const r = Math.round(LOW_RPE_COLOR.r + (HIGH_RPE_COLOR.r - LOW_RPE_COLOR.r) * t);
-  const g = Math.round(LOW_RPE_COLOR.g + (HIGH_RPE_COLOR.g - LOW_RPE_COLOR.g) * t);
-  const b = Math.round(LOW_RPE_COLOR.b + (HIGH_RPE_COLOR.b - LOW_RPE_COLOR.b) * t);
-  return `rgb(${r}, ${g}, ${b})`;
+interface Series {
+  name: string;
+  color: string;
+  values: (ExercisePoint | null)[];
 }
 
 /**
  * 평가지에 기록된 "운동 수행능력" 항목 중 무게·횟수가 모두 있는 탑세트만 골라
- * 운동 이름별로 묶는다. 같은 날짜에 같은 운동이 여러 건이면(같은 날 재평가 등)
+ * 날짜별로 묶는다. 같은 날짜에 같은 운동이 여러 건이면(같은 날 재평가 등)
  * 가장 나중에 작성된 값을 우선한다.
  */
-function buildExerciseSeries(assessments: AssessmentRow[]): Map<string, ExercisePoint[]> {
+function buildDayGroups(assessments: AssessmentRow[]): DayGroup[] {
   const sorted = [...assessments].sort((a, b) => createdAtMs(a) - createdAtMs(b));
-  const byExercise = new Map<string, Map<string, ExercisePoint>>();
+  const byDate = new Map<string, Record<string, ExercisePoint>>();
 
   for (const a of sorted) {
     const dateKey = dateKeyOf(a);
+    const byExercise = byDate.get(dateKey) ?? {};
     for (const entry of a.exercise_performance) {
       const name = entry.exercise.trim();
       if (!name || entry.weight == null || entry.reps == null) continue;
       const e1rm = computeE1rm(entry.weight, entry.reps);
       if (e1rm == null) continue;
-      const byDate = byExercise.get(name) ?? new Map<string, ExercisePoint>();
-      byDate.set(dateKey, { dateKey, e1rm, weight: entry.weight, reps: entry.reps, rpe: entry.rpe });
-      byExercise.set(name, byDate);
+      byExercise[name] = { e1rm, weight: entry.weight, reps: entry.reps, rpe: entry.rpe };
     }
+    byDate.set(dateKey, byExercise);
   }
 
-  const result = new Map<string, ExercisePoint[]>();
-  for (const [name, byDate] of byExercise) {
-    result.set(
-      name,
-      Array.from(byDate.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey)),
-    );
-  }
-  return result;
+  return Array.from(byDate.entries())
+    .map(([dateKey, byExercise]) => ({ dateKey, byExercise }))
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 }
 
-/** 운동 하나의 차트 카드에 붙는 "빠른 기록 추가" 폼 — 관리자 화면에서 memberId가 있을 때만 노출된다. */
-function QuickAddExerciseForm({ memberId, name, onDone }: { memberId: number; name: string; onDone: () => void }) {
+/** 운동 수행능력 그래프에 붙는 "빠른 기록 추가" 폼 — 이미 추적 중인 운동 중 하나를 골라 오늘 날짜의 기록만 새로 남긴다. */
+function QuickAddExerciseForm({
+  memberId,
+  exerciseNames,
+  onDone,
+}: {
+  memberId: number;
+  exerciseNames: string[];
+  onDone: () => void;
+}) {
   const router = useRouter();
+  const [name, setName] = useState(exerciseNames[0] ?? "");
   const [date, setDate] = useState(() => koreaTodayKey());
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
@@ -101,8 +110,8 @@ function QuickAddExerciseForm({ memberId, name, onDone }: { memberId: number; na
   async function handleSubmit() {
     const weightNum = Number(weight);
     const repsNum = Number(reps);
-    if (!weightNum || !repsNum) {
-      setError("무게와 횟수를 입력해주세요.");
+    if (!name || !weightNum || !repsNum) {
+      setError("운동, 무게, 횟수를 입력해주세요.");
       return;
     }
     setSubmitting(true);
@@ -133,8 +142,19 @@ function QuickAddExerciseForm({ memberId, name, onDone }: { memberId: number; na
   }
 
   return (
-    <div className="mt-3 pt-3 border-t border-line/50">
+    <div className="mb-3 pb-3 border-b border-line/50">
       <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral max-w-[160px]"
+        >
+          {exerciseNames.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
         <input
           type="date"
           value={date}
@@ -190,22 +210,51 @@ function QuickAddExerciseForm({ memberId, name, onDone }: { memberId: number; na
   );
 }
 
-function SingleExerciseChart({
-  name,
-  points,
+// 회원의 "운동 수행능력" 기록 중 무게·횟수가 있는 탑세트만 골라 종목별
+// e1RM(추정 1RM)을 하나의 그래프에 겹쳐서 보여준다. 통증 척도 그래프와 같은
+// 방식으로, 종목마다 선 색을 다르게 해 "선이 올라간다 = 강해지고 있다"를
+// 한눈에 비교할 수 있게 한다.
+export function ExercisePerformanceChart({
+  assessments,
   memberId,
 }: {
-  name: string;
-  points: ExercisePoint[];
+  assessments: AssessmentRow[];
   memberId?: number;
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const n = points.length;
-  const values = points.map((p) => p.e1rm);
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
+  const dayGroups = useMemo(() => buildDayGroups(assessments), [assessments]);
+
+  const exerciseNames = useMemo(() => {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const g of dayGroups) {
+      for (const name of Object.keys(g.byExercise)) {
+        if (!seen.has(name)) {
+          seen.add(name);
+          names.push(name);
+        }
+      }
+    }
+    return names;
+  }, [dayGroups]);
+
+  if (dayGroups.length === 0 || exerciseNames.length === 0) return null;
+
+  const dateLabels = dayGroups.map((g) => shortDateLabel(g.dateKey));
+  const fullDates = dayGroups.map((g) => g.dateKey);
+
+  const series: Series[] = exerciseNames.map((name, i) => ({
+    name,
+    color: SERIES_COLORS[i % SERIES_COLORS.length],
+    values: dayGroups.map((g) => g.byExercise[name] ?? null),
+  }));
+
+  const n = dayGroups.length;
+  const allValues = series.flatMap((s) => s.values).filter((v): v is ExercisePoint => v != null);
+  const rawMin = Math.min(...allValues.map((v) => v.e1rm));
+  const rawMax = Math.max(...allValues.map((v) => v.e1rm));
   const span = rawMax - rawMin || rawMax * 0.2 || 10;
   const yMin = Math.max(0, rawMin - span * 0.2);
   const yMax = rawMax + span * 0.2;
@@ -216,16 +265,46 @@ function SingleExerciseChart({
   const xAt = (i: number) => PAD_LEFT + (n > 1 ? i * xStep : plotWidth / 2);
   const yAt = (v: number) => PAD_TOP + plotHeight * (1 - (v - yMin) / (yMax - yMin || 1));
 
-  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${xAt(i)},${yAt(p.e1rm)} `).join("");
-
   const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+
+  // 같은 날짜에 두 개 이상의 시리즈가 정확히 같은 e1RM을 가지면 좌표가 완전히
+  // 겹치므로, 겹치는 시리즈끼리 좌우 대칭으로 살짝 띄운 y좌표를 미리 계산해둔다.
+  const yPixels: number[][] = series.map(() => new Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    const groupsByValue = new Map<number, number[]>();
+    series.forEach((s, si) => {
+      const v = s.values[i];
+      if (v == null) return;
+      const seriesIdxs = groupsByValue.get(v.e1rm) ?? [];
+      seriesIdxs.push(si);
+      groupsByValue.set(v.e1rm, seriesIdxs);
+    });
+    for (const [value, seriesIdxs] of groupsByValue) {
+      const baseY = yAt(value);
+      const count = seriesIdxs.length;
+      seriesIdxs.forEach((si, k) => {
+        yPixels[si][i] = baseY + (k - (count - 1) / 2) * OVERLAP_JITTER_PX;
+      });
+    }
+  }
+
+  function pathFor(si: number): string {
+    let d = "";
+    let started = false;
+    series[si].values.forEach((v, i) => {
+      if (v == null) return;
+      d += `${started ? "L" : "M"}${xAt(i)},${yPixels[si][i]} `;
+      started = true;
+    });
+    return d.trim();
+  }
 
   function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const relX = ((e.clientX - rect.left) / rect.width) * WIDTH;
     let nearest = 0;
     let best = Infinity;
-    points.forEach((_, i) => {
+    dateLabels.forEach((_, i) => {
       const dist = Math.abs(xAt(i) - relX);
       if (dist < best) {
         best = dist;
@@ -235,12 +314,13 @@ function SingleExerciseChart({
     setHoverIndex(nearest);
   }
 
-  const hovered = hoverIndex != null ? points[hoverIndex] : null;
   const tooltipLeftPct = hoverIndex != null ? (xAt(hoverIndex) / WIDTH) * 100 : 0;
-
-  const first = points[0];
-  const last = points[points.length - 1];
-  const trendUp = last.e1rm > first.e1rm;
+  const hoveredValues =
+    hoverIndex != null
+      ? series
+          .map((s) => ({ name: s.name, color: s.color, value: s.values[hoverIndex!] }))
+          .filter((s): s is { name: string; color: string; value: ExercisePoint } => s.value != null)
+      : [];
 
   return (
     <div className="rounded-2xl border border-line/60 bg-white shadow-sm px-5 py-4 mb-4">
@@ -249,27 +329,35 @@ function SingleExerciseChart({
           to { stroke-dashoffset: 0; }
         }
       `}</style>
-      <div className="flex items-center justify-between mb-1 gap-2">
-        <p className="font-display text-base">{name}</p>
-        <div className="flex items-center gap-2">
-          <p className="text-xs text-ink/50 whitespace-nowrap">
-            {first.e1rm}kg → <span className={trendUp ? "text-sage font-medium" : ""}>{last.e1rm}kg</span>{" "}
-            (e1RM)
-          </p>
-          {memberId != null && !showAddForm && (
-            <button
-              type="button"
-              onClick={() => setShowAddForm(true)}
-              className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
-            >
-              + 기록추가
-            </button>
-          )}
-        </div>
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <p className="font-display text-base">운동 수행능력 그래프 (e1RM)</p>
+        {memberId != null && !showAddForm && (
+          <button
+            type="button"
+            onClick={() => setShowAddForm(true)}
+            className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
+          >
+            + 기록추가
+          </button>
+        )}
       </div>
-      <p className="text-[11px] text-ink/40 mb-2">
-        점 크기·색이 진할수록(코랄) 그날 힘들었던 세트, 연할수록(세이지) 가볍게 든 세트예요.
-      </p>
+
+      {memberId != null && showAddForm && (
+        <QuickAddExerciseForm
+          memberId={memberId}
+          exerciseNames={exerciseNames}
+          onDone={() => setShowAddForm(false)}
+        />
+      )}
+
+      <div className="flex items-center gap-x-4 gap-y-1.5 mb-2 text-xs text-ink/60 flex-wrap">
+        {series.map((s) => (
+          <span key={s.name} className="flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-4" style={{ backgroundColor: s.color }} />
+            {s.name}
+          </span>
+        ))}
+      </div>
 
       <div className="relative">
         <svg
@@ -294,16 +382,9 @@ function SingleExerciseChart({
             </g>
           ))}
 
-          {points.map((p, i) => (
-            <text
-              key={i}
-              x={xAt(i)}
-              y={HEIGHT - 8}
-              textAnchor="middle"
-              fontSize={9}
-              fill="#8a8578"
-            >
-              {shortDateLabel(p.dateKey)}
+          {dateLabels.map((label, i) => (
+            <text key={i} x={xAt(i)} y={HEIGHT - 8} textAnchor="middle" fontSize={9} fill="#8a8578">
+              {label}
             </text>
           ))}
 
@@ -318,78 +399,62 @@ function SingleExerciseChart({
             />
           )}
 
-          <path
-            d={path}
-            fill="none"
-            stroke="#9c7238"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            pathLength={1}
-            style={{
-              strokeDasharray: 1,
-              strokeDashoffset: 1,
-              animation: "exercise-chart-draw 1.1s ease forwards",
-            }}
-          />
-          {points.map((p, i) => (
-            <circle
-              key={i}
-              cx={xAt(i)}
-              cy={yAt(p.e1rm)}
-              r={radiusForRpe(p.rpe)}
-              fill={colorForRpe(p.rpe)}
-              stroke="#ffffff"
-              strokeWidth={1.5}
-            />
+          {series.map((s, si) => (
+            <g key={s.name}>
+              <path
+                d={pathFor(si)}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                pathLength={1}
+                style={{
+                  strokeDasharray: 1,
+                  strokeDashoffset: 1,
+                  animation: "exercise-chart-draw 1.1s ease forwards",
+                  animationDelay: `${si * 0.15}s`,
+                }}
+              />
+              {s.values.map(
+                (v, i) =>
+                  v != null && (
+                    <circle
+                      key={i}
+                      cx={xAt(i)}
+                      cy={yPixels[si][i]}
+                      r={4}
+                      fill={s.color}
+                      stroke="#ffffff"
+                      strokeWidth={2}
+                    />
+                  ),
+              )}
+            </g>
           ))}
         </svg>
 
-        {hovered && (
+        {hoverIndex != null && hoveredValues.length > 0 && (
           <div
-            className="absolute top-0 -translate-x-1/2 rounded-lg border border-line bg-white shadow-md px-2.5 py-1.5 text-xs pointer-events-none w-max max-w-[200px]"
+            className="absolute top-0 -translate-x-1/2 rounded-lg border border-line bg-white shadow-md px-2.5 py-1.5 text-xs pointer-events-none w-max max-w-[220px]"
             style={{ left: `${tooltipLeftPct}%` }}
           >
-            <p className="text-ink/50 mb-0.5 whitespace-nowrap">{hovered.dateKey}</p>
-            <p className="font-medium">e1RM {hovered.e1rm}kg</p>
-            <p className="text-ink/60">
-              {hovered.weight}kg × {hovered.reps}회
-              {hovered.rpe != null && ` · RPE ${hovered.rpe}`}
-            </p>
+            <p className="text-ink/50 mb-0.5 whitespace-nowrap">{fullDates[hoverIndex]}</p>
+            {hoveredValues.map((h) => (
+              <p key={h.name} className="leading-snug break-words">
+                <span className="font-medium" style={{ color: h.color }}>
+                  {h.value.e1rm}kg
+                </span>
+                <span className="text-ink/50">
+                  {" "}
+                  {h.name} · {h.value.weight}kg × {h.value.reps}회
+                  {h.value.rpe != null && ` · RPE ${h.value.rpe}`}
+                </span>
+              </p>
+            ))}
           </div>
         )}
       </div>
-
-      {memberId != null && showAddForm && (
-        <QuickAddExerciseForm memberId={memberId} name={name} onDone={() => setShowAddForm(false)} />
-      )}
-    </div>
-  );
-}
-
-// 회원의 "운동 수행능력" 기록 중 무게·횟수가 있는 탑세트만 골라 운동 종목별로
-// e1RM(추정 1RM) 추이를 꺾은선 그래프로 보여준다. 전문 지식 없이도 "선이
-// 올라간다 = 강해지고 있다"만 보면 되도록 종목마다 그래프를 하나씩 분리해
-// 단순하게 그린다. RPE는 점 크기와 색으로 표현해 "더 가벼운 느낌으로 더
-// 무거운 무게를 든다"는 변화를 함께 보여준다.
-export function ExercisePerformanceChart({
-  assessments,
-  memberId,
-}: {
-  assessments: AssessmentRow[];
-  memberId?: number;
-}) {
-  const series = useMemo(() => buildExerciseSeries(assessments), [assessments]);
-  const entries = Array.from(series.entries()).filter(([, points]) => points.length > 0);
-
-  if (entries.length === 0) return null;
-
-  return (
-    <div className="mb-4">
-      <p className="font-display text-base mb-2">운동 수행능력 추이 (e1RM)</p>
-      {entries.map(([name, points]) => (
-        <SingleExerciseChart key={name} name={name} points={points} memberId={memberId} />
-      ))}
     </div>
   );
 }

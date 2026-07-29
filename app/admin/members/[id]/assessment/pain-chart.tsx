@@ -341,7 +341,7 @@ export function AssessmentPainChart({
         }
       `}</style>
       <div className="flex items-center justify-between mb-2 gap-2">
-        <p className="font-display text-base">통증 척도 추이</p>
+        <p className="font-display text-base">통증 척도 그래프</p>
         {memberId != null && series.length > 0 && !showAddForm && (
           <button
             type="button"
