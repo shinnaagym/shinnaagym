@@ -190,6 +190,7 @@ export async function updateMember(
   if (input.followupStatus !== undefined) {
     fields.push(`followup_status = $${++i}`);
     values.push(input.followupStatus);
+    fields.push(`followup_updated_at = now()`);
   }
   if (input.followupMemo !== undefined) {
     fields.push(`followup_memo = $${++i}`);
@@ -1060,6 +1061,158 @@ export async function getMonthlyTrend(
     completedSessions: sessionMap.get(month) ?? 0,
     consultationCount: consultationMap.get(month) ?? 0,
   }));
+}
+
+// ---- 재등록 관리 ----
+
+export interface MonthlyRetentionPoint {
+  month: string; // YYYY-MM
+  newMemberCount: number;
+  reRegisteredCount: number;
+  churnedCount: number;
+  reRegistrationRate: number | null; // 재등록 / (재등록 + 이탈), 분모 0이면 null
+}
+
+/**
+ * endYearMonth 기준 최근 `months`개월 치 신규 등록·재등록·이탈 추이.
+ * 신규/재등록은 패키지 구매 이력(최초 구매=신규, 이후 구매=재등록) 기준이고,
+ * 이탈은 관리자가 팔로업 상태를 "이탈"로 직접 처리한 시점(followup_updated_at) 기준이다.
+ */
+export async function getMonthlyRetentionStats(
+  endYearMonth: string,
+  months: number,
+): Promise<MonthlyRetentionPoint[]> {
+  const monthKeys: string[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    monthKeys.push(addMonthsToKey(endYearMonth, -i));
+  }
+
+  const [newResult, reRegisteredResult, churnedResult] = await Promise.all([
+    query<{ month: string; count: string }>(
+      `SELECT to_char(f.first_at, 'YYYY-MM') as month, COUNT(*) as count
+       FROM (SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id) f
+       WHERE to_char(f.first_at, 'YYYY-MM') = ANY($1)
+       GROUP BY month`,
+      [monthKeys],
+    ),
+    query<{ month: string; count: string }>(
+      `SELECT to_char(p.purchased_at, 'YYYY-MM') as month, COUNT(DISTINCT p.member_id) as count
+       FROM packages p
+       WHERE to_char(p.purchased_at, 'YYYY-MM') = ANY($1)
+         AND p.purchased_at <> (
+           SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+         )
+       GROUP BY month`,
+      [monthKeys],
+    ),
+    query<{ month: string; count: string }>(
+      `SELECT to_char(followup_updated_at, 'YYYY-MM') as month, COUNT(*) as count
+       FROM members
+       WHERE followup_status = '이탈' AND to_char(followup_updated_at, 'YYYY-MM') = ANY($1)
+       GROUP BY month`,
+      [monthKeys],
+    ),
+  ]);
+
+  const newMap = new Map(newResult.rows.map((r) => [r.month, Number(r.count ?? 0)]));
+  const reRegisteredMap = new Map(
+    reRegisteredResult.rows.map((r) => [r.month, Number(r.count ?? 0)]),
+  );
+  const churnedMap = new Map(churnedResult.rows.map((r) => [r.month, Number(r.count ?? 0)]));
+
+  return monthKeys.map((month) => {
+    const reRegisteredCount = reRegisteredMap.get(month) ?? 0;
+    const churnedCount = churnedMap.get(month) ?? 0;
+    const denom = reRegisteredCount + churnedCount;
+    return {
+      month,
+      newMemberCount: newMap.get(month) ?? 0,
+      reRegisteredCount,
+      churnedCount,
+      reRegistrationRate: denom > 0 ? reRegisteredCount / denom : null,
+    };
+  });
+}
+
+export interface CoachRetentionReport {
+  coachId: number;
+  coachName: string;
+  monthReRegisteredCount: number;
+  periodReRegisteredCount: number;
+  periodChurnedCount: number;
+  reRegistrationRate: number | null; // periodReRegisteredCount / (periodReRegisteredCount + periodChurnedCount)
+}
+
+/** endYearMonth 기준 최근 `months`개월 치 코치별 재등록·이탈 건수(재등록 관리 페이지용). */
+export async function getCoachRetentionReports(
+  endYearMonth: string,
+  months: number,
+): Promise<CoachRetentionReport[]> {
+  const monthKeys: string[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    monthKeys.push(addMonthsToKey(endYearMonth, -i));
+  }
+
+  const [coachesResult, monthReRegisteredResult, periodReRegisteredResult, periodChurnedResult] =
+    await Promise.all([
+      query<CoachRow>(`SELECT * FROM coaches ORDER BY id ASC`),
+      query<{ coach_id: number; count: string }>(
+        `SELECT m.coach_id as coach_id, COUNT(*) as count
+         FROM packages p
+         JOIN members m ON m.id = p.member_id
+         WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+           AND m.coach_id IS NOT NULL
+           AND p.purchased_at <> (
+             SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+           )
+         GROUP BY m.coach_id`,
+        [endYearMonth],
+      ),
+      query<{ coach_id: number; count: string }>(
+        `SELECT m.coach_id as coach_id, COUNT(*) as count
+         FROM packages p
+         JOIN members m ON m.id = p.member_id
+         WHERE to_char(p.purchased_at, 'YYYY-MM') = ANY($1)
+           AND m.coach_id IS NOT NULL
+           AND p.purchased_at <> (
+             SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+           )
+         GROUP BY m.coach_id`,
+        [monthKeys],
+      ),
+      query<{ coach_id: number; count: string }>(
+        `SELECT coach_id, COUNT(*) as count
+         FROM members
+         WHERE followup_status = '이탈' AND to_char(followup_updated_at, 'YYYY-MM') = ANY($1)
+           AND coach_id IS NOT NULL
+         GROUP BY coach_id`,
+        [monthKeys],
+      ),
+    ]);
+
+  const monthReRegisteredMap = new Map(
+    monthReRegisteredResult.rows.map((r) => [r.coach_id, Number(r.count ?? 0)]),
+  );
+  const periodReRegisteredMap = new Map(
+    periodReRegisteredResult.rows.map((r) => [r.coach_id, Number(r.count ?? 0)]),
+  );
+  const periodChurnedMap = new Map(
+    periodChurnedResult.rows.map((r) => [r.coach_id, Number(r.count ?? 0)]),
+  );
+
+  return coachesResult.rows.map((coach) => {
+    const periodReRegisteredCount = periodReRegisteredMap.get(coach.id) ?? 0;
+    const periodChurnedCount = periodChurnedMap.get(coach.id) ?? 0;
+    const denom = periodReRegisteredCount + periodChurnedCount;
+    return {
+      coachId: coach.id,
+      coachName: coach.name,
+      monthReRegisteredCount: monthReRegisteredMap.get(coach.id) ?? 0,
+      periodReRegisteredCount,
+      periodChurnedCount,
+      reRegistrationRate: denom > 0 ? periodReRegisteredCount / denom : null,
+    };
+  });
 }
 
 export interface NewRegistration {

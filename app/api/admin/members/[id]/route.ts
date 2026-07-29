@@ -80,7 +80,7 @@ export async function PATCH(
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const VALID_FOLLOWUP_STATUSES = ["대기", "재등록 완료", "이탈"];
+  const VALID_FOLLOWUP_STATUSES = ["대기", "연락함", "재등록 확정", "보류", "이탈"];
 
   await updateMember(idNum, {
     name: typeof body.name === "string" ? body.name.trim() : undefined,

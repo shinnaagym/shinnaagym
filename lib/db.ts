@@ -341,6 +341,7 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
             ALTER TABLE members ADD COLUMN IF NOT EXISTS improvement_direction TEXT NOT NULL DEFAULT '';
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_updated_at TIMESTAMPTZ;
             `,
           ),
           getPool().query(
@@ -409,6 +410,7 @@ export interface MemberRow {
   available_times: string;
   followup_status: string;
   followup_memo: string;
+  followup_updated_at: string | null;
   improvement_direction: string;
   status: MemberStatus;
   token: string;

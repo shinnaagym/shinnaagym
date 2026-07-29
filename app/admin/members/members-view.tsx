@@ -180,10 +180,12 @@ export function MembersView({
   initialMembers,
   coaches,
   initialFixedSlots,
+  initialOpenId,
 }: {
   initialMembers: MemberWithProgress[];
   coaches: CoachRow[];
   initialFixedSlots: FixedSlotWithMember[];
+  initialOpenId?: number | null;
 }) {
   const members = initialMembers;
   const fixedSlots = initialFixedSlots;
@@ -192,7 +194,7 @@ export function MembersView({
   const [coachFilter, setCoachFilter] = useState<number | "all" | "unassigned">("all");
   const [statusFilter, setStatusFilter] = useState<MemberStatus | "all">("active");
   const [showCreate, setShowCreate] = useState(false);
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(initialOpenId ?? null);
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
