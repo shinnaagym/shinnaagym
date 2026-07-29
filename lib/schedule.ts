@@ -801,7 +801,7 @@ export async function linkPreReservationToSchedule(input: {
       coachId: member.coach_id ?? coachId,
       date: input.date,
       hour: input.hour,
-      memo: "사전예약 자동 등록",
+      memo: `사전예약 자동 등록 (${input.phone})`,
       entryType: "consultation",
     });
     return { memberId: member.id, sessionId: session.id };

@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+import { COACH_COLOR_PALETTE, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { addDaysToKey, mondayOfWeek } from "@/lib/date";
 import type { CoachRow, PtType, ScheduleMemoRow, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { CoachScheduleStats, MemberWithProgress } from "@/lib/schedule";
@@ -51,18 +51,6 @@ const STATUS_LABEL: Record<SessionStatus, string> = {
   no_show: "노쇼",
   cancelled: "취소",
 };
-
-/** 코치별로 다른 색을 매기기 위한 팔레트. 코치 순서에 따라 순환한다. */
-// 신나아짐 브랜드 톤(골드·세이지·코랄 + 보조 색)에서 파생한 코치 색상 팔레트.
-// Tailwind 기본 rainbow 팔레트 대신 브랜드와 어울리는 톤만 순환시킨다.
-const COACH_COLOR_PALETTE: Array<{ header: string; headerText: string; accent: string }> = [
-  { header: "bg-gold/15", headerText: "text-gold-deep", accent: "border-l-gold" },
-  { header: "bg-sage/20", headerText: "text-[#3f6357]", accent: "border-l-sage" },
-  { header: "bg-coral/12", headerText: "text-[#a84a2c]", accent: "border-l-coral" },
-  { header: "bg-[#e6ecec]", headerText: "text-[#3d5a5c]", accent: "border-l-[#8fadaf]" },
-  { header: "bg-[#f1e3e0]", headerText: "text-[#8a5347]", accent: "border-l-[#c98f83]" },
-  { header: "bg-[#f3e9d2]", headerText: "text-[#8a6a1f]", accent: "border-l-[#cdae6a]" },
-];
 
 /** 일정 pill의 배경/테두리 스타일. 상담·메모·수업불가는 상태와 무관하게 고정 톤을 쓴다(취소 제외). */
 function entryStyle(session: SessionWithMember): string {
@@ -208,17 +196,7 @@ export function ScheduleGrid({
     coachId: number;
   } | null>(null);
   const [editTarget, setEditTarget] = useState<SessionWithMember | null>(null);
-  const todayIdx = dateKeys.indexOf(today);
-  const [selectedDayIdx, setSelectedDayIdx] = useState(todayIdx >= 0 ? todayIdx : 0);
-  const dayChipRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
-
-  useEffect(() => {
-    dayChipRefs.current[selectedDayIdx]?.scrollIntoView({
-      inline: "center",
-      block: "nearest",
-    });
-  }, [selectedDayIdx]);
 
   const effectiveCoaches = coaches.length > 0 ? coaches : [];
   const visibleCoaches =
@@ -278,8 +256,6 @@ export function ScheduleGrid({
       },
     );
   }, [coachStats]);
-
-  const selectedDate = dateKeys[selectedDayIdx];
 
   /** 코치 한 명을 필터로 골랐을 때(주간 보기) 이번 주 전체의 PT/2:1/상담 합계. */
   const weeklySummary = useMemo(() => {
@@ -435,41 +411,9 @@ export function ScheduleGrid({
         <p className="font-display text-lg">{formatWeekLabel(dateKeys)}</p>
       </div>
 
-      {/* 요일 선택 (데스크톱·모바일 공통) */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 mb-4">
-        {dateKeys.map((date, dayIdx) => {
-          const hours = dayHours[date];
-          const isSelected = dayIdx === selectedDayIdx;
-          const isToday = date === today;
-          return (
-            <button
-              key={date}
-              ref={(el) => {
-                dayChipRefs.current[dayIdx] = el;
-              }}
-              onClick={() => setSelectedDayIdx(dayIdx)}
-              className={[
-                "shrink-0 rounded-xl px-3 py-2 text-center min-w-[52px] border transition",
-                isSelected
-                  ? "bg-ink text-white border-ink"
-                  : isToday
-                    ? "border-coral text-ink bg-white"
-                    : "border-line bg-white text-ink/70",
-              ].join(" ")}
-            >
-              <p className="text-[11px]">{WEEKDAY_LABELS[dayIdx]}</p>
-              <p className="text-sm font-medium">{Number(date.split("-")[2])}</p>
-              {hours?.closed && (
-                <p className={`text-[9px] ${isSelected ? "text-white/60" : "text-ink/30"}`}>휴무</p>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
       <ScheduleMemoPad initialMemos={initialMemos} />
 
-      {/* 코치를 한 명만 선택하면 요일 탭과 무관하게 그 코치의 이번 주 전체를 한 번에 보여준다. */}
+      {/* 코치를 한 명만 선택하면 그 코치의 이번 주 전체를 한 번에 보여준다. */}
       {singleCoach ? (
         <>
           <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-4">
@@ -586,20 +530,9 @@ export function ScheduleGrid({
           </div>
         </>
       ) : (
-      /* 선택한 날짜 — 코치를 세로 컬럼으로 나열하는 스케줄표 */
+      /* 코치 전체 — 요일별로 나열하지 않고 이번 주(월~토) 전체를 한 화면에 보여준다.
+         칸마다 그 요일·시간대에 예약된 모든 코치의 일정을 모아 표시한다. */
       (() => {
-        const date = selectedDate;
-        const hours = dayHours[date];
-        const holidayName = holidayMap[date];
-        const dayIdx = selectedDayIdx;
-
-        if (hours?.closed) {
-          return (
-            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-10 text-center text-ink/40 text-sm">
-              이 날은 휴무예요.
-            </div>
-          );
-        }
         if (visibleCoaches.length === 0) {
           return (
             <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-10 text-center text-ink/40 text-sm">
@@ -608,74 +541,109 @@ export function ScheduleGrid({
           );
         }
 
-        const hourList = SCHEDULE_HOUR_ROWS.filter(
-          (hour) => hours && hour >= hours.start && hour < hours.end,
-        );
-        const gridMinWidth = 64 + visibleCoaches.length * 110;
+        const gridMinWidth = 64 + dateKeys.length * 150;
 
         return (
           <>
+            {effectiveCoaches.length > 1 && (
+              <div className="flex flex-wrap items-center gap-3 mb-3 text-xs text-ink/60">
+                <span className="font-medium text-ink/50">코치별 색상</span>
+                {effectiveCoaches.map((c) => {
+                  const palette = coachColorMap.get(c.id);
+                  return (
+                    <span key={c.id} className="flex items-center gap-1">
+                      <span
+                        className={`inline-block h-2.5 w-2.5 rounded-full ${palette?.header ?? "bg-bone"}`}
+                      />
+                      {c.name}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-4">
               <div
                 className="grid"
                 style={{
-                  gridTemplateColumns: `64px repeat(${visibleCoaches.length}, minmax(100px, 1fr))`,
+                  gridTemplateColumns: `64px repeat(${dateKeys.length}, minmax(140px, 1fr))`,
                   minWidth: `${gridMinWidth}px`,
                 }}
               >
-                {/* 날짜 타이틀 */}
                 <div className="col-span-full border-b border-line/60 bg-bone/50 px-3 py-2.5 text-center">
-                  <p className="font-display text-sm">
-                    {date} ({WEEKDAY_LABELS[dayIdx]})
-                    {holidayName && <span className="ml-2 text-xs text-coral/70">{holidayName}</span>}
-                  </p>
+                  <p className="font-display text-sm">이번 주 전체 ({formatWeekLabel(dateKeys)})</p>
                 </div>
 
-                {/* 코치 이름 헤더 행 (코치별 색상 적용) */}
                 <div className="border-b border-line/40 bg-bone/30" />
-                {visibleCoaches.map((c) => {
-                  const palette = coachColorMap.get(c.id);
+                {dateKeys.map((d, i) => {
+                  const isToday = d === today;
+                  const closed = dayHours[d]?.closed;
                   return (
                     <div
-                      key={c.id}
+                      key={d}
                       className={[
-                        "border-b border-l-4 border-line/40 px-2 py-2 text-center",
-                        palette?.header ?? "bg-bone/30",
-                        palette?.accent ?? "",
+                        "border-b border-line/40 px-2 py-2 text-center",
+                        isToday ? "bg-coral/10" : "bg-bone/30",
                       ].join(" ")}
                     >
-                      <p className={`text-xs font-medium truncate ${palette?.headerText ?? "text-ink/70"}`}>
-                        {c.name}
+                      <p className="text-xs font-medium truncate">
+                        {WEEKDAY_LABELS[i]} {Number(d.split("-")[2])}
                       </p>
+                      {closed && <p className="text-[9px] text-ink/30">휴무</p>}
+                      {holidayMap[d] && !closed && (
+                        <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
+                      )}
                     </div>
                   );
                 })}
 
-                {/* 시간 행들 — 코치 하나당 컬럼 하나 */}
-                {hourList.map((hour) => (
+                {SCHEDULE_HOUR_ROWS.map((hour) => (
                   <Fragment key={hour}>
                     <div className="border-b border-line/40 px-2 py-2 text-xs text-ink/50 text-right">
                       {hour}:00
                     </div>
-                    {visibleCoaches.map((coach) => {
-                      const session = sessionMap.get(`${date}-${coach.id}-${hour}`);
-                      const palette = coachColorMap.get(coach.id);
+                    {dateKeys.map((d) => {
+                      const dh = dayHours[d];
+                      const withinHours = !!dh && !dh.closed && hour >= dh.start && hour < dh.end;
+                      const cellSessions = withinHours
+                        ? visibleCoaches
+                            .map((coach) => sessionMap.get(`${d}-${coach.id}-${hour}`))
+                            .filter((s): s is SessionWithMember => !!s)
+                        : [];
                       return (
-                        <div
-                          key={coach.id}
-                          className={[
-                            "border-b border-l-4 border-line/40 p-1",
-                            palette?.accent ?? "",
-                          ].join(" ")}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => handleDropOnCell(e, date, hour, coach.id)}
-                        >
-                          <SessionCellButton
-                            session={session}
-                            goldenBellMemberIds={goldenBellMemberIds}
-                            onEdit={setEditTarget}
-                            onCreate={() => setCreateTarget({ date, hour, coachId: coach.id })}
-                          />
+                        <div key={d} className="border-b border-line/40 p-1">
+                          {!withinHours ? (
+                            <div className="w-full rounded-lg px-2 py-1.5 text-center text-[11px] text-ink/15">
+                              ·
+                            </div>
+                          ) : cellSessions.length > 0 ? (
+                            <div className="space-y-1">
+                              {cellSessions.map((session) => {
+                                const palette = coachColorMap.get(session.coach_id);
+                                return (
+                                  <div
+                                    key={session.id}
+                                    className={`border-l-2 pl-1 ${palette?.accent ?? "border-l-transparent"}`}
+                                  >
+                                    <SessionCellButton
+                                      session={session}
+                                      goldenBellMemberIds={goldenBellMemberIds}
+                                      onEdit={setEditTarget}
+                                      onCreate={() => {}}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                setCreateTarget({ date: d, hour, coachId: visibleCoaches[0].id })
+                              }
+                              className="w-full rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-xs text-ink/30 hover:text-coral hover:border-coral transition truncate"
+                            >
+                              + 추가
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -683,7 +651,6 @@ export function ScheduleGrid({
                 ))}
               </div>
             </div>
-
           </>
         );
       })()

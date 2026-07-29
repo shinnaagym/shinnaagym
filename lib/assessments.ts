@@ -150,12 +150,20 @@ export async function deleteAssessment(id: number): Promise<void> {
   await query(`DELETE FROM assessments WHERE id = $1`, [id]);
 }
 
-/** 회원별 평가 작성 건수 — 상단 탭 목록의 작성 여부/건수 표시용. */
-export async function listAssessmentCountsByMember(): Promise<Map<number, number>> {
-  const result = await query<{ member_id: number; count: string }>(
-    `SELECT member_id, COUNT(*) AS count FROM assessments GROUP BY member_id`,
+/**
+ * 회원별 평가 작성 건수 + 가장 최근 작성 시각 — 상단 탭 목록의 작성 여부/건수
+ * 표시와, 최근 작성 순 정렬(최신 작성자가 맨 위) 둘 다에 쓰인다.
+ */
+export async function listAssessmentCountsByMember(): Promise<
+  Map<number, { count: number; latestAt: string }>
+> {
+  const result = await query<{ member_id: number; count: string; latest_at: string }>(
+    `SELECT member_id, COUNT(*) AS count, MAX(created_at) AS latest_at
+     FROM assessments GROUP BY member_id`,
   );
-  return new Map(result.rows.map((r) => [r.member_id, Number(r.count)]));
+  return new Map(
+    result.rows.map((r) => [r.member_id, { count: Number(r.count), latestAt: r.latest_at }]),
+  );
 }
 
 /** 회원의 평가 이력을 최신순으로 반환한다(요약 목록용 — movements는 그대로 포함). */

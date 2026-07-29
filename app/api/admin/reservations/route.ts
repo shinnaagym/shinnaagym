@@ -9,7 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
   const result = await query<ReservationRow>(
-    `SELECT * FROM reservations ORDER BY reservation_date ASC, reservation_hour ASC`,
+    `SELECT * FROM reservations ORDER BY created_at DESC`,
   );
   return NextResponse.json({ reservations: result.rows });
 }

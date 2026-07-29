@@ -28,6 +28,28 @@ function formatMonthShort(monthKey: string): string {
   return `${Number(m)}월`;
 }
 
+// 방문 경로별 브랜드/성격에 맞춘 그래프 색상 — 네이버 계열(블로그·카페)은 네이버
+// 브랜드 그린, 인스타그램은 인스타그램 핑크 계열로 한눈에 구분되게 한다.
+const VISIT_CHANNEL_COLORS: Record<string, string> = {
+  blog: "#5FA777",
+  naver_cafe: "#03C75A",
+  instagram: "#E1306C",
+  signboard: "#F2A93B",
+  banner: "#4A90D9",
+  flyer: "#9B6B43",
+  referral: "#FF6F61",
+  other: "#9AA0A6",
+};
+// 방문 경로 "기타"를 고르고 자유 입력한 텍스트는 카테고리가 미리 정해져 있지 않으므로,
+// 문자열을 해시해 고정 팔레트에서 색을 골라 매번 같은 문구가 같은 색을 쓰도록 한다.
+const CUSTOM_VISIT_CHANNEL_FALLBACK_COLORS = ["#7B8FA1", "#B08CC2", "#6FA8A0", "#D48B5D"];
+function colorForVisitChannel(key: string): string {
+  if (VISIT_CHANNEL_COLORS[key]) return VISIT_CHANNEL_COLORS[key];
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return CUSTOM_VISIT_CHANNEL_FALLBACK_COLORS[hash % CUSTOM_VISIT_CHANNEL_FALLBACK_COLORS.length];
+}
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()}`;
@@ -61,17 +83,17 @@ export default async function AdminDashboardPage({
   const visitChannelTotal = Object.values(visitChannelCounts).reduce((a, b) => a + b, 0);
   const knownVisitChannelValues = new Set<string>(VISIT_CHANNEL_OPTIONS.map((opt) => opt.value));
   const visitChannelFixedRows = VISIT_CHANNEL_OPTIONS.filter((opt) => opt.value !== "other").map(
-    (opt) => ({ label: opt.label, count: visitChannelCounts[opt.value] ?? 0 }),
+    (opt) => ({ label: opt.label, value: opt.value as string, count: visitChannelCounts[opt.value] ?? 0 }),
   );
   // "기타"를 고르고 자유 입력을 남긴 경우, 그 텍스트 자체가 getVisitChannelCountsForMonth에서
   // 이미 새 카테고리 키로 집계되어 있다 — 여기서는 알려진 값이 아닌 키를 전부 모아 동적으로 보여준다.
   const customVisitChannelRows = Object.entries(visitChannelCounts)
     .filter(([key]) => key !== "" && !knownVisitChannelValues.has(key))
-    .map(([label, count]) => ({ label, count }))
+    .map(([label, count]) => ({ label, value: label, count }))
     .sort((a, b) => b.count - a.count);
   const visitChannelRows = [
     ...visitChannelFixedRows,
-    { label: "기타", count: visitChannelCounts["other"] ?? 0 },
+    { label: "기타", value: "other", count: visitChannelCounts["other"] ?? 0 },
     ...customVisitChannelRows,
   ];
   const unknownVisitChannelCount = visitChannelCounts[""] ?? 0;
@@ -282,8 +304,11 @@ export default async function AdminDashboardPage({
                     <span className="w-16 shrink-0 text-xs text-ink/60">{row.label}</span>
                     <div className="flex-1 h-4 rounded-full bg-bone overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-coral/70"
-                        style={{ width: `${(row.count / maxVisitChannelCount) * 100}%` }}
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${(row.count / maxVisitChannelCount) * 100}%`,
+                          backgroundColor: colorForVisitChannel(row.value),
+                        }}
                       />
                     </div>
                     <span className="w-8 shrink-0 text-right text-xs text-ink/70">{row.count}</span>

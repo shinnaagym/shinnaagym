@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { listMembers } from "@/lib/schedule";
-import { listIntakeMemberIds } from "@/lib/intake";
+import { listIntakeMemberTimestamps } from "@/lib/intake";
 import { IntakeLanding } from "./intake-landing";
 
 export default async function IntakeLandingPage() {
@@ -9,7 +9,10 @@ export default async function IntakeLandingPage() {
     redirect("/admin");
   }
 
-  const [members, intakeMemberIds] = await Promise.all([listMembers(), listIntakeMemberIds()]);
+  const [members, intakeTimestamps] = await Promise.all([
+    listMembers(),
+    listIntakeMemberTimestamps(),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -21,7 +24,7 @@ export default async function IntakeLandingPage() {
       </p>
       <IntakeLanding
         members={members.map((m) => ({ id: m.id, name: m.name, phone: m.phone }))}
-        intakeMemberIds={[...intakeMemberIds]}
+        intakeTimestamps={[...intakeTimestamps.entries()]}
       />
     </div>
   );

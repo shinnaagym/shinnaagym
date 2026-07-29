@@ -63,12 +63,15 @@ export async function deleteIntakeQuestionnaire(memberId: number): Promise<void>
   await query(`DELETE FROM intake_questionnaires WHERE member_id = $1`, [memberId]);
 }
 
-/** 초진 문진표가 이미 작성된 회원 id 집합 — 상단 탭 목록의 작성 여부 표시용. */
-export async function listIntakeMemberIds(): Promise<Set<number>> {
-  const result = await query<{ member_id: number }>(
-    `SELECT member_id FROM intake_questionnaires`,
+/**
+ * 초진 문진표가 이미 작성된 회원별 작성 시각 — 상단 탭 목록의 작성 여부 표시와,
+ * 최근 작성 순 정렬(최신 작성자가 맨 위) 둘 다에 쓰인다.
+ */
+export async function listIntakeMemberTimestamps(): Promise<Map<number, string>> {
+  const result = await query<{ member_id: number; created_at: string }>(
+    `SELECT member_id, created_at FROM intake_questionnaires`,
   );
-  return new Set(result.rows.map((r) => r.member_id));
+  return new Map(result.rows.map((r) => [r.member_id, r.created_at]));
 }
 
 /**

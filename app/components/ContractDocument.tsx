@@ -1,14 +1,14 @@
 import type { ContractEntryType, PaymentMethod, PtType, VisitChannel } from "@/lib/db";
 import { PURPOSE_LABELS } from "@/lib/constants";
+import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
 
 const VISIT_CHANNEL_LABELS: Record<string, string> = {
+  // 예전(방문 경로 선택지를 문진표와 통일하기 전) 계약서에 저장된 값 표시용 —
+  // 신규 계약서는 더 이상 이 값들을 선택할 수 없지만, 과거 데이터는 계속 보여야 한다.
   naver: "네이버",
-  instagram: "인스타",
   danggeun: "당근",
   cafe: "카페",
-  flyer: "외부 홍보물",
-  referral: "지인",
-  other: "기타",
+  ...Object.fromEntries(VISIT_CHANNEL_OPTIONS.map((opt) => [opt.value, opt.label])),
 };
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -65,7 +65,7 @@ export function ContractDocument({
 
   const visitChannelLabel = contract.visit_channel
     ? contract.visit_channel === "referral" && contract.visit_channel_referrer_name
-      ? `지인 (${contract.visit_channel_referrer_name})`
+      ? `소개 (${contract.visit_channel_referrer_name})`
       : contract.visit_channel === "other" && contract.visit_channel_other
         ? `기타 (${contract.visit_channel_other})`
         : VISIT_CHANNEL_LABELS[contract.visit_channel]

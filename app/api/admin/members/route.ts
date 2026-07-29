@@ -3,18 +3,13 @@ import { isAdminAuthed } from "@/lib/auth";
 import { addPackage, createMember, getMemberById, getMemberByPhone, listMembers, updateMember } from "@/lib/schedule";
 import { createContract } from "@/lib/contracts";
 import { recordUndo, type UndoOp } from "@/lib/undo";
+import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
 import type { PaymentMethod, PtType, VisitChannel } from "@/lib/db";
 
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 const VALID_PAYMENT_METHODS: PaymentMethod[] = ["card", "transfer"];
 const VALID_VISIT_CHANNELS: VisitChannel[] = [
-  "naver",
-  "instagram",
-  "danggeun",
-  "cafe",
-  "flyer",
-  "referral",
-  "other",
+  ...VISIT_CHANNEL_OPTIONS.map((opt) => opt.value),
   "",
 ];
 

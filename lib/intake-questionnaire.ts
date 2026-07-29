@@ -9,9 +9,11 @@ export const EXERCISE_PURPOSE_OPTIONS = [
   { key: "growth", label: "키성장" },
 ] as const;
 
+// 초진 문진표 · 계약서 작성 · 대시보드 월별 통계가 모두 이 목록 하나를 공유한다 —
+// 세 곳의 방문 경로 선택지가 서로 다르면 통계가 어긋나므로 반드시 통일해서 쓴다.
 export const VISIT_CHANNEL_OPTIONS = [
   { value: "blog", label: "블로그" },
-  { value: "danggeun", label: "당근" },
+  { value: "naver_cafe", label: "네이버 카페" },
   { value: "instagram", label: "인스타그램" },
   { value: "signboard", label: "간판" },
   { value: "banner", label: "현수막" },

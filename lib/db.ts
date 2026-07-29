@@ -468,11 +468,14 @@ export interface FixedSlotRow {
 }
 
 export type ContractEntryType = "new" | "renewal";
+// 초진 문진표·계약서·대시보드 통계가 공유하는 방문 경로 값 — 실제 선택지 목록은
+// lib/intake-questionnaire.ts의 VISIT_CHANNEL_OPTIONS를 참고(단일 출처).
 export type VisitChannel =
-  | "naver"
+  | "blog"
+  | "naver_cafe"
   | "instagram"
-  | "danggeun"
-  | "cafe"
+  | "signboard"
+  | "banner"
   | "flyer"
   | "referral"
   | "other"

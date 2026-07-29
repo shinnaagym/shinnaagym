@@ -14,7 +14,7 @@ export function AssessmentLanding({
   assessmentCounts,
 }: {
   members: MemberOption[];
-  assessmentCounts: [number, number][];
+  assessmentCounts: [number, { count: number; latestAt: string }][];
 }) {
   const router = useRouter();
   const countMap = useMemo(() => new Map(assessmentCounts), [assessmentCounts]);
@@ -25,10 +25,19 @@ export function AssessmentLanding({
   const [error, setError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return members;
     const q = search.trim();
-    return members.filter((m) => m.name.includes(q) || m.phone.includes(q));
-  }, [members, search]);
+    const base = q ? members.filter((m) => m.name.includes(q) || m.phone.includes(q)) : members;
+    // 가장 최근에 평가지를 작성한 회원이 맨 위로 오게 정렬하고, 아직 작성하지
+    // 않은 회원은 그 뒤에 이름순으로 남겨둔다.
+    return [...base].sort((a, b) => {
+      const aAt = countMap.get(a.id)?.latestAt;
+      const bAt = countMap.get(b.id)?.latestAt;
+      if (aAt && bAt) return bAt.localeCompare(aAt);
+      if (aAt) return -1;
+      if (bAt) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [members, search, countMap]);
 
   async function handleCreate() {
     const trimmedName = name.trim();
@@ -106,7 +115,7 @@ export function AssessmentLanding({
       ) : (
         <ul className="space-y-2">
           {filtered.map((m) => {
-            const count = countMap.get(m.id) ?? 0;
+            const count = countMap.get(m.id)?.count ?? 0;
             return (
               <li key={m.id}>
                 <button

@@ -11,13 +11,13 @@ interface MemberOption {
 
 export function IntakeLanding({
   members,
-  intakeMemberIds,
+  intakeTimestamps,
 }: {
   members: MemberOption[];
-  intakeMemberIds: number[];
+  intakeTimestamps: [number, string][];
 }) {
   const router = useRouter();
-  const doneIds = useMemo(() => new Set(intakeMemberIds), [intakeMemberIds]);
+  const timestampMap = useMemo(() => new Map(intakeTimestamps), [intakeTimestamps]);
   const [search, setSearch] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -45,10 +45,19 @@ export function IntakeLanding({
   }
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return members;
     const q = search.trim();
-    return members.filter((m) => m.name.includes(q) || m.phone.includes(q));
-  }, [members, search]);
+    const base = q ? members.filter((m) => m.name.includes(q) || m.phone.includes(q)) : members;
+    // 가장 최근에 문진표를 작성한 회원이 맨 위로 오게 정렬하고, 아직 작성하지
+    // 않은 회원은 그 뒤에 이름순으로 남겨둔다.
+    return [...base].sort((a, b) => {
+      const aAt = timestampMap.get(a.id);
+      const bAt = timestampMap.get(b.id);
+      if (aAt && bAt) return bAt.localeCompare(aAt);
+      if (aAt) return -1;
+      if (bAt) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [members, search, timestampMap]);
 
   async function handleCreate() {
     const trimmedName = name.trim();
@@ -126,7 +135,7 @@ export function IntakeLanding({
       ) : (
         <ul className="space-y-2">
           {filtered.map((m) => {
-            const done = doneIds.has(m.id) && !removedIds.has(m.id);
+            const done = timestampMap.has(m.id) && !removedIds.has(m.id);
             return (
               <li
                 key={m.id}

@@ -12,7 +12,9 @@ import type {
   VisitChannel,
 } from "@/lib/db";
 import type { FixedSlotWithMember, MemberWithProgress } from "@/lib/schedule";
-import { PURPOSE_OPTIONS, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+import { COACH_COLOR_PALETTE, PURPOSE_OPTIONS, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+import type { CoachColorStyle } from "@/lib/constants";
+import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
 import { ContractDocument } from "@/app/components/ContractDocument";
 import { SignaturePad } from "@/app/components/SignaturePad";
 
@@ -29,16 +31,6 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 const FIXED_SLOT_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토"];
 const FIXED_SLOT_CAPACITY = 3;
-
-const VISIT_CHANNEL_OPTIONS: Array<{ value: VisitChannel; label: string }> = [
-  { value: "naver", label: "네이버" },
-  { value: "instagram", label: "인스타" },
-  { value: "danggeun", label: "당근" },
-  { value: "cafe", label: "카페" },
-  { value: "flyer", label: "외부 홍보물" },
-  { value: "referral", label: "지인" },
-  { value: "other", label: "기타" },
-];
 
 type SessionSummary = {
   id: number;
@@ -475,6 +467,7 @@ export function MembersView({
 
       <FixedSlotSchedule
         fixedSlots={fixedSlots}
+        coaches={coaches}
         coachFilter={coachFilter}
         coachName={
           coachFilter === "all"
@@ -520,13 +513,25 @@ export function MembersView({
 
 function FixedSlotSchedule({
   fixedSlots,
+  coaches,
   coachFilter,
   coachName,
 }: {
   fixedSlots: FixedSlotWithMember[];
+  coaches: CoachRow[];
   coachFilter: number | "all" | "unassigned";
   coachName: string | null;
 }) {
+  // 코치별 색상은 전체 코치 목록 기준 순서로 고정해, 스케줄표와도 같은 코치가
+  // 항상 같은 색을 쓰도록 한다(스케줄표의 코치 색상 팔레트와 동일한 로직).
+  const coachColorMap = useMemo(() => {
+    const map = new Map<number, CoachColorStyle>();
+    coaches.forEach((c, i) => {
+      map.set(c.id, COACH_COLOR_PALETTE[i % COACH_COLOR_PALETTE.length]);
+    });
+    return map;
+  }, [coaches]);
+
   const scopedSlots = useMemo(() => {
     if (coachFilter === "all") return fixedSlots;
     if (coachFilter === "unassigned") {
@@ -536,12 +541,12 @@ function FixedSlotSchedule({
   }, [fixedSlots, coachFilter]);
 
   const byCell = useMemo(() => {
-    const map = new Map<string, string[]>();
+    const map = new Map<string, Array<{ name: string; coachId: number | null }>>();
     for (const slot of scopedSlots) {
       const key = `${slot.weekday}-${slot.hour}`;
-      const names = map.get(key) ?? [];
-      names.push(slot.member_name);
-      map.set(key, names);
+      const entries = map.get(key) ?? [];
+      entries.push({ name: slot.member_name, coachId: slot.member_coach_id });
+      map.set(key, entries);
     }
     return map;
   }, [scopedSlots]);
@@ -584,27 +589,33 @@ function FixedSlotSchedule({
               <tr key={hour} className="border-b border-line/30 last:border-0">
                 <td className="px-3 py-2.5 text-ink/50 whitespace-nowrap">{hour}시</td>
                 {FIXED_SLOT_WEEKDAY_LABELS.map((_, weekday) => {
-                  const names = byCell.get(`${weekday}-${hour}`) ?? [];
+                  const entries = byCell.get(`${weekday}-${hour}`) ?? [];
                   return (
                     <td key={weekday} className="px-3 py-2.5 align-top">
-                      {names.length > 0 && (
+                      {entries.length > 0 && (
                         <div
                           className={[
                             "flex flex-wrap gap-1 rounded-lg px-1.5 py-1",
                             over ? "bg-red-50" : "",
                           ].join(" ")}
                         >
-                          {names.map((name, i) => (
-                            <span
-                              key={`${name}-${i}`}
-                              className={[
-                                "rounded-full px-1.5 py-0.5 whitespace-nowrap",
-                                over ? "bg-red-100 text-red-600" : "bg-sage/15 text-ink/70",
-                              ].join(" ")}
-                            >
-                              {name}
-                            </span>
-                          ))}
+                          {entries.map((entry, i) => {
+                            const coachStyle =
+                              entry.coachId != null ? coachColorMap.get(entry.coachId) : undefined;
+                            const pillClass = over
+                              ? "bg-red-100 text-red-600"
+                              : coachStyle
+                                ? `${coachStyle.header} ${coachStyle.headerText}`
+                                : "bg-sage/15 text-ink/70";
+                            return (
+                              <span
+                                key={`${entry.name}-${i}`}
+                                className={["rounded-full px-1.5 py-0.5 whitespace-nowrap", pillClass].join(" ")}
+                              >
+                                {entry.name}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                     </td>
