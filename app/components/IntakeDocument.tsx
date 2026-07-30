@@ -167,8 +167,14 @@ export function IntakeDocument({
 
       <Section title="통증 위치 표시">
         <BodyPainDiagram
-          front={intake.body_diagram_front}
-          back={intake.body_diagram_back}
+          value={{
+            front: intake.body_diagram_front,
+            back: intake.body_diagram_back,
+            left: intake.body_diagram_left,
+            right: intake.body_diagram_right,
+            feet: intake.body_diagram_feet,
+            hands: intake.body_diagram_hands,
+          }}
           readOnly
         />
       </Section>

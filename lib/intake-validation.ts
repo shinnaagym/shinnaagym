@@ -131,6 +131,10 @@ export interface ParsedIntakeInput {
   painMoi: string;
   bodyDiagramFront: string;
   bodyDiagramBack: string;
+  bodyDiagramLeft: string;
+  bodyDiagramRight: string;
+  bodyDiagramFeet: string;
+  bodyDiagramHands: string;
   painMovements: PainMovementEntry[];
   painCycleSituation: string;
   painCycleMorning: string;
@@ -181,6 +185,10 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     painMoi: str(body?.painMoi),
     bodyDiagramFront: bodyDiagram(body?.bodyDiagramFront),
     bodyDiagramBack: bodyDiagram(body?.bodyDiagramBack),
+    bodyDiagramLeft: bodyDiagram(body?.bodyDiagramLeft),
+    bodyDiagramRight: bodyDiagram(body?.bodyDiagramRight),
+    bodyDiagramFeet: bodyDiagram(body?.bodyDiagramFeet),
+    bodyDiagramHands: bodyDiagram(body?.bodyDiagramHands),
     painMovements: painMovements(body?.painMovements),
     painCycleSituation: str(body?.painCycleSituation),
     painCycleMorning: enumVal(body?.painCycleMorning, VALID_PAIN_CYCLE_DIRECTION),

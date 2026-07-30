@@ -466,13 +466,26 @@ export function IntakeForm({
 
       <SectionCard title="통증 위치 표시">
         <p className="text-xs text-ink/50 mb-3">
-          그림을 손가락(또는 마우스)으로 눌러 아픈 위치를 직접 표시해주세요.
+          부위를 고른 뒤, 그림을 손가락(또는 마우스)으로 눌러 아픈 위치를 직접 표시해주세요.
         </p>
         <BodyPainDiagram
-          front={form.bodyDiagramFront}
-          back={form.bodyDiagramBack}
-          onChange={({ front, back }) =>
-            patch({ bodyDiagramFront: front, bodyDiagramBack: back })
+          value={{
+            front: form.bodyDiagramFront,
+            back: form.bodyDiagramBack,
+            left: form.bodyDiagramLeft,
+            right: form.bodyDiagramRight,
+            feet: form.bodyDiagramFeet,
+            hands: form.bodyDiagramHands,
+          }}
+          onChange={(next) =>
+            patch({
+              bodyDiagramFront: next.front,
+              bodyDiagramBack: next.back,
+              bodyDiagramLeft: next.left,
+              bodyDiagramRight: next.right,
+              bodyDiagramFeet: next.feet,
+              bodyDiagramHands: next.hands,
+            })
           }
         />
       </SectionCard>

@@ -24,6 +24,10 @@ export interface IntakeFormState {
   painMoi: string;
   bodyDiagramFront: string;
   bodyDiagramBack: string;
+  bodyDiagramLeft: string;
+  bodyDiagramRight: string;
+  bodyDiagramFeet: string;
+  bodyDiagramHands: string;
   painMovements: PainMovementEntry[];
   painCycleSituation: string;
   painCycleMorning: string;
@@ -80,6 +84,10 @@ export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
   painMoi: "",
   bodyDiagramFront: "",
   bodyDiagramBack: "",
+  bodyDiagramLeft: "",
+  bodyDiagramRight: "",
+  bodyDiagramFeet: "",
+  bodyDiagramHands: "",
   painMovements: [{ ...EMPTY_PAIN_MOVEMENT }],
   painCycleSituation: "",
   painCycleMorning: "",

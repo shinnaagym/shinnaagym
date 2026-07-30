@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// 통증 위치를 그림으로 콕 짚어 표시할 수 있는 캔버스. 임상에서 흔히 쓰는 관례대로
-// 펜 색상에 의미를 부여한다(빨강=통증/파랑=저림·감각저하/초록=약화/검정=기타).
-// 몸 그림은 저작권 걱정 없는 아주 단순한 실루엣(원+두꺼운 둥근 선)으로 직접 그려서
-// 어디를 짚었는지 알아볼 수 있을 정도로만 깔끔하게 표현한다.
+// 통증 위치를 그림으로 콕 짚어 표시할 수 있는 캔버스. 전면/후면/좌측면/우측면/발/손
+// 6개 부위 중 하나를 골라 그 부위의 해부학 그림 위에 직접 그린다. 펜 색상은 임상에서
+// 흔히 쓰는 관례대로 의미를 부여한다(빨강=통증/파랑=저림·감각저하/초록=약화/검정=기타).
 const PEN_COLORS = [
   { value: "#d1483f", label: "통증" },
   { value: "#3b6fd6", label: "저림·감각저하" },
@@ -13,79 +12,52 @@ const PEN_COLORS = [
   { value: "#22262b", label: "기타" },
 ];
 
-const CANVAS_WIDTH = 200;
-const CANVAS_HEIGHT = 400;
+export type BodyRegionKey = "front" | "back" | "left" | "right" | "feet" | "hands";
+export type BodyDiagramValue = Record<BodyRegionKey, string>;
 
-type BodyShape =
-  | { kind: "circle"; cx: number; cy: number; r: number }
-  | { kind: "path"; points: [number, number][]; width: number };
+export const EMPTY_BODY_DIAGRAM: BodyDiagramValue = {
+  front: "",
+  back: "",
+  left: "",
+  right: "",
+  feet: "",
+  hands: "",
+};
 
-const BODY_SHAPES: BodyShape[] = [
-  { kind: "circle", cx: 100, cy: 36, r: 25 },
-  { kind: "path", points: [[100, 60], [100, 76]], width: 18 },
-  { kind: "path", points: [[100, 78], [100, 208]], width: 70 },
-  { kind: "path", points: [[76, 92], [54, 146], [49, 200]], width: 21 },
-  { kind: "path", points: [[124, 92], [146, 146], [151, 200]], width: 21 },
-  { kind: "path", points: [[81, 205], [77, 300], [73, 378]], width: 29 },
-  { kind: "path", points: [[119, 205], [123, 300], [127, 378]], width: 29 },
-];
+const REGION_ORDER: BodyRegionKey[] = ["front", "back", "left", "right", "feet", "hands"];
 
-function pointsAttr(points: [number, number][]): string {
-  return points.map(([x, y]) => `${x},${y}`).join(" ");
-}
-
-function BodyOutline({ borderColor, fillColor }: { borderColor: string; fillColor: string }) {
-  return (
-    <svg
-      viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
-      className="absolute inset-0 h-full w-full pointer-events-none"
-    >
-      {[
-        { color: borderColor, extra: 5 },
-        { color: fillColor, extra: 0 },
-      ].map((pass, passIdx) =>
-        BODY_SHAPES.map((shape, i) => {
-          const key = `${passIdx}-${i}`;
-          if (shape.kind === "circle") {
-            return (
-              <circle key={key} cx={shape.cx} cy={shape.cy} r={shape.r + pass.extra} fill={pass.color} />
-            );
-          }
-          return (
-            <polyline
-              key={key}
-              points={pointsAttr(shape.points)}
-              fill="none"
-              stroke={pass.color}
-              strokeWidth={shape.width + pass.extra * 2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          );
-        }),
-      )}
-    </svg>
-  );
-}
+const REGION_META: Record<
+  BodyRegionKey,
+  { label: string; src: string; width: number; height: number }
+> = {
+  front: { label: "전면", src: "/body-diagram/front.png", width: 340, height: 704 },
+  back: { label: "후면", src: "/body-diagram/back.png", width: 350, height: 704 },
+  left: { label: "좌측면", src: "/body-diagram/side.png", width: 295, height: 704 },
+  right: { label: "우측면", src: "/body-diagram/side-flipped.png", width: 295, height: 704 },
+  feet: { label: "발", src: "/body-diagram/feet.png", width: 439, height: 334 },
+  hands: { label: "손", src: "/body-diagram/hands.png", width: 439, height: 337 },
+};
 
 function DiagramCanvas({
-  label,
+  regionKey,
   value,
   color,
   readOnly,
   onChange,
 }: {
-  label: string;
+  regionKey: BodyRegionKey;
   value: string;
   color: string;
   readOnly?: boolean;
   onChange: (dataUrl: string) => void;
 }) {
+  const meta = REGION_META[regionKey];
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const hasContentRef = useRef(false);
 
-  // 처음 열었을 때 저장된 그림이 있으면 캔버스에 미리 그려서, 이어서 계속 그릴 수 있게 한다.
+  // 부위를 바꾸거나 처음 열었을 때, 저장된 그림이 있으면 캔버스에 미리 그려서
+  // 이어서 계속 그릴 수 있게 한다.
   useEffect(() => {
     if (readOnly) return;
     const canvas = canvasRef.current;
@@ -118,7 +90,7 @@ function DiagramCanvas({
     // 드래그 없이 콕 찍기만 해도 점이 남도록, 시작점에 펜 굵기만한 점을 먼저 찍어둔다.
     ctx.beginPath();
     ctx.fillStyle = color;
-    ctx.arc(x, y, 1.75, 0, Math.PI * 2);
+    ctx.arc(x, y, 2.25, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -130,7 +102,7 @@ function DiagramCanvas({
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const { x, y } = getPoint(e);
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 4.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = color;
@@ -157,26 +129,31 @@ function DiagramCanvas({
 
   return (
     <div>
-      <p className="text-xs text-ink/50 mb-1.5 text-center">{label}</p>
       <div
-        className="relative rounded-xl border border-line bg-white overflow-hidden touch-none"
-        style={{ aspectRatio: `${CANVAS_WIDTH} / ${CANVAS_HEIGHT}` }}
+        className="relative rounded-xl border border-line bg-white overflow-hidden touch-none mx-auto"
+        style={{ aspectRatio: `${meta.width} / ${meta.height}`, maxWidth: 280 }}
       >
-        <BodyOutline borderColor="#ddd6c4" fillColor="#f7f5ee" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={meta.src}
+          alt={meta.label}
+          draggable={false}
+          className="absolute inset-0 h-full w-full object-contain pointer-events-none select-none"
+        />
         {readOnly ? (
           value && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={value}
-              alt={`${label} 통증 표시`}
+              alt={`${meta.label} 통증 표시`}
               className="absolute inset-0 h-full w-full"
             />
           )
         ) : (
           <canvas
             ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
+            width={meta.width}
+            height={meta.height}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -199,24 +176,48 @@ function DiagramCanvas({
 }
 
 export function BodyPainDiagram({
-  front,
-  back,
+  value,
   onChange,
   readOnly,
 }: {
-  front: string;
-  back: string;
-  onChange?: (next: { front: string; back: string }) => void;
+  value: BodyDiagramValue;
+  onChange?: (next: BodyDiagramValue) => void;
   readOnly?: boolean;
 }) {
   const [color, setColor] = useState(PEN_COLORS[0].value);
+  const [active, setActive] = useState<BodyRegionKey>("front");
 
-  if (readOnly && !front && !back) {
+  if (readOnly && REGION_ORDER.every((k) => !value[k])) {
     return <p className="text-sm text-ink/40">표시된 통증 위치가 없어요.</p>;
   }
 
   return (
     <div>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {REGION_ORDER.map((key) => {
+          const meta = REGION_META[key];
+          const marked = !!value[key];
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActive(key)}
+              className={[
+                "rounded-lg border px-3 py-1.5 text-xs font-medium transition",
+                active === key
+                  ? "bg-coral text-white border-coral"
+                  : "border-line text-ink/60 hover:bg-bone",
+              ].join(" ")}
+            >
+              {meta.label}
+              {marked && (
+                <span className={active === key ? "ml-1" : "ml-1 text-coral"}>●</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {!readOnly && (
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <span className="text-xs text-ink/50 mr-0.5">펜 색상</span>
@@ -245,22 +246,15 @@ export function BodyPainDiagram({
           </label>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-4 max-w-sm">
-        <DiagramCanvas
-          label="앞"
-          value={front}
-          color={color}
-          readOnly={readOnly}
-          onChange={(v) => onChange?.({ front: v, back })}
-        />
-        <DiagramCanvas
-          label="뒤"
-          value={back}
-          color={color}
-          readOnly={readOnly}
-          onChange={(v) => onChange?.({ front, back: v })}
-        />
-      </div>
+
+      <DiagramCanvas
+        key={active}
+        regionKey={active}
+        value={value[active]}
+        color={color}
+        readOnly={readOnly}
+        onChange={(v) => onChange?.({ ...value, [active]: v })}
+      />
     </div>
   );
 }

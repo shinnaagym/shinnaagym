@@ -261,6 +261,10 @@ function ensureSchema(): Promise<void> {
           faam_sports_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
           body_diagram_front TEXT NOT NULL DEFAULT '',
           body_diagram_back TEXT NOT NULL DEFAULT '',
+          body_diagram_left TEXT NOT NULL DEFAULT '',
+          body_diagram_right TEXT NOT NULL DEFAULT '',
+          body_diagram_feet TEXT NOT NULL DEFAULT '',
+          body_diagram_hands TEXT NOT NULL DEFAULT '',
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -372,6 +376,10 @@ function ensureSchema(): Promise<void> {
               FOREIGN KEY (class_session_id) REFERENCES class_sessions(id) ON DELETE SET NULL;
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS body_diagram_front TEXT NOT NULL DEFAULT '';
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS body_diagram_back TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS body_diagram_left TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS body_diagram_right TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS body_diagram_feet TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS body_diagram_hands TEXT NOT NULL DEFAULT '';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS improvement_direction TEXT NOT NULL DEFAULT '';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_updated_at TIMESTAMPTZ;
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS visit_channel_other TEXT NOT NULL DEFAULT '';
@@ -636,6 +644,10 @@ export interface IntakeQuestionnaireRow {
   faam_sports_answers: Record<string, number>;
   body_diagram_front: string;
   body_diagram_back: string;
+  body_diagram_left: string;
+  body_diagram_right: string;
+  body_diagram_feet: string;
+  body_diagram_hands: string;
   created_at: string;
   updated_at: string;
 }
