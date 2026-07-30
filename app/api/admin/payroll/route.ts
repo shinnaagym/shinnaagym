@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed, isPayrollAuthed } from "@/lib/auth";
 import { isValidMonthKey } from "@/lib/date";
 import { listPayrollRecords, savePayrollRecord, type ReferralEntry } from "@/lib/payroll";
-import { calculatePayroll, type AllocationOrder } from "@/lib/payroll/calculate";
+import {
+  calculatePayroll,
+  computeReferralSupplyAmount,
+  type AllocationOrder,
+  type ReferralPaymentMethod,
+} from "@/lib/payroll/calculate";
 import type { EmploymentType } from "@/lib/db";
+
+const VALID_REFERRAL_PAYMENT_METHODS: ReferralPaymentMethod[] = ["card", "transfer"];
 
 function parseReferralEntries(value: unknown): ReferralEntry[] | null {
   if (!Array.isArray(value)) return null;
@@ -12,9 +19,16 @@ function parseReferralEntries(value: unknown): ReferralEntry[] | null {
     if (typeof item !== "object" || item === null) return null;
     const note = (item as Record<string, unknown>).note;
     const amount = (item as Record<string, unknown>).amount;
+    const paymentMethod = (item as Record<string, unknown>).paymentMethod;
     if (typeof note !== "string") return null;
     if (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0) return null;
-    entries.push({ note: note.trim(), amount });
+    if (
+      typeof paymentMethod !== "string" ||
+      !VALID_REFERRAL_PAYMENT_METHODS.includes(paymentMethod as ReferralPaymentMethod)
+    ) {
+      return null;
+    }
+    entries.push({ note: note.trim(), amount, paymentMethod: paymentMethod as ReferralPaymentMethod });
   }
   return entries;
 }
@@ -93,6 +107,8 @@ export async function POST(req: NextRequest) {
       : NaN;
   const referralEntries =
     body?.referralEntries === undefined ? [] : parseReferralEntries(body.referralEntries);
+  // 화면 표시·이력 보관용 원 결제금액 합계(결제 수단 무관). 실제 인센티브 계산은
+  // computeReferralSupplyAmount로 결제 수단별 부가세 처리를 반영해 따로 구한다.
   const referralPaymentAmount = (referralEntries ?? []).reduce((sum, e) => sum + e.amount, 0);
   const allocationOrder =
     typeof body?.allocationOrder === "string" &&
@@ -124,7 +140,7 @@ export async function POST(req: NextRequest) {
     isTeamLead,
     sessionCount1on1,
     sessionCount2on1,
-    referralPaymentAmount,
+    referralSupplyAmount: computeReferralSupplyAmount(referralEntries ?? []),
     allocationOrder,
   });
 

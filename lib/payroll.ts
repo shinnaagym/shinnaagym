@@ -1,6 +1,8 @@
 import { query } from "./db";
 import type { PayrollRecordRow } from "./db";
-import type { PayrollResult } from "./payroll/calculate";
+import type { PayrollResult, ReferralEntry } from "./payroll/calculate";
+
+export type { ReferralEntry, ReferralPaymentMethod } from "./payroll/calculate";
 
 export interface CoachMonthSessionCounts {
   sessionCount1on1: number;
@@ -29,12 +31,6 @@ export async function getCoachSessionCountsForMonth(
     else if (row.pt_type === "2:1") sessionCount2on1 = Number(row.count);
   }
   return { sessionCount1on1, sessionCount2on1 };
-}
-
-/** 소개 결제 내역 한 줄(내용 메모 + 금액, 부가세 포함 금액). */
-export interface ReferralEntry {
-  note: string;
-  amount: number;
 }
 
 export interface SavePayrollRecordInput {

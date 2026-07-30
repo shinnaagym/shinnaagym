@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { CoachRow, EmploymentType } from "@/lib/db";
 import {
   calculatePayroll,
+  computeReferralSupplyAmount,
   type AllocationOrder,
   type PayrollInput,
+  type ReferralPaymentMethod,
 } from "@/lib/payroll/calculate";
 import { PrintButton } from "@/app/components/PrintButton";
 import { PayrollResultCards } from "./payroll-result";
@@ -22,6 +24,11 @@ const ALLOCATION_OPTIONS: Array<{ value: AllocationOrder; label: string }> = [
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   regular: "정직원",
   freelancer: "프리랜서",
+};
+
+const REFERRAL_PAYMENT_METHOD_LABEL: Record<ReferralPaymentMethod, string> = {
+  card: "카드결제(부가세 포함)",
+  transfer: "계좌이체(부가세 제외)",
 };
 
 export function PayrollView({
@@ -42,8 +49,8 @@ export function PayrollView({
   const [sessionCount1on1, setSessionCount1on1] = useState("0");
   const [sessionCount2on1, setSessionCount2on1] = useState("0");
   const [referralEntries, setReferralEntries] = useState<
-    Array<{ note: string; amount: string }>
-  >([{ note: "", amount: "" }]);
+    Array<{ note: string; amount: string; paymentMethod: ReferralPaymentMethod }>
+  >([{ note: "", amount: "", paymentMethod: "card" }]);
   const [allocationOrder, setAllocationOrder] = useState<AllocationOrder>("proportional");
   const [loadingCounts, setLoadingCounts] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -99,10 +106,13 @@ export function PayrollView({
     coachSelection === "manual" ? manualName.trim() : (selectedCoach?.name ?? "");
 
   function addReferralEntry() {
-    setReferralEntries((prev) => [...prev, { note: "", amount: "" }]);
+    setReferralEntries((prev) => [...prev, { note: "", amount: "", paymentMethod: "card" }]);
   }
 
-  function updateReferralEntry(index: number, patch: Partial<{ note: string; amount: string }>) {
+  function updateReferralEntry(
+    index: number,
+    patch: Partial<{ note: string; amount: string; paymentMethod: ReferralPaymentMethod }>,
+  ) {
     setReferralEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
   }
 
@@ -110,9 +120,13 @@ export function PayrollView({
     setReferralEntries((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
   }
 
-  const referralPaymentAmount = referralEntries.reduce(
-    (sum, e) => sum + (Number(e.amount) || 0),
-    0,
+  const referralRawTotal = referralEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const referralSupplyAmount = computeReferralSupplyAmount(
+    referralEntries.map((e) => ({
+      note: e.note,
+      amount: Number(e.amount) || 0,
+      paymentMethod: e.paymentMethod,
+    })),
   );
 
   const baseInput: PayrollInput = useMemo(
@@ -123,7 +137,7 @@ export function PayrollView({
       isTeamLead,
       sessionCount1on1: Number(sessionCount1on1) || 0,
       sessionCount2on1: Number(sessionCount2on1) || 0,
-      referralPaymentAmount,
+      referralSupplyAmount,
       allocationOrder,
     }),
     [
@@ -133,7 +147,7 @@ export function PayrollView({
       isTeamLead,
       sessionCount1on1,
       sessionCount2on1,
-      referralPaymentAmount,
+      referralSupplyAmount,
       allocationOrder,
     ],
   );
@@ -173,7 +187,11 @@ export function PayrollView({
           ...baseInput,
           referralEntries: referralEntries
             .filter((e) => e.note.trim() || Number(e.amount) > 0)
-            .map((e) => ({ note: e.note.trim(), amount: Number(e.amount) || 0 })),
+            .map((e) => ({
+              note: e.note.trim(),
+              amount: Number(e.amount) || 0,
+              paymentMethod: e.paymentMethod,
+            })),
         }),
       });
       if (!res.ok) {
@@ -219,34 +237,48 @@ export function PayrollView({
       ) : (
         <div className="space-y-6">
           <div className="no-print rounded-2xl border border-line/60 bg-white shadow-sm p-5 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs text-ink/50 mb-1">직원</label>
-                <select
-                  value={coachSelection}
-                  onChange={(e) => setCoachSelection(e.target.value)}
-                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            <div>
+              <label className="block text-xs text-ink/50 mb-1">직원</label>
+              <div className="flex flex-wrap gap-2">
+                {coaches.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCoachSelection(String(c.id))}
+                    className={[
+                      "rounded-full px-4 py-1.5 text-sm font-medium transition-colors border",
+                      coachSelection === String(c.id)
+                        ? "bg-coral text-white border-coral shadow-sm"
+                        : "border-line text-ink/60 hover:text-ink hover:bg-bone",
+                    ].join(" ")}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCoachSelection("manual")}
+                  className={[
+                    "rounded-full px-4 py-1.5 text-sm font-medium transition-colors border",
+                    coachSelection === "manual"
+                      ? "bg-coral text-white border-coral shadow-sm"
+                      : "border-line text-ink/60 hover:text-ink hover:bg-bone",
+                  ].join(" ")}
                 >
-                  <option value="">선택</option>
-                  {coaches.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                  <option value="manual">직접 입력</option>
-                </select>
+                  직접 입력
+                </button>
               </div>
               {coachSelection === "manual" && (
-                <div>
-                  <label className="block text-xs text-ink/50 mb-1">이름</label>
-                  <input
-                    value={manualName}
-                    onChange={(e) => setManualName(e.target.value)}
-                    placeholder="이름 입력"
-                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-                  />
-                </div>
+                <input
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder="이름 입력"
+                  className="w-full max-w-xs mt-2 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                />
               )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs text-ink/50 mb-1">정산 기준월</label>
                 <input
@@ -315,16 +347,16 @@ export function PayrollView({
               </div>
               <div className="col-span-full">
                 <label className="block text-xs text-ink/50 mb-1">
-                  소개 결제 내역 (부가세 포함 금액, 여러 건 추가 가능)
+                  소개 결제 내역 (여러 건 추가 가능, 결제 수단별로 부가세 처리가 달라요)
                 </label>
                 <div className="space-y-2">
                   {referralEntries.map((entry, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={i} className="flex flex-wrap items-center gap-2">
                       <input
                         value={entry.note}
                         onChange={(e) => updateReferralEntry(i, { note: e.target.value })}
                         placeholder="내용 (예: 김철수 소개)"
-                        className="flex-1 min-w-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                        className="flex-1 min-w-[10rem] rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                       />
                       <input
                         type="number"
@@ -332,8 +364,25 @@ export function PayrollView({
                         value={entry.amount}
                         onChange={(e) => updateReferralEntry(i, { amount: e.target.value })}
                         placeholder="결제 금액"
-                        className="w-36 shrink-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                        className="w-32 shrink-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                       />
+                      <select
+                        value={entry.paymentMethod}
+                        onChange={(e) =>
+                          updateReferralEntry(i, {
+                            paymentMethod: e.target.value as ReferralPaymentMethod,
+                          })
+                        }
+                        className="shrink-0 rounded-lg border border-line px-2 py-2 text-sm outline-none focus:border-coral"
+                      >
+                        {(Object.keys(REFERRAL_PAYMENT_METHOD_LABEL) as ReferralPaymentMethod[]).map(
+                          (method) => (
+                            <option key={method} value={method}>
+                              {REFERRAL_PAYMENT_METHOD_LABEL[method]}
+                            </option>
+                          ),
+                        )}
+                      </select>
                       <button
                         type="button"
                         onClick={() => removeReferralEntry(i)}
@@ -352,9 +401,10 @@ export function PayrollView({
                 >
                   + 줄 추가
                 </button>
-                {referralPaymentAmount > 0 && (
+                {referralRawTotal > 0 && (
                   <p className="text-xs text-ink/40 mt-1">
-                    합계 {referralPaymentAmount.toLocaleString("ko-KR")}원 (부가세 포함)
+                    결제 금액 합계 {referralRawTotal.toLocaleString("ko-KR")}원 · 공급가액 환산
+                    합계 {Math.round(referralSupplyAmount).toLocaleString("ko-KR")}원
                   </p>
                 )}
               </div>

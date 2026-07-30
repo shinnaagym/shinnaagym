@@ -73,6 +73,27 @@ export function describeTenureBucket(bucket: TenureBucket): string {
   return TENURE_BUCKET_LABEL[bucket];
 }
 
+export type ReferralPaymentMethod = "card" | "transfer";
+
+/** 소개 결제 내역 한 줄(내용 메모 + 금액 + 결제 수단). */
+export interface ReferralEntry {
+  note: string;
+  amount: number;
+  paymentMethod: ReferralPaymentMethod;
+}
+
+/**
+ * 소개 결제 내역 여러 건을 공급가액(부가세 제외) 기준 합계로 환산한다.
+ * 카드결제는 결제 금액에 부가세가 포함돼 있다고 보고 부가세(10%)를 제외하고,
+ * 계좌이체는 입력한 금액 자체가 이미 부가세를 제외한 금액이라 그대로 더한다.
+ */
+export function computeReferralSupplyAmount(entries: ReferralEntry[]): number {
+  return entries.reduce((sum, entry) => {
+    const amount = Math.max(0, entry.amount);
+    return sum + (entry.paymentMethod === "card" ? amount / (1 + VAT_RATE) : amount);
+  }, 0);
+}
+
 export type AllocationOrder = "proportional" | "1on1-first" | "2on1-first";
 
 export interface SessionAllocation {
@@ -136,7 +157,8 @@ export interface PayrollInput {
   isTeamLead: boolean; // 정직원만 의미 있음
   sessionCount1on1: number;
   sessionCount2on1: number;
-  referralPaymentAmount: number;
+  /** 소개 결제 내역을 computeReferralSupplyAmount()로 환산한 공급가액 합계. */
+  referralSupplyAmount: number;
   allocationOrder?: AllocationOrder;
   /**
    * 근속 시뮬레이션(같은 조건으로 근속 구간만 바꿔 비교)용 오버라이드.
@@ -191,7 +213,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     employmentType,
     hiredAt,
     yearMonth,
-    referralPaymentAmount,
+    referralSupplyAmount,
     allocationOrder = "proportional",
   } = input;
   const sessionCount1on1 = Math.max(0, input.sessionCount1on1);
@@ -218,10 +240,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const baseSalary = employmentType === "regular" ? REGULAR_BASE_SALARY : 0;
   const mealAllowance = employmentType === "regular" ? REGULAR_MEAL_ALLOWANCE : 0;
   const teamLeadAllowance = isTeamLead ? REGULAR_TEAM_LEAD_ALLOWANCE : 0;
-  // 결제 금액은 부가세 포함 금액으로 들어온다고 보고, 부가세(10%)를 제외한
-  // 공급가액 기준으로 인센티브(5%)를 계산한다.
-  const referralSupplyAmount = referralPaymentAmount / (1 + VAT_RATE);
-  const referralIncentive = round(referralSupplyAmount * REFERRAL_INCENTIVE_RATE);
+  const referralIncentive = round(Math.max(0, referralSupplyAmount) * REFERRAL_INCENTIVE_RATE);
 
   const grossPay =
     baseSalary + mealAllowance + lessonFeeTotal + teamLeadAllowance + referralIncentive;

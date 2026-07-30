@@ -1,5 +1,5 @@
 import type { EmploymentType } from "@/lib/db";
-import type { ReferralEntry } from "@/lib/payroll";
+import type { ReferralEntry, ReferralPaymentMethod } from "@/lib/payroll";
 import type { PayrollResult } from "@/lib/payroll/calculate";
 
 function formatWon(n: number): string {
@@ -9,6 +9,11 @@ function formatWon(n: number): string {
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   regular: "정직원",
   freelancer: "프리랜서",
+};
+
+const REFERRAL_PAYMENT_METHOD_SHORT_LABEL: Record<ReferralPaymentMethod, string> = {
+  card: "카드",
+  transfer: "계좌이체",
 };
 
 function SpecRow({
@@ -227,7 +232,12 @@ export function PayrollSpecCard({
           <p className="mb-1.5 font-medium text-ink/60">소개 결제 내역</p>
           {referralEntries.map((entry, i) => (
             <div key={i} className="flex items-center justify-between py-0.5">
-              <span>{entry.note || "(내용 없음)"}</span>
+              <span>
+                {entry.note || "(내용 없음)"}
+                <span className="ml-1 text-ink/40">
+                  ({REFERRAL_PAYMENT_METHOD_SHORT_LABEL[entry.paymentMethod]})
+                </span>
+              </span>
               <span>{formatWon(entry.amount)}</span>
             </div>
           ))}
