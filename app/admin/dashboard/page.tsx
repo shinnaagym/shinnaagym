@@ -4,6 +4,7 @@ import { isValidMonthKey, koreaCurrentMonthKey } from "@/lib/date";
 import {
   getCoachMonthlyReports,
   getDashboardOverview,
+  getMonthlyRetentionStats,
   getMonthlyTrend,
   listNewRegistrations,
   listPackagePurchases,
@@ -71,14 +72,16 @@ export default async function AdminDashboardPage({
   const { month } = await searchParams;
   const monthKey = month && isValidMonthKey(month) ? month : koreaCurrentMonthKey();
 
-  const [overview, coachReports, trend, newRegs, purchases, visitChannelCounts] = await Promise.all([
-    getDashboardOverview(monthKey),
-    getCoachMonthlyReports(monthKey),
-    getMonthlyTrend(monthKey, TREND_MONTHS),
-    listNewRegistrations(monthKey),
-    listPackagePurchases(monthKey),
-    getVisitChannelCountsForMonth(monthKey),
-  ]);
+  const [overview, coachReports, trend, retentionTrend, newRegs, purchases, visitChannelCounts] =
+    await Promise.all([
+      getDashboardOverview(monthKey),
+      getCoachMonthlyReports(monthKey),
+      getMonthlyTrend(monthKey, TREND_MONTHS),
+      getMonthlyRetentionStats(monthKey, TREND_MONTHS),
+      listNewRegistrations(monthKey),
+      listPackagePurchases(monthKey),
+      getVisitChannelCountsForMonth(monthKey),
+    ]);
 
   const visitChannelTotal = Object.values(visitChannelCounts).reduce((a, b) => a + b, 0);
   const knownVisitChannelValues = new Set<string>(VISIT_CHANNEL_OPTIONS.map((opt) => opt.value));
@@ -104,8 +107,9 @@ export default async function AdminDashboardPage({
   );
 
   const maxRevenue = Math.max(1, ...trend.map((t) => t.revenue));
-  const maxSessions = Math.max(1, ...trend.map((t) => t.completedSessions));
+  const maxSessions = Math.max(1, ...trend.map((t) => t.sessionCount));
   const maxConsultations = Math.max(1, ...trend.map((t) => t.consultationCount));
+  const maxNewRegs = Math.max(1, ...retentionTrend.map((t) => t.newMemberCount));
 
   const newRegByCoach = new Map<string, string[]>();
   for (const r of newRegs) {
@@ -116,7 +120,6 @@ export default async function AdminDashboardPage({
 
   const kpiCards: Array<{ label: string; value: string; accent?: boolean }> = [
     { label: "활성 회원", value: `${overview.activeMemberCount}명` },
-    { label: "이번 달 완료 세션", value: `${overview.monthlyCompletedSessions}회` },
     { label: "이번 달 총 상담수", value: `${overview.monthlyConsultationCount}건` },
     { label: "카드결제 매출 (부가세포함)", value: formatWon(overview.monthlyRevenueCard), accent: true },
     { label: "계좌이체 매출 (부가세제외)", value: formatWon(overview.monthlyRevenueTransfer), accent: true },
@@ -151,7 +154,7 @@ export default async function AdminDashboardPage({
           </div>
 
           {/* 월별 추이 차트 */}
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
               <p className="text-sm font-medium mb-4">
                 월별 결제액 <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
@@ -175,20 +178,20 @@ export default async function AdminDashboardPage({
             </div>
             <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
               <p className="text-sm font-medium mb-4">
-                월별 완료 세션{" "}
+                월별 수업수{" "}
                 <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
               </p>
               <div className="flex items-end gap-2 h-36">
                 {trend.map((t) => (
                   <div key={t.month} className="flex-1 flex flex-col items-center gap-1.5">
                     <p className="text-[10px] text-ink/50 h-3">
-                      {t.completedSessions > 0 ? t.completedSessions : ""}
+                      {t.sessionCount > 0 ? t.sessionCount : ""}
                     </p>
                     <div
                       className={`w-full rounded-t-md transition-all ${
                         t.month === monthKey ? "bg-sage" : "bg-sage/40"
                       }`}
-                      style={{ height: `${Math.max(4, (t.completedSessions / maxSessions) * 100)}px` }}
+                      style={{ height: `${Math.max(4, (t.sessionCount / maxSessions) * 100)}px` }}
                     />
                     <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
                   </div>
@@ -212,6 +215,30 @@ export default async function AdminDashboardPage({
                       }`}
                       style={{
                         height: `${Math.max(4, (t.consultationCount / maxConsultations) * 100)}px`,
+                      }}
+                    />
+                    <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+              <p className="text-sm font-medium mb-4">
+                월별 신규 등록{" "}
+                <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
+              </p>
+              <div className="flex items-end gap-2 h-36">
+                {retentionTrend.map((t) => (
+                  <div key={t.month} className="flex-1 flex flex-col items-center gap-1.5">
+                    <p className="text-[10px] text-ink/50 h-3">
+                      {t.newMemberCount > 0 ? `${t.newMemberCount}명` : ""}
+                    </p>
+                    <div
+                      className={`w-full rounded-t-md transition-all ${
+                        t.month === monthKey ? "bg-gold-light" : "bg-gold-light/40"
+                      }`}
+                      style={{
+                        height: `${Math.max(4, (t.newMemberCount / maxNewRegs) * 100)}px`,
                       }}
                     />
                     <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
@@ -394,9 +421,9 @@ export default async function AdminDashboardPage({
           </div>
 
       <p className="text-xs text-ink/40 mt-4 leading-relaxed">
-        매출은 그 달에 결제된 패키지 금액 합계이고, 완료 세션은 세션 상태가 &apos;완료&apos;인
-        건수예요. 신규 등록은 첫 패키지를 이번 달에 구매한 회원, 재등록은 이미 패키지가 있던
-        회원이 이번 달에 추가로 구매한 경우예요.
+        매출은 그 달에 결제된 패키지 금액 합계이고, 수업수는 취소되지 않은 수업(완료·노쇼·예정
+        포함) 건수예요. 신규 등록은 첫 패키지를 이번 달에 구매한 회원, 재등록은 이미 패키지가
+        있던 회원이 이번 달에 추가로 구매한 경우예요.
       </p>
     </div>
   );

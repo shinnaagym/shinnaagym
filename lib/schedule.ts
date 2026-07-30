@@ -942,7 +942,6 @@ export interface DashboardOverview {
   activeMemberCount: number;
   monthlyRevenueCard: number;
   monthlyRevenueTransfer: number;
-  monthlyCompletedSessions: number;
   monthlyNoShowCount: number;
   noShowRate: number | null;
   monthlyNewMemberCount: number;
@@ -1003,7 +1002,6 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
     activeMemberCount: Number(activeMembers.rows[0]?.count ?? 0),
     monthlyRevenueCard: revenueByMethod.get("card") ?? 0,
     monthlyRevenueTransfer: revenueByMethod.get("transfer") ?? 0,
-    monthlyCompletedSessions: completed,
     monthlyNoShowCount: noShow,
     noShowRate: denom > 0 ? noShow / denom : null,
     monthlyNewMemberCount: Number(newMembers.rows[0]?.count ?? 0),
@@ -1015,11 +1013,11 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
 export interface MonthlyTrendPoint {
   month: string; // YYYY-MM
   revenue: number;
-  completedSessions: number;
+  sessionCount: number;
   consultationCount: number;
 }
 
-/** endYearMonth 기준 최근 `months`개월 치 매출·완료세션·상담수 추이 (차트용). */
+/** endYearMonth 기준 최근 `months`개월 치 매출·수업수·상담수 추이 (차트용). */
 export async function getMonthlyTrend(
   endYearMonth: string,
   months: number,
@@ -1038,10 +1036,11 @@ export async function getMonthlyTrend(
        GROUP BY month`,
       [monthKeys],
     ),
-    query<{ month: string; completed: string }>(
-      `SELECT LEFT(session_date, 7) as month, COUNT(*) as completed
+    // "수업수"는 스케줄표 KPI와 동일한 정의: 취소되지 않은 수업(완료·노쇼·예정 포함) 건수.
+    query<{ month: string; count: string }>(
+      `SELECT LEFT(session_date, 7) as month, COUNT(*) as count
        FROM class_sessions
-       WHERE entry_type = 'session' AND status IN ('completed', 'no_show')
+       WHERE entry_type = 'session' AND status <> 'cancelled'
          AND LEFT(session_date, 7) = ANY($1)
        GROUP BY month`,
       [monthKeys],
@@ -1057,7 +1056,7 @@ export async function getMonthlyTrend(
   ]);
 
   const revenueMap = new Map(revenueResult.rows.map((r) => [r.month, Number(r.revenue ?? 0)]));
-  const sessionMap = new Map(sessionResult.rows.map((r) => [r.month, Number(r.completed ?? 0)]));
+  const sessionMap = new Map(sessionResult.rows.map((r) => [r.month, Number(r.count ?? 0)]));
   const consultationMap = new Map(
     consultationResult.rows.map((r) => [r.month, Number(r.count ?? 0)]),
   );
@@ -1065,7 +1064,7 @@ export async function getMonthlyTrend(
   return monthKeys.map((month) => ({
     month,
     revenue: revenueMap.get(month) ?? 0,
-    completedSessions: sessionMap.get(month) ?? 0,
+    sessionCount: sessionMap.get(month) ?? 0,
     consultationCount: consultationMap.get(month) ?? 0,
   }));
 }
