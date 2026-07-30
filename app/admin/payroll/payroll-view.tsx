@@ -197,8 +197,8 @@ export function PayrollView({
       ) : (
         <div className="space-y-6">
           <div className="no-print rounded-2xl border border-line/60 bg-white shadow-sm p-5 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="col-span-2 sm:col-span-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
                 <label className="block text-xs text-ink/50 mb-1">직원</label>
                 <select
                   value={coachSelection}
@@ -215,7 +215,7 @@ export function PayrollView({
                 </select>
               </div>
               {coachSelection === "manual" && (
-                <div className="col-span-2 sm:col-span-1">
+                <div>
                   <label className="block text-xs text-ink/50 mb-1">이름</label>
                   <input
                     value={manualName}
@@ -301,7 +301,7 @@ export function PayrollView({
                   className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                 />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-full">
                 <label className="block text-xs text-ink/50 mb-1">
                   초과 수업 안분 방식 (1:1·2:1 혼합 시)
                 </label>

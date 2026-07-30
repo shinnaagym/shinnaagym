@@ -98,54 +98,101 @@ export function PayrollHistory({ coaches }: { coaches: CoachRow[] }) {
           저장된 급여 이력이 없어요.
         </div>
       ) : (
-        <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-ink/50 text-xs border-b border-line/60">
-                <th className="px-4 py-2.5 font-medium">정산월</th>
-                <th className="px-4 py-2.5 font-medium">이름</th>
-                <th className="px-4 py-2.5 font-medium">고용형태</th>
-                <th className="px-4 py-2.5 font-medium">근속</th>
-                <th className="px-4 py-2.5 font-medium text-right">총지급액</th>
-                <th className="px-4 py-2.5 font-medium text-right">실지급액</th>
-                <th className="px-4 py-2.5 font-medium">저장일시</th>
-                <th className="px-4 py-2.5 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((r) => {
-                const result = r.result as PayrollResult;
-                return (
-                  <tr key={r.id} className="border-b border-line/40 last:border-0">
-                    <td className="px-4 py-2.5 whitespace-nowrap">{r.year_month}</td>
-                    <td className="px-4 py-2.5">{r.employee_name}</td>
-                    <td className="px-4 py-2.5">{EMPLOYMENT_TYPE_LABEL[r.employment_type]}</td>
-                    <td className="px-4 py-2.5">{result?.tenureLabel ?? "-"}</td>
-                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                      {formatWon(result?.grossPay ?? 0)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right whitespace-nowrap font-medium">
-                      {formatWon(result?.netPay ?? 0)}
-                    </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap text-ink/50 text-xs">
-                      {new Date(r.created_at).toLocaleString("ko-KR")}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(r.id)}
-                        disabled={deletingId === r.id}
-                        className="text-xs text-coral hover:opacity-70 disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {deletingId === r.id ? "삭제 중..." : "삭제"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* 좁은 화면에서는 표 대신 항목별 카드로 쌓아 열이 서로 겹치지 않게 한다. */}
+          <div className="sm:hidden space-y-2">
+            {records.map((r) => {
+              const result = r.result as PayrollResult;
+              return (
+                <div
+                  key={r.id}
+                  className="rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3 text-sm"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="font-medium">
+                      {r.employee_name}{" "}
+                      <span className="text-xs text-ink/40 font-normal">
+                        {EMPLOYMENT_TYPE_LABEL[r.employment_type]} · {r.year_month}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(r.id)}
+                      disabled={deletingId === r.id}
+                      className="text-xs text-coral hover:opacity-70 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {deletingId === r.id ? "삭제 중..." : "삭제"}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-ink/60">
+                    <span>근속</span>
+                    <span>{result?.tenureLabel ?? "-"}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-ink/60">
+                    <span>총지급액</span>
+                    <span>{formatWon(result?.grossPay ?? 0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between font-medium">
+                    <span>실지급액</span>
+                    <span>{formatWon(result?.netPay ?? 0)}</span>
+                  </div>
+                  <p className="text-xs text-ink/40 mt-1.5">
+                    {new Date(r.created_at).toLocaleString("ko-KR")} 저장
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-ink/50 text-xs border-b border-line/60">
+                  <th className="px-4 py-2.5 font-medium">정산월</th>
+                  <th className="px-4 py-2.5 font-medium">이름</th>
+                  <th className="px-4 py-2.5 font-medium">고용형태</th>
+                  <th className="px-4 py-2.5 font-medium">근속</th>
+                  <th className="px-4 py-2.5 font-medium text-right">총지급액</th>
+                  <th className="px-4 py-2.5 font-medium text-right">실지급액</th>
+                  <th className="px-4 py-2.5 font-medium">저장일시</th>
+                  <th className="px-4 py-2.5 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r) => {
+                  const result = r.result as PayrollResult;
+                  return (
+                    <tr key={r.id} className="border-b border-line/40 last:border-0">
+                      <td className="px-4 py-2.5 whitespace-nowrap">{r.year_month}</td>
+                      <td className="px-4 py-2.5">{r.employee_name}</td>
+                      <td className="px-4 py-2.5">{EMPLOYMENT_TYPE_LABEL[r.employment_type]}</td>
+                      <td className="px-4 py-2.5">{result?.tenureLabel ?? "-"}</td>
+                      <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                        {formatWon(result?.grossPay ?? 0)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right whitespace-nowrap font-medium">
+                        {formatWon(result?.netPay ?? 0)}
+                      </td>
+                      <td className="px-4 py-2.5 whitespace-nowrap text-ink/50 text-xs">
+                        {new Date(r.created_at).toLocaleString("ko-KR")}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(r.id)}
+                          disabled={deletingId === r.id}
+                          className="text-xs text-coral hover:opacity-70 disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {deletingId === r.id ? "삭제 중..." : "삭제"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

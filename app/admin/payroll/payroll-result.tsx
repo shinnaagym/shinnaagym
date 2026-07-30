@@ -116,39 +116,75 @@ function TenureSimulationTable({
   currentBucket: string;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-ink/50 text-xs border-b border-line/60">
-            <th className="py-2 font-medium">근속 구간</th>
-            <th className="py-2 font-medium text-right">1:1 단가</th>
-            <th className="py-2 font-medium text-right">수업료 합계</th>
-            <th className="py-2 font-medium text-right">실지급액</th>
-          </tr>
-        </thead>
-        <tbody>
-          {simulations.map((sim) => (
-            <tr
-              key={sim.tenureBucket}
-              className={[
-                "border-b border-line/40 last:border-0",
-                sim.tenureBucket === currentBucket ? "bg-coral/5 font-medium" : "",
-              ].join(" ")}
-            >
-              <td className="py-2">
-                {sim.tenureLabel}
-                {sim.tenureBucket === currentBucket && (
-                  <span className="ml-1.5 text-[11px] text-coral">현재</span>
-                )}
-              </td>
-              <td className="py-2 text-right">{formatWon(sim.rate1on1)}</td>
-              <td className="py-2 text-right">{formatWon(sim.lessonFeeTotal)}</td>
-              <td className="py-2 text-right">{formatWon(sim.netPay)}</td>
+    <>
+      {/* 좁은 화면에서는 표 대신 항목별 카드로 쌓아 열이 서로 겹치지 않게 한다. */}
+      <div className="sm:hidden space-y-2">
+        {simulations.map((sim) => (
+          <div
+            key={sim.tenureBucket}
+            className={[
+              "rounded-xl border px-3 py-2.5 text-sm",
+              sim.tenureBucket === currentBucket
+                ? "border-coral/40 bg-coral/5"
+                : "border-line/60",
+            ].join(" ")}
+          >
+            <p className="font-medium mb-1.5">
+              {sim.tenureLabel}
+              {sim.tenureBucket === currentBucket && (
+                <span className="ml-1.5 text-[11px] text-coral font-normal">현재</span>
+              )}
+            </p>
+            <div className="flex items-center justify-between text-ink/60">
+              <span>1:1 단가</span>
+              <span>{formatWon(sim.rate1on1)}</span>
+            </div>
+            <div className="flex items-center justify-between text-ink/60">
+              <span>수업료 합계</span>
+              <span>{formatWon(sim.lessonFeeTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between font-medium">
+              <span>실지급액</span>
+              <span>{formatWon(sim.netPay)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-ink/50 text-xs border-b border-line/60">
+              <th className="py-2 font-medium">근속 구간</th>
+              <th className="py-2 font-medium text-right">1:1 단가</th>
+              <th className="py-2 font-medium text-right">수업료 합계</th>
+              <th className="py-2 font-medium text-right">실지급액</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {simulations.map((sim) => (
+              <tr
+                key={sim.tenureBucket}
+                className={[
+                  "border-b border-line/40 last:border-0",
+                  sim.tenureBucket === currentBucket ? "bg-coral/5 font-medium" : "",
+                ].join(" ")}
+              >
+                <td className="py-2">
+                  {sim.tenureLabel}
+                  {sim.tenureBucket === currentBucket && (
+                    <span className="ml-1.5 text-[11px] text-coral">현재</span>
+                  )}
+                </td>
+                <td className="py-2 text-right">{formatWon(sim.rate1on1)}</td>
+                <td className="py-2 text-right">{formatWon(sim.lessonFeeTotal)}</td>
+                <td className="py-2 text-right">{formatWon(sim.netPay)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -242,7 +278,7 @@ export function PayrollResultCards({
         <p className="text-xs text-ink/50 mb-3">
           같은 근속·수업 횟수 조건으로 고용형태만 바꿔봤을 때의 실수령액 비교예요.
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-xl border border-coral/40 bg-coral/5 p-3">
             <p className="text-xs text-ink/50 mb-1">{EMPLOYMENT_TYPE_LABEL[result.employmentType]}(현재)</p>
             <p className="font-semibold">{formatWon(result.netPay)}</p>
