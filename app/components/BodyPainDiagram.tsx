@@ -84,12 +84,21 @@ function DiagramCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function getPoint(e: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } {
+  // 부위마다 캔버스 내부 해상도(meta.width)와 실제 화면에 렌더링되는 크기가 달라
+  // (예: 측면은 폭이 좁아 후면과 다른 배율로 확대/축소된다), 같은 strokeWidth
+  // 값이라도 화면에 보이는 굵기가 부위마다 달라질 수 있다. strokeWidth는 "화면
+  // 픽셀 기준 굵기"로 취급하고, 실제로 그릴 때는 그 순간의 캔버스-화면 배율
+  // (scaleX)을 곱해 항상 같은 화면 굵기로 보이게 한다.
+  function getPointAndScale(e: React.PointerEvent<HTMLCanvasElement>): {
+    x: number;
+    y: number;
+    scaleX: number;
+  } {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY, scaleX };
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -102,11 +111,11 @@ function DiagramCanvas({
     });
     drawingRef.current = true;
     hasContentRef.current = true;
-    const { x, y } = getPoint(e);
+    const { x, y, scaleX } = getPointAndScale(e);
     // 드래그 없이 콕 찍기만 해도 점이 남도록, 시작점에 펜 굵기만한 점을 먼저 찍어둔다.
     ctx.beginPath();
     ctx.fillStyle = color;
-    ctx.arc(x, y, strokeWidth / 2, 0, Math.PI * 2);
+    ctx.arc(x, y, (strokeWidth * scaleX) / 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -117,8 +126,8 @@ function DiagramCanvas({
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const { x, y } = getPoint(e);
-    ctx.lineWidth = strokeWidth;
+    const { x, y, scaleX } = getPointAndScale(e);
+    ctx.lineWidth = strokeWidth * scaleX;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = color;
