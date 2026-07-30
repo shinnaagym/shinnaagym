@@ -154,7 +154,7 @@ function DiagramCanvas({
     <div>
       <div
         className="relative rounded-xl border border-line bg-white overflow-hidden touch-none mx-auto"
-        style={{ aspectRatio: `${meta.width} / ${meta.height}`, maxWidth: 280 }}
+        style={{ aspectRatio: `${meta.width} / ${meta.height}`, maxWidth: 280, maxHeight: 560 }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
