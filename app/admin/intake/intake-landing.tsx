@@ -9,6 +9,18 @@ interface MemberOption {
   phone: string;
 }
 
+type SortMode = "date" | "name";
+
+function formatDateTimeShort(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day} ${hh}:${mm}`;
+}
+
 export function IntakeLanding({
   members,
   intakeTimestamps,
@@ -19,6 +31,7 @@ export function IntakeLanding({
   const router = useRouter();
   const timestampMap = useMemo(() => new Map(intakeTimestamps), [intakeTimestamps]);
   const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("date");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -47,6 +60,9 @@ export function IntakeLanding({
   const filtered = useMemo(() => {
     const q = search.trim();
     const base = q ? members.filter((m) => m.name.includes(q) || m.phone.includes(q)) : members;
+    if (sortMode === "name") {
+      return [...base].sort((a, b) => a.name.localeCompare(b.name));
+    }
     // 가장 최근에 문진표를 작성한 회원이 맨 위로 오게 정렬하고, 아직 작성하지
     // 않은 회원은 그 뒤에 이름순으로 남겨둔다.
     return [...base].sort((a, b) => {
@@ -57,7 +73,7 @@ export function IntakeLanding({
       if (bAt) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [members, search, timestampMap]);
+  }, [members, search, sortMode, timestampMap]);
 
   async function handleCreate() {
     const trimmedName = name.trim();
@@ -125,8 +141,30 @@ export function IntakeLanding({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="이름 또는 연락처 검색"
-        className="w-full rounded-full border border-line bg-white px-4 py-2 text-sm outline-none focus:border-coral mb-4"
+        className="w-full rounded-full border border-line bg-white px-4 py-2 text-sm outline-none focus:border-coral mb-3"
       />
+
+      <div className="flex items-center gap-1.5 mb-4 text-xs">
+        <span className="text-ink/40">정렬</span>
+        {(
+          [
+            ["date", "최신 작성순"],
+            ["name", "이름순"],
+          ] as const
+        ).map(([mode, label]) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => setSortMode(mode)}
+            className={[
+              "rounded-full px-3 py-1 font-medium transition",
+              sortMode === mode ? "bg-coral text-white" : "bg-bone/70 text-ink/60 hover:bg-bone",
+            ].join(" ")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {filtered.length === 0 ? (
         <div className="rounded-2xl bg-white border border-line/60 px-5 py-8 text-center text-ink/40 text-sm">
@@ -136,6 +174,7 @@ export function IntakeLanding({
         <ul className="space-y-2">
           {filtered.map((m) => {
             const done = timestampMap.has(m.id) && !removedIds.has(m.id);
+            const writtenAt = timestampMap.get(m.id);
             return (
               <li
                 key={m.id}
@@ -150,14 +189,21 @@ export function IntakeLanding({
                     <p className="font-medium">{m.name}</p>
                     {m.phone && <p className="text-xs text-ink/40 mt-0.5">{m.phone}</p>}
                   </div>
-                  <span
-                    className={[
-                      "rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ml-2",
-                      done ? "bg-sage/20 text-sage" : "bg-line/40 text-ink/50",
-                    ].join(" ")}
-                  >
-                    {done ? "작성 완료" : "미작성"}
-                  </span>
+                  <div className="flex flex-col items-end gap-0.5 ml-2 shrink-0">
+                    {done && writtenAt && (
+                      <span className="text-[11px] text-ink/40 whitespace-nowrap">
+                        {formatDateTimeShort(writtenAt)}
+                      </span>
+                    )}
+                    <span
+                      className={[
+                        "rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+                        done ? "bg-sage/20 text-sage" : "bg-line/40 text-ink/50",
+                      ].join(" ")}
+                    >
+                      {done ? "작성 완료" : "미작성"}
+                    </span>
+                  </div>
                 </button>
                 {done && (
                   <button
