@@ -259,6 +259,8 @@ function ensureSchema(): Promise<void> {
           koos12_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
           faam_adl_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
           faam_sports_answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          body_diagram_front TEXT NOT NULL DEFAULT '',
+          body_diagram_back TEXT NOT NULL DEFAULT '',
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -368,6 +370,8 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_class_session_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_class_session_id_fkey
               FOREIGN KEY (class_session_id) REFERENCES class_sessions(id) ON DELETE SET NULL;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS body_diagram_front TEXT NOT NULL DEFAULT '';
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS body_diagram_back TEXT NOT NULL DEFAULT '';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS improvement_direction TEXT NOT NULL DEFAULT '';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_updated_at TIMESTAMPTZ;
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS visit_channel_other TEXT NOT NULL DEFAULT '';
@@ -630,6 +634,8 @@ export interface IntakeQuestionnaireRow {
   koos12_answers: Record<string, number>;
   faam_adl_answers: Record<string, number>;
   faam_sports_answers: Record<string, number>;
+  body_diagram_front: string;
+  body_diagram_back: string;
   created_at: string;
   updated_at: string;
 }

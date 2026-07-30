@@ -54,6 +54,8 @@ export default async function IntakeQuestionnairePage({
         painOnsetPeriod: intake.pain_onset_period,
         painOnsetType: intake.pain_onset_type,
         painMoi: intake.pain_moi,
+        bodyDiagramFront: intake.body_diagram_front,
+        bodyDiagramBack: intake.body_diagram_back,
         painMovements:
           intake.pain_movements.length > 0
             ? intake.pain_movements

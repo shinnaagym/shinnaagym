@@ -31,6 +31,7 @@ import {
 } from "@/lib/prom-instruments";
 import { PromAccordion } from "@/app/components/PromAccordion";
 import { PrintButton } from "@/app/components/PrintButton";
+import { BodyPainDiagram } from "@/app/components/BodyPainDiagram";
 import type { PainMovementEntry } from "@/lib/db";
 import { EMPTY_INTAKE_FORM_STATE, EMPTY_PAIN_MOVEMENT, type IntakeFormState } from "./intake-form-state";
 
@@ -460,6 +461,19 @@ export function IntakeForm({
           rows={4}
           placeholder="통증이 어떻게 시작되었는지 서술"
           className={textareaClass()}
+        />
+      </SectionCard>
+
+      <SectionCard title="통증 위치 표시">
+        <p className="text-xs text-ink/50 mb-3">
+          그림을 손가락(또는 마우스)으로 눌러 아픈 위치를 직접 표시해주세요.
+        </p>
+        <BodyPainDiagram
+          front={form.bodyDiagramFront}
+          back={form.bodyDiagramBack}
+          onChange={({ front, back }) =>
+            patch({ bodyDiagramFront: front, bodyDiagramBack: back })
+          }
         />
       </SectionCard>
 

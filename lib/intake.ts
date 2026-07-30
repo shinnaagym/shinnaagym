@@ -24,6 +24,8 @@ export interface UpsertIntakeQuestionnaireInput {
   painOnsetPeriod: string;
   painOnsetType: string;
   painMoi: string;
+  bodyDiagramFront: string;
+  bodyDiagramBack: string;
   painMovements: PainMovementEntry[];
   painCycleSituation: string;
   painCycleMorning: string;
@@ -124,11 +126,11 @@ export async function upsertIntakeQuestionnaire(
        improve_factors, worsen_factors, perceived_cause, post_pain_action,
        past_same_pain_history, past_treatment, major_complaint, minor_complaint,
        odi_answers, ndi_answers, quickdash_answers, koos12_answers, faam_adl_answers,
-       faam_sports_answers, startback_answers, updated_at
+       faam_sports_answers, startback_answers, body_diagram_front, body_diagram_back, updated_at
      ) VALUES (
        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-       $39,$40,$41,$42,$43,$44,$45, now()
+       $39,$40,$41,$42,$43,$44,$45,$46,$47, now()
      )
      ON CONFLICT (member_id) DO UPDATE SET
        intake_name = EXCLUDED.intake_name,
@@ -175,6 +177,8 @@ export async function upsertIntakeQuestionnaire(
        faam_adl_answers = EXCLUDED.faam_adl_answers,
        faam_sports_answers = EXCLUDED.faam_sports_answers,
        startback_answers = EXCLUDED.startback_answers,
+       body_diagram_front = EXCLUDED.body_diagram_front,
+       body_diagram_back = EXCLUDED.body_diagram_back,
        updated_at = now()
      RETURNING *`,
     [
@@ -223,6 +227,8 @@ export async function upsertIntakeQuestionnaire(
       JSON.stringify(input.faamAdlAnswers),
       JSON.stringify(input.faamSportsAnswers),
       JSON.stringify(input.startbackAnswers),
+      input.bodyDiagramFront,
+      input.bodyDiagramBack,
     ],
   );
   return result.rows[0];

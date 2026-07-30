@@ -24,6 +24,7 @@ import {
   computeFaamScore,
   computeStartBackScore,
 } from "@/lib/prom-instruments";
+import { BodyPainDiagram } from "@/app/components/BodyPainDiagram";
 import type { IntakeQuestionnaireRow } from "@/lib/db";
 
 interface PromSummary {
@@ -162,6 +163,14 @@ export function IntakeDocument({
 
       <Section title="상담 내용">
         <Field label="서술">{intake.pain_moi || "-"}</Field>
+      </Section>
+
+      <Section title="통증 위치 표시">
+        <BodyPainDiagram
+          front={intake.body_diagram_front}
+          back={intake.body_diagram_back}
+          readOnly
+        />
       </Section>
 
       <Section title="통증의 발생">

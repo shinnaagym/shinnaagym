@@ -85,6 +85,12 @@ function parsePromAnswers(raw: unknown, items: readonly PromItem[]): Record<stri
   return answers;
 }
 
+// 통증 표시 그림은 클라이언트 캔버스에서 만든 PNG data URL만 허용한다(그 외 값은
+// 조작되었거나 손상된 것으로 보고 빈 문자열로 무시).
+function bodyDiagram(raw: unknown): string {
+  return typeof raw === "string" && raw.startsWith("data:image/png;base64,") ? raw : "";
+}
+
 function painMovements(raw: unknown): PainMovementEntry[] {
   if (!Array.isArray(raw)) return [];
   const entries: PainMovementEntry[] = [];
@@ -123,6 +129,8 @@ export interface ParsedIntakeInput {
   painOnsetPeriod: string;
   painOnsetType: string;
   painMoi: string;
+  bodyDiagramFront: string;
+  bodyDiagramBack: string;
   painMovements: PainMovementEntry[];
   painCycleSituation: string;
   painCycleMorning: string;
@@ -171,6 +179,8 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     painOnsetPeriod: str(body?.painOnsetPeriod),
     painOnsetType: enumVal(body?.painOnsetType, VALID_PAIN_ONSET_TYPE),
     painMoi: str(body?.painMoi),
+    bodyDiagramFront: bodyDiagram(body?.bodyDiagramFront),
+    bodyDiagramBack: bodyDiagram(body?.bodyDiagramBack),
     painMovements: painMovements(body?.painMovements),
     painCycleSituation: str(body?.painCycleSituation),
     painCycleMorning: enumVal(body?.painCycleMorning, VALID_PAIN_CYCLE_DIRECTION),
