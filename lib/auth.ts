@@ -7,6 +7,13 @@ export const ADMIN_DEVICE_COOKIE_NAME = "shinna_device_id";
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12시간
 const DEVICE_ID_TTL_MS = 2 * 365 * 24 * 60 * 60 * 1000; // 2년(기기 식별용, 로그아웃해도 유지)
 
+// 급여 계산 페이지는 대표만 봐야 하는 민감한 화면이라, 관리자 공용 비밀번호로
+// 로그인한 상태에서도 별도의 2차 비밀번호를 요구한다. 기존 관리자 세션(기기별
+// 원격 로그아웃 등)과는 무관한 독립적인 짧은 세션이라 device 개념 없이 단순
+// 서명+만료만 검증한다.
+export const PAYROLL_SESSION_COOKIE_NAME = "shinna_payroll_session";
+const PAYROLL_SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2시간
+
 function getSecret(): string {
   return process.env.ADMIN_SESSION_SECRET || "dev-only-insecure-secret-change-me";
 }
@@ -96,4 +103,53 @@ export async function setAdminSessionCookie(deviceId: string): Promise<void> {
 export async function clearAdminSessionCookie(): Promise<void> {
   const store = await cookies();
   store.delete(ADMIN_SESSION_COOKIE_NAME);
+}
+
+export function checkPayrollPassword(candidate: string): boolean {
+  const expected = process.env.PAYROLL_PASSWORD || "qw152426350";
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function createPayrollSessionToken(): string {
+  const expires = Date.now() + PAYROLL_SESSION_TTL_MS;
+  return `${expires}.${sign(`payroll:${expires}`)}`;
+}
+
+function parsePayrollSessionToken(token: string | undefined | null): boolean {
+  if (!token) return false;
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  const [expiresStr, signature] = parts;
+  const expires = Number(expiresStr);
+  if (!Number.isFinite(expires) || Date.now() > expires) return false;
+
+  const expected = sign(`payroll:${expiresStr}`);
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+export async function isPayrollAuthed(): Promise<boolean> {
+  const store = await cookies();
+  return parsePayrollSessionToken(store.get(PAYROLL_SESSION_COOKIE_NAME)?.value);
+}
+
+export async function setPayrollSessionCookie(): Promise<void> {
+  const store = await cookies();
+  store.set(PAYROLL_SESSION_COOKIE_NAME, createPayrollSessionToken(), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: PAYROLL_SESSION_TTL_MS / 1000,
+  });
+}
+
+export async function clearPayrollSessionCookie(): Promise<void> {
+  const store = await cookies();
+  store.delete(PAYROLL_SESSION_COOKIE_NAME);
 }

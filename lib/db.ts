@@ -91,7 +91,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -329,6 +329,28 @@ function runFullMigration(): Promise<void> {
           revoked_at TIMESTAMPTZ
         );
 
+        -- 급여 계산 결과 이력. coach_id는 나중에 코치가 삭제/개명되어도 당시 급여
+        -- 명세를 그대로 보존할 수 있게 nullable로 두고, employee_name에 계산 당시
+        -- 이름을 스냅샷으로 함께 저장한다. result에는 계산된 급여명세 전체(기본급/
+        -- 식대/수업료/인센티브/공제/실지급액 등)를 JSON으로 통째로 저장해, 화면
+        -- 구성이 바뀌어도 과거 이력 조회가 깨지지 않게 한다.
+        CREATE TABLE IF NOT EXISTS payroll_records (
+          id SERIAL PRIMARY KEY,
+          coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL,
+          employee_name TEXT NOT NULL,
+          year_month TEXT NOT NULL,
+          employment_type TEXT NOT NULL DEFAULT 'regular',
+          hired_at TEXT NOT NULL DEFAULT '',
+          is_team_lead BOOLEAN NOT NULL DEFAULT false,
+          session_count_1on1 NUMERIC NOT NULL DEFAULT 0,
+          session_count_2on1 NUMERIC NOT NULL DEFAULT 0,
+          referral_payment_amount INTEGER NOT NULL DEFAULT 0,
+          result JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_payroll_records_year_month ON payroll_records(year_month);
+        CREATE INDEX IF NOT EXISTS idx_payroll_records_coach_id ON payroll_records(coach_id);
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -353,6 +375,9 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_status TEXT NOT NULL DEFAULT '대기';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_memo TEXT NOT NULL DEFAULT '';
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
+            ALTER TABLE coaches ADD COLUMN IF NOT EXISTS employment_type TEXT NOT NULL DEFAULT 'regular';
+            ALTER TABLE coaches ADD COLUMN IF NOT EXISTS hired_at TEXT NOT NULL DEFAULT '';
+            ALTER TABLE coaches ADD COLUMN IF NOT EXISTS is_team_lead BOOLEAN NOT NULL DEFAULT false;
           ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS exercise_performance JSONB NOT NULL DEFAULT '[]'::jsonb;
@@ -486,11 +511,16 @@ export interface ReservationRow {
   class_session_id: number | null;
 }
 
+export type EmploymentType = "regular" | "freelancer";
+
 export interface CoachRow {
   id: number;
   name: string;
   phone: string;
   active: boolean;
+  employment_type: EmploymentType;
+  hired_at: string;
+  is_team_lead: boolean;
   created_at: string;
 }
 
@@ -741,6 +771,21 @@ export interface ExpenseRow {
   amount: number;
   quantity: number;
   note: string;
+  created_at: string;
+}
+
+export interface PayrollRecordRow {
+  id: number;
+  coach_id: number | null;
+  employee_name: string;
+  year_month: string;
+  employment_type: EmploymentType;
+  hired_at: string;
+  is_team_lead: boolean;
+  session_count_1on1: number;
+  session_count_2on1: number;
+  referral_payment_amount: number;
+  result: unknown;
   created_at: string;
 }
 

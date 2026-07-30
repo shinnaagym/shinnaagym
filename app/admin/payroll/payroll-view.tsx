@@ -1,0 +1,349 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import type { CoachRow, EmploymentType } from "@/lib/db";
+import {
+  calculatePayroll,
+  type AllocationOrder,
+  type PayrollInput,
+} from "@/lib/payroll/calculate";
+import { PrintButton } from "@/app/components/PrintButton";
+import { PayrollResultCards } from "./payroll-result";
+import { PayrollHistory } from "./payroll-history";
+
+const TENURE_BUCKETS = ["under1", "1to2", "over2"] as const;
+
+const ALLOCATION_OPTIONS: Array<{ value: AllocationOrder; label: string }> = [
+  { value: "proportional", label: "진행 비율 안분" },
+  { value: "1on1-first", label: "낮은 단가(1:1)부터 차감" },
+  { value: "2on1-first", label: "높은 단가(2:1)부터 차감" },
+];
+
+const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
+  regular: "정직원",
+  freelancer: "프리랜서",
+};
+
+export function PayrollView({
+  coaches,
+  defaultYearMonth,
+}: {
+  coaches: CoachRow[];
+  defaultYearMonth: string;
+}) {
+  const [tab, setTab] = useState<"calc" | "history">("calc");
+
+  const [coachSelection, setCoachSelection] = useState<string>("");
+  const [manualName, setManualName] = useState("");
+  const [employmentType, setEmploymentType] = useState<EmploymentType>("regular");
+  const [hiredAt, setHiredAt] = useState("");
+  const [isTeamLead, setIsTeamLead] = useState(false);
+  const [yearMonth, setYearMonth] = useState(defaultYearMonth);
+  const [sessionCount1on1, setSessionCount1on1] = useState("0");
+  const [sessionCount2on1, setSessionCount2on1] = useState("0");
+  const [referralPaymentAmount, setReferralPaymentAmount] = useState("0");
+  const [allocationOrder, setAllocationOrder] = useState<AllocationOrder>("proportional");
+  const [loadingCounts, setLoadingCounts] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const selectedCoach = useMemo(
+    () =>
+      coachSelection && coachSelection !== "manual"
+        ? coaches.find((c) => c.id === Number(coachSelection)) ?? null
+        : null,
+    [coachSelection, coaches],
+  );
+
+  // 코치를 바꾸면 등록해둔 고용정보를 자동으로 불러온다(직접 수정 가능). 렌더링
+  // 도중 선택이 바뀐 걸 감지해 상태를 조정하는 패턴이라 useEffect를 쓰지 않는다.
+  const [appliedCoachSelection, setAppliedCoachSelection] = useState(coachSelection);
+  if (coachSelection !== appliedCoachSelection) {
+    setAppliedCoachSelection(coachSelection);
+    if (selectedCoach) {
+      setEmploymentType(selectedCoach.employment_type);
+      setHiredAt(selectedCoach.hired_at);
+      setIsTeamLead(selectedCoach.is_team_lead);
+    }
+  }
+
+  // 코치+정산월이 정해지면 그 달 진행 수업 횟수를 자동으로 불러온다(수동 보정 가능).
+  useEffect(() => {
+    if (!selectedCoach || !yearMonth) return;
+    const coachId = selectedCoach.id;
+    let cancelled = false;
+    async function loadSessionCounts() {
+      setLoadingCounts(true);
+      try {
+        const res = await fetch(
+          `/api/admin/payroll/session-counts?coachId=${coachId}&yearMonth=${yearMonth}`,
+        );
+        const data = res.ok ? await res.json() : null;
+        if (cancelled || !data) return;
+        setSessionCount1on1(String(data.sessionCount1on1 ?? 0));
+        setSessionCount2on1(String(data.sessionCount2on1 ?? 0));
+      } finally {
+        if (!cancelled) setLoadingCounts(false);
+      }
+    }
+    void loadSessionCounts();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCoach, yearMonth]);
+
+  const employeeName =
+    coachSelection === "manual" ? manualName.trim() : (selectedCoach?.name ?? "");
+
+  const baseInput: PayrollInput = useMemo(
+    () => ({
+      employmentType,
+      hiredAt,
+      yearMonth,
+      isTeamLead,
+      sessionCount1on1: Number(sessionCount1on1) || 0,
+      sessionCount2on1: Number(sessionCount2on1) || 0,
+      referralPaymentAmount: Number(referralPaymentAmount) || 0,
+      allocationOrder,
+    }),
+    [
+      employmentType,
+      hiredAt,
+      yearMonth,
+      isTeamLead,
+      sessionCount1on1,
+      sessionCount2on1,
+      referralPaymentAmount,
+      allocationOrder,
+    ],
+  );
+
+  const result = useMemo(() => calculatePayroll(baseInput), [baseInput]);
+
+  const comparisonEmploymentType: EmploymentType =
+    employmentType === "regular" ? "freelancer" : "regular";
+  const comparisonResult = useMemo(
+    () => calculatePayroll({ ...baseInput, employmentType: comparisonEmploymentType }),
+    [baseInput, comparisonEmploymentType],
+  );
+
+  const tenureSimulations = useMemo(
+    () =>
+      TENURE_BUCKETS.map((bucket) =>
+        calculatePayroll({ ...baseInput, tenureBucketOverride: bucket }),
+      ),
+    [baseInput],
+  );
+
+  async function handleSave() {
+    if (!employeeName) {
+      setError("직원을 선택하거나 이름을 입력해주세요.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setSaveMessage(null);
+    try {
+      const res = await fetch("/api/admin/payroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coachId: selectedCoach?.id ?? null,
+          employeeName,
+          ...baseInput,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "저장에 실패했어요.");
+        return;
+      }
+      setSaveMessage("저장했어요. '월별 이력'에서 확인할 수 있어요.");
+    } catch {
+      setError("네트워크 오류가 발생했어요.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="no-print flex items-center gap-1 rounded-full bg-bone/70 p-1 mb-6 w-fit">
+        <button
+          type="button"
+          onClick={() => setTab("calc")}
+          className={[
+            "px-4 py-1.5 rounded-full text-sm font-medium transition-colors",
+            tab === "calc" ? "bg-coral text-white shadow-sm" : "text-ink/60 hover:text-ink",
+          ].join(" ")}
+        >
+          급여 계산
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("history")}
+          className={[
+            "px-4 py-1.5 rounded-full text-sm font-medium transition-colors",
+            tab === "history" ? "bg-coral text-white shadow-sm" : "text-ink/60 hover:text-ink",
+          ].join(" ")}
+        >
+          월별 이력
+        </button>
+      </div>
+
+      {tab === "history" ? (
+        <PayrollHistory coaches={coaches} />
+      ) : (
+        <div className="space-y-6">
+          <div className="no-print rounded-2xl border border-line/60 bg-white shadow-sm p-5 space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-xs text-ink/50 mb-1">직원</label>
+                <select
+                  value={coachSelection}
+                  onChange={(e) => setCoachSelection(e.target.value)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                >
+                  <option value="">선택</option>
+                  {coaches.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                  <option value="manual">직접 입력</option>
+                </select>
+              </div>
+              {coachSelection === "manual" && (
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs text-ink/50 mb-1">이름</label>
+                  <input
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    placeholder="이름 입력"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">정산 기준월</label>
+                <input
+                  type="month"
+                  value={yearMonth}
+                  onChange={(e) => setYearMonth(e.target.value)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">고용형태</label>
+                <select
+                  value={employmentType}
+                  onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                >
+                  {(Object.keys(EMPLOYMENT_TYPE_LABEL) as EmploymentType[]).map((type) => (
+                    <option key={type} value={type}>
+                      {EMPLOYMENT_TYPE_LABEL[type]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">입사일</label>
+                <input
+                  type="date"
+                  value={hiredAt}
+                  onChange={(e) => setHiredAt(e.target.value)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                />
+              </div>
+              {employmentType === "regular" && (
+                <div className="flex items-end pb-2">
+                  <label className="flex items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isTeamLead}
+                      onChange={(e) => setIsTeamLead(e.target.checked)}
+                    />
+                    팀장
+                  </label>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">
+                  1:1 수업 횟수 {loadingCounts && <span className="text-coral">불러오는 중…</span>}
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={sessionCount1on1}
+                  onChange={(e) => setSessionCount1on1(e.target.value)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">2:1 수업 횟수</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={sessionCount2on1}
+                  onChange={(e) => setSessionCount2on1(e.target.value)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-ink/50 mb-1">소개 결제 금액</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={referralPaymentAmount}
+                  onChange={(e) => setReferralPaymentAmount(e.target.value)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-ink/50 mb-1">
+                  초과 수업 안분 방식 (1:1·2:1 혼합 시)
+                </label>
+                <select
+                  value={allocationOrder}
+                  onChange={(e) => setAllocationOrder(e.target.value as AllocationOrder)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                >
+                  {ALLOCATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <PayrollResultCards
+            employeeName={employeeName || "이름 미입력"}
+            yearMonth={yearMonth}
+            result={result}
+            comparisonResult={comparisonResult}
+            comparisonEmploymentType={comparisonEmploymentType}
+            tenureSimulations={tenureSimulations}
+          />
+
+          <div className="no-print flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-full bg-coral text-white px-5 py-2.5 text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+            >
+              {saving ? "저장 중..." : "이 결과 저장"}
+            </button>
+            <PrintButton />
+            {saveMessage && <span className="text-sm text-sage">{saveMessage}</span>}
+            {error && <span className="text-sm text-coral">{error}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

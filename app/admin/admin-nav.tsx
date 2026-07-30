@@ -15,6 +15,7 @@ const TABS = [
   { href: "/admin/assessments", label: "평가지" },
   { href: "/admin/notices", label: "공지사항" },
   { href: "/admin/expenses", label: "가계부" },
+  { href: "/admin/payroll", label: "급여 계산" },
   { href: "/admin/settings", label: "설정" },
 ];
 

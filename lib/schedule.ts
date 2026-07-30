@@ -4,6 +4,7 @@ import { query, UNIQUE_VIOLATION } from "./db";
 import type {
   ClassSessionRow,
   CoachRow,
+  EmploymentType,
   FixedSlotRow,
   HolidayRow,
   MemberRow,
@@ -50,6 +51,17 @@ export async function setCoachActive(id: number, active: boolean): Promise<void>
 
 export async function setCoachPhone(id: number, phone: string): Promise<void> {
   await query(`UPDATE coaches SET phone = $2 WHERE id = $1`, [id, phone]);
+  revalidateTag("coaches", { expire: 0 });
+}
+
+export async function setCoachEmploymentInfo(
+  id: number,
+  info: { employmentType: EmploymentType; hiredAt: string; isTeamLead: boolean },
+): Promise<void> {
+  await query(
+    `UPDATE coaches SET employment_type = $2, hired_at = $3, is_team_lead = $4 WHERE id = $1`,
+    [id, info.employmentType, info.hiredAt, info.isTeamLead],
+  );
   revalidateTag("coaches", { expire: 0 });
 }
 
