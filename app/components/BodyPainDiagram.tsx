@@ -19,6 +19,8 @@ const PEN_WIDTHS = [
   { value: 10.5, label: "매우 굵게" },
 ];
 
+type Tool = "pen" | "eraser";
+
 export type BodyRegionKey = "front" | "back" | "left" | "right" | "feet" | "hands";
 export type BodyDiagramValue = Record<BodyRegionKey, string>;
 
@@ -50,6 +52,7 @@ function DiagramCanvas({
   value,
   color,
   strokeWidth,
+  tool,
   readOnly,
   onChange,
 }: {
@@ -57,6 +60,7 @@ function DiagramCanvas({
   value: string;
   color: string;
   strokeWidth: number;
+  tool: Tool;
   readOnly?: boolean;
   onChange: (dataUrl: string) => void;
 }) {
@@ -112,7 +116,10 @@ function DiagramCanvas({
     drawingRef.current = true;
     hasContentRef.current = true;
     const { x, y, scaleX } = getPointAndScale(e);
-    // 드래그 없이 콕 찍기만 해도 점이 남도록, 시작점에 펜 굵기만한 점을 먼저 찍어둔다.
+    // 지우개는 그리는 대신 destination-out으로 이미 그려진 픽셀을 투명하게 지운다.
+    ctx.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
+    // 드래그 없이 콕 찍기만 해도 점(또는 지운 자국)이 남도록, 시작점에 굵기만한
+    // 점을 먼저 찍어둔다.
     ctx.beginPath();
     ctx.fillStyle = color;
     ctx.arc(x, y, (strokeWidth * scaleX) / 2, 0, Math.PI * 2);
@@ -127,6 +134,7 @@ function DiagramCanvas({
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const { x, y, scaleX } = getPointAndScale(e);
+    ctx.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
     ctx.lineWidth = strokeWidth * scaleX;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -191,6 +199,7 @@ function DiagramCanvas({
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
             className="absolute inset-0 h-full w-full touch-none"
+            style={{ cursor: tool === "eraser" ? "cell" : "crosshair" }}
           />
         )}
       </div>
@@ -218,6 +227,7 @@ export function BodyPainDiagram({
 }) {
   const [color, setColor] = useState(PEN_COLORS[0].value);
   const [strokeWidth, setStrokeWidth] = useState(PEN_WIDTHS[1].value);
+  const [tool, setTool] = useState<Tool>("pen");
   const [active, setActive] = useState<BodyRegionKey>("front");
 
   if (readOnly && REGION_ORDER.every((k) => !value[k])) {
@@ -253,6 +263,39 @@ export function BodyPainDiagram({
 
       {!readOnly && (
         <div className="flex items-center gap-2 flex-wrap mb-3">
+          <span className="text-xs text-ink/50 mr-0.5">도구</span>
+          <button
+            type="button"
+            onClick={() => setTool("pen")}
+            className={[
+              "rounded-full border px-3 py-1 text-xs font-medium transition",
+              tool === "pen" ? "bg-ink text-white border-ink" : "border-line text-ink/60 hover:bg-bone",
+            ].join(" ")}
+          >
+            펜
+          </button>
+          <button
+            type="button"
+            onClick={() => setTool("eraser")}
+            className={[
+              "rounded-full border px-3 py-1 text-xs font-medium transition",
+              tool === "eraser"
+                ? "bg-ink text-white border-ink"
+                : "border-line text-ink/60 hover:bg-bone",
+            ].join(" ")}
+          >
+            지우개
+          </button>
+        </div>
+      )}
+
+      {!readOnly && (
+        <div
+          className={[
+            "flex items-center gap-2 flex-wrap mb-3 transition",
+            tool === "eraser" ? "opacity-40 pointer-events-none" : "",
+          ].join(" ")}
+        >
           <span className="text-xs text-ink/50 mr-0.5">펜 색상</span>
           {PEN_COLORS.map((c) => (
             <button
@@ -310,6 +353,7 @@ export function BodyPainDiagram({
         value={value[active]}
         color={color}
         strokeWidth={strokeWidth}
+        tool={tool}
         readOnly={readOnly}
         onChange={(v) => onChange?.({ ...value, [active]: v })}
       />
