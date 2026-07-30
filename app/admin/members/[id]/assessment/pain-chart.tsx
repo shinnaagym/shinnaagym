@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ASSESSMENT_REGIONS, NRS_PAIN_OPTIONS, movementLabelWithRegion } from "@/lib/assessment-movements";
 import { koreaTodayKey } from "@/lib/date";
+import { svgToPngDataUrl } from "@/lib/chart-image";
 import type { AssessmentMovements, AssessmentRow, PainTriggerEntry } from "@/lib/db";
+import { ChartZoomModal } from "@/app/components/ChartZoomModal";
 
 const WIDTH = 640;
 const HEIGHT = 220;
@@ -220,6 +222,24 @@ export function AssessmentPainChart({
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomLoading, setZoomLoading] = useState(false);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+
+  async function handleZoom() {
+    if (!svgRef.current) return;
+    setZoomOpen(true);
+    setZoomLoading(true);
+    try {
+      const dataUrl = await svgToPngDataUrl(svgRef.current);
+      setZoomImage(dataUrl);
+    } catch {
+      setZoomOpen(false);
+    } finally {
+      setZoomLoading(false);
+    }
+  }
 
   const dayGroups = useMemo(() => groupByDate(assessments), [assessments]);
 
@@ -378,8 +398,9 @@ export function AssessmentPainChart({
         </div>
       )}
 
-      <div className="relative">
+      <div className="relative cursor-zoom-in" onClick={handleZoom} title="탭하여 확대 · 이미지 저장">
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="w-full touch-none"
           onPointerMove={handlePointerMove}
@@ -471,6 +492,17 @@ export function AssessmentPainChart({
           </div>
         )}
       </div>
+
+      <ChartZoomModal
+        open={zoomOpen}
+        title="통증 척도 그래프"
+        imageUrl={zoomImage}
+        loading={zoomLoading}
+        onClose={() => {
+          setZoomOpen(false);
+          setZoomImage(null);
+        }}
+      />
     </div>
   );
 }

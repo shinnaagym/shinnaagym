@@ -92,17 +92,22 @@ export default function Home() {
             <br />
             신나아짐에서 시작됩니다.
           </h1>
-          <div className="hero-fade-2 flex flex-wrap items-center gap-3 mb-4">
-            <span className="rounded-full border border-gold/50 px-3 py-1 text-xs tracking-[0.15em] text-gold-light uppercase">
-              오픈 기념 특별
+          <div className="hero-fade-2 mb-6">
+            <span className="inline-block rounded-full border border-gold/50 px-3 py-1 text-xs tracking-[0.15em] text-gold-light uppercase mb-3">
+              오픈 기념 특별 · 오픈 후 한 달간
             </span>
-            <span className="rounded-full bg-black border border-gold/40 px-4 py-1.5 text-sm font-semibold text-gold-light">
-              평생 20% 할인
-            </span>
+            <div className="inline-flex items-baseline gap-2 rounded-2xl bg-black border border-gold/40 px-6 py-3 shadow-lg shadow-black/30">
+              <span className="font-serif-display text-3xl sm:text-4xl font-bold text-gold-light tracking-tight">
+                평생 20% 할인
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-gold-light/80 tracking-wide">
+              오픈 후 한 달간 진행되는 이벤트예요
+            </p>
+            <p className="mt-3 text-sm text-sage">
+              선착순 15% 할인 + 그 이후 등록 시 추가 5%
+            </p>
           </div>
-          <p className="hero-fade-2 text-sm text-sage mb-6">
-            선착순 15% 할인 + 그 이후 등록 시 추가 5%
-          </p>
           <p className="hero-fade-3 max-w-xl text-bone/80 leading-relaxed mb-3">
             물리치료사가 설계하는 프리미엄 PT, 신나아짐이 곧 문을 엽니다.
             오픈에 앞서 가장 먼저 예약하고 첫 회원이 되어주세요.
