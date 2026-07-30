@@ -12,6 +12,13 @@ const PEN_COLORS = [
   { value: "#22262b", label: "기타" },
 ];
 
+const PEN_WIDTHS = [
+  { value: 2.5, label: "얇게" },
+  { value: 4.5, label: "보통" },
+  { value: 7, label: "굵게" },
+  { value: 10.5, label: "매우 굵게" },
+];
+
 export type BodyRegionKey = "front" | "back" | "left" | "right" | "feet" | "hands";
 export type BodyDiagramValue = Record<BodyRegionKey, string>;
 
@@ -30,24 +37,26 @@ const REGION_META: Record<
   BodyRegionKey,
   { label: string; src: string; width: number; height: number }
 > = {
-  front: { label: "전면", src: "/body-diagram/front.png", width: 340, height: 704 },
-  back: { label: "후면", src: "/body-diagram/back.png", width: 350, height: 704 },
-  left: { label: "좌측면", src: "/body-diagram/side.png", width: 295, height: 704 },
-  right: { label: "우측면", src: "/body-diagram/side-flipped.png", width: 295, height: 704 },
-  feet: { label: "발", src: "/body-diagram/feet.png", width: 439, height: 334 },
-  hands: { label: "손", src: "/body-diagram/hands.png", width: 439, height: 337 },
+  front: { label: "전면", src: "/body-diagram/front.png", width: 350, height: 704 },
+  back: { label: "후면", src: "/body-diagram/back.png", width: 355, height: 704 },
+  left: { label: "좌측면", src: "/body-diagram/side.png", width: 170, height: 704 },
+  right: { label: "우측면", src: "/body-diagram/side-flipped.png", width: 170, height: 704 },
+  feet: { label: "발", src: "/body-diagram/feet.png", width: 366, height: 310 },
+  hands: { label: "손", src: "/body-diagram/hands.png", width: 365, height: 292 },
 };
 
 function DiagramCanvas({
   regionKey,
   value,
   color,
+  strokeWidth,
   readOnly,
   onChange,
 }: {
   regionKey: BodyRegionKey;
   value: string;
   color: string;
+  strokeWidth: number;
   readOnly?: boolean;
   onChange: (dataUrl: string) => void;
 }) {
@@ -55,6 +64,9 @@ function DiagramCanvas({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const hasContentRef = useRef(false);
+  // 획을 하나 그리기 시작할 때마다 "그 직전 상태"를 스냅샷으로 쌓아두고, 되돌리기를
+  // 누르면 가장 최근 스냅샷 하나만 복원한다(전체 지우기가 아니라 한 획씩 되돌리기).
+  const historyRef = useRef<{ dataUrl: string; hadContent: boolean }[]>([]);
 
   // 부위를 바꾸거나 처음 열었을 때, 저장된 그림이 있으면 캔버스에 미리 그려서
   // 이어서 계속 그릴 수 있게 한다.
@@ -84,13 +96,17 @@ function DiagramCanvas({
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
+    historyRef.current.push({
+      dataUrl: canvas.toDataURL("image/png"),
+      hadContent: hasContentRef.current,
+    });
     drawingRef.current = true;
     hasContentRef.current = true;
     const { x, y } = getPoint(e);
     // 드래그 없이 콕 찍기만 해도 점이 남도록, 시작점에 펜 굵기만한 점을 먼저 찍어둔다.
     ctx.beginPath();
     ctx.fillStyle = color;
-    ctx.arc(x, y, 2.25, 0, Math.PI * 2);
+    ctx.arc(x, y, strokeWidth / 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -102,7 +118,7 @@ function DiagramCanvas({
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const { x, y } = getPoint(e);
-    ctx.lineWidth = 4.5;
+    ctx.lineWidth = strokeWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.strokeStyle = color;
@@ -118,13 +134,20 @@ function DiagramCanvas({
     onChange(hasContentRef.current ? canvas.toDataURL("image/png") : "");
   }
 
-  function handleClear() {
+  function handleUndo() {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    hasContentRef.current = false;
-    onChange("");
+    const prev = historyRef.current.pop();
+    if (!prev) return;
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (prev.hadContent) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      hasContentRef.current = prev.hadContent;
+      onChange(prev.hadContent ? prev.dataUrl : "");
+    };
+    img.src = prev.dataUrl;
   }
 
   return (
@@ -165,10 +188,10 @@ function DiagramCanvas({
       {!readOnly && (
         <button
           type="button"
-          onClick={handleClear}
+          onClick={handleUndo}
           className="mt-1.5 w-full text-xs text-coral hover:opacity-70 transition"
         >
-          지우기
+          되돌리기 (한 획씩 취소)
         </button>
       )}
     </div>
@@ -185,6 +208,7 @@ export function BodyPainDiagram({
   readOnly?: boolean;
 }) {
   const [color, setColor] = useState(PEN_COLORS[0].value);
+  const [strokeWidth, setStrokeWidth] = useState(PEN_WIDTHS[1].value);
   const [active, setActive] = useState<BodyRegionKey>("front");
 
   if (readOnly && REGION_ORDER.every((k) => !value[k])) {
@@ -247,11 +271,36 @@ export function BodyPainDiagram({
         </div>
       )}
 
+      {!readOnly && (
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          <span className="text-xs text-ink/50 mr-0.5">굵기</span>
+          {PEN_WIDTHS.map((w) => (
+            <button
+              key={w.value}
+              type="button"
+              onClick={() => setStrokeWidth(w.value)}
+              title={w.label}
+              aria-label={w.label}
+              className={[
+                "h-7 w-7 rounded-full border flex items-center justify-center transition",
+                strokeWidth === w.value ? "border-coral bg-coral/5" : "border-line hover:bg-bone",
+              ].join(" ")}
+            >
+              <span
+                className="rounded-full bg-ink"
+                style={{ width: w.value, height: w.value }}
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
       <DiagramCanvas
         key={active}
         regionKey={active}
         value={value[active]}
         color={color}
+        strokeWidth={strokeWidth}
         readOnly={readOnly}
         onChange={(v) => onChange?.({ ...value, [active]: v })}
       />
