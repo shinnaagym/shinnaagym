@@ -6,7 +6,7 @@ import { query } from "@/lib/db";
 import { recordUndo } from "@/lib/undo";
 import type { ClassSessionRow, PtType, SessionStatus } from "@/lib/db";
 
-const VALID_STATUSES: SessionStatus[] = ["reserved", "completed", "no_show", "cancelled"];
+const VALID_STATUSES: SessionStatus[] = ["reserved", "no_show", "cancelled"];
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 
 export async function PATCH(

@@ -91,7 +91,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -404,6 +404,11 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_updated_at TIMESTAMPTZ;
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS visit_channel_other TEXT NOT NULL DEFAULT '';
 
+            -- "수업 완료" 상태 개념을 없애고 취소되지 않은 수업은 모두 "예약"으로 단순화했다
+            -- (SCHEMA_VERSION 2). 기존에 자동/수동으로 'completed'가 된 기록을 'reserved'로
+            -- 되돌려, 더 이상 쓰지 않는 상태값이 화면에 남아있지 않게 한다.
+            UPDATE class_sessions SET status = 'reserved' WHERE status = 'completed';
+
             -- class_sessions/packages는 매일 계속 쌓이는 테이블인데 PK 외 인덱스가 전혀 없어서,
             -- 데이터가 늘어날수록 스케줄표·대시보드·재등록 관리의 거의 모든 조회가 매번 전체
             -- 테이블을 훑는 시퀀셜 스캔이 되어 갈수록 느려졌다(체감상 "버퍼링"). 실제 조회 조건
@@ -702,7 +707,7 @@ export interface IntakeQuestionnaireRow {
   updated_at: string;
 }
 
-export type SessionStatus = "reserved" | "completed" | "no_show" | "cancelled";
+export type SessionStatus = "reserved" | "no_show" | "cancelled";
 export type SessionEntryType = "session" | "consultation" | "memo" | "blocked";
 
 export interface ClassSessionRow {

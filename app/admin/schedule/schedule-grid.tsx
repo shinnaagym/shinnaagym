@@ -36,7 +36,6 @@ const CATEGORY_LABELS: Record<SessionEntryType, string> = {
 
 const STATUS_STYLE: Record<SessionStatus, string> = {
   reserved: "bg-white border-coral/40 text-ink",
-  completed: "bg-sage/20 border-sage/50 text-ink",
   no_show: "bg-red-50 border-red-300 text-red-700 line-through",
   cancelled: "bg-transparent border-dashed border-line text-ink/30 line-through",
 };
@@ -47,7 +46,6 @@ const BLOCKED_STYLE = "bg-ink/5 border-ink/25 text-ink/50";
 
 const STATUS_LABEL: Record<SessionStatus, string> = {
   reserved: "예약",
-  completed: "완료",
   no_show: "노쇼",
   cancelled: "취소",
 };
@@ -588,7 +586,7 @@ export function ScheduleGrid({
                     data-date={d}
                     style={{ gridColumn: `span ${nCoaches}` }}
                     className={[
-                      "border-b border-l border-line/40 px-2 py-2 text-center",
+                      "border-b border-l-2 border-ink/25 px-2 py-2 text-center",
                       isToday ? "bg-coral/10" : "bg-bone/30",
                     ].join(" ")}
                   >
@@ -614,7 +612,7 @@ export function ScheduleGrid({
                           key={`${d}-${c.id}`}
                           className={[
                             "border-b py-1 text-center",
-                            ci === 0 ? "border-l border-line/40" : "border-l border-line/20",
+                            ci === 0 ? "border-l-2 border-ink/25" : "border-l border-line/20",
                             palette?.header ?? "bg-bone/20",
                           ].join(" ")}
                         >
@@ -645,7 +643,7 @@ export function ScheduleGrid({
                           key={`${d}-${coach.id}`}
                           className={[
                             "border-b p-1",
-                            ci === 0 ? "border-l border-line/40" : "border-l border-line/20",
+                            ci === 0 ? "border-l-2 border-ink/25" : "border-l border-line/20",
                           ].join(" ")}
                           onDragOver={withinHours ? (e) => e.preventDefault() : undefined}
                           onDrop={
@@ -1426,17 +1424,10 @@ function EditSessionModal({
         <div className="grid grid-cols-2 gap-2">
           <button
             disabled={submitting}
-            onClick={() => patch({ status: "completed" })}
-            className="rounded-full bg-sage/80 text-white py-2 text-sm font-medium hover:bg-sage transition disabled:opacity-50"
-          >
-            ✓ 수업 완료
-          </button>
-          <button
-            disabled={submitting}
             onClick={() => patch({ status: "no_show" })}
             className="rounded-full bg-red-400 text-white py-2 text-sm font-medium hover:bg-red-500 transition disabled:opacity-50"
           >
-            ✕ 노쇼 처리
+            ✕ 노쇼 처리(차감)
           </button>
           <button
             disabled={submitting}
@@ -1452,7 +1443,7 @@ function EditSessionModal({
                 session.entry_type === "session" ? { memo, coachId, ptType } : { memo, coachId },
               )
             }
-            className="rounded-full border border-line py-2 text-sm hover:bg-bone transition disabled:opacity-50"
+            className="col-start-2 rounded-full border border-line py-2 text-sm hover:bg-bone transition disabled:opacity-50"
           >
             메모·담당 저장
           </button>

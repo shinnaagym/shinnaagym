@@ -262,7 +262,7 @@ export default async function AdminDashboardPage({
                 <div className="grid grid-cols-2 gap-1.5 text-xs text-ink/60">
                   <span>담당 {r.memberCount}명</span>
                   <span>
-                    완료 1:1 {r.completedSessions1on1}회 · 2:1 {r.completedSessions2on1}회
+                    1:1 {r.sessionCount1on1}회 · 2:1 {r.sessionCount2on1}회
                   </span>
                   <span>노쇼 {r.noShowCount}회</span>
                   <span>재등록율 {formatRate(r.reRegistrationRate)}</span>
@@ -283,8 +283,8 @@ export default async function AdminDashboardPage({
                 <tr className="text-left text-ink/50 text-xs border-b border-line/60">
                   <th className="px-5 py-3 font-medium">코치</th>
                   <th className="px-5 py-3 font-medium">담당 회원</th>
-                  <th className="px-5 py-3 font-medium">완료 1:1</th>
-                  <th className="px-5 py-3 font-medium">완료 2:1</th>
+                  <th className="px-5 py-3 font-medium">1:1</th>
+                  <th className="px-5 py-3 font-medium">2:1</th>
                   <th className="px-5 py-3 font-medium">노쇼</th>
                   <th className="px-5 py-3 font-medium">매출</th>
                   <th className="px-5 py-3 font-medium">재등록율</th>
@@ -297,8 +297,8 @@ export default async function AdminDashboardPage({
                   <tr key={r.coachId} className="border-b border-line/40 last:border-0">
                     <td className="px-5 py-3 font-medium">{r.coachName}</td>
                     <td className="px-5 py-3 text-ink/70">{r.memberCount}명</td>
-                    <td className="px-5 py-3 text-ink/70">{r.completedSessions1on1}회</td>
-                    <td className="px-5 py-3 text-ink/70">{r.completedSessions2on1}회</td>
+                    <td className="px-5 py-3 text-ink/70">{r.sessionCount1on1}회</td>
+                    <td className="px-5 py-3 text-ink/70">{r.sessionCount2on1}회</td>
                     <td className="px-5 py-3 text-ink/70">{r.noShowCount}회</td>
                     <td className="px-5 py-3 text-gold-deep font-medium">{formatWon(r.revenue)}</td>
                     <td className="px-5 py-3 text-ink/70">{formatRate(r.reRegistrationRate)}</td>
@@ -421,9 +421,9 @@ export default async function AdminDashboardPage({
           </div>
 
       <p className="text-xs text-ink/40 mt-4 leading-relaxed">
-        매출은 그 달에 결제된 패키지 금액 합계이고, 수업수는 취소되지 않은 수업(완료·노쇼·예정
-        포함) 건수예요. 신규 등록은 첫 패키지를 이번 달에 구매한 회원, 재등록은 이미 패키지가
-        있던 회원이 이번 달에 추가로 구매한 경우예요.
+        매출은 그 달에 결제된 패키지 금액 합계이고, 수업수는 취소되지 않은 수업(노쇼·예정 포함)
+        건수예요. 신규 등록은 첫 패키지를 이번 달에 구매한 회원, 재등록은 이미 패키지가 있던
+        회원이 이번 달에 추가로 구매한 경우예요.
       </p>
     </div>
   );

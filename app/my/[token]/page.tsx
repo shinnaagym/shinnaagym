@@ -22,7 +22,6 @@ const DEFAULT_STUDIO_PHONE = "010-6859-6114";
 
 const STATUS_LABEL: Record<string, string> = {
   reserved: "예약",
-  completed: "완료",
   no_show: "노쇼",
   cancelled: "취소",
 };

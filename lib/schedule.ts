@@ -231,7 +231,6 @@ export async function listMembersWithProgress(
   nextWeekStart?: string,
   nextWeekEnd?: string,
 ): Promise<MemberWithProgress[]> {
-  await autoCompletePastSessions();
   const result = await query<MemberWithProgress>(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
@@ -246,7 +245,7 @@ export async function listMembersWithProgress(
      ) p ON p.member_id = m.id
      LEFT JOIN (
        SELECT member_id, COUNT(*) as done FROM class_sessions
-       WHERE entry_type = 'session' AND status IN ('completed', 'no_show') GROUP BY member_id
+       WHERE entry_type = 'session' AND status <> 'cancelled' GROUP BY member_id
      ) s ON s.member_id = m.id
      LEFT JOIN (
        SELECT DISTINCT member_id FROM class_sessions
@@ -317,22 +316,19 @@ async function getLatestPtType(memberId: number): Promise<PtType> {
   return result.rows[0]?.pt_type ?? "1:1";
 }
 
-/** 아직 스케줄표에 예약으로 배정되지 않은 잔여 회차 수(= 잔여 회차 - 이미 예약된 건수). */
+/** 아직 스케줄표에 예약으로 배정되지 않은 잔여 회차 수(= 잔여 회차 - 이미 잡힌 건수). */
 async function getUnallocatedSessionCount(memberId: number): Promise<number> {
-  const result = await query<{ total: string | null; done: string; reserved: string }>(
+  const result = await query<{ total: string | null; taken: string }>(
     `SELECT
        (SELECT COALESCE(SUM(total_sessions), 0) FROM packages WHERE member_id = $1) as total,
        (SELECT COUNT(*) FROM class_sessions
-          WHERE member_id = $1 AND entry_type = 'session' AND status IN ('completed', 'no_show')) as done,
-       (SELECT COUNT(*) FROM class_sessions
-          WHERE member_id = $1 AND entry_type = 'session' AND status = 'reserved') as reserved`,
+          WHERE member_id = $1 AND entry_type = 'session' AND status <> 'cancelled') as taken`,
     [memberId],
   );
   const row = result.rows[0];
   const total = Number(row?.total ?? 0);
-  const done = Number(row?.done ?? 0);
-  const reserved = Number(row?.reserved ?? 0);
-  return Math.max(0, total - done - reserved);
+  const taken = Number(row?.taken ?? 0);
+  return Math.max(0, total - taken);
 }
 
 /** YYYY-MM-DD 날짜의 요일을 0=월 ... 6=일 인덱스로 변환 (fixed_slots.weekday와 동일한 규칙). */
@@ -500,12 +496,11 @@ export async function deletePackage(id: number): Promise<void> {
 
 export interface MemberProgress {
   totalSessions: number;
-  doneCount: number; // completed + no_show
+  doneCount: number; // 취소 제외 전체 수업 수(예약 포함)
   remaining: number;
 }
 
 export async function computeMemberProgress(memberId: number): Promise<MemberProgress> {
-  await autoCompletePastSessions();
   const [packagesResult, doneResult] = await Promise.all([
     query<{ sum: string | null }>(
       `SELECT SUM(total_sessions) as sum FROM packages WHERE member_id = $1`,
@@ -513,7 +508,7 @@ export async function computeMemberProgress(memberId: number): Promise<MemberPro
     ),
     query<{ count: string }>(
       `SELECT COUNT(*) as count FROM class_sessions
-       WHERE member_id = $1 AND entry_type = 'session' AND status IN ('completed', 'no_show')`,
+       WHERE member_id = $1 AND entry_type = 'session' AND status <> 'cancelled'`,
       [memberId],
     ),
   ]);
@@ -544,26 +539,6 @@ const SESSION_SELECT_FIELDS = `
   ) END) as total_sessions
 `;
 
-// 이미 지난 PT 수업(entry_type='session')은 관리자가 수동으로 완료 처리하지 않아도
-// 자동으로 '완료' 상태가 되도록 한다. 같은 시(時) 안에서는 반복 실행해도 결과가
-// 같은 멱등 UPDATE라, 서버 인스턴스별로 KST 기준 (오늘 날짜, 시각)이 바뀔 때만 재실행한다.
-let autoCompleteCacheKey: string | null = null;
-
-async function autoCompletePastSessions(): Promise<void> {
-  const todayKey = koreaTodayKey();
-  const hour = koreaCurrentHour();
-  const cacheKey = `${todayKey}-${hour}`;
-  if (autoCompleteCacheKey === cacheKey) return;
-  autoCompleteCacheKey = cacheKey;
-  await query(
-    `UPDATE class_sessions
-     SET status = 'completed'
-     WHERE entry_type = 'session' AND status = 'reserved'
-       AND (session_date < $1 OR (session_date = $1 AND session_hour < $2))`,
-    [todayKey, hour],
-  );
-}
-
 export interface CoachScheduleStats {
   monthPt: number;
   monthPair: number;
@@ -580,7 +555,6 @@ export async function getAllCoachScheduleStats(
   weekStart: string,
   weekEnd: string,
 ): Promise<Map<number, CoachScheduleStats>> {
-  await autoCompletePastSessions();
   const result = await query<{
     coach_id: number;
     month_pt: string;
@@ -622,7 +596,6 @@ export async function listSessionsInRange(
   fromKey: string,
   toKey: string,
 ): Promise<SessionWithMember[]> {
-  await autoCompletePastSessions();
   const result = await query<SessionWithMember>(
     `SELECT ${SESSION_SELECT_FIELDS}
      FROM class_sessions s
@@ -636,7 +609,6 @@ export async function listSessionsInRange(
 }
 
 export async function listMemberSessions(memberId: number): Promise<SessionWithMember[]> {
-  await autoCompletePastSessions();
   const result = await query<SessionWithMember>(
     `SELECT ${SESSION_SELECT_FIELDS}
      FROM class_sessions s
@@ -818,9 +790,9 @@ export interface CoachMonthlyReport {
   coachId: number;
   coachName: string;
   memberCount: number;
-  completedSessions: number;
-  completedSessions1on1: number;
-  completedSessions2on1: number;
+  sessionCount: number;
+  sessionCount1on1: number;
+  sessionCount2on1: number;
   noShowCount: number;
   revenue: number;
   reRegisteredCount: number;
@@ -832,7 +804,6 @@ export interface CoachMonthlyReport {
 
 /** yearMonth: "YYYY-MM" */
 export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMonthlyReport[]> {
-  await autoCompletePastSessions();
   const monthStart = `${yearMonth}-01`;
 
   const [coachesResult, revenueResult, sessionsResult, memberStatsResult, consultationResult] =
@@ -848,15 +819,15 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
       ),
       query<{
         coach_id: number;
-        completed: string;
-        completed_1on1: string;
-        completed_2on1: string;
+        session_count: string;
+        session_count_1on1: string;
+        session_count_2on1: string;
         no_show: string;
       }>(
         `SELECT coach_id,
-           COUNT(*) FILTER (WHERE status IN ('completed', 'no_show')) as completed,
-           COUNT(*) FILTER (WHERE status IN ('completed', 'no_show') AND pt_type = '1:1') as completed_1on1,
-           COUNT(*) FILTER (WHERE status IN ('completed', 'no_show') AND pt_type = '2:1') as completed_2on1,
+           COUNT(*) FILTER (WHERE status <> 'cancelled') as session_count,
+           COUNT(*) FILTER (WHERE status <> 'cancelled' AND pt_type = '1:1') as session_count_1on1,
+           COUNT(*) FILTER (WHERE status <> 'cancelled' AND pt_type = '2:1') as session_count_2on1,
            COUNT(*) FILTER (WHERE status = 'no_show') as no_show
          FROM class_sessions
          WHERE entry_type = 'session'
@@ -898,13 +869,13 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
 
   const revenueMap = new Map(revenueResult.rows.map((r) => [r.coach_id, Number(r.revenue ?? 0)]));
   const sessionsMap = new Map(
-    sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed ?? 0)]),
+    sessionsResult.rows.map((r) => [r.coach_id, Number(r.session_count ?? 0)]),
   );
   const sessions1on1Map = new Map(
-    sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed_1on1 ?? 0)]),
+    sessionsResult.rows.map((r) => [r.coach_id, Number(r.session_count_1on1 ?? 0)]),
   );
   const sessions2on1Map = new Map(
-    sessionsResult.rows.map((r) => [r.coach_id, Number(r.completed_2on1 ?? 0)]),
+    sessionsResult.rows.map((r) => [r.coach_id, Number(r.session_count_2on1 ?? 0)]),
   );
   const noShowMap = new Map(sessionsResult.rows.map((r) => [r.coach_id, Number(r.no_show ?? 0)]));
   const memberStatsMap = new Map(memberStatsResult.rows.map((r) => [r.coach_id, r]));
@@ -922,9 +893,9 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
       coachId: coach.id,
       coachName: coach.name,
       memberCount: Number(stats?.member_count ?? 0),
-      completedSessions: sessionsMap.get(coach.id) ?? 0,
-      completedSessions1on1: sessions1on1Map.get(coach.id) ?? 0,
-      completedSessions2on1: sessions2on1Map.get(coach.id) ?? 0,
+      sessionCount: sessionsMap.get(coach.id) ?? 0,
+      sessionCount1on1: sessions1on1Map.get(coach.id) ?? 0,
+      sessionCount2on1: sessions2on1Map.get(coach.id) ?? 0,
       noShowCount: noShowMap.get(coach.id) ?? 0,
       revenue: revenueMap.get(coach.id) ?? 0,
       reRegisteredCount: reRegistered,
@@ -951,7 +922,6 @@ export interface DashboardOverview {
 
 /** yearMonth: "YYYY-MM" */
 export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
-  await autoCompletePastSessions();
   const [activeMembers, revenue, sessionStats, newMembers, reRegistered, consultations] =
     await Promise.all([
       query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
@@ -961,9 +931,9 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
          GROUP BY payment_method`,
         [yearMonth],
       ),
-      query<{ completed: string; no_show: string }>(
+      query<{ total: string; no_show: string }>(
         `SELECT
-           COUNT(*) FILTER (WHERE status = 'completed') as completed,
+           COUNT(*) FILTER (WHERE status <> 'cancelled') as total,
            COUNT(*) FILTER (WHERE status = 'no_show') as no_show
          FROM class_sessions
          WHERE entry_type = 'session' AND LEFT(session_date, 7) = $1`,
@@ -991,9 +961,8 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
       ),
     ]);
 
-  const completed = Number(sessionStats.rows[0]?.completed ?? 0);
   const noShow = Number(sessionStats.rows[0]?.no_show ?? 0);
-  const denom = completed + noShow;
+  const denom = Number(sessionStats.rows[0]?.total ?? 0);
   const revenueByMethod = new Map(
     revenue.rows.map((r) => [r.payment_method, Number(r.revenue ?? 0)]),
   );
@@ -1022,7 +991,6 @@ export async function getMonthlyTrend(
   endYearMonth: string,
   months: number,
 ): Promise<MonthlyTrendPoint[]> {
-  await autoCompletePastSessions();
   const monthKeys: string[] = [];
   for (let i = months - 1; i >= 0; i--) {
     monthKeys.push(addMonthsToKey(endYearMonth, -i));
@@ -1318,7 +1286,7 @@ export async function getCoachAvailability(
     query<{ session_date: string; session_hour: number }>(
       `SELECT session_date, session_hour FROM class_sessions
        WHERE coach_id = $1 AND session_date >= $2 AND session_date <= $3
-         AND status IN ('reserved', 'completed')`,
+         AND status <> 'cancelled'`,
       [coachId, fromKey, toKey],
     ),
   ]);
