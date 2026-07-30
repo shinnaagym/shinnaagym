@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExpenseRow } from "@/lib/db";
+import { ExpenseMonthPicker } from "./expense-month-picker";
 
 function addMonthsToMonthKey(monthKey: string, delta: number): string {
   const [y, m] = monthKey.split("-").map(Number);
@@ -37,7 +38,7 @@ export function ExpensesView({
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const total = expenses.reduce((sum, e) => sum + e.amount * e.quantity, 0);
 
   function goToMonth(key: string) {
     router.push(`/admin/expenses?month=${key}`);
@@ -104,7 +105,7 @@ export function ExpensesView({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_260px] items-start">
       <div>
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <button
             type="button"
             onClick={() => goToMonth(addMonthsToMonthKey(monthKey, -1))}
@@ -127,6 +128,10 @@ export function ExpensesView({
             다음 달 ›
           </button>
           <p className="font-display text-lg ml-2">{formatMonthLabel(monthKey)}</p>
+        </div>
+
+        <div className="mb-6">
+          <ExpenseMonthPicker monthKey={monthKey} />
         </div>
 
         <div className="rounded-2xl border border-coral/30 bg-coral/5 px-5 py-4 mb-6">
@@ -184,6 +189,7 @@ export function ExpensesView({
                   <th className="px-4 py-2.5 font-medium">지출 내역</th>
                   <th className="px-4 py-2.5 font-medium text-right">금액</th>
                   <th className="px-4 py-2.5 font-medium text-right">수량</th>
+                  <th className="px-4 py-2.5 font-medium text-right">소계</th>
                   <th className="px-4 py-2.5 font-medium">내용</th>
                   <th className="px-4 py-2.5 font-medium"></th>
                 </tr>
@@ -196,6 +202,9 @@ export function ExpensesView({
                       {formatWon(e.amount)}
                     </td>
                     <td className="px-4 py-2.5 text-right">{e.quantity}</td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap font-medium">
+                      {formatWon(e.amount * e.quantity)}
+                    </td>
                     <td className="px-4 py-2.5 text-ink/60">{e.note}</td>
                     <td className="px-4 py-2.5 text-right">
                       <button
@@ -212,11 +221,13 @@ export function ExpensesView({
               </tbody>
               <tfoot>
                 <tr>
-                  <td className="px-4 py-3 font-medium">합계</td>
+                  <td colSpan={3} className="px-4 py-3 font-medium">
+                    합계
+                  </td>
                   <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
                     {formatWon(total)}
                   </td>
-                  <td colSpan={3} />
+                  <td colSpan={2} />
                 </tr>
               </tfoot>
             </table>
