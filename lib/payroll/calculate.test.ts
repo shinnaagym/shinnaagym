@@ -128,7 +128,8 @@ test("프리랜서는 의무수업이 없어 진행한 전 수업이 수업료 �
   assert.equal(result.mealAllowance, 0);
   assert.equal(result.lessonFee1on1, 10 * FREELANCER_RATE_1ON1["1to2"]);
   assert.equal(result.lessonFee2on1, 5 * FREELANCER_RATE_2ON1);
-  assert.equal(result.referralIncentive, 50_000);
+  // 부가세(10%) 제외한 공급가액(1,000,000 / 1.1)의 5%.
+  assert.equal(result.referralIncentive, Math.round((1_000_000 / 1.1) * 0.05));
   // 프리랜서는 3.3% 원천징수만 있고 4대보험은 없음.
   assert.equal(result.deductions.nationalPension, 0);
   assert.equal(
@@ -136,6 +137,20 @@ test("프리랜서는 의무수업이 없어 진행한 전 수업이 수업료 �
     Math.round(result.grossPay * 0.033),
   );
   assert.equal(result.netPay, result.grossPay - result.deductions.freelancerWithholding);
+});
+
+test("소개 인센티브는 부가세(10%) 제외한 공급가액의 5%", () => {
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralPaymentAmount: 1_100_000,
+  });
+  // 1,100,000 / 1.1 = 1,000,000(공급가액), 그 5% = 50,000.
+  assert.equal(result.referralIncentive, 50_000);
 });
 
 test("근속 경계일: 입사 1주년 당일은 '1년 이상 2년 미만'", () => {

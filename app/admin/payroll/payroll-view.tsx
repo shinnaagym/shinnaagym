@@ -41,7 +41,9 @@ export function PayrollView({
   const [yearMonth, setYearMonth] = useState(defaultYearMonth);
   const [sessionCount1on1, setSessionCount1on1] = useState("0");
   const [sessionCount2on1, setSessionCount2on1] = useState("0");
-  const [referralPaymentAmount, setReferralPaymentAmount] = useState("0");
+  const [referralEntries, setReferralEntries] = useState<
+    Array<{ note: string; amount: string }>
+  >([{ note: "", amount: "" }]);
   const [allocationOrder, setAllocationOrder] = useState<AllocationOrder>("proportional");
   const [loadingCounts, setLoadingCounts] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -96,6 +98,23 @@ export function PayrollView({
   const employeeName =
     coachSelection === "manual" ? manualName.trim() : (selectedCoach?.name ?? "");
 
+  function addReferralEntry() {
+    setReferralEntries((prev) => [...prev, { note: "", amount: "" }]);
+  }
+
+  function updateReferralEntry(index: number, patch: Partial<{ note: string; amount: string }>) {
+    setReferralEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+  }
+
+  function removeReferralEntry(index: number) {
+    setReferralEntries((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+  }
+
+  const referralPaymentAmount = referralEntries.reduce(
+    (sum, e) => sum + (Number(e.amount) || 0),
+    0,
+  );
+
   const baseInput: PayrollInput = useMemo(
     () => ({
       employmentType,
@@ -104,7 +123,7 @@ export function PayrollView({
       isTeamLead,
       sessionCount1on1: Number(sessionCount1on1) || 0,
       sessionCount2on1: Number(sessionCount2on1) || 0,
-      referralPaymentAmount: Number(referralPaymentAmount) || 0,
+      referralPaymentAmount,
       allocationOrder,
     }),
     [
@@ -152,6 +171,9 @@ export function PayrollView({
           coachId: selectedCoach?.id ?? null,
           employeeName,
           ...baseInput,
+          referralEntries: referralEntries
+            .filter((e) => e.note.trim() || Number(e.amount) > 0)
+            .map((e) => ({ note: e.note.trim(), amount: Number(e.amount) || 0 })),
         }),
       });
       if (!res.ok) {
@@ -291,15 +313,50 @@ export function PayrollView({
                   className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                 />
               </div>
-              <div>
-                <label className="block text-xs text-ink/50 mb-1">소개 결제 금액</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={referralPaymentAmount}
-                  onChange={(e) => setReferralPaymentAmount(e.target.value)}
-                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-                />
+              <div className="col-span-full">
+                <label className="block text-xs text-ink/50 mb-1">
+                  소개 결제 내역 (부가세 포함 금액, 여러 건 추가 가능)
+                </label>
+                <div className="space-y-2">
+                  {referralEntries.map((entry, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={entry.note}
+                        onChange={(e) => updateReferralEntry(i, { note: e.target.value })}
+                        placeholder="내용 (예: 김철수 소개)"
+                        className="flex-1 min-w-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={entry.amount}
+                        onChange={(e) => updateReferralEntry(i, { amount: e.target.value })}
+                        placeholder="결제 금액"
+                        className="w-36 shrink-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeReferralEntry(i)}
+                        disabled={referralEntries.length === 1}
+                        className="shrink-0 text-xs text-coral hover:opacity-70 disabled:opacity-30"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addReferralEntry}
+                  className="mt-2 text-xs text-ink/50 hover:text-coral"
+                >
+                  + 줄 추가
+                </button>
+                {referralPaymentAmount > 0 && (
+                  <p className="text-xs text-ink/40 mt-1">
+                    합계 {referralPaymentAmount.toLocaleString("ko-KR")}원 (부가세 포함)
+                  </p>
+                )}
               </div>
               <div className="col-span-full">
                 <label className="block text-xs text-ink/50 mb-1">

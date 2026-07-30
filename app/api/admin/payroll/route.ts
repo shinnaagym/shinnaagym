@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed, isPayrollAuthed } from "@/lib/auth";
 import { isValidMonthKey } from "@/lib/date";
-import { listPayrollRecords, savePayrollRecord } from "@/lib/payroll";
+import { listPayrollRecords, savePayrollRecord, type ReferralEntry } from "@/lib/payroll";
 import { calculatePayroll, type AllocationOrder } from "@/lib/payroll/calculate";
 import type { EmploymentType } from "@/lib/db";
+
+function parseReferralEntries(value: unknown): ReferralEntry[] | null {
+  if (!Array.isArray(value)) return null;
+  const entries: ReferralEntry[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) return null;
+    const note = (item as Record<string, unknown>).note;
+    const amount = (item as Record<string, unknown>).amount;
+    if (typeof note !== "string") return null;
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0) return null;
+    entries.push({ note: note.trim(), amount });
+  }
+  return entries;
+}
 
 const VALID_EMPLOYMENT_TYPES: EmploymentType[] = ["regular", "freelancer"];
 const VALID_ALLOCATION_ORDERS: AllocationOrder[] = [
@@ -55,7 +69,7 @@ export async function POST(req: NextRequest) {
         isTeamLead?: unknown;
         sessionCount1on1?: unknown;
         sessionCount2on1?: unknown;
-        referralPaymentAmount?: unknown;
+        referralEntries?: unknown;
         allocationOrder?: unknown;
       }
     | null;
@@ -77,11 +91,9 @@ export async function POST(req: NextRequest) {
     typeof body?.sessionCount2on1 === "number" && Number.isFinite(body.sessionCount2on1)
       ? body.sessionCount2on1
       : NaN;
-  const referralPaymentAmount =
-    typeof body?.referralPaymentAmount === "number" &&
-    Number.isFinite(body.referralPaymentAmount)
-      ? body.referralPaymentAmount
-      : 0;
+  const referralEntries =
+    body?.referralEntries === undefined ? [] : parseReferralEntries(body.referralEntries);
+  const referralPaymentAmount = (referralEntries ?? []).reduce((sum, e) => sum + e.amount, 0);
   const allocationOrder =
     typeof body?.allocationOrder === "string" &&
     VALID_ALLOCATION_ORDERS.includes(body.allocationOrder as AllocationOrder)
@@ -97,7 +109,8 @@ export async function POST(req: NextRequest) {
     Number.isNaN(sessionCount1on1) ||
     Number.isNaN(sessionCount2on1) ||
     sessionCount1on1 < 0 ||
-    sessionCount2on1 < 0
+    sessionCount2on1 < 0 ||
+    referralEntries === null
   ) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
@@ -125,6 +138,7 @@ export async function POST(req: NextRequest) {
     sessionCount1on1,
     sessionCount2on1,
     referralPaymentAmount,
+    referralEntries,
     result,
   });
 

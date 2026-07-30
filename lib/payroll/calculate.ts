@@ -13,6 +13,7 @@ import {
   REGULAR_MEAL_ALLOWANCE,
   REGULAR_TEAM_LEAD_ALLOWANCE,
   TENURE_BUCKET_LABEL,
+  VAT_RATE,
   rate1on1For,
   rate2on1For,
   type EmploymentType,
@@ -217,7 +218,10 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const baseSalary = employmentType === "regular" ? REGULAR_BASE_SALARY : 0;
   const mealAllowance = employmentType === "regular" ? REGULAR_MEAL_ALLOWANCE : 0;
   const teamLeadAllowance = isTeamLead ? REGULAR_TEAM_LEAD_ALLOWANCE : 0;
-  const referralIncentive = round(referralPaymentAmount * REFERRAL_INCENTIVE_RATE);
+  // 결제 금액은 부가세 포함 금액으로 들어온다고 보고, 부가세(10%)를 제외한
+  // 공급가액 기준으로 인센티브(5%)를 계산한다.
+  const referralSupplyAmount = referralPaymentAmount / (1 + VAT_RATE);
+  const referralIncentive = round(referralSupplyAmount * REFERRAL_INCENTIVE_RATE);
 
   const grossPay =
     baseSalary + mealAllowance + lessonFeeTotal + teamLeadAllowance + referralIncentive;

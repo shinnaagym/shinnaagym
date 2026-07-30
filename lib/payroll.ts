@@ -31,6 +31,12 @@ export async function getCoachSessionCountsForMonth(
   return { sessionCount1on1, sessionCount2on1 };
 }
 
+/** 소개 결제 내역 한 줄(내용 메모 + 금액, 부가세 포함 금액). */
+export interface ReferralEntry {
+  note: string;
+  amount: number;
+}
+
 export interface SavePayrollRecordInput {
   coachId: number | null;
   employeeName: string;
@@ -41,6 +47,7 @@ export interface SavePayrollRecordInput {
   sessionCount1on1: number;
   sessionCount2on1: number;
   referralPaymentAmount: number;
+  referralEntries: ReferralEntry[];
   result: PayrollResult;
 }
 
@@ -50,8 +57,8 @@ export async function savePayrollRecord(
   const result = await query<PayrollRecordRow>(
     `INSERT INTO payroll_records
        (coach_id, employee_name, year_month, employment_type, hired_at, is_team_lead,
-        session_count_1on1, session_count_2on1, referral_payment_amount, result)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        session_count_1on1, session_count_2on1, referral_payment_amount, referral_entries, result)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       input.coachId,
@@ -63,6 +70,7 @@ export async function savePayrollRecord(
       input.sessionCount1on1,
       input.sessionCount2on1,
       input.referralPaymentAmount,
+      JSON.stringify(input.referralEntries),
       JSON.stringify(input.result),
     ],
   );

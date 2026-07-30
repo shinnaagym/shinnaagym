@@ -91,7 +91,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -345,6 +345,7 @@ function runFullMigration(): Promise<void> {
           session_count_1on1 NUMERIC NOT NULL DEFAULT 0,
           session_count_2on1 NUMERIC NOT NULL DEFAULT 0,
           referral_payment_amount INTEGER NOT NULL DEFAULT 0,
+          referral_entries JSONB NOT NULL DEFAULT '[]'::jsonb,
           result JSONB NOT NULL DEFAULT '{}'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -378,6 +379,7 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS employment_type TEXT NOT NULL DEFAULT 'regular';
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS hired_at TEXT NOT NULL DEFAULT '';
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS is_team_lead BOOLEAN NOT NULL DEFAULT false;
+            ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS referral_entries JSONB NOT NULL DEFAULT '[]'::jsonb;
           ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb;
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS exercise_performance JSONB NOT NULL DEFAULT '[]'::jsonb;
@@ -785,6 +787,7 @@ export interface PayrollRecordRow {
   session_count_1on1: number;
   session_count_2on1: number;
   referral_payment_amount: number;
+  referral_entries: unknown;
   result: unknown;
   created_at: string;
 }

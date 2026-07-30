@@ -77,14 +77,6 @@ export function AdminNav() {
 
         <div className="shrink-0 flex items-center gap-1">
           <button
-            onClick={() => router.refresh()}
-            title="새로고침"
-            className="shrink-0 rounded-full border border-line px-2 py-1 text-xs text-ink/70 hover:bg-bone transition"
-          >
-            ⟳
-          </button>
-
-          <button
             onClick={handleUndo}
             disabled={undoing}
             title="뒤로가기"

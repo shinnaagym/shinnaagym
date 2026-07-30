@@ -1,4 +1,5 @@
 import type { EmploymentType } from "@/lib/db";
+import type { ReferralEntry } from "@/lib/payroll";
 import type { PayrollResult } from "@/lib/payroll/calculate";
 
 function formatWon(n: number): string {
@@ -35,7 +36,7 @@ function SpecRow({
 
 const CHART_COLORS = ["bg-ink", "bg-sage", "bg-coral", "bg-gold", "bg-gold-deep", "bg-line"];
 
-function PayComposition({ result }: { result: PayrollResult }) {
+export function PayComposition({ result }: { result: PayrollResult }) {
   const segments = [
     { label: "기본급", value: result.baseSalary },
     { label: "식대", value: result.mealAllowance },
@@ -79,7 +80,7 @@ function PayComposition({ result }: { result: PayrollResult }) {
   );
 }
 
-function MandatoryGauge({ result }: { result: PayrollResult }) {
+export function MandatoryGauge({ result }: { result: PayrollResult }) {
   if (result.employmentType === "freelancer") {
     return (
       <p className="text-sm text-ink/50">
@@ -188,6 +189,81 @@ function TenureSimulationTable({
   );
 }
 
+/** 급여명세서 카드 하나. 실시간 계산 화면과 저장된 이력의 상세보기에서 공통으로 쓴다. */
+export function PayrollSpecCard({
+  employeeName,
+  yearMonth,
+  result,
+  referralEntries,
+}: {
+  employeeName: string;
+  yearMonth: string;
+  result: PayrollResult;
+  referralEntries?: ReferralEntry[];
+}) {
+  return (
+    <div className="rounded-2xl border border-line/60 bg-white shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h2 className="font-display text-lg">{employeeName} 급여명세서</h2>
+          <p className="text-xs text-ink/50">
+            {yearMonth} · {EMPLOYMENT_TYPE_LABEL[result.employmentType]} · {result.tenureLabel}
+          </p>
+        </div>
+      </div>
+
+      <div className="text-sm divide-y divide-line/40">
+        <SpecRow label="기본급" value={result.baseSalary} />
+        <SpecRow label="식대(비과세)" value={result.mealAllowance} />
+        <SpecRow label="수업료(1:1)" value={result.lessonFee1on1} />
+        <SpecRow label="수업료(2:1)" value={result.lessonFee2on1} />
+        <SpecRow label="팀장수당" value={result.teamLeadAllowance} />
+        <SpecRow label="소개 인센티브(부가세 제외 5%)" value={result.referralIncentive} />
+        <SpecRow label="총지급액" value={result.grossPay} emphasis />
+      </div>
+
+      {referralEntries && referralEntries.length > 0 && (
+        <div className="text-xs text-ink/50 mt-3 pt-3 border-t border-line/60">
+          <p className="mb-1.5 font-medium text-ink/60">소개 결제 내역</p>
+          {referralEntries.map((entry, i) => (
+            <div key={i} className="flex items-center justify-between py-0.5">
+              <span>{entry.note || "(내용 없음)"}</span>
+              <span>{formatWon(entry.amount)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="text-sm divide-y divide-line/40 mt-3 pt-3 border-t border-line/60">
+        {result.employmentType === "regular" ? (
+          <>
+            <SpecRow label="국민연금(4.5%)" value={result.deductions.nationalPension} negative />
+            <SpecRow label="건강보험(3.545%)" value={result.deductions.healthInsurance} negative />
+            <SpecRow label="장기요양보험" value={result.deductions.longTermCare} negative />
+            <SpecRow label="고용보험(0.9%)" value={result.deductions.employmentInsurance} negative />
+          </>
+        ) : (
+          <SpecRow label="원천징수(3.3%)" value={result.deductions.freelancerWithholding} negative />
+        )}
+        <SpecRow label="실지급액" value={result.netPay} emphasis />
+      </div>
+
+      {result.employmentType === "regular" && (
+        <p className="text-xs text-ink/40 mt-3">
+          * 근로소득세는 간이세액표 기준 계산이 필요해 이 화면에서는 제외했어요(소득세 별도).
+        </p>
+      )}
+
+      {result.severanceEstimate !== null && (
+        <p className="text-xs text-ink/50 mt-2">
+          퇴직금 누적 예상액(간이 계산): {formatWon(result.severanceEstimate)} — 실제 퇴직금은
+          퇴사 직전 3개월 평균임금 기준이라 차이가 날 수 있어요.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function PayrollResultCards({
   employeeName,
   yearMonth,
@@ -205,53 +281,7 @@ export function PayrollResultCards({
 }) {
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-line/60 bg-white shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <div>
-            <h2 className="font-display text-lg">{employeeName} 급여명세서</h2>
-            <p className="text-xs text-ink/50">
-              {yearMonth} · {EMPLOYMENT_TYPE_LABEL[result.employmentType]} · {result.tenureLabel}
-            </p>
-          </div>
-        </div>
-
-        <div className="text-sm divide-y divide-line/40">
-          <SpecRow label="기본급" value={result.baseSalary} />
-          <SpecRow label="식대(비과세)" value={result.mealAllowance} />
-          <SpecRow label="수업료(1:1)" value={result.lessonFee1on1} />
-          <SpecRow label="수업료(2:1)" value={result.lessonFee2on1} />
-          <SpecRow label="팀장수당" value={result.teamLeadAllowance} />
-          <SpecRow label="소개 인센티브(5%)" value={result.referralIncentive} />
-          <SpecRow label="총지급액" value={result.grossPay} emphasis />
-        </div>
-
-        <div className="text-sm divide-y divide-line/40 mt-3 pt-3 border-t border-line/60">
-          {result.employmentType === "regular" ? (
-            <>
-              <SpecRow label="국민연금(4.5%)" value={result.deductions.nationalPension} negative />
-              <SpecRow label="건강보험(3.545%)" value={result.deductions.healthInsurance} negative />
-              <SpecRow label="장기요양보험" value={result.deductions.longTermCare} negative />
-              <SpecRow label="고용보험(0.9%)" value={result.deductions.employmentInsurance} negative />
-            </>
-          ) : (
-            <SpecRow label="원천징수(3.3%)" value={result.deductions.freelancerWithholding} negative />
-          )}
-          <SpecRow label="실지급액" value={result.netPay} emphasis />
-        </div>
-
-        {result.employmentType === "regular" && (
-          <p className="text-xs text-ink/40 mt-3">
-            * 근로소득세는 간이세액표 기준 계산이 필요해 이 화면에서는 제외했어요(소득세 별도).
-          </p>
-        )}
-
-        {result.severanceEstimate !== null && (
-          <p className="text-xs text-ink/50 mt-2">
-            퇴직금 누적 예상액(간이 계산): {formatWon(result.severanceEstimate)} — 실제 퇴직금은
-            퇴사 직전 3개월 평균임금 기준이라 차이가 날 수 있어요.
-          </p>
-        )}
-      </div>
+      <PayrollSpecCard employeeName={employeeName} yearMonth={yearMonth} result={result} />
 
       <div className="rounded-2xl border border-line/60 bg-white shadow-sm p-5">
         <h3 className="font-display text-base mb-3">의무수업 진행 현황</h3>
