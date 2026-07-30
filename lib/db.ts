@@ -84,11 +84,19 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
   ["2026-12-25", "성탄절"],
 ];
 
-function ensureSchema(): Promise<void> {
-  if (!schemaReady) {
-    schemaReady = getPool()
-      .query(
-        `
+// 스키마 마이그레이션(테이블 생성 + 60여 개 ALTER/INDEX 체크)을 매 콜드 스타트마다
+// 다시 실행하면, 이미 다 적용되어 있어 사실상 아무 것도 안 바뀌는 경우에도 그
+// 왕복 자체가 체감 로딩 지연에 더해진다. schema_migrations 테이블에 버전을
+// 기록해두고, 이미 최신이면(대부분의 요청) 가벼운 SELECT 한 번으로 끝내고
+// 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
+// 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
+// 실제로 적용된다.
+const SCHEMA_VERSION = 1;
+
+function runFullMigration(): Promise<void> {
+  return getPool()
+    .query(
+      `
         CREATE TABLE IF NOT EXISTS reservations (
           id SERIAL PRIMARY KEY,
           name TEXT NOT NULL,
@@ -420,11 +428,32 @@ function ensureSchema(): Promise<void> {
           ),
         ]),
       )
-      .then(() => undefined)
-      .catch((err) => {
-        schemaReady = null;
-        throw err;
-      });
+      .then(() => undefined);
+}
+
+function ensureSchema(): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      // pg는 세미콜론으로 여러 문장을 이어붙인 쿼리를 실행하면 문장별 결과를
+      // 담은 배열을 반환한다(마지막 문장의 .rows가 바로 나오지 않는다), 그래서
+      // 결과값(rows)이 필요한 SELECT는 별도 호출로 분리한다.
+      await getPool().query(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER NOT NULL DEFAULT 0);
+        INSERT INTO schema_migrations (version)
+          SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM schema_migrations);
+      `);
+      const { rows } = await getPool().query<{ version: number }>(
+        `SELECT version FROM schema_migrations LIMIT 1`,
+      );
+      const currentVersion = rows[0]?.version ?? 0;
+      if (currentVersion >= SCHEMA_VERSION) return;
+
+      await runFullMigration();
+      await getPool().query(`UPDATE schema_migrations SET version = $1`, [SCHEMA_VERSION]);
+    })().catch((err) => {
+      schemaReady = null;
+      throw err;
+    });
   }
   return schemaReady;
 }

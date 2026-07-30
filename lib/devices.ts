@@ -1,5 +1,18 @@
 import { query, type AdminDeviceRow } from "@/lib/db";
 
+// isAdminAuthed()는 모든 관리자 페이지·API 요청마다 호출되는 핫패스라, 매번
+// DB를 조회하면(특히 서버리스 콜드 스타트나 Neon 같은 절전형 DB에서) 그 자체가
+// 체감 로딩 지연의 큰 원인이 된다. 같은 서버 인스턴스가 살아있는 동안에는
+// 기기별 로그아웃 여부를 짧게(30초) 메모리에 캐시해 반복 조회를 없앤다 —
+// 원격 로그아웃 반영이 최대 30초 정도 늦어질 수 있지만(하트비트 주기와 비슷한
+// 수준), 페이지 이동마다 DB 왕복이 생기는 것보다 훨씬 낫다.
+const REVOKED_CACHE_TTL_MS = 30_000;
+const revokedCache = new Map<string, { revoked: boolean; expiresAt: number }>();
+
+function setRevokedCache(deviceId: string, revoked: boolean): void {
+  revokedCache.set(deviceId, { revoked, expiresAt: Date.now() + REVOKED_CACHE_TTL_MS });
+}
+
 export function labelFromUserAgent(ua: string): string {
   if (/iPad/i.test(ua)) return "iPad";
   if (/iPhone/i.test(ua)) return "iPhone";
@@ -24,6 +37,7 @@ export async function upsertDeviceOnLogin(
        revoked_at = NULL`,
     [deviceId, deviceLabel, appVersion],
   );
+  setRevokedCache(deviceId, false);
 }
 
 // 로그인 없이도(=페이지 접속 중 하트비트만으로도) 최신 버전/접속시각을 갱신하되,
@@ -38,12 +52,16 @@ export async function touchDeviceHeartbeat(deviceId: string, appVersion: string)
 }
 
 export async function isDeviceRevoked(deviceId: string): Promise<boolean> {
+  const cached = revokedCache.get(deviceId);
+  if (cached && cached.expiresAt > Date.now()) return cached.revoked;
+
   const { rows } = await query<{ revoked_at: string | null }>(
     `SELECT revoked_at FROM admin_devices WHERE device_id = $1`,
     [deviceId],
   );
-  if (rows.length === 0) return false;
-  return rows[0].revoked_at !== null;
+  const revoked = rows.length > 0 && rows[0].revoked_at !== null;
+  setRevokedCache(deviceId, revoked);
+  return revoked;
 }
 
 export async function listActiveDevices(): Promise<AdminDeviceRow[]> {
@@ -55,4 +73,5 @@ export async function listActiveDevices(): Promise<AdminDeviceRow[]> {
 
 export async function revokeDevice(deviceId: string): Promise<void> {
   await query(`UPDATE admin_devices SET revoked_at = now() WHERE device_id = $1`, [deviceId]);
+  setRevokedCache(deviceId, true);
 }
