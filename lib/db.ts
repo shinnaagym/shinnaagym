@@ -352,6 +352,9 @@ function ensureSchema(): Promise<void> {
             ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_member_id_fkey;
             ALTER TABLE reservations ADD CONSTRAINT reservations_member_id_fkey
               FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
+            ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_class_session_id_fkey;
+            ALTER TABLE reservations ADD CONSTRAINT reservations_class_session_id_fkey
+              FOREIGN KEY (class_session_id) REFERENCES class_sessions(id) ON DELETE SET NULL;
             ALTER TABLE members ADD COLUMN IF NOT EXISTS improvement_direction TEXT NOT NULL DEFAULT '';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_updated_at TIMESTAMPTZ;
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS visit_channel_other TEXT NOT NULL DEFAULT '';
