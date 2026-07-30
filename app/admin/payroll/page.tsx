@@ -1,16 +1,12 @@
 import { redirect } from "next/navigation";
-import { isAdminAuthed, isPayrollAuthed } from "@/lib/auth";
+import { isAdminAuthed } from "@/lib/auth";
 import { koreaCurrentMonthKey } from "@/lib/date";
 import { listCoaches } from "@/lib/schedule";
-import { PayrollGate } from "./payroll-gate";
-import { PayrollView } from "./payroll-view";
+import { PayrollGated } from "./payroll-gated";
 
 export default async function PayrollPage() {
   if (!(await isAdminAuthed())) {
     redirect("/admin");
-  }
-  if (!(await isPayrollAuthed())) {
-    return <PayrollGate />;
   }
 
   const coaches = await listCoaches(true);
@@ -23,7 +19,7 @@ export default async function PayrollPage() {
         직원을 선택하고 정산월을 고르면 입사일과 진행 수업 횟수를 불러와요. 자동으로 불러온
         값은 오차 보정을 위해 직접 고쳐 쓸 수 있어요.
       </p>
-      <PayrollView coaches={coaches} defaultYearMonth={koreaCurrentMonthKey()} />
+      <PayrollGated coaches={coaches} defaultYearMonth={koreaCurrentMonthKey()} />
     </div>
   );
 }

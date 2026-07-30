@@ -16,6 +16,7 @@ import {
   FREELANCER_RATE_2ON1,
   REGULAR_BASE_SALARY,
   REGULAR_MEAL_ALLOWANCE,
+  REGULAR_TEAM_LEAD_ALLOWANCE,
 } from "./config.ts";
 
 test("의무수업(60회) 미만이면 수업료 0원", () => {
@@ -148,7 +149,7 @@ test("근속 경계일: 입사 2주년 당일부터 '2년 이상'", () => {
   assert.equal(tenureBucket("2024-06-30", "2026-06-30"), "over2");
 });
 
-test("팀장수당은 정직원에게만, 기본급과 동일 금액", () => {
+test("팀장수당은 정직원에게만, 고정 20만원 추가 지급", () => {
   const teamLead = calculatePayroll({
     employmentType: "regular",
     hiredAt: "2020-01-01",
@@ -158,7 +159,7 @@ test("팀장수당은 정직원에게만, 기본급과 동일 금액", () => {
     sessionCount2on1: 0,
     referralPaymentAmount: 0,
   });
-  assert.equal(teamLead.teamLeadAllowance, REGULAR_BASE_SALARY);
+  assert.equal(teamLead.teamLeadAllowance, REGULAR_TEAM_LEAD_ALLOWANCE);
 
   const freelancerTeamLead = calculatePayroll({
     employmentType: "freelancer",

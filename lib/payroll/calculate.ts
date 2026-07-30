@@ -11,6 +11,7 @@ import {
   REGULAR_BASE_SALARY,
   REGULAR_MANDATORY_SESSIONS,
   REGULAR_MEAL_ALLOWANCE,
+  REGULAR_TEAM_LEAD_ALLOWANCE,
   TENURE_BUCKET_LABEL,
   rate1on1For,
   rate2on1For,
@@ -215,7 +216,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
 
   const baseSalary = employmentType === "regular" ? REGULAR_BASE_SALARY : 0;
   const mealAllowance = employmentType === "regular" ? REGULAR_MEAL_ALLOWANCE : 0;
-  const teamLeadAllowance = isTeamLead ? baseSalary : 0;
+  const teamLeadAllowance = isTeamLead ? REGULAR_TEAM_LEAD_ALLOWANCE : 0;
   const referralIncentive = round(referralPaymentAmount * REFERRAL_INCENTIVE_RATE);
 
   const grossPay =

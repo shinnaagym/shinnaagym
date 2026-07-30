@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 
-export function PayrollGate() {
-  const router = useRouter();
+export function PayrollGate({ onUnlock }: { onUnlock: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -24,7 +22,7 @@ export function PayrollGate() {
         setError(data.error ?? "확인에 실패했습니다.");
         return;
       }
-      router.refresh();
+      onUnlock();
     } catch {
       setError("네트워크 오류가 발생했습니다.");
     } finally {

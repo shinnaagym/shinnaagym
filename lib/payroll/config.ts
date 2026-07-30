@@ -25,8 +25,8 @@ export const REGULAR_RATE_1ON1: Record<TenureBucket, number> = {
 // 2:1 수업은 근속에 따른 단가 인상이 없음(고정 단가).
 export const REGULAR_RATE_2ON1 = 40_000;
 
-// 팀장수당: 기본급과 동일한 금액을 별도 지급(정직원만 해당).
-export const REGULAR_TEAM_LEAD_ALLOWANCE_MULTIPLIER = 1;
+// 팀장수당: 정직원 팀장에게 급여에 고정 금액을 별도로 추가 지급.
+export const REGULAR_TEAM_LEAD_ALLOWANCE = 200_000;
 
 // ── 프리랜서 ─────────────────────────────────────────────
 // 기본급·식대·의무수업 없음: 진행한 수업 전체가 수업료 대상.
