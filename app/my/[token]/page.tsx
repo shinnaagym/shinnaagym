@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -30,6 +31,22 @@ const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 function weekdayOf(dateKey: string): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   return WEEKDAY_LABELS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+  const { token } = await params;
+  const member = await getMemberByToken(token);
+  if (!member) return {};
+
+  const title = `${member.name}님의 예약 사이트`;
+  return {
+    title,
+    openGraph: { title },
+  };
 }
 
 export default async function MyReservationPage({

@@ -530,8 +530,9 @@ export function ScheduleGrid({
           </div>
         </>
       ) : (
-      /* 코치 전체 — 요일별로 나열하지 않고 이번 주(월~토) 전체를 한 화면에 보여준다.
-         칸마다 그 요일·시간대에 예약된 모든 코치의 일정을 모아 표시한다. */
+      /* 코치 전체 — 이번 주 전체를 한 화면에 보여주되, 요일마다 코치별로 세로 열을
+         나눠서 배치한다(요일 > 코치 순 중첩 열). 열 수가 많아 화면 밖으로
+         넘어가면 좌우 스크롤(드래그/스와이프)로 볼 수 있다. */
       (() => {
         if (visibleCoaches.length === 0) {
           return (
@@ -541,117 +542,116 @@ export function ScheduleGrid({
           );
         }
 
-        const gridMinWidth = 64 + dateKeys.length * 150;
+        const nCoaches = effectiveCoaches.length;
+        const totalCols = dateKeys.length * nCoaches;
+        const gridMinWidth = 64 + totalCols * 100;
 
         return (
-          <>
-            {effectiveCoaches.length > 1 && (
-              <div className="flex flex-wrap items-center gap-3 mb-3 text-xs text-ink/60">
-                <span className="font-medium text-ink/50">코치별 색상</span>
-                {effectiveCoaches.map((c) => {
-                  const palette = coachColorMap.get(c.id);
-                  return (
-                    <span key={c.id} className="flex items-center gap-1">
-                      <span
-                        className={`inline-block h-2.5 w-2.5 rounded-full ${palette?.header ?? "bg-bone"}`}
-                      />
-                      {c.name}
-                    </span>
-                  );
-                })}
+          <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-4">
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: `64px repeat(${totalCols}, minmax(100px, 1fr))`,
+                minWidth: `${gridMinWidth}px`,
+              }}
+            >
+              <div className="col-span-full border-b border-line/60 bg-bone/50 px-3 py-2.5 text-center">
+                <p className="font-display text-sm">이번 주 전체 ({formatWeekLabel(dateKeys)})</p>
               </div>
-            )}
-            <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-4">
-              <div
-                className="grid"
-                style={{
-                  gridTemplateColumns: `64px repeat(${dateKeys.length}, minmax(140px, 1fr))`,
-                  minWidth: `${gridMinWidth}px`,
-                }}
-              >
-                <div className="col-span-full border-b border-line/60 bg-bone/50 px-3 py-2.5 text-center">
-                  <p className="font-display text-sm">이번 주 전체 ({formatWeekLabel(dateKeys)})</p>
-                </div>
 
-                <div className="border-b border-line/40 bg-bone/30" />
-                {dateKeys.map((d, i) => {
-                  const isToday = d === today;
-                  const closed = dayHours[d]?.closed;
-                  return (
-                    <div
-                      key={d}
-                      className={[
-                        "border-b border-line/40 px-2 py-2 text-center",
-                        isToday ? "bg-coral/10" : "bg-bone/30",
-                      ].join(" ")}
-                    >
-                      <p className="text-xs font-medium truncate">
-                        {WEEKDAY_LABELS[i]} {Number(d.split("-")[2])}
-                      </p>
-                      {closed && <p className="text-[9px] text-ink/30">휴무</p>}
-                      {holidayMap[d] && !closed && (
-                        <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="border-b border-line/40 bg-bone/30" />
+              {dateKeys.map((d, i) => {
+                const isToday = d === today;
+                const closed = dayHours[d]?.closed;
+                return (
+                  <div
+                    key={d}
+                    style={{ gridColumn: `span ${nCoaches}` }}
+                    className={[
+                      "border-b border-l border-line/40 px-2 py-2 text-center",
+                      isToday ? "bg-coral/10" : "bg-bone/30",
+                    ].join(" ")}
+                  >
+                    <p className="text-xs font-medium truncate">
+                      {WEEKDAY_LABELS[i]} {Number(d.split("-")[2])}
+                    </p>
+                    {closed && <p className="text-[9px] text-ink/30">휴무</p>}
+                    {holidayMap[d] && !closed && (
+                      <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
+                    )}
+                  </div>
+                );
+              })}
 
-                {SCHEDULE_HOUR_ROWS.map((hour) => (
-                  <Fragment key={hour}>
-                    <div className="border-b border-line/40 px-2 py-2 text-xs text-ink/50 text-right">
-                      {hour}:00
-                    </div>
-                    {dateKeys.map((d) => {
-                      const dh = dayHours[d];
-                      const withinHours = !!dh && !dh.closed && hour >= dh.start && hour < dh.end;
-                      const cellSessions = withinHours
-                        ? visibleCoaches
-                            .map((coach) => sessionMap.get(`${d}-${coach.id}-${hour}`))
-                            .filter((s): s is SessionWithMember => !!s)
-                        : [];
+              {nCoaches > 1 && (
+                <>
+                  <div className="border-b border-line/40 bg-bone/30" />
+                  {dateKeys.map((d) =>
+                    effectiveCoaches.map((c, ci) => {
+                      const palette = coachColorMap.get(c.id);
                       return (
-                        <div key={d} className="border-b border-line/40 p-1">
+                        <div
+                          key={`${d}-${c.id}`}
+                          className={[
+                            "border-b py-1 text-center",
+                            ci === 0 ? "border-l border-line/40" : "border-l border-line/20",
+                            palette?.header ?? "bg-bone/20",
+                          ].join(" ")}
+                        >
+                          <p className={`text-[10px] font-medium truncate px-1 ${palette?.headerText ?? "text-ink/50"}`}>
+                            {c.name}
+                          </p>
+                        </div>
+                      );
+                    }),
+                  )}
+                </>
+              )}
+
+              {SCHEDULE_HOUR_ROWS.map((hour) => (
+                <Fragment key={hour}>
+                  <div className="border-b border-line/40 px-2 py-2 text-xs text-ink/50 text-right">
+                    {hour}:00
+                  </div>
+                  {dateKeys.map((d) => {
+                    const dh = dayHours[d];
+                    const withinHours = !!dh && !dh.closed && hour >= dh.start && hour < dh.end;
+                    return effectiveCoaches.map((coach, ci) => {
+                      const session = withinHours
+                        ? sessionMap.get(`${d}-${coach.id}-${hour}`)
+                        : undefined;
+                      return (
+                        <div
+                          key={`${d}-${coach.id}`}
+                          className={[
+                            "border-b p-1",
+                            ci === 0 ? "border-l border-line/40" : "border-l border-line/20",
+                          ].join(" ")}
+                          onDragOver={withinHours ? (e) => e.preventDefault() : undefined}
+                          onDrop={
+                            withinHours ? (e) => handleDropOnCell(e, d, hour, coach.id) : undefined
+                          }
+                        >
                           {!withinHours ? (
                             <div className="w-full rounded-lg px-2 py-1.5 text-center text-[11px] text-ink/15">
                               ·
                             </div>
-                          ) : cellSessions.length > 0 ? (
-                            <div className="space-y-1">
-                              {cellSessions.map((session) => {
-                                const palette = coachColorMap.get(session.coach_id);
-                                return (
-                                  <div
-                                    key={session.id}
-                                    className={`border-l-2 pl-1 ${palette?.accent ?? "border-l-transparent"}`}
-                                  >
-                                    <SessionCellButton
-                                      session={session}
-                                      goldenBellMemberIds={goldenBellMemberIds}
-                                      onEdit={setEditTarget}
-                                      onCreate={() => {}}
-                                    />
-                                  </div>
-                                );
-                              })}
-                            </div>
                           ) : (
-                            <button
-                              onClick={() =>
-                                setCreateTarget({ date: d, hour, coachId: visibleCoaches[0].id })
-                              }
-                              className="w-full rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-xs text-ink/30 hover:text-coral hover:border-coral transition truncate"
-                            >
-                              + 추가
-                            </button>
+                            <SessionCellButton
+                              session={session}
+                              goldenBellMemberIds={goldenBellMemberIds}
+                              onEdit={setEditTarget}
+                              onCreate={() => setCreateTarget({ date: d, hour, coachId: coach.id })}
+                            />
                           )}
                         </div>
                       );
-                    })}
-                  </Fragment>
-                ))}
-              </div>
+                    });
+                  })}
+                </Fragment>
+              ))}
             </div>
-          </>
+          </div>
         );
       })()
       )}

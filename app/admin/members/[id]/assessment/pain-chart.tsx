@@ -12,7 +12,6 @@ const PAD_LEFT = 28;
 const PAD_RIGHT = 16;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 28;
-const GRID_TICKS = [0, 2, 4, 6, 8, 10];
 // 같은 날짜에 여러 동작의 점수가 정확히 겹칠 때 서로 구분되도록 주는 픽셀 단위 간격.
 const OVERLAP_JITTER_PX = 4;
 
@@ -274,7 +273,14 @@ export function AssessmentPainChart({
   const plotHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
   const xStep = n > 1 ? plotWidth / (n - 1) : 0;
   const xAt = (i: number) => PAD_LEFT + (n > 1 ? i * xStep : plotWidth / 2);
-  const yAt = (v: number) => PAD_TOP + plotHeight * (1 - v / 10);
+
+  // 통증 점수는 0~10 척도지만, 기록된 값이 전부 낮으면(4 이하) 그래프가
+  // 아래쪽에 작게 몰려 보이므로 그럴 때는 축 상한을 낮춰 더 크게 보이게 한다.
+  const allPainValues = series.flatMap((s) => s.values).filter((v): v is number => v != null);
+  const rawMax = allPainValues.length > 0 ? Math.max(...allPainValues) : 10;
+  const yMax = rawMax <= 4 ? 4 : 10;
+  const gridTicks = yMax === 4 ? [0, 1, 2, 3, 4] : [0, 2, 4, 6, 8, 10];
+  const yAt = (v: number) => PAD_TOP + plotHeight * (1 - v / yMax);
 
   // 같은 날짜에 두 개 이상의 시리즈가 정확히 같은 점수를 가지면 그리는 좌표가
   // 완전히 겹쳐 하나만 보이므로, 겹치는 시리즈끼리 좌우 대칭으로 살짝 띄운
@@ -379,7 +385,7 @@ export function AssessmentPainChart({
           onPointerMove={handlePointerMove}
           onPointerLeave={() => setHoverIndex(null)}
         >
-          {GRID_TICKS.map((t) => (
+          {gridTicks.map((t) => (
             <g key={t}>
               <line
                 x1={PAD_LEFT}
