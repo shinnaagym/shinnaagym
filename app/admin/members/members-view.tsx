@@ -205,12 +205,47 @@ export function MembersView({
     });
   }, [members, search, coachFilter, statusFilter]);
 
+  /** 초진/재등록, 그리고 그중 소개로 온 회원 수를 따로 집계한다(현재 필터 적용 목록 기준).
+      초=현재 패키지가 첫 패키지, 재=재등록(2번째 이상 패키지), 소개(초)/소개(재)=그중 소개(referrer)로 온 경우. */
+  const typeStats = useMemo(() => {
+    let first = 0;
+    let renewal = 0;
+    let referralFirst = 0;
+    let referralRenewal = 0;
+    for (const m of filtered) {
+      if (m.total_sessions <= 0) continue;
+      const isFirst = m.package_count < 2;
+      if (isFirst) first += 1;
+      else renewal += 1;
+      if (m.referrer) {
+        if (isFirst) referralFirst += 1;
+        else referralRenewal += 1;
+      }
+    }
+    return { first, renewal, referralFirst, referralRenewal };
+  }, [filtered]);
+
   async function refresh() {
     window.location.reload();
   }
 
   return (
     <div>
+      <div className="flex items-center gap-3 flex-wrap mb-3 text-xs">
+        <span className="rounded-full bg-coral/10 text-coral px-3 py-1 font-medium">
+          초 {typeStats.first}명
+        </span>
+        <span className="rounded-full bg-sage/20 text-sage px-3 py-1 font-medium">
+          재 {typeStats.renewal}명
+        </span>
+        <span className="rounded-full bg-line/40 text-ink/60 px-3 py-1 font-medium">
+          소개(초) {typeStats.referralFirst}명
+        </span>
+        <span className="rounded-full bg-line/40 text-ink/60 px-3 py-1 font-medium">
+          소개(재) {typeStats.referralRenewal}명
+        </span>
+      </div>
+
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <input
@@ -760,7 +795,7 @@ function ContractFieldsFieldset({
           </Field>
         </>
       )}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="운동 시작일">
           <input
             type="date"
@@ -1857,7 +1892,7 @@ function MemberDetailModal({
         onCreated={() => {
           setShowWriteContract(false);
           onChanged();
-          onClose();
+          setShowContractView(true);
         }}
       />
     )}

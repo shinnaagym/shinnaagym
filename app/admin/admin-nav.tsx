@@ -73,20 +73,29 @@ export function AdminNav() {
           })}
         </nav>
 
-        <button
-          onClick={handleUndo}
-          disabled={undoing}
-          className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition disabled:opacity-50"
-        >
-          ← 뒤로가기
-        </button>
+        <div className="shrink-0 flex items-center gap-2">
+          <button
+            onClick={() => router.refresh()}
+            className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition"
+          >
+            ⟳ 새로고침
+          </button>
 
-        <button
-          onClick={handleLogout}
-          className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition"
-        >
-          로그아웃
-        </button>
+          <button
+            onClick={handleUndo}
+            disabled={undoing}
+            className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition disabled:opacity-50"
+          >
+            ← 뒤로가기
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="shrink-0 rounded-full border border-line px-3.5 py-1.5 text-sm text-ink/70 hover:bg-bone transition"
+          >
+            로그아웃
+          </button>
+        </div>
       </div>
     </header>
   );

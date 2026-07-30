@@ -1157,6 +1157,100 @@ function CreateSessionModal({
   );
 }
 
+/** 일정 상세 모달에서 드래그 대신(또는 함께) 쓸 수 있는 명시적 "이동" 폼 —
+    날짜·시간·코치를 직접 골라 다른 칸으로 옮긴다. */
+function MoveSessionSection({
+  coaches,
+  showMove,
+  onToggle,
+  moveDate,
+  onMoveDateChange,
+  moveHour,
+  onMoveHourChange,
+  moveCoachId,
+  onMoveCoachIdChange,
+  submitting,
+  onMove,
+}: {
+  coaches: CoachRow[];
+  showMove: boolean;
+  onToggle: (next: boolean) => void;
+  moveDate: string;
+  onMoveDateChange: (v: string) => void;
+  moveHour: number;
+  onMoveHourChange: (v: number) => void;
+  moveCoachId: number;
+  onMoveCoachIdChange: (v: number) => void;
+  submitting: boolean;
+  onMove: () => void;
+}) {
+  if (!showMove) {
+    return (
+      <button
+        type="button"
+        onClick={() => onToggle(true)}
+        className="w-full rounded-full border border-line py-2.5 text-sm font-medium hover:border-coral/40 hover:text-coral transition"
+      >
+        📅 다른 날짜·시간으로 이동
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-2xl border border-line/60 bg-bone/30 p-3">
+      <p className="text-sm font-medium">이동할 날짜·시간</p>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="date"
+          value={moveDate}
+          onChange={(e) => onMoveDateChange(e.target.value)}
+          className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+        />
+        <select
+          value={moveHour}
+          onChange={(e) => onMoveHourChange(Number(e.target.value))}
+          className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+        >
+          {SCHEDULE_HOUR_ROWS.map((h) => (
+            <option key={h} value={h}>
+              {h}:00
+            </option>
+          ))}
+        </select>
+      </div>
+      {coaches.length > 1 && (
+        <select
+          value={moveCoachId}
+          onChange={(e) => onMoveCoachIdChange(Number(e.target.value))}
+          className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+        >
+          {coaches.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onToggle(false)}
+          className="flex-1 rounded-full border border-line py-2 text-sm hover:bg-bone transition"
+        >
+          취소
+        </button>
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={onMove}
+          className="flex-1 rounded-full bg-ink text-white py-2 text-sm font-medium hover:bg-coral transition disabled:opacity-50"
+        >
+          이동
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function EditSessionModal({
   session,
   coaches,
@@ -1173,6 +1267,10 @@ function EditSessionModal({
   const [ptType, setPtType] = useState<PtType>(session.pt_type);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showMove, setShowMove] = useState(false);
+  const [moveDate, setMoveDate] = useState(session.session_date);
+  const [moveHour, setMoveHour] = useState(session.session_hour);
+  const [moveCoachId, setMoveCoachId] = useState(session.coach_id);
 
   async function patch(body: Record<string, unknown>) {
     setSubmitting(true);
@@ -1232,6 +1330,21 @@ function EditSessionModal({
           >
             저장
           </button>
+
+          <MoveSessionSection
+            coaches={coaches}
+            showMove={showMove}
+            onToggle={setShowMove}
+            moveDate={moveDate}
+            onMoveDateChange={setMoveDate}
+            moveHour={moveHour}
+            onMoveHourChange={setMoveHour}
+            moveCoachId={moveCoachId}
+            onMoveCoachIdChange={setMoveCoachId}
+            submitting={submitting}
+            onMove={() => patch({ date: moveDate, hour: moveHour, coachId: moveCoachId })}
+          />
+
           <button
             disabled={submitting}
             onClick={handleDelete}
@@ -1344,6 +1457,20 @@ function EditSessionModal({
             메모·담당 저장
           </button>
         </div>
+
+        <MoveSessionSection
+          coaches={coaches}
+          showMove={showMove}
+          onToggle={setShowMove}
+          moveDate={moveDate}
+          onMoveDateChange={setMoveDate}
+          moveHour={moveHour}
+          onMoveHourChange={setMoveHour}
+          moveCoachId={moveCoachId}
+          onMoveCoachIdChange={setMoveCoachId}
+          submitting={submitting}
+          onMove={() => patch({ date: moveDate, hour: moveHour, coachId: moveCoachId })}
+        />
 
         <button
           disabled={submitting}
