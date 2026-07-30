@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { COACH_COLOR_PALETTE, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { addDaysToKey, mondayOfWeek } from "@/lib/date";
@@ -197,6 +197,7 @@ export function ScheduleGrid({
   } | null>(null);
   const [editTarget, setEditTarget] = useState<SessionWithMember | null>(null);
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
+  const allGridScrollRef = useRef<HTMLDivElement | null>(null);
 
   const effectiveCoaches = coaches.length > 0 ? coaches : [];
   const visibleCoaches =
@@ -275,6 +276,21 @@ export function ScheduleGrid({
     }
     return map;
   }, [sessions, visibleCoaches]);
+
+  /** "코치 전체" 주간 그리드를 열면 항상 월요일부터 보이는데, 오늘 요일이 화면
+      밖에 있을 수 있어 처음부터 오늘 요일이 보이도록 가로 스크롤을 맞춰준다. */
+  useEffect(() => {
+    if (coachFilter !== "all") return;
+    const container = allGridScrollRef.current;
+    if (!container) return;
+    const todayCell = container.querySelector<HTMLElement>(`[data-date="${today}"]`);
+    if (!todayCell) return;
+    const offset =
+      todayCell.getBoundingClientRect().left -
+      container.getBoundingClientRect().left +
+      container.scrollLeft;
+    container.scrollLeft = Math.max(0, offset - 64);
+  }, [coachFilter, dateKeys, today]);
 
   async function refreshSessions() {
     const weekEnd = dateKeys[dateKeys.length - 1];
@@ -547,7 +563,10 @@ export function ScheduleGrid({
         const gridMinWidth = 64 + totalCols * 100;
 
         return (
-          <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-4">
+          <div
+            ref={allGridScrollRef}
+            className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-4"
+          >
             <div
               className="grid"
               style={{
@@ -566,6 +585,7 @@ export function ScheduleGrid({
                 return (
                   <div
                     key={d}
+                    data-date={d}
                     style={{ gridColumn: `span ${nCoaches}` }}
                     className={[
                       "border-b border-l border-line/40 px-2 py-2 text-center",

@@ -7,7 +7,18 @@ export async function svgToPngDataUrl(svg: SVGSVGElement, scale = 3): Promise<st
     ? viewBox.split(/\s+/).map(Number)
     : [0, 0, svg.clientWidth || 640, svg.clientHeight || 220];
 
-  let source = new XMLSerializer().serializeToString(svg);
+  // 그래프 선은 처음 그려질 때 stroke-dasharray/dashoffset + CSS 애니메이션으로
+  // 왼쪽에서 오른쪽으로 그려지는 효과를 준다. 이 SVG를 그대로 잘라내 별도
+  // 문서(blob URL)로 불러오면 @keyframes 정의가 함께 딸려가지 않아 애니메이션이
+  // 아예 적용되지 않고, 선이 시작 상태(dashoffset=1, 즉 안 보이는 상태)로 굳어
+  // 버린다. 내보낼 때는 애니메이션 관련 인라인 스타일을 지우고 항상 완성된
+  // 모습(선이 끝까지 그려진 상태)으로 캡처한다.
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.querySelectorAll("path").forEach((path) => {
+    path.removeAttribute("style");
+  });
+
+  let source = new XMLSerializer().serializeToString(clone);
   if (!source.includes("xmlns=")) {
     source = source.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
   }
