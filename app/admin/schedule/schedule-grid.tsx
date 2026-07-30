@@ -1421,18 +1421,18 @@ function EditSessionModal({
 
         {error && <p className="text-sm text-coral">{error}</p>}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             disabled={submitting}
             onClick={() => patch({ status: "no_show" })}
-            className="rounded-full bg-red-400 text-white py-2 text-sm font-medium hover:bg-red-500 transition disabled:opacity-50"
+            className="rounded-full bg-red-400 text-white py-2 text-xs sm:text-sm font-medium hover:bg-red-500 transition disabled:opacity-50"
           >
             ✕ 노쇼 처리(차감)
           </button>
           <button
             disabled={submitting}
             onClick={() => patch({ status: "cancelled" })}
-            className="rounded-full border border-line py-2 text-sm hover:bg-bone transition disabled:opacity-50"
+            className="rounded-full border border-line py-2 text-xs sm:text-sm hover:bg-bone transition disabled:opacity-50"
           >
             취소 (차감 없음)
           </button>
@@ -1443,7 +1443,7 @@ function EditSessionModal({
                 session.entry_type === "session" ? { memo, coachId, ptType } : { memo, coachId },
               )
             }
-            className="col-start-2 rounded-full border border-line py-2 text-sm hover:bg-bone transition disabled:opacity-50"
+            className="rounded-full border border-line py-2 text-xs sm:text-sm hover:bg-bone transition disabled:opacity-50"
           >
             메모·담당 저장
           </button>
