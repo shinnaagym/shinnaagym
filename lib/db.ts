@@ -309,6 +309,18 @@ function ensureSchema(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
+        -- 관리자 로그인 세션이 실제로 열려있는 기기 목록. 로그인/하트비트 시
+        -- device_id(브라우저에 오래 저장되는 랜덤 쿠키)로 upsert되고, 설정
+        -- 페이지의 "최근 접속 기기"에서 목록 조회 및 원격 로그아웃(revoked_at)에 쓰인다.
+        CREATE TABLE IF NOT EXISTS admin_devices (
+          device_id TEXT PRIMARY KEY,
+          device_label TEXT NOT NULL DEFAULT '기타 기기',
+          app_version TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          revoked_at TIMESTAMPTZ
+        );
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -446,6 +458,15 @@ export interface CoachRow {
   phone: string;
   active: boolean;
   created_at: string;
+}
+
+export interface AdminDeviceRow {
+  device_id: string;
+  device_label: string;
+  app_version: string;
+  created_at: string;
+  last_seen_at: string;
+  revoked_at: string | null;
 }
 
 export interface HolidayRow {

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
-import { isAdminAuthed } from "@/lib/auth";
+import { getDeviceId, isAdminAuthed } from "@/lib/auth";
 import { getActiveMemberCountsByCoach, listCoaches, listHolidays } from "@/lib/schedule";
+import { BUILD_ID } from "@/lib/build-info";
+import { listActiveDevices } from "@/lib/devices";
 import { SettingsView } from "./settings-view";
 
 export default async function AdminSettingsPage() {
@@ -8,10 +10,12 @@ export default async function AdminSettingsPage() {
     redirect("/admin");
   }
 
-  const [coaches, holidays, memberCounts] = await Promise.all([
+  const [coaches, holidays, memberCounts, devices, currentDeviceId] = await Promise.all([
     listCoaches(),
     listHolidays(),
     getActiveMemberCountsByCoach(),
+    listActiveDevices(),
+    getDeviceId(),
   ]);
 
   return (
@@ -20,6 +24,9 @@ export default async function AdminSettingsPage() {
         initialCoaches={coaches}
         initialHolidays={holidays}
         memberCounts={memberCounts}
+        buildId={BUILD_ID}
+        initialDevices={devices}
+        currentDeviceId={currentDeviceId ?? null}
       />
     </div>
   );

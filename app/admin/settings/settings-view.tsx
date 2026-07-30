@@ -1,16 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import type { CoachRow, HolidayRow } from "@/lib/db";
+import type { AdminDeviceRow, CoachRow, HolidayRow } from "@/lib/db";
+import { SyncDiagnostics } from "./sync-diagnostics";
 
 export function SettingsView({
   initialCoaches,
   initialHolidays,
   memberCounts,
+  buildId,
+  initialDevices,
+  currentDeviceId,
 }: {
   initialCoaches: CoachRow[];
   initialHolidays: HolidayRow[];
   memberCounts: Record<number, number>;
+  buildId: string;
+  initialDevices: AdminDeviceRow[];
+  currentDeviceId: string | null;
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
@@ -98,6 +105,12 @@ export function SettingsView({
 
   return (
     <div className="space-y-6">
+      <SyncDiagnostics
+        buildId={buildId}
+        initialDevices={initialDevices}
+        currentDeviceId={currentDeviceId}
+      />
+
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">코치 관리</h2>
         <p className="text-xs text-ink/50 mb-4">
