@@ -12,6 +12,7 @@ import {
 import { getLatestContractByMember } from "@/lib/contracts";
 import { listAssessmentsByMember } from "@/lib/assessments";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
+import { listNotices } from "@/lib/notices";
 import { koreaTodayKey } from "@/lib/date";
 import { AssessmentPainChart } from "@/app/admin/members/[id]/assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
@@ -60,7 +61,7 @@ export default async function MyReservationPage({
     notFound();
   }
 
-  const [progress, sessions, availability, coaches, contract, assessments, intake] =
+  const [progress, sessions, availability, coaches, contract, assessments, intake, notices] =
     await Promise.all([
       computeMemberProgress(member.id),
       listMemberSessions(member.id),
@@ -71,7 +72,12 @@ export default async function MyReservationPage({
       getLatestContractByMember(member.id),
       listAssessmentsByMember(member.id),
       getIntakeQuestionnaireByMember(member.id),
+      listNotices(),
     ]);
+
+  // 제목이 비어있지 않은(=실제로 내용을 입력한) 항목만 회원 화면에 노출한다.
+  const activeNotices = notices.filter((n) => n.category === "notice" && n.title.trim());
+  const activeEvents = notices.filter((n) => n.category === "event" && n.title.trim());
 
   const contactPhone =
     coaches.find((c) => c.id === member.coach_id)?.phone.trim() || DEFAULT_STUDIO_PHONE;
@@ -96,6 +102,45 @@ export default async function MyReservationPage({
 
         <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">My Reservation</p>
         <h1 className="font-display text-3xl mb-8">{member.name}님의 예약</h1>
+
+        {(activeNotices.length > 0 || activeEvents.length > 0) && (
+          <div className="space-y-4 mb-10">
+            {activeEvents.length > 0 && (
+              <section className="rounded-2xl border border-gold/30 bg-gold/5 px-6 py-5">
+                <p className="font-display text-lg mb-3">🎉 진행 중인 이벤트</p>
+                <ul className="space-y-3">
+                  {activeEvents.map((n) => (
+                    <li key={n.id}>
+                      <p className="font-medium text-sm">{n.title}</p>
+                      {n.content && (
+                        <p className="text-sm text-ink/60 mt-1 whitespace-pre-wrap">
+                          {n.content}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {activeNotices.length > 0 && (
+              <section className="rounded-2xl border border-line bg-white/60 px-6 py-5">
+                <p className="font-display text-lg mb-3">📢 공지사항</p>
+                <ul className="space-y-3">
+                  {activeNotices.map((n) => (
+                    <li key={n.id}>
+                      <p className="font-medium text-sm">{n.title}</p>
+                      {n.content && (
+                        <p className="text-sm text-ink/60 mt-1 whitespace-pre-wrap">
+                          {n.content}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        )}
 
         {progress.totalSessions > 0 && progress.remaining <= 3 && (
           <div className="rounded-2xl bg-gold/10 border border-gold/30 px-6 py-5 mb-10">

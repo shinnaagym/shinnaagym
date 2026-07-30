@@ -272,6 +272,19 @@ function ensureSchema(): Promise<void> {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
+        -- 관리자 전용 가계부(지출 내역). year_month는 'YYYY-MM' 형식으로 저장해
+        -- 월별 목록 조회를 간단한 등호 비교로 처리한다.
+        CREATE TABLE IF NOT EXISTS expenses (
+          id SERIAL PRIMARY KEY,
+          year_month TEXT NOT NULL,
+          item TEXT NOT NULL,
+          amount INTEGER NOT NULL DEFAULT 0,
+          quantity INTEGER NOT NULL DEFAULT 1,
+          note TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_expenses_year_month ON expenses(year_month);
+
         CREATE TABLE IF NOT EXISTS schedule_memos (
           id SERIAL PRIMARY KEY,
           content TEXT NOT NULL,
@@ -646,6 +659,16 @@ export interface NoticeRow {
   content: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ExpenseRow {
+  id: number;
+  year_month: string;
+  item: string;
+  amount: number;
+  quantity: number;
+  note: string;
+  created_at: string;
 }
 
 export interface ScheduleMemoRow {
