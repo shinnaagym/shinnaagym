@@ -161,8 +161,14 @@ export async function listAssessmentCountsByMember(): Promise<
     `SELECT member_id, COUNT(*) AS count, MAX(created_at) AS latest_at
      FROM assessments GROUP BY member_id`,
   );
+  // pg 드라이버가 TIMESTAMPTZ 컬럼을 Date 인스턴스로 파싱해서 돌려주므로(타입 선언과
+  // 달리 실제로는 string이 아닐 수 있음), 클라이언트에서 문자열 메서드(localeCompare
+  // 등)로 정렬해도 안전하도록 여기서 ISO 문자열로 명시적으로 변환해둔다.
   return new Map(
-    result.rows.map((r) => [r.member_id, { count: Number(r.count), latestAt: r.latest_at }]),
+    result.rows.map((r) => [
+      r.member_id,
+      { count: Number(r.count), latestAt: new Date(r.latest_at).toISOString() },
+    ]),
   );
 }
 

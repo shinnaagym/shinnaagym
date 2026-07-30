@@ -71,7 +71,12 @@ export async function listIntakeMemberTimestamps(): Promise<Map<number, string>>
   const result = await query<{ member_id: number; created_at: string }>(
     `SELECT member_id, created_at FROM intake_questionnaires`,
   );
-  return new Map(result.rows.map((r) => [r.member_id, r.created_at]));
+  // pg 드라이버가 TIMESTAMPTZ 컬럼을 Date 인스턴스로 파싱해서 돌려주므로(타입 선언과
+  // 달리 실제로는 string이 아닐 수 있음), 클라이언트에서 문자열 메서드(localeCompare
+  // 등)로 정렬해도 안전하도록 여기서 ISO 문자열로 명시적으로 변환해둔다.
+  return new Map(
+    result.rows.map((r) => [r.member_id, new Date(r.created_at).toISOString()]),
+  );
 }
 
 /**
