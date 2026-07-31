@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { isAdminAuthed } from "@/lib/auth";
+import { BUILD_ID } from "@/lib/build-info";
 import { AdminNav } from "./admin-nav";
+import { AutoUpdateWatcher } from "./auto-update-watcher";
 
 // 루트 manifest(app/manifest.ts)는 start_url이 공개 사전예약 페이지("/")라서,
 // 관리자가 /admin에서 "홈 화면에 추가"를 하면 아이콘을 눌러도 사전예약
@@ -25,6 +27,7 @@ export default async function AdminLayout({
   }
   return (
     <>
+      <AutoUpdateWatcher buildId={BUILD_ID} />
       <AdminNav />
       <main className="flex-1 bg-[#f7f8fa]">{children}</main>
     </>
