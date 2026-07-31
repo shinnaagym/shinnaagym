@@ -1296,9 +1296,12 @@ export async function getCoachAvailability(
   const [hoursMap, sessionsResult] = await Promise.all([
     getDayHoursForRange(dateKeys),
     query<{ session_date: string; session_hour: number }>(
+      // 개인 일정(memo)은 코치의 사적인 메모일 뿐이라 회원에게는 마감으로
+      // 보이지 않아야 한다. 실제 예약(session/consultation)과 수업 불가만
+      // 마감으로 취급한다.
       `SELECT session_date, session_hour FROM class_sessions
        WHERE coach_id = $1 AND session_date >= $2 AND session_date <= $3
-         AND status <> 'cancelled'`,
+         AND status <> 'cancelled' AND entry_type <> 'memo'`,
       [coachId, fromKey, toKey],
     ),
   ]);
