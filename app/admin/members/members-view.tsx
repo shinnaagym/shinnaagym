@@ -687,7 +687,8 @@ function ContractFieldsFieldset({
   onOptionNoteChange,
   privacyConsent,
   onPrivacyConsentChange,
-  showVisitChannelAndPurpose = true,
+  showVisitChannel = true,
+  showPurpose = true,
 }: {
   rrnFront: string;
   onRrnFrontChange: (v: string) => void;
@@ -709,8 +710,10 @@ function ContractFieldsFieldset({
   onOptionNoteChange: (v: string) => void;
   privacyConsent: boolean;
   onPrivacyConsentChange: (v: boolean) => void;
-  /** 초진 문진표에서 이미 수집하는 회원 등록 흐름에서는 방문경로/운동 목표를 숨긴다. */
-  showVisitChannelAndPurpose?: boolean;
+  /** 초진 문진표에서 이미 방문경로를 수집하는 흐름에서는 여기서 숨긴다. */
+  showVisitChannel?: boolean;
+  /** 운동 목적을 별도 자유입력 textarea로 이미 받는 흐름에서는 태그형 운동 목표를 숨긴다. */
+  showPurpose?: boolean;
 }) {
   return (
     <>
@@ -731,69 +734,69 @@ function ContractFieldsFieldset({
           />
         </Field>
       </div>
-      {showVisitChannelAndPurpose && (
-        <>
-          <Field label="방문 경로">
-            <div className="flex flex-wrap gap-1.5">
-              {VISIT_CHANNEL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => onVisitChannelChange(opt.value)}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-xs font-medium transition border",
-                    visitChannel === opt.value
-                      ? "bg-coral text-white border-coral"
-                      : "border-line text-ink/60 hover:bg-bone",
-                  ].join(" ")}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            {visitChannel === "referral" && (
-              <input
-                value={visitChannelReferrerName}
-                onChange={(e) => onVisitChannelReferrerNameChange(e.target.value)}
-                placeholder="소개해주신 분 이름"
-                className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-              />
-            )}
-            {visitChannel === "other" && (
-              <input
-                value={visitChannelOther}
-                onChange={(e) => onVisitChannelOtherChange(e.target.value)}
-                placeholder="경로를 입력해주세요"
-                className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-              />
-            )}
-          </Field>
-          <Field label="운동 목표">
-            <div className="flex flex-wrap gap-1.5">
-              {PURPOSE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => onTogglePurpose(opt.value)}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-xs font-medium transition border",
-                    purposes.includes(opt.value)
-                      ? "bg-coral text-white border-coral"
-                      : "border-line text-ink/60 hover:bg-bone",
-                  ].join(" ")}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+      {showVisitChannel && (
+        <Field label="방문 경로">
+          <div className="flex flex-wrap gap-1.5">
+            {VISIT_CHANNEL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onVisitChannelChange(opt.value)}
+                className={[
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                  visitChannel === opt.value
+                    ? "bg-coral text-white border-coral"
+                    : "border-line text-ink/60 hover:bg-bone",
+                ].join(" ")}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {visitChannel === "referral" && (
             <input
-              value={purposeOther}
-              onChange={(e) => onPurposeOtherChange(e.target.value)}
-              placeholder="기타 (선택 입력)"
+              value={visitChannelReferrerName}
+              onChange={(e) => onVisitChannelReferrerNameChange(e.target.value)}
+              placeholder="소개해주신 분 이름"
               className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
             />
-          </Field>
-        </>
+          )}
+          {visitChannel === "other" && (
+            <input
+              value={visitChannelOther}
+              onChange={(e) => onVisitChannelOtherChange(e.target.value)}
+              placeholder="경로를 입력해주세요"
+              className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          )}
+        </Field>
+      )}
+      {showPurpose && (
+        <Field label="운동 목표">
+          <div className="flex flex-wrap gap-1.5">
+            {PURPOSE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onTogglePurpose(opt.value)}
+                className={[
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                  purposes.includes(opt.value)
+                    ? "bg-coral text-white border-coral"
+                    : "border-line text-ink/60 hover:bg-bone",
+                ].join(" ")}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <input
+            value={purposeOther}
+            onChange={(e) => onPurposeOtherChange(e.target.value)}
+            placeholder="기타 (선택 입력)"
+            className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
+        </Field>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="운동 시작일">
@@ -1024,7 +1027,7 @@ function CreateMemberModal({
             onOptionNoteChange={setOptionNote}
             privacyConsent={privacyConsent}
             onPrivacyConsentChange={setPrivacyConsent}
-            showVisitChannelAndPurpose={false}
+            showPurpose={false}
           />
         </div>
 
