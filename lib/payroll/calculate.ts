@@ -14,6 +14,7 @@ import {
   REGULAR_TEAM_LEAD_ALLOWANCE,
   TENURE_BUCKET_LABEL,
   VAT_RATE,
+  isRegularPayScale,
   rate1on1For,
   rate2on1For,
   type EmploymentType,
@@ -154,7 +155,7 @@ export interface PayrollInput {
   employmentType: EmploymentType;
   hiredAt: string; // YYYY-MM-DD
   yearMonth: string; // YYYY-MM (정산 기준월)
-  isTeamLead: boolean; // 정직원만 의미 있음
+  isTeamLead: boolean; // 정직원 여부 체크박스. team_lead 유형은 이 값과 무관하게 항상 팀장수당 적용.
   sessionCount1on1: number;
   sessionCount2on1: number;
   /** 소개 결제 내역을 computeReferralSupplyAmount()로 환산한 공급가액 합계. */
@@ -218,12 +219,50 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   } = input;
   const sessionCount1on1 = Math.max(0, input.sessionCount1on1);
   const sessionCount2on1 = Math.max(0, input.sessionCount2on1);
-  const isTeamLead = employmentType === "regular" && input.isTeamLead;
 
   const referenceDate = monthEndDateKey(yearMonth);
   const tenure = input.tenureBucketOverride ?? tenureBucket(hiredAt, referenceDate);
 
-  const mandatorySessions = employmentType === "regular" ? REGULAR_MANDATORY_SESSIONS : 0;
+  // 대표는 이 시스템으로 급여를 지급하지 않는 분류용 값이라, 입력값과 무관하게
+  // 모든 금액을 0으로 고정한다.
+  if (employmentType === "owner") {
+    return {
+      employmentType,
+      tenureBucket: tenure,
+      tenureLabel: describeTenureBucket(tenure),
+      totalSessions: sessionCount1on1 + sessionCount2on1,
+      mandatorySessions: 0,
+      excess1on1: 0,
+      excess2on1: 0,
+      excessTotal: 0,
+      rate1on1: 0,
+      rate2on1: 0,
+      baseSalary: 0,
+      mealAllowance: 0,
+      lessonFee1on1: 0,
+      lessonFee2on1: 0,
+      lessonFeeTotal: 0,
+      teamLeadAllowance: 0,
+      referralIncentive: 0,
+      grossPay: 0,
+      taxableAmount: 0,
+      deductions: {
+        nationalPension: 0,
+        healthInsurance: 0,
+        longTermCare: 0,
+        employmentInsurance: 0,
+        freelancerWithholding: 0,
+        totalDeduction: 0,
+      },
+      netPay: 0,
+      severanceEstimate: null,
+    };
+  }
+
+  // team_lead(팀장)는 체크박스 없이 팀장수당이 항상 자동 적용된다.
+  const isTeamLead = employmentType === "team_lead" || (employmentType === "regular" && input.isTeamLead);
+
+  const mandatorySessions = isRegularPayScale(employmentType) ? REGULAR_MANDATORY_SESSIONS : 0;
   const { excess1on1, excess2on1, excessTotal } = allocateExcessSessions(
     sessionCount1on1,
     sessionCount2on1,
@@ -237,8 +276,8 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const lessonFee2on1 = round(excess2on1 * rate2on1);
   const lessonFeeTotal = lessonFee1on1 + lessonFee2on1;
 
-  const baseSalary = employmentType === "regular" ? REGULAR_BASE_SALARY : 0;
-  const mealAllowance = employmentType === "regular" ? REGULAR_MEAL_ALLOWANCE : 0;
+  const baseSalary = isRegularPayScale(employmentType) ? REGULAR_BASE_SALARY : 0;
+  const mealAllowance = isRegularPayScale(employmentType) ? REGULAR_MEAL_ALLOWANCE : 0;
   const teamLeadAllowance = isTeamLead ? REGULAR_TEAM_LEAD_ALLOWANCE : 0;
   const referralIncentive = round(Math.max(0, referralSupplyAmount) * REFERRAL_INCENTIVE_RATE);
 
@@ -247,7 +286,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
 
   let deductions: PayrollDeductions;
   let taxableAmount: number;
-  if (employmentType === "regular") {
+  if (isRegularPayScale(employmentType)) {
     taxableAmount = Math.max(0, grossPay - mealAllowance);
     const nationalPension = round(taxableAmount * NATIONAL_PENSION_RATE);
     const healthInsurance = round(taxableAmount * HEALTH_INSURANCE_RATE);
@@ -277,7 +316,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const netPay = grossPay - deductions.totalDeduction;
 
   const severanceEstimate =
-    employmentType === "regular" && tenure !== "under1" && !input.tenureBucketOverride
+    isRegularPayScale(employmentType) && tenure !== "under1" && !input.tenureBucketOverride
       ? round((grossPay * (daysBetween(hiredAt, referenceDate) / 365)) / 12)
       : null;
 

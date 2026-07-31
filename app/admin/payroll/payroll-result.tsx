@@ -9,6 +9,8 @@ function formatWon(n: number): string {
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   regular: "정직원",
   freelancer: "프리랜서",
+  team_lead: "팀장",
+  owner: "대표",
 };
 
 const REFERRAL_PAYMENT_METHOD_SHORT_LABEL: Record<ReferralPaymentMethod, string> = {

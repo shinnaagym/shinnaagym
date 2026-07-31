@@ -1,5 +1,5 @@
 import { query } from "./db";
-import type { PayrollRecordRow } from "./db";
+import type { EmploymentType, PayrollRecordRow } from "./db";
 import type { PayrollResult, ReferralEntry } from "./payroll/calculate";
 
 export type { ReferralEntry, ReferralPaymentMethod } from "./payroll/calculate";
@@ -37,7 +37,7 @@ export interface SavePayrollRecordInput {
   coachId: number | null;
   employeeName: string;
   yearMonth: string;
-  employmentType: "regular" | "freelancer";
+  employmentType: EmploymentType;
   hiredAt: string;
   isTeamLead: boolean;
   sessionCount1on1: number;

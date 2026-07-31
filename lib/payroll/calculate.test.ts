@@ -225,3 +225,47 @@ test("근속 1년 이상이면 퇴직금 예상액이 계산됨", () => {
   assert.notEqual(result.severanceEstimate, null);
   assert.ok((result.severanceEstimate ?? 0) > 0);
 });
+
+test("대표(owner)는 수업/소개 실적과 무관하게 급여가 항상 0원", () => {
+  const result = calculatePayroll({
+    employmentType: "owner",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 70,
+    sessionCount2on1: 30,
+    referralSupplyAmount: 1_000_000,
+  });
+  assert.equal(result.grossPay, 0);
+  assert.equal(result.netPay, 0);
+  assert.equal(result.baseSalary, 0);
+  assert.equal(result.lessonFeeTotal, 0);
+  assert.equal(result.referralIncentive, 0);
+  assert.equal(result.teamLeadAllowance, 0);
+  assert.equal(result.severanceEstimate, null);
+});
+
+test("팀장(team_lead) 유형은 정직원과 동일한 급여 규칙을 쓰고, 체크박스 없이 팀장수당이 자동 적용됨", () => {
+  const teamLeadType = calculatePayroll({
+    employmentType: "team_lead",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false, // 체크박스가 꺼져 있어도 자동 적용되는지 확인
+    sessionCount1on1: 70,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  // team_lead 유형은 체크박스 입력값과 무관하게 항상 팀장수당이 붙으므로,
+  // "체크박스를 켠 정직원"과 완전히 동일한 결과가 나와야 한다.
+  const regularWithCheckbox = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: true,
+    sessionCount1on1: 70,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  assert.equal(teamLeadType.teamLeadAllowance, REGULAR_TEAM_LEAD_ALLOWANCE);
+  assert.deepEqual(teamLeadType, { ...regularWithCheckbox, employmentType: "team_lead" });
+});

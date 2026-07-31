@@ -33,7 +33,7 @@ function parseReferralEntries(value: unknown): ReferralEntry[] | null {
   return entries;
 }
 
-const VALID_EMPLOYMENT_TYPES: EmploymentType[] = ["regular", "freelancer"];
+const VALID_EMPLOYMENT_TYPES: EmploymentType[] = ["regular", "freelancer", "team_lead", "owner"];
 const VALID_ALLOCATION_ORDERS: AllocationOrder[] = [
   "proportional",
   "1on1-first",

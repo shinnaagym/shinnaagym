@@ -5,7 +5,7 @@ import { query } from "@/lib/db";
 import { recordUndo } from "@/lib/undo";
 import type { CoachRow, EmploymentType } from "@/lib/db";
 
-const VALID_EMPLOYMENT_TYPES: EmploymentType[] = ["regular", "freelancer"];
+const VALID_EMPLOYMENT_TYPES: EmploymentType[] = ["regular", "freelancer", "team_lead", "owner"];
 
 export async function PATCH(
   req: NextRequest,

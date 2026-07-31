@@ -2,7 +2,15 @@
 // 수정하면 되도록, lib/payroll/calculate.ts는 이 파일의 값만 참조하고
 // 숫자를 직접 하드코딩하지 않는다.
 
-export type EmploymentType = "regular" | "freelancer";
+// team_lead(팀장)는 급여 계산상 정직원과 완전히 동일하게 취급하고(분류 표기만
+// 다름) 팀장수당을 체크박스 없이 자동 적용한다. owner(대표)는 이 시스템으로
+// 급여를 지급하지 않는 분류용 값으로, 계산 결과는 항상 0으로 고정한다.
+export type EmploymentType = "regular" | "freelancer" | "team_lead" | "owner";
+
+/** 정직원과 동일한 급여 규칙(기본급/식대/의무수업/4대보험/퇴직금)을 쓰는 유형인지. */
+export function isRegularPayScale(employmentType: EmploymentType): boolean {
+  return employmentType === "regular" || employmentType === "team_lead";
+}
 
 export type TenureBucket = "under1" | "1to2" | "over2";
 
@@ -57,11 +65,11 @@ export const EMPLOYMENT_INSURANCE_RATE = 0.009;
 export const FREELANCER_WITHHOLDING_RATE = 0.033;
 
 export function rate1on1For(employmentType: EmploymentType, tenure: TenureBucket): number {
-  return employmentType === "regular"
+  return isRegularPayScale(employmentType)
     ? REGULAR_RATE_1ON1[tenure]
     : FREELANCER_RATE_1ON1[tenure];
 }
 
 export function rate2on1For(employmentType: EmploymentType): number {
-  return employmentType === "regular" ? REGULAR_RATE_2ON1 : FREELANCER_RATE_2ON1;
+  return isRegularPayScale(employmentType) ? REGULAR_RATE_2ON1 : FREELANCER_RATE_2ON1;
 }

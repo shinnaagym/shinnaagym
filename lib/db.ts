@@ -513,7 +513,7 @@ export interface ReservationRow {
   class_session_id: number | null;
 }
 
-export type EmploymentType = "regular" | "freelancer";
+export type EmploymentType = "regular" | "freelancer" | "team_lead" | "owner";
 
 export interface CoachRow {
   id: number;
