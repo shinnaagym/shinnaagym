@@ -4,6 +4,7 @@ import { addDaysToKey, koreaCurrentMonthKey, koreaTodayKey, mondayOfWeek } from 
 import {
   getAllCoachScheduleStats,
   getDayHoursForRange,
+  getDutyOverridesForDates,
   getDutyRoster,
   listCoaches,
   listHolidays,
@@ -31,7 +32,7 @@ export default async function AdminSchedulePage({
 
   const monthKey = koreaCurrentMonthKey();
 
-  const [coaches, members, sessions, dayHours, holidays, coachStats, memos, dutyRoster] =
+  const [coaches, members, sessions, dayHours, holidays, coachStats, memos, dutyRoster, dutyOverrides] =
     await Promise.all([
       listCoaches(),
       listMembersWithProgress(),
@@ -41,6 +42,7 @@ export default async function AdminSchedulePage({
       getAllCoachScheduleStats(monthKey, weekStart, weekEnd),
       listScheduleMemos(),
       getDutyRoster(),
+      getDutyOverridesForDates(dateKeys),
     ]);
 
   const holidayMap = Object.fromEntries(
@@ -64,6 +66,7 @@ export default async function AdminSchedulePage({
         coachStats={Object.fromEntries(coachStats)}
         initialMemos={memos}
         dutyRoster={dutyRoster}
+        dutyOverrides={dutyOverrides}
       />
     </div>
   );

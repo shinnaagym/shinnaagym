@@ -107,6 +107,45 @@ export async function setDutyAssignment(weekday: number, coachId: number | null)
   revalidateTag("duty-roster", { expire: 0 });
 }
 
+export interface DutyOverride {
+  coachId: number | null;
+  coachName: string | null;
+}
+
+/** 특정 날짜들에 대한 당직 예외(이번 주만 변경 등)를 조회한다. 캐싱하지
+    않는다 — 스케줄표를 볼 때마다 실시간으로 반영돼야 한다. */
+export async function getDutyOverridesForDates(
+  dateKeys: string[],
+): Promise<Record<string, DutyOverride>> {
+  if (dateKeys.length === 0) return {};
+  const result = await query<{ override_date: string; coach_id: number | null; coach_name: string | null }>(
+    `SELECT o.override_date, o.coach_id, c.name AS coach_name
+     FROM duty_overrides o LEFT JOIN coaches c ON c.id = o.coach_id
+     WHERE o.override_date = ANY($1)`,
+    [dateKeys],
+  );
+  return Object.fromEntries(
+    result.rows.map((r) => [r.override_date, { coachId: r.coach_id, coachName: r.coach_name }]),
+  );
+}
+
+/** coachId가 undefined면 이 날짜의 예외 지정을 완전히 지워 요일 기본값으로
+    되돌린다. null이면 "이 날짜는 당직자 없음"을 명시적으로 저장한다. */
+export async function setDutyOverride(
+  date: string,
+  coachId: number | null | undefined,
+): Promise<void> {
+  if (coachId === undefined) {
+    await query(`DELETE FROM duty_overrides WHERE override_date = $1`, [date]);
+  } else {
+    await query(
+      `INSERT INTO duty_overrides (override_date, coach_id) VALUES ($1, $2)
+       ON CONFLICT (override_date) DO UPDATE SET coach_id = EXCLUDED.coach_id`,
+      [date, coachId],
+    );
+  }
+}
+
 // ---- 공휴일 ----
 
 // 공휴일도 코치 목록과 마찬가지로 자주 바뀌지 않는 참조성 데이터라 캐싱한다.
