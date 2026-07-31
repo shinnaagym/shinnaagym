@@ -196,7 +196,9 @@ export function AdminNav() {
                 <Link
                   href={tab.href}
                   onClick={handleTabClick}
+                  onContextMenu={(e) => e.preventDefault()}
                   draggable={false}
+                  style={{ WebkitTouchCallout: "none" }}
                   className={[
                     "block px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors select-none",
                     active ? "bg-coral text-white shadow-sm" : "text-ink/60 hover:text-ink",

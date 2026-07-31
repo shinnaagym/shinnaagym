@@ -91,7 +91,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -337,6 +337,15 @@ function runFullMigration(): Promise<void> {
           coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE
         );
 
+        -- 특정 날짜 하루만 당직자를 요일 기본값과 다르게 바꾸고 싶을 때 쓰는
+        -- 예외 테이블(스케줄표에서 "당직" 표시를 눌러 바꾸면 이 표에 기록된다).
+        -- coach_id가 NULL이면 "이 날짜는 당직자 없음"을 명시적으로 나타내고,
+        -- 행 자체가 없으면 duty_roster의 요일 기본값을 그대로 따른다.
+        CREATE TABLE IF NOT EXISTS duty_overrides (
+          override_date TEXT PRIMARY KEY,
+          coach_id INTEGER REFERENCES coaches(id) ON DELETE CASCADE
+        );
+
         -- 급여 계산 결과 이력. coach_id는 나중에 코치가 삭제/개명되어도 당시 급여
         -- 명세를 그대로 보존할 수 있게 nullable로 두고, employee_name에 계산 당시
         -- 이름을 스냅샷으로 함께 저장한다. result에는 계산된 급여명세 전체(기본급/
@@ -538,6 +547,12 @@ export interface CoachRow {
 export interface DutyRosterRow {
   weekday: number;
   coach_id: number;
+}
+
+/** coach_id가 null이면 "이 날짜는 당직자 없음"을 명시적으로 저장한 것. */
+export interface DutyOverrideRow {
+  override_date: string;
+  coach_id: number | null;
 }
 
 export interface AdminDeviceRow {
