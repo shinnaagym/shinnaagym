@@ -768,7 +768,8 @@ export interface IntakeQuestionnaireRow {
   updated_at: string;
 }
 
-export type SessionStatus = "reserved" | "no_show" | "cancelled";
+// "done"은 개인 일정(memo)을 완료 처리했을 때만 쓰는 상태 — PT 수업/상담에는 쓰지 않는다.
+export type SessionStatus = "reserved" | "no_show" | "cancelled" | "done";
 export type SessionEntryType = "session" | "consultation" | "memo" | "blocked";
 
 export interface ClassSessionRow {

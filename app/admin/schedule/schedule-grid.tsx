@@ -38,9 +38,11 @@ const STATUS_STYLE: Record<SessionStatus, string> = {
   reserved: "bg-sky-100 border-sky-400 text-sky-900",
   no_show: "bg-red-100 border-red-400 text-red-800 line-through",
   cancelled: "bg-transparent border-dashed border-line text-ink/30 line-through",
+  done: "bg-sky-100 border-sky-400 text-sky-900 line-through",
 };
 
 const MEMO_STYLE = "bg-violet-200 border-violet-500 text-violet-900";
+const MEMO_DONE_STYLE = "bg-violet-100 border-violet-400 text-violet-700 line-through";
 const CONSULT_STYLE = "bg-amber-200 border-amber-500 text-amber-900";
 const BLOCKED_STYLE = "bg-slate-300 border-slate-600 text-slate-900";
 
@@ -48,11 +50,13 @@ const STATUS_LABEL: Record<SessionStatus, string> = {
   reserved: "예약",
   no_show: "노쇼",
   cancelled: "취소",
+  done: "완료",
 };
 
-/** 일정 pill의 배경/테두리 스타일. 상담·메모·수업불가는 상태와 무관하게 고정 톤을 쓴다(취소 제외). */
+/** 일정 pill의 배경/테두리 스타일. 상담·메모·수업불가는 상태와 무관하게 고정 톤을 쓴다(취소·완료 제외).
+    개인 일정(memo)을 완료 처리하면 제목에 취소선을 그어 한눈에 끝난 일정임을 알 수 있게 한다. */
 function entryStyle(session: SessionWithMember): string {
-  if (session.entry_type === "memo") return MEMO_STYLE;
+  if (session.entry_type === "memo") return session.status === "done" ? MEMO_DONE_STYLE : MEMO_STYLE;
   if (session.entry_type === "blocked") return BLOCKED_STYLE;
   if (session.status === "cancelled") return STATUS_STYLE.cancelled;
   if (session.entry_type === "consultation") return CONSULT_STYLE;
@@ -1544,6 +1548,16 @@ function EditSessionModal({
             저장
           </button>
 
+          {session.entry_type === "memo" && (
+            <button
+              disabled={submitting}
+              onClick={() => patch({ status: session.status === "done" ? "reserved" : "done" })}
+              className="w-full rounded-full border border-line py-2.5 text-sm hover:bg-bone transition disabled:opacity-50"
+            >
+              {session.status === "done" ? "완료 취소" : "완료 처리"}
+            </button>
+          )}
+
           <MoveSessionSection
             coaches={coaches}
             showMove={showMove}
@@ -1747,6 +1761,32 @@ function EditMergedBlockModal({
     }
   }
 
+  async function handleToggleDone() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const nextStatus = first.status === "done" ? "reserved" : "done";
+      const results = await Promise.all(
+        sessions.map((s) =>
+          fetch(`/api/admin/sessions/${s.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: nextStatus }),
+          }),
+        ),
+      );
+      if (results.some((r) => !r.ok)) {
+        setError("일부 시간대 처리에 실패했어요.");
+        return;
+      }
+      onChanged();
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <ModalShell
       title={`${CATEGORY_LABELS[first.entry_type]} — ${first.session_date} ${first.session_hour}:00~${last.session_hour + 1}:00`}
@@ -1775,6 +1815,15 @@ function EditMergedBlockModal({
         >
           저장
         </button>
+        {first.entry_type === "memo" && (
+          <button
+            disabled={submitting}
+            onClick={handleToggleDone}
+            className="w-full rounded-full border border-line py-2.5 text-sm hover:bg-bone transition disabled:opacity-50"
+          >
+            {first.status === "done" ? "완료 취소" : "완료 처리"}
+          </button>
+        )}
         <button
           disabled={submitting}
           onClick={handleDelete}
