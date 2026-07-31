@@ -689,6 +689,7 @@ function ContractFieldsFieldset({
   onPrivacyConsentChange,
   showVisitChannel = true,
   showPurpose = true,
+  showOptionNote = true,
 }: {
   rrnFront: string;
   onRrnFrontChange: (v: string) => void;
@@ -714,6 +715,8 @@ function ContractFieldsFieldset({
   showVisitChannel?: boolean;
   /** 운동 목적을 별도 자유입력 textarea로 이미 받는 흐름에서는 태그형 운동 목표를 숨긴다. */
   showPurpose?: boolean;
+  /** 옵션을 다른 위치에서 별도로 렌더링하는 흐름(신규 회원 등록)에서는 여기서 숨긴다. */
+  showOptionNote?: boolean;
 }) {
   return (
     <>
@@ -798,7 +801,7 @@ function ContractFieldsFieldset({
           />
         </Field>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className={showOptionNote ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : undefined}>
         <Field label="운동 시작일">
           <input
             type="date"
@@ -807,14 +810,16 @@ function ContractFieldsFieldset({
             className="w-full min-w-0 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
           />
         </Field>
-        <Field label="옵션">
-          <input
-            value={optionNote}
-            onChange={(e) => onOptionNoteChange(e.target.value)}
-            placeholder="선택 입력"
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-          />
-        </Field>
+        {showOptionNote && (
+          <Field label="옵션">
+            <input
+              value={optionNote}
+              onChange={(e) => onOptionNoteChange(e.target.value)}
+              placeholder="선택 입력"
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+        )}
       </div>
       <label className="flex items-center gap-2 text-sm text-ink/70">
         <input
@@ -995,6 +1000,14 @@ function CreateMemberModal({
         <Field label="결제 수단">
           <PaymentMethodToggle value={paymentMethod} onChange={setPaymentMethod} />
         </Field>
+        <Field label="옵션">
+          <input
+            value={optionNote}
+            onChange={(e) => setOptionNote(e.target.value)}
+            placeholder="선택 입력"
+            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
+        </Field>
         <Field label="운동 목적 / 특이사항">
           <textarea
             value={notes}
@@ -1028,6 +1041,7 @@ function CreateMemberModal({
             privacyConsent={privacyConsent}
             onPrivacyConsentChange={setPrivacyConsent}
             showPurpose={false}
+            showOptionNote={false}
           />
         </div>
 
