@@ -35,14 +35,14 @@ const CATEGORY_LABELS: Record<SessionEntryType, string> = {
 };
 
 const STATUS_STYLE: Record<SessionStatus, string> = {
-  reserved: "bg-white border-coral/40 text-ink",
-  no_show: "bg-red-50 border-red-300 text-red-700 line-through",
+  reserved: "bg-sky-100 border-sky-400 text-sky-900",
+  no_show: "bg-red-100 border-red-400 text-red-800 line-through",
   cancelled: "bg-transparent border-dashed border-line text-ink/30 line-through",
 };
 
-const MEMO_STYLE = "bg-violet-50 border-violet-200 text-violet-700";
-const CONSULT_STYLE = "bg-amber-50 border-amber-300 text-amber-800";
-const BLOCKED_STYLE = "bg-ink/5 border-ink/25 text-ink/50";
+const MEMO_STYLE = "bg-violet-200 border-violet-500 text-violet-900";
+const CONSULT_STYLE = "bg-amber-200 border-amber-500 text-amber-900";
+const BLOCKED_STYLE = "bg-slate-300 border-slate-600 text-slate-900";
 
 const STATUS_LABEL: Record<SessionStatus, string> = {
   reserved: "예약",
@@ -146,7 +146,9 @@ function SessionCellButton({
                 </span>
               )}
           </span>
-          <span className="block text-[10px] opacity-70">{STATUS_LABEL[session.status]}</span>
+          {session.status !== "reserved" && (
+            <span className="block text-[10px] opacity-70">{STATUS_LABEL[session.status]}</span>
+          )}
           {session.memo && (
             <span className="block text-[10px] opacity-60 truncate">{session.memo}</span>
           )}
