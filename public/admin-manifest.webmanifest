@@ -1,0 +1,14 @@
+{
+  "name": "신나아짐 관리자",
+  "short_name": "신나아짐 관리자",
+  "description": "신나아짐 PT 스튜디오 관리자 페이지",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#f6f1e7",
+  "theme_color": "#f6f1e7",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

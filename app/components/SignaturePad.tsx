@@ -2,7 +2,15 @@
 
 import { useRef, useState } from "react";
 
-export function SignaturePad({ token, contractId }: { token: string; contractId: number }) {
+// 회원 개인 페이지와 관리자 계약서 보기 모달이 공유하는 서명 캔버스 —
+// 어디에 서명을 저장할지는 signUrl로만 다르다(회원용 vs 관리자용 엔드포인트).
+export function SignaturePad({
+  signUrl,
+  onSigned,
+}: {
+  signUrl: string;
+  onSigned?: () => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const hasDrawnRef = useRef(false);
@@ -66,7 +74,7 @@ export function SignaturePad({ token, contractId }: { token: string; contractId:
     setError(null);
     try {
       const signatureDataUrl = canvas.toDataURL("image/png");
-      const res = await fetch(`/api/my/${token}/contract/sign`, {
+      const res = await fetch(signUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ signatureDataUrl }),
@@ -77,6 +85,7 @@ export function SignaturePad({ token, contractId }: { token: string; contractId:
         return;
       }
       setSigned(true);
+      onSigned?.();
     } catch {
       setError("네트워크 오류가 발생했어요.");
     } finally {
@@ -109,7 +118,6 @@ export function SignaturePad({ token, contractId }: { token: string; contractId:
         onPointerLeave={handlePointerUp}
         className="w-full touch-none rounded-xl border border-line bg-white"
         style={{ height: 180 }}
-        data-contract-id={contractId}
       />
       {error && <p className="text-sm text-coral mt-2">{error}</p>}
       <div className="flex gap-2 mt-3">

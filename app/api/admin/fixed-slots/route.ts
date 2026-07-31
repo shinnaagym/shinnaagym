@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { addFixedSlotWithBackfill, listFixedSlots } from "@/lib/schedule";
+import { recordUndo, type UndoOp } from "@/lib/undo";
 
 export async function GET() {
   if (!(await isAdminAuthed())) {
@@ -33,6 +34,11 @@ export async function POST(req: NextRequest) {
   }
   try {
     const result = await addFixedSlotWithBackfill(memberId, weekday, hour);
+    const ops: UndoOp[] = [
+      ...result.createdSessionIds.map((sid): UndoOp => ({ op: "delete", table: "class_sessions", id: sid })),
+      { op: "delete", table: "fixed_slots", id: result.slot.id },
+    ];
+    await recordUndo("고정 시간대 추가", ops);
     return NextResponse.json(result, { status: 201 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "고정 시간대 추가 중 오류가 발생했습니다.";

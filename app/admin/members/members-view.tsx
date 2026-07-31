@@ -1,9 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CoachRow, MemberStatus, PackageRow, PaymentMethod, PtType, VisitChannel } from "@/lib/db";
+import Link from "next/link";
+import type {
+  CoachRow,
+  ContractRow,
+  MemberStatus,
+  PackageRow,
+  PaymentMethod,
+  PtType,
+  VisitChannel,
+} from "@/lib/db";
 import type { FixedSlotWithMember, MemberWithProgress } from "@/lib/schedule";
-import { PURPOSE_OPTIONS, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+import { COACH_COLOR_PALETTE, PURPOSE_OPTIONS, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+import type { CoachColorStyle } from "@/lib/constants";
+import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
+import { ContractDocument } from "@/app/components/ContractDocument";
+import { SignaturePad } from "@/app/components/SignaturePad";
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
 
 const PT_TYPE_OPTIONS: PtType[] = ["1:1", "2:1"];
 const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = ["card", "transfer"];
@@ -13,14 +31,6 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 const FIXED_SLOT_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토"];
 const FIXED_SLOT_CAPACITY = 3;
-
-const VISIT_CHANNEL_OPTIONS: Array<{ value: VisitChannel; label: string }> = [
-  { value: "naver", label: "네이버" },
-  { value: "instagram", label: "인스타" },
-  { value: "flyer", label: "외부 홍보물" },
-  { value: "referral", label: "지인" },
-  { value: "other", label: "기타" },
-];
 
 type SessionSummary = {
   id: number;
@@ -77,7 +87,7 @@ function GoldenBellBadge() {
   return (
     <span
       title="재등록 골든타임 — 잔여 3회 이하"
-      className="rounded-full bg-gold/15 text-gold px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
+      className="rounded-full bg-gold/15 text-gold-deep px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
     >
       🔔 골든벨
     </span>
@@ -164,28 +174,56 @@ export function MembersView({
   initialMembers,
   coaches,
   initialFixedSlots,
+  initialOpenId,
+  initialShowContractView,
 }: {
   initialMembers: MemberWithProgress[];
   coaches: CoachRow[];
   initialFixedSlots: FixedSlotWithMember[];
+  initialOpenId?: number | null;
+  initialShowContractView?: boolean;
 }) {
   const members = initialMembers;
   const fixedSlots = initialFixedSlots;
   const activeCoaches = useMemo(() => coaches.filter((c) => c.active), [coaches]);
   const [search, setSearch] = useState("");
-  const [coachFilter, setCoachFilter] = useState<number | "all">("all");
+  const [coachFilter, setCoachFilter] = useState<number | "all" | "unassigned">("all");
   const [statusFilter, setStatusFilter] = useState<MemberStatus | "all">("active");
   const [showCreate, setShowCreate] = useState(false);
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(initialOpenId ?? null);
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
       if (search && !m.name.includes(search)) return false;
-      if (coachFilter !== "all" && m.coach_id !== coachFilter) return false;
+      if (coachFilter === "unassigned") {
+        if (m.coach_id !== null) return false;
+      } else if (coachFilter !== "all" && m.coach_id !== coachFilter) {
+        return false;
+      }
       if (statusFilter !== "all" && m.status !== statusFilter) return false;
       return true;
     });
   }, [members, search, coachFilter, statusFilter]);
+
+  /** 초진/재등록, 그리고 그중 소개로 온 회원 수를 따로 집계한다(현재 필터 적용 목록 기준).
+      초=현재 패키지가 첫 패키지, 재=재등록(2번째 이상 패키지), 소개(초)/소개(재)=그중 소개(referrer)로 온 경우. */
+  const typeStats = useMemo(() => {
+    let first = 0;
+    let renewal = 0;
+    let referralFirst = 0;
+    let referralRenewal = 0;
+    for (const m of filtered) {
+      if (m.total_sessions <= 0) continue;
+      const isFirst = m.package_count < 2;
+      if (isFirst) first += 1;
+      else renewal += 1;
+      if (m.referrer) {
+        if (isFirst) referralFirst += 1;
+        else referralRenewal += 1;
+      }
+    }
+    return { first, renewal, referralFirst, referralRenewal };
+  }, [filtered]);
 
   async function refresh() {
     window.location.reload();
@@ -193,6 +231,21 @@ export function MembersView({
 
   return (
     <div>
+      <div className="flex items-center gap-3 flex-wrap mb-3 text-xs">
+        <span className="rounded-full bg-coral/10 text-coral px-3 py-1 font-medium">
+          초 {typeStats.first}명
+        </span>
+        <span className="rounded-full bg-sage/20 text-sage px-3 py-1 font-medium">
+          재 {typeStats.renewal}명
+        </span>
+        <span className="rounded-full bg-line/40 text-ink/60 px-3 py-1 font-medium">
+          소개(초) {typeStats.referralFirst}명
+        </span>
+        <span className="rounded-full bg-line/40 text-ink/60 px-3 py-1 font-medium">
+          소개(재) {typeStats.referralRenewal}명
+        </span>
+      </div>
+
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <input
@@ -203,12 +256,14 @@ export function MembersView({
           />
           <select
             value={coachFilter}
-            onChange={(e) =>
-              setCoachFilter(e.target.value === "all" ? "all" : Number(e.target.value))
-            }
+            onChange={(e) => {
+              const v = e.target.value;
+              setCoachFilter(v === "all" ? "all" : v === "unassigned" ? "unassigned" : Number(v));
+            }}
             className="rounded-full border border-line bg-white px-4 py-2 text-sm outline-none"
           >
             <option value="all">담당 코치 전체</option>
+            <option value="unassigned">미지정</option>
             {coaches.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -253,10 +308,13 @@ export function MembersView({
               const low = !expired && remaining > 0 && remaining <= 3;
               const goldenBell = m.status === "active" && m.total_sessions > 0 && remaining <= 3;
               return (
-                <button
+                <div
                   key={m.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setDetailId(m.id)}
-                  className="text-left rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3.5 active:bg-bone/40 transition"
+                  onKeyDown={(e) => e.key === "Enter" && setDetailId(m.id)}
+                  className="text-left rounded-2xl bg-white border border-line/60 shadow-sm px-4 py-3.5 active:bg-bone/40 transition cursor-pointer"
                 >
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="font-medium flex items-center gap-1.5 flex-wrap">
@@ -265,16 +323,25 @@ export function MembersView({
                       {goldenBell && <GoldenBellBadge />}
                       {m.referrer && <ReferrerBadge referrer={m.referrer} />}
                     </span>
-                    <span
-                      className={[
-                        "rounded-full px-2.5 py-0.5 text-xs shrink-0",
-                        m.status === "active"
-                          ? "bg-sage/20 text-sage"
-                          : "bg-line/40 text-ink/50",
-                      ].join(" ")}
-                    >
-                      {m.status === "active" ? "활성" : "비활성"}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Link
+                        href={`/admin/members/${m.id}/assessment`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
+                      >
+                        평가 기록
+                      </Link>
+                      <span
+                        className={[
+                          "rounded-full px-2.5 py-0.5 text-xs shrink-0",
+                          m.status === "active"
+                            ? "bg-sage/20 text-sage"
+                            : "bg-line/40 text-ink/50",
+                        ].join(" ")}
+                      >
+                        {m.status === "active" ? "활성" : "비활성"}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex-1 h-1.5 rounded-full bg-line/60 overflow-hidden">
@@ -315,7 +382,7 @@ export function MembersView({
                     </span>
                     <span className="text-ink/50">다음주 수업 예약</span>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -355,6 +422,13 @@ export function MembersView({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {m.name}
                           {m.referrer && <ReferrerBadge referrer={m.referrer} />}
+                          <Link
+                            href={`/admin/members/${m.id}/assessment`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
+                          >
+                            평가 기록
+                          </Link>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-ink/70">{coachName}</td>
@@ -426,57 +500,106 @@ export function MembersView({
         </>
       )}
 
-      <FixedSlotSchedule fixedSlots={fixedSlots} />
+      <FixedSlotSchedule
+        fixedSlots={fixedSlots}
+        coaches={coaches}
+        coachFilter={coachFilter}
+        coachName={
+          coachFilter === "all"
+            ? null
+            : coachFilter === "unassigned"
+              ? "미지정"
+              : coaches.find((c) => c.id === coachFilter)?.name ?? null
+        }
+      />
 
       {showCreate && (
         <CreateMemberModal
           coaches={activeCoaches}
           onClose={() => setShowCreate(false)}
-          onCreated={() => {
-            setShowCreate(false);
-            refresh();
+          onCreated={(memberId) => {
+            // 등록을 마치자마자 방금 만든 계약서를 바로 확인할 수 있도록 상세
+            // 모달 + 계약서 보기를 연 상태로 이동한다.
+            window.location.href = `/admin/members?open=${memberId}&contract=1`;
           }}
         />
       )}
 
-      {detailId && (
-        <MemberDetailModal
-          memberId={detailId}
-          coaches={coaches}
-          activeCoaches={activeCoaches}
-          fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
-          onClose={() => setDetailId(null)}
-          onChanged={refresh}
-        />
-      )}
+      {detailId &&
+        (() => {
+          const detailMember = members.find((m) => m.id === detailId);
+          if (!detailMember) return null;
+          return (
+            <MemberDetailModal
+              memberId={detailId}
+              initialMember={detailMember}
+              coaches={coaches}
+              activeCoaches={activeCoaches}
+              fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
+              onClose={() => setDetailId(null)}
+              onChanged={refresh}
+              initialShowContractView={initialShowContractView}
+            />
+          );
+        })()}
     </div>
   );
 }
 
-function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }) {
+function FixedSlotSchedule({
+  fixedSlots,
+  coaches,
+  coachFilter,
+  coachName,
+}: {
+  fixedSlots: FixedSlotWithMember[];
+  coaches: CoachRow[];
+  coachFilter: number | "all" | "unassigned";
+  coachName: string | null;
+}) {
+  // 코치별 색상은 전체 코치 목록 기준 순서로 고정해, 스케줄표와도 같은 코치가
+  // 항상 같은 색을 쓰도록 한다(스케줄표의 코치 색상 팔레트와 동일한 로직).
+  const coachColorMap = useMemo(() => {
+    const map = new Map<number, CoachColorStyle>();
+    coaches.forEach((c, i) => {
+      map.set(c.id, COACH_COLOR_PALETTE[i % COACH_COLOR_PALETTE.length]);
+    });
+    return map;
+  }, [coaches]);
+
+  const scopedSlots = useMemo(() => {
+    if (coachFilter === "all") return fixedSlots;
+    if (coachFilter === "unassigned") {
+      return fixedSlots.filter((slot) => slot.member_coach_id === null);
+    }
+    return fixedSlots.filter((slot) => slot.member_coach_id === coachFilter);
+  }, [fixedSlots, coachFilter]);
+
   const byCell = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const slot of fixedSlots) {
+    const map = new Map<string, Array<{ name: string; coachId: number | null }>>();
+    for (const slot of scopedSlots) {
       const key = `${slot.weekday}-${slot.hour}`;
-      const names = map.get(key) ?? [];
-      names.push(slot.member_name);
-      map.set(key, names);
+      const entries = map.get(key) ?? [];
+      entries.push({ name: slot.member_name, coachId: slot.member_coach_id });
+      map.set(key, entries);
     }
     return map;
-  }, [fixedSlots]);
+  }, [scopedSlots]);
 
   const hourTotals = useMemo(() => {
     const totals = new Map<number, number>();
-    for (const slot of fixedSlots) {
+    for (const slot of scopedSlots) {
       totals.set(slot.hour, (totals.get(slot.hour) ?? 0) + 1);
     }
     return totals;
-  }, [fixedSlots]);
+  }, [scopedSlots]);
 
   return (
     <div className="mt-10">
       <div className="flex items-center gap-2 mb-1">
-        <p className="font-display text-lg">고정 회원 시간표</p>
+        <p className="font-display text-lg">
+          {coachName ? `${coachName} 코치 고정 회원 시간표` : "고정 회원 시간표"}
+        </p>
         <span className="text-xs text-ink/40">시간대별 고정 회원 배정 현황</span>
       </div>
       <p className="text-xs text-ink/40 mb-3">
@@ -501,27 +624,33 @@ function FixedSlotSchedule({ fixedSlots }: { fixedSlots: FixedSlotWithMember[] }
               <tr key={hour} className="border-b border-line/30 last:border-0">
                 <td className="px-3 py-2.5 text-ink/50 whitespace-nowrap">{hour}시</td>
                 {FIXED_SLOT_WEEKDAY_LABELS.map((_, weekday) => {
-                  const names = byCell.get(`${weekday}-${hour}`) ?? [];
+                  const entries = byCell.get(`${weekday}-${hour}`) ?? [];
                   return (
                     <td key={weekday} className="px-3 py-2.5 align-top">
-                      {names.length > 0 && (
+                      {entries.length > 0 && (
                         <div
                           className={[
                             "flex flex-wrap gap-1 rounded-lg px-1.5 py-1",
                             over ? "bg-red-50" : "",
                           ].join(" ")}
                         >
-                          {names.map((name, i) => (
-                            <span
-                              key={`${name}-${i}`}
-                              className={[
-                                "rounded-full px-1.5 py-0.5 whitespace-nowrap",
-                                over ? "bg-red-100 text-red-600" : "bg-sage/15 text-ink/70",
-                              ].join(" ")}
-                            >
-                              {name}
-                            </span>
-                          ))}
+                          {entries.map((entry, i) => {
+                            const coachStyle =
+                              entry.coachId != null ? coachColorMap.get(entry.coachId) : undefined;
+                            const pillClass = over
+                              ? "bg-red-100 text-red-600"
+                              : coachStyle
+                                ? `${coachStyle.header} ${coachStyle.headerText}`
+                                : "bg-sage/15 text-ink/70";
+                            return (
+                              <span
+                                key={`${entry.name}-${i}`}
+                                className={["rounded-full px-1.5 py-0.5 whitespace-nowrap", pillClass].join(" ")}
+                              >
+                                {entry.name}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                     </td>
@@ -546,6 +675,8 @@ function ContractFieldsFieldset({
   onVisitChannelChange,
   visitChannelReferrerName,
   onVisitChannelReferrerNameChange,
+  visitChannelOther,
+  onVisitChannelOtherChange,
   purposes,
   onTogglePurpose,
   purposeOther,
@@ -556,6 +687,7 @@ function ContractFieldsFieldset({
   onOptionNoteChange,
   privacyConsent,
   onPrivacyConsentChange,
+  showVisitChannelAndPurpose = true,
 }: {
   rrnFront: string;
   onRrnFrontChange: (v: string) => void;
@@ -565,6 +697,8 @@ function ContractFieldsFieldset({
   onVisitChannelChange: (v: VisitChannel) => void;
   visitChannelReferrerName: string;
   onVisitChannelReferrerNameChange: (v: string) => void;
+  visitChannelOther: string;
+  onVisitChannelOtherChange: (v: string) => void;
   purposes: string[];
   onTogglePurpose: (v: string) => void;
   purposeOther: string;
@@ -575,6 +709,8 @@ function ContractFieldsFieldset({
   onOptionNoteChange: (v: string) => void;
   privacyConsent: boolean;
   onPrivacyConsentChange: (v: boolean) => void;
+  /** 초진 문진표에서 이미 수집하는 회원 등록 흐름에서는 방문경로/운동 목표를 숨긴다. */
+  showVisitChannelAndPurpose?: boolean;
 }) {
   return (
     <>
@@ -595,65 +731,77 @@ function ContractFieldsFieldset({
           />
         </Field>
       </div>
-      <Field label="방문 경로">
-        <div className="flex flex-wrap gap-1.5">
-          {VISIT_CHANNEL_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onVisitChannelChange(opt.value)}
-              className={[
-                "rounded-full px-3 py-1.5 text-xs font-medium transition border",
-                visitChannel === opt.value
-                  ? "bg-coral text-white border-coral"
-                  : "border-line text-ink/60 hover:bg-bone",
-              ].join(" ")}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        {visitChannel === "referral" && (
-          <input
-            value={visitChannelReferrerName}
-            onChange={(e) => onVisitChannelReferrerNameChange(e.target.value)}
-            placeholder="소개해주신 분 이름"
-            className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-          />
-        )}
-      </Field>
-      <Field label="운동 목표">
-        <div className="flex flex-wrap gap-1.5">
-          {PURPOSE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onTogglePurpose(opt.value)}
-              className={[
-                "rounded-full px-3 py-1.5 text-xs font-medium transition border",
-                purposes.includes(opt.value)
-                  ? "bg-coral text-white border-coral"
-                  : "border-line text-ink/60 hover:bg-bone",
-              ].join(" ")}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <input
-          value={purposeOther}
-          onChange={(e) => onPurposeOtherChange(e.target.value)}
-          placeholder="기타 (선택 입력)"
-          className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-        />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
+      {showVisitChannelAndPurpose && (
+        <>
+          <Field label="방문 경로">
+            <div className="flex flex-wrap gap-1.5">
+              {VISIT_CHANNEL_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onVisitChannelChange(opt.value)}
+                  className={[
+                    "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                    visitChannel === opt.value
+                      ? "bg-coral text-white border-coral"
+                      : "border-line text-ink/60 hover:bg-bone",
+                  ].join(" ")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {visitChannel === "referral" && (
+              <input
+                value={visitChannelReferrerName}
+                onChange={(e) => onVisitChannelReferrerNameChange(e.target.value)}
+                placeholder="소개해주신 분 이름"
+                className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            )}
+            {visitChannel === "other" && (
+              <input
+                value={visitChannelOther}
+                onChange={(e) => onVisitChannelOtherChange(e.target.value)}
+                placeholder="경로를 입력해주세요"
+                className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            )}
+          </Field>
+          <Field label="운동 목표">
+            <div className="flex flex-wrap gap-1.5">
+              {PURPOSE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onTogglePurpose(opt.value)}
+                  className={[
+                    "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                    purposes.includes(opt.value)
+                      ? "bg-coral text-white border-coral"
+                      : "border-line text-ink/60 hover:bg-bone",
+                  ].join(" ")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={purposeOther}
+              onChange={(e) => onPurposeOtherChange(e.target.value)}
+              placeholder="기타 (선택 입력)"
+              className="w-full mt-2 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+        </>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="운동 시작일">
           <input
             type="date"
             value={startDate}
             onChange={(e) => onStartDateChange(e.target.value)}
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            className="w-full min-w-0 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
           />
         </Field>
         <Field label="옵션">
@@ -671,7 +819,7 @@ function ContractFieldsFieldset({
           checked={privacyConsent}
           onChange={(e) => onPrivacyConsentChange(e.target.checked)}
         />
-        개인 정보 활용에 동의합니다.
+        개인정보(민감정보 포함) 수집·이용에 동의합니다.
       </label>
     </>
   );
@@ -684,7 +832,7 @@ function CreateMemberModal({
 }: {
   coaches: CoachRow[];
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (memberId: number) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -704,6 +852,7 @@ function CreateMemberModal({
   const [address, setAddress] = useState("");
   const [visitChannel, setVisitChannel] = useState<VisitChannel>("");
   const [visitChannelReferrerName, setVisitChannelReferrerName] = useState("");
+  const [visitChannelOther, setVisitChannelOther] = useState("");
   const [purposes, setPurposes] = useState<string[]>([]);
   const [purposeOther, setPurposeOther] = useState("");
   const [optionNote, setOptionNote] = useState("");
@@ -746,6 +895,7 @@ function CreateMemberModal({
           address,
           visitChannel,
           visitChannelReferrerName,
+          visitChannelOther,
           purposes,
           purposeOther,
           optionNote,
@@ -758,7 +908,7 @@ function CreateMemberModal({
         setError(data.error ?? "등록에 실패했습니다.");
         return;
       }
-      onCreated();
+      onCreated(data.member.id);
     } catch {
       setError("네트워크 오류가 발생했습니다.");
     } finally {
@@ -862,6 +1012,8 @@ function CreateMemberModal({
             onVisitChannelChange={setVisitChannel}
             visitChannelReferrerName={visitChannelReferrerName}
             onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
+            visitChannelOther={visitChannelOther}
+            onVisitChannelOtherChange={setVisitChannelOther}
             purposes={purposes}
             onTogglePurpose={togglePurpose}
             purposeOther={purposeOther}
@@ -872,6 +1024,7 @@ function CreateMemberModal({
             onOptionNoteChange={setOptionNote}
             privacyConsent={privacyConsent}
             onPrivacyConsentChange={setPrivacyConsent}
+            showVisitChannelAndPurpose={false}
           />
         </div>
 
@@ -903,6 +1056,7 @@ function WriteContractModal({
   const [address, setAddress] = useState("");
   const [visitChannel, setVisitChannel] = useState<VisitChannel>("");
   const [visitChannelReferrerName, setVisitChannelReferrerName] = useState("");
+  const [visitChannelOther, setVisitChannelOther] = useState("");
   const [purposes, setPurposes] = useState<string[]>([]);
   const [purposeOther, setPurposeOther] = useState("");
   const [optionNote, setOptionNote] = useState("");
@@ -929,6 +1083,7 @@ function WriteContractModal({
           address,
           visitChannel,
           visitChannelReferrerName,
+          visitChannelOther,
           purposes,
           purposeOther,
           optionNote,
@@ -968,6 +1123,8 @@ function WriteContractModal({
           onVisitChannelChange={setVisitChannel}
           visitChannelReferrerName={visitChannelReferrerName}
           onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
+          visitChannelOther={visitChannelOther}
+          onVisitChannelOtherChange={setVisitChannelOther}
           purposes={purposes}
           onTogglePurpose={togglePurpose}
           purposeOther={purposeOther}
@@ -992,26 +1149,117 @@ function WriteContractModal({
   );
 }
 
+function ContractViewModal({
+  memberId,
+  onClose,
+  onSigned,
+}: {
+  memberId: number;
+  onClose: () => void;
+  onSigned?: () => void;
+}) {
+  const [data, setData] = useState<{
+    member: { name: string; phone: string };
+    contract: ContractRow & { rrn_front: string };
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function load() {
+    fetch(`/api/admin/members/${memberId}/contract`)
+      .then(async (res) => {
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(d.error ?? "계약서를 불러오지 못했어요.");
+          return;
+        }
+        setData(d);
+      })
+      .catch(() => setError("네트워크 오류가 발생했어요."));
+  }
+
+  useEffect(load, [memberId]);
+
+  function handleSigned() {
+    load();
+    onSigned?.();
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-ink/40 px-4 overflow-y-auto py-8">
+      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl p-6 sm:p-10 my-auto">
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-display text-lg">계약서</p>
+          <button onClick={onClose} className="text-ink/40 hover:text-ink text-xl leading-none">
+            ×
+          </button>
+        </div>
+        {error && <p className="text-sm text-coral">{error}</p>}
+        {!data && !error && <p className="text-sm text-ink/50">불러오는 중...</p>}
+        {data && (
+          <ContractDocument
+            memberName={data.member.name}
+            memberPhone={data.member.phone}
+            contract={data.contract}
+          >
+            {data.contract.signed_at ? (
+              <div className="rounded-2xl border border-sage/40 bg-sage/10 px-6 py-6">
+                <p className="font-display text-lg mb-3">회원 서명</p>
+                {data.contract.signature_data_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={data.contract.signature_data_url}
+                    alt="회원 서명"
+                    className="h-32 rounded-lg border border-line bg-white"
+                  />
+                )}
+                <p className="text-xs text-ink/50 mt-2">
+                  {formatDateTime(data.contract.signed_at)} 서명 완료
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs text-ink/50 mb-3">
+                  아직 서명 전이에요. 회원이 매장에 방문했다면 아래에서 바로 서명받을 수
+                  있고, 회원 개인 페이지에서 직접 서명할 수도 있어요.
+                </p>
+                <SignaturePad
+                  signUrl={`/api/admin/members/${memberId}/contract/sign`}
+                  onSigned={handleSigned}
+                />
+              </div>
+            )}
+          </ContractDocument>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MemberDetailModal({
   memberId,
+  initialMember,
   coaches,
   activeCoaches,
   fixedSlots,
   onClose,
   onChanged,
+  initialShowContractView,
 }: {
   memberId: number;
+  initialMember: MemberWithProgress;
   coaches: CoachRow[];
   activeCoaches: CoachRow[];
   fixedSlots: FixedSlotWithMember[];
   onClose: () => void;
   onChanged: () => void;
+  initialShowContractView?: boolean;
 }) {
   const [newSlotWeekday, setNewSlotWeekday] = useState(0);
   const [newSlotHour, setNewSlotHour] = useState(SCHEDULE_HOUR_ROWS[0]);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [savingSlot, setSavingSlot] = useState(false);
   const [showWriteContract, setShowWriteContract] = useState(false);
+  const [showContractView, setShowContractView] = useState(!!initialShowContractView);
 
   async function addSlot() {
     if (!data?.member.coach_id) {
@@ -1052,13 +1300,29 @@ function MemberDetailModal({
     await fetch(`/api/admin/fixed-slots/${id}`, { method: "DELETE" });
     onChanged();
   }
+  // 목록에서 이미 알고 있는 회원 기본 정보(이름·연락처·담당·상태·소개자·가능시간·메모·개인
+  // 예약 링크)는 곧바로 채워 넣어, 모달을 열자마자 편집 폼이 보이게 한다. 목록에는 없는
+  // 패키지·세션·계약서·평가 기록 요약만 아래 useEffect의 백그라운드 조회로 채운다.
   const [data, setData] = useState<{
     member: MemberDetail;
     progress: { totalSessions: number; doneCount: number; remaining: number };
     packages: PackageRow[];
     sessions: SessionSummary[];
     contract: { id: number; entryType: string; signedAt: string | null } | null;
-  } | null>(null);
+    assessmentSummary: { count: number; latestAt: string | null };
+  }>({
+    member: initialMember,
+    progress: {
+      totalSessions: initialMember.total_sessions,
+      doneCount: initialMember.done_count,
+      remaining: initialMember.total_sessions - initialMember.done_count,
+    },
+    packages: [],
+    sessions: [],
+    contract: null,
+    assessmentSummary: { count: 0, latestAt: null },
+  });
+  const [detailLoading, setDetailLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [addSessions, setAddSessions] = useState("");
   const [addPrice, setAddPrice] = useState("");
@@ -1067,14 +1331,14 @@ function MemberDetailModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // 편집 폼 상태
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [coachId, setCoachId] = useState<number | "">("");
-  const [status, setStatus] = useState<MemberStatus>("active");
-  const [referrer, setReferrer] = useState("");
-  const [availableTimes, setAvailableTimes] = useState("");
-  const [notes, setNotes] = useState("");
+  // 편집 폼 상태 — 이미 목록에 있는 값으로 즉시 초기화한다.
+  const [name, setName] = useState(initialMember.name);
+  const [phone, setPhone] = useState(initialMember.phone);
+  const [coachId, setCoachId] = useState<number | "">(initialMember.coach_id ?? "");
+  const [status, setStatus] = useState<MemberStatus>(initialMember.status);
+  const [referrer, setReferrer] = useState(initialMember.referrer);
+  const [availableTimes, setAvailableTimes] = useState(initialMember.available_times);
+  const [notes, setNotes] = useState(initialMember.notes);
 
   const [editingPkgId, setEditingPkgId] = useState<number | null>(null);
   const [editTotal, setEditTotal] = useState("");
@@ -1083,32 +1347,15 @@ function MemberDetailModal({
   const [editPtType, setEditPtType] = useState<PtType>("1:1");
   const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>("card");
 
-  function loadFrom(member: MemberDetail) {
-    setName(member.name);
-    setPhone(member.phone);
-    setCoachId(member.coach_id ?? "");
-    setStatus(member.status);
-    setReferrer(member.referrer);
-    setAvailableTimes(member.available_times);
-    setNotes(member.notes);
-  }
-
+  // 이름/연락처 등 편집 폼 값은 이미 목록에서 받은 값으로 채워둔 상태라 여기서 다시 덮어쓰지
+  // 않는다(관리자가 응답이 오기 전에 입력을 시작했다면 그 값을 유지하기 위함) — 패키지·세션·
+  // 계약서·평가 기록 요약만 이 응답으로 채운다.
   useEffect(() => {
     fetch(`/api/admin/members/${memberId}`)
       .then((res) => res.json())
-      .then((d) => {
-        setData(d);
-        loadFrom(d.member);
-      });
+      .then((d) => setData(d))
+      .finally(() => setDetailLoading(false));
   }, [memberId]);
-
-  if (!data) {
-    return (
-      <ModalShell title="불러오는 중..." onClose={onClose}>
-        <p className="text-sm text-ink/50">잠시만 기다려주세요.</p>
-      </ModalShell>
-    );
-  }
 
   const link =
     typeof window !== "undefined" ? `${window.location.origin}/my/${data.member.token}` : "";
@@ -1145,6 +1392,27 @@ function MemberDetailModal({
         setError(d.error ?? "저장에 실패했습니다.");
         return;
       }
+
+      // 결제·패키지 이력의 횟수를 입력해둔 채로 하단 저장 버튼을 눌러도(별도로
+      // "+ 재등록/패키지 추가"를 누르지 않아도) 결제 내역이 함께 저장되도록 한다.
+      if (addSessions && Number(addSessions) >= 1) {
+        const pkgRes = await fetch(`/api/admin/members/${memberId}/packages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            totalSessions: Number(addSessions),
+            price: Number(addPrice || 0),
+            ptType: addPtType,
+            paymentMethod: addPaymentMethod,
+          }),
+        });
+        if (!pkgRes.ok) {
+          const d = await pkgRes.json().catch(() => ({}));
+          setError(d.error ?? "결제 내역 저장에 실패했습니다.");
+          return;
+        }
+      }
+
       onChanged();
       onClose();
     } finally {
@@ -1263,14 +1531,15 @@ function MemberDetailModal({
             {data.progress.remaining}회)
           </span>
           {data.contract ? (
-            <span
+            <button
+              onClick={() => setShowContractView(true)}
               className={[
-                "rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+                "rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap transition hover:opacity-80",
                 data.contract.signedAt ? "bg-sage/20 text-sage" : "bg-coral/10 text-coral",
               ].join(" ")}
             >
-              계약서 {data.contract.signedAt ? "서명완료" : "서명대기"}
-            </span>
+              계약서 {data.contract.signedAt ? "서명완료" : "서명대기"} · 보기
+            </button>
           ) : (
             data.packages.length > 0 && (
               <button
@@ -1281,6 +1550,23 @@ function MemberDetailModal({
               </button>
             )
           )}
+        </div>
+
+        <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm flex items-center justify-between gap-2">
+          <span>
+            체형 평가{" "}
+            {detailLoading
+              ? "불러오는 중..."
+              : data.assessmentSummary.count > 0
+                ? `${data.assessmentSummary.count}건 · 최근 ${data.assessmentSummary.latestAt}`
+                : "기록 없음"}
+          </span>
+          <Link
+            href={`/admin/members/${memberId}/assessment`}
+            className="rounded-full border border-coral text-coral px-2.5 py-0.5 text-xs font-medium hover:bg-coral/5 transition whitespace-nowrap"
+          >
+            {data.assessmentSummary.count > 0 ? "평가 기록" : "+ 평가 작성"}
+          </Link>
         </div>
 
         <div>
@@ -1606,8 +1892,21 @@ function MemberDetailModal({
         onCreated={() => {
           setShowWriteContract(false);
           onChanged();
-          onClose();
+          setShowContractView(true);
         }}
+      />
+    )}
+    {showContractView && (
+      <ContractViewModal
+        memberId={memberId}
+        onClose={() => setShowContractView(false)}
+        onSigned={() =>
+          setData((prev) =>
+            prev.contract
+              ? { ...prev, contract: { ...prev.contract, signedAt: new Date().toISOString() } }
+              : prev,
+          )
+        }
       />
     )}
     </>
@@ -1616,7 +1915,7 @@ function MemberDetailModal({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label className="block text-sm font-medium mb-1.5">{label}</label>
       {children}
     </div>

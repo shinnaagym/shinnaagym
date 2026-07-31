@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAdminPassword, setAdminSessionCookie } from "@/lib/auth";
+import { checkAdminPassword, getOrCreateDeviceId, setAdminSessionCookie } from "@/lib/auth";
+import { BUILD_ID } from "@/lib/build-info";
+import { labelFromUserAgent, upsertDeviceOnLogin } from "@/lib/devices";
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -14,6 +16,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "비밀번호가 올바르지 않습니다." }, { status: 401 });
   }
 
-  await setAdminSessionCookie();
+  const deviceId = await getOrCreateDeviceId();
+  const deviceLabel = labelFromUserAgent(req.headers.get("user-agent") ?? "");
+  await upsertDeviceOnLogin(deviceId, deviceLabel, BUILD_ID);
+  await setAdminSessionCookie(deviceId);
   return NextResponse.json({ ok: true });
 }

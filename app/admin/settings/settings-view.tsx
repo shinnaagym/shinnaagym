@@ -1,16 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import type { CoachRow, HolidayRow } from "@/lib/db";
+import type { AdminDeviceRow, CoachRow, EmploymentType, HolidayRow } from "@/lib/db";
+import { SyncDiagnostics } from "./sync-diagnostics";
+
+const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
+  regular: "정직원",
+  freelancer: "프리랜서",
+  team_lead: "팀장",
+  owner: "대표",
+};
 
 export function SettingsView({
   initialCoaches,
   initialHolidays,
   memberCounts,
+  buildId,
+  initialDevices,
+  currentDeviceId,
 }: {
   initialCoaches: CoachRow[];
   initialHolidays: HolidayRow[];
   memberCounts: Record<number, number>;
+  buildId: string;
+  initialDevices: AdminDeviceRow[];
+  currentDeviceId: string | null;
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
@@ -44,6 +58,22 @@ export function SettingsView({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone }),
+    });
+  }
+
+  async function updateCoachEmployment(
+    id: number,
+    patch: Partial<Pick<CoachRow, "employment_type" | "hired_at" | "is_team_lead">>,
+  ) {
+    setCoaches((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    await fetch(`/api/admin/coaches/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        employmentType: patch.employment_type,
+        hiredAt: patch.hired_at,
+        isTeamLead: patch.is_team_lead,
+      }),
     });
   }
 
@@ -98,6 +128,12 @@ export function SettingsView({
 
   return (
     <div className="space-y-6">
+      <SyncDiagnostics
+        buildId={buildId}
+        initialDevices={initialDevices}
+        currentDeviceId={currentDeviceId}
+      />
+
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">코치 관리</h2>
         <p className="text-xs text-ink/50 mb-4">
@@ -106,40 +142,78 @@ export function SettingsView({
         </p>
         <div className="divide-y divide-line/50">
           {coaches.map((c) => (
-            <div key={c.id} className="flex items-center justify-between py-2.5 gap-3 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm">{c.name}</span>
-                <span
+            <div key={c.id} className="py-2.5 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm">{c.name}</span>
+                  <span
+                    className={[
+                      "rounded-full px-2 py-0.5 text-[11px]",
+                      c.active ? "bg-sage/10 text-sage" : "bg-line/40 text-ink/40",
+                    ].join(" ")}
+                  >
+                    {c.active ? "재직 중" : "퇴사함"}
+                  </span>
+                  {c.active && (memberCounts[c.id] ?? 0) > 0 && (
+                    <span className="text-[11px] text-ink/40">
+                      담당 {memberCounts[c.id]}명
+                    </span>
+                  )}
+                  <input
+                    defaultValue={c.phone}
+                    placeholder="연락처 (예: 010-0000-0000)"
+                    onBlur={(e) => updateCoachPhone(c.id, e.target.value.trim())}
+                    className="w-40 rounded-lg border border-line px-2.5 py-1 text-xs outline-none focus:border-coral"
+                  />
+                </div>
+                <button
+                  onClick={() => toggleCoach(c)}
                   className={[
-                    "rounded-full px-2 py-0.5 text-[11px]",
-                    c.active ? "bg-sage/10 text-sage" : "bg-line/40 text-ink/40",
+                    "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs border transition",
+                    c.active
+                      ? "border-red-200 text-red-500 hover:bg-red-50"
+                      : "border-sage/50 text-sage hover:bg-sage/10",
                   ].join(" ")}
                 >
-                  {c.active ? "재직 중" : "퇴사함"}
-                </span>
-                {c.active && (memberCounts[c.id] ?? 0) > 0 && (
-                  <span className="text-[11px] text-ink/40">
-                    담당 {memberCounts[c.id]}명
-                  </span>
-                )}
-                <input
-                  defaultValue={c.phone}
-                  placeholder="연락처 (예: 010-0000-0000)"
-                  onBlur={(e) => updateCoachPhone(c.id, e.target.value.trim())}
-                  className="w-40 rounded-lg border border-line px-2.5 py-1 text-xs outline-none focus:border-coral"
-                />
+                  {c.active ? "퇴사 처리" : "재직으로 전환"}
+                </button>
               </div>
-              <button
-                onClick={() => toggleCoach(c)}
-                className={[
-                  "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs border transition",
-                  c.active
-                    ? "border-red-200 text-red-500 hover:bg-red-50"
-                    : "border-sage/50 text-sage hover:bg-sage/10",
-                ].join(" ")}
-              >
-                {c.active ? "퇴사 처리" : "재직으로 전환"}
-              </button>
+              <div className="flex items-center gap-2 flex-wrap pl-0.5">
+                <span className="text-[11px] text-ink/40">급여 계산용</span>
+                <select
+                  value={c.employment_type}
+                  onChange={(e) =>
+                    updateCoachEmployment(c.id, {
+                      employment_type: e.target.value as EmploymentType,
+                    })
+                  }
+                  className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-coral"
+                >
+                  {(Object.keys(EMPLOYMENT_TYPE_LABEL) as EmploymentType[]).map((type) => (
+                    <option key={type} value={type}>
+                      {EMPLOYMENT_TYPE_LABEL[type]}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  defaultValue={c.hired_at}
+                  onChange={(e) => updateCoachEmployment(c.id, { hired_at: e.target.value })}
+                  className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-coral"
+                />
+                {c.employment_type === "regular" && (
+                  <label className="flex items-center gap-1 text-xs text-ink/60">
+                    <input
+                      type="checkbox"
+                      checked={c.is_team_lead}
+                      onChange={(e) =>
+                        updateCoachEmployment(c.id, { is_team_lead: e.target.checked })
+                      }
+                    />
+                    팀장
+                  </label>
+                )}
+              </div>
             </div>
           ))}
         </div>

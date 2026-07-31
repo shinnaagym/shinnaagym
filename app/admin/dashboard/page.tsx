@@ -1,14 +1,17 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { addMonthsToKey, isValidMonthKey, koreaCurrentMonthKey } from "@/lib/date";
+import { isValidMonthKey, koreaCurrentMonthKey } from "@/lib/date";
 import {
   getCoachMonthlyReports,
   getDashboardOverview,
+  getMonthlyRetentionStats,
   getMonthlyTrend,
   listNewRegistrations,
   listPackagePurchases,
 } from "@/lib/schedule";
+import { getVisitChannelCountsForMonth } from "@/lib/intake";
+import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
+import { DashboardMonthPicker } from "./month-picker";
 
 const TREND_MONTHS = 6;
 
@@ -24,6 +27,28 @@ function formatMonthLabel(monthKey: string): string {
 function formatMonthShort(monthKey: string): string {
   const [, m] = monthKey.split("-");
   return `${Number(m)}월`;
+}
+
+// 방문 경로별 브랜드/성격에 맞춘 그래프 색상 — 네이버 계열(블로그·카페)은 네이버
+// 브랜드 그린, 인스타그램은 인스타그램 핑크 계열로 한눈에 구분되게 한다.
+const VISIT_CHANNEL_COLORS: Record<string, string> = {
+  blog: "#5FA777",
+  naver_cafe: "#03C75A",
+  instagram: "#E1306C",
+  signboard: "#F2A93B",
+  banner: "#4A90D9",
+  flyer: "#9B6B43",
+  referral: "#FF6F61",
+  other: "#9AA0A6",
+};
+// 방문 경로 "기타"를 고르고 자유 입력한 텍스트는 카테고리가 미리 정해져 있지 않으므로,
+// 문자열을 해시해 고정 팔레트에서 색을 골라 매번 같은 문구가 같은 색을 쓰도록 한다.
+const CUSTOM_VISIT_CHANNEL_FALLBACK_COLORS = ["#7B8FA1", "#B08CC2", "#6FA8A0", "#D48B5D"];
+function colorForVisitChannel(key: string): string {
+  if (VISIT_CHANNEL_COLORS[key]) return VISIT_CHANNEL_COLORS[key];
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return CUSTOM_VISIT_CHANNEL_FALLBACK_COLORS[hash % CUSTOM_VISIT_CHANNEL_FALLBACK_COLORS.length];
 }
 
 function formatDate(iso: string): string {
@@ -47,16 +72,44 @@ export default async function AdminDashboardPage({
   const { month } = await searchParams;
   const monthKey = month && isValidMonthKey(month) ? month : koreaCurrentMonthKey();
 
-  const [overview, coachReports, trend, newRegs, purchases] = await Promise.all([
-    getDashboardOverview(monthKey),
-    getCoachMonthlyReports(monthKey),
-    getMonthlyTrend(monthKey, TREND_MONTHS),
-    listNewRegistrations(monthKey),
-    listPackagePurchases(monthKey),
-  ]);
+  const [overview, coachReports, trend, retentionTrend, newRegs, purchases, visitChannelCounts] =
+    await Promise.all([
+      getDashboardOverview(monthKey),
+      getCoachMonthlyReports(monthKey),
+      getMonthlyTrend(monthKey, TREND_MONTHS),
+      getMonthlyRetentionStats(monthKey, TREND_MONTHS),
+      listNewRegistrations(monthKey),
+      listPackagePurchases(monthKey),
+      getVisitChannelCountsForMonth(monthKey),
+    ]);
+
+  const visitChannelTotal = Object.values(visitChannelCounts).reduce((a, b) => a + b, 0);
+  const knownVisitChannelValues = new Set<string>(VISIT_CHANNEL_OPTIONS.map((opt) => opt.value));
+  const visitChannelFixedRows = VISIT_CHANNEL_OPTIONS.filter((opt) => opt.value !== "other").map(
+    (opt) => ({ label: opt.label, value: opt.value as string, count: visitChannelCounts[opt.value] ?? 0 }),
+  );
+  // "기타"를 고르고 자유 입력을 남긴 경우, 그 텍스트 자체가 getVisitChannelCountsForMonth에서
+  // 이미 새 카테고리 키로 집계되어 있다 — 여기서는 알려진 값이 아닌 키를 전부 모아 동적으로 보여준다.
+  const customVisitChannelRows = Object.entries(visitChannelCounts)
+    .filter(([key]) => key !== "" && !knownVisitChannelValues.has(key))
+    .map(([label, count]) => ({ label, value: label, count }))
+    .sort((a, b) => b.count - a.count);
+  const visitChannelRows = [
+    ...visitChannelFixedRows,
+    { label: "기타", value: "other", count: visitChannelCounts["other"] ?? 0 },
+    ...customVisitChannelRows,
+  ];
+  const unknownVisitChannelCount = visitChannelCounts[""] ?? 0;
+  const maxVisitChannelCount = Math.max(
+    1,
+    ...visitChannelRows.map((r) => r.count),
+    unknownVisitChannelCount,
+  );
 
   const maxRevenue = Math.max(1, ...trend.map((t) => t.revenue));
-  const maxSessions = Math.max(1, ...trend.map((t) => t.completedSessions));
+  const maxSessions = Math.max(1, ...trend.map((t) => t.sessionCount));
+  const maxConsultations = Math.max(1, ...trend.map((t) => t.consultationCount));
+  const maxNewRegs = Math.max(1, ...retentionTrend.map((t) => t.newMemberCount));
 
   const newRegByCoach = new Map<string, string[]>();
   for (const r of newRegs) {
@@ -67,7 +120,6 @@ export default async function AdminDashboardPage({
 
   const kpiCards: Array<{ label: string; value: string; accent?: boolean }> = [
     { label: "활성 회원", value: `${overview.activeMemberCount}명` },
-    { label: "이번 달 완료 세션", value: `${overview.monthlyCompletedSessions}회` },
     { label: "이번 달 총 상담수", value: `${overview.monthlyConsultationCount}건` },
     { label: "카드결제 매출 (부가세포함)", value: formatWon(overview.monthlyRevenueCard), accent: true },
     { label: "계좌이체 매출 (부가세제외)", value: formatWon(overview.monthlyRevenueTransfer), accent: true },
@@ -79,29 +131,10 @@ export default async function AdminDashboardPage({
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       {/* 월 네비게이션 */}
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/admin/dashboard?month=${addMonthsToKey(monthKey, -1)}`}
-                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
-              >
-                ‹ 이전 달
-              </Link>
-              <Link
-                href="/admin/dashboard"
-                className="rounded-full bg-ink text-white px-4 py-1.5 text-sm hover:bg-coral transition"
-              >
-                이번 달
-              </Link>
-              <Link
-                href={`/admin/dashboard?month=${addMonthsToKey(monthKey, 1)}`}
-                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
-              >
-                다음 달 ›
-              </Link>
-            </div>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-3">
             <p className="font-display text-lg">{formatMonthLabel(monthKey)}</p>
           </div>
+          <DashboardMonthPicker monthKey={monthKey} />
 
           {/* KPI 카드 */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -112,7 +145,7 @@ export default async function AdminDashboardPage({
               >
                 <p className="text-xs text-ink/50 mb-2">{card.label}</p>
                 <p
-                  className={`text-lg sm:text-2xl font-semibold ${card.accent ? "text-gold" : "text-ink"}`}
+                  className={`text-lg sm:text-2xl font-semibold ${card.accent ? "text-gold-deep" : "text-ink"}`}
                 >
                   {card.value}
                 </p>
@@ -121,7 +154,7 @@ export default async function AdminDashboardPage({
           </div>
 
           {/* 월별 추이 차트 */}
-          <div className="grid sm:grid-cols-2 gap-4 mb-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
               <p className="text-sm font-medium mb-4">
                 월별 결제액 <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
@@ -145,20 +178,68 @@ export default async function AdminDashboardPage({
             </div>
             <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
               <p className="text-sm font-medium mb-4">
-                월별 완료 세션{" "}
+                월별 수업수{" "}
                 <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
               </p>
               <div className="flex items-end gap-2 h-36">
                 {trend.map((t) => (
                   <div key={t.month} className="flex-1 flex flex-col items-center gap-1.5">
                     <p className="text-[10px] text-ink/50 h-3">
-                      {t.completedSessions > 0 ? t.completedSessions : ""}
+                      {t.sessionCount > 0 ? t.sessionCount : ""}
                     </p>
                     <div
                       className={`w-full rounded-t-md transition-all ${
                         t.month === monthKey ? "bg-sage" : "bg-sage/40"
                       }`}
-                      style={{ height: `${Math.max(4, (t.completedSessions / maxSessions) * 100)}px` }}
+                      style={{ height: `${Math.max(4, (t.sessionCount / maxSessions) * 100)}px` }}
+                    />
+                    <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+              <p className="text-sm font-medium mb-4">
+                월별 상담수{" "}
+                <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
+              </p>
+              <div className="flex items-end gap-2 h-36">
+                {trend.map((t) => (
+                  <div key={t.month} className="flex-1 flex flex-col items-center gap-1.5">
+                    <p className="text-[10px] text-ink/50 h-3">
+                      {t.consultationCount > 0 ? t.consultationCount : ""}
+                    </p>
+                    <div
+                      className={`w-full rounded-t-md transition-all ${
+                        t.month === monthKey ? "bg-coral" : "bg-coral/30"
+                      }`}
+                      style={{
+                        height: `${Math.max(4, (t.consultationCount / maxConsultations) * 100)}px`,
+                      }}
+                    />
+                    <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+              <p className="text-sm font-medium mb-4">
+                월별 신규 등록{" "}
+                <span className="text-xs text-ink/40 font-normal">최근 {TREND_MONTHS}개월</span>
+              </p>
+              <div className="flex items-end gap-2 h-36">
+                {retentionTrend.map((t) => (
+                  <div key={t.month} className="flex-1 flex flex-col items-center gap-1.5">
+                    <p className="text-[10px] text-ink/50 h-3">
+                      {t.newMemberCount > 0 ? `${t.newMemberCount}명` : ""}
+                    </p>
+                    <div
+                      className={`w-full rounded-t-md transition-all ${
+                        t.month === monthKey ? "bg-gold-light" : "bg-gold-light/40"
+                      }`}
+                      style={{
+                        height: `${Math.max(4, (t.newMemberCount / maxNewRegs) * 100)}px`,
+                      }}
                     />
                     <p className="text-[10px] text-ink/40">{formatMonthShort(t.month)}</p>
                   </div>
@@ -176,11 +257,13 @@ export default async function AdminDashboardPage({
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium">{r.coachName}</span>
-                  <span className="text-gold font-semibold">{formatWon(r.revenue)}</span>
+                  <span className="text-gold-deep font-semibold">{formatWon(r.revenue)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 text-xs text-ink/60">
                   <span>담당 {r.memberCount}명</span>
-                  <span>완료 {r.completedSessions}회</span>
+                  <span>
+                    1:1 {r.sessionCount1on1}회 · 2:1 {r.sessionCount2on1}회
+                  </span>
                   <span>노쇼 {r.noShowCount}회</span>
                   <span>재등록율 {formatRate(r.reRegistrationRate)}</span>
                   <span>월 상담수 {r.consultationCount}명</span>
@@ -195,12 +278,13 @@ export default async function AdminDashboardPage({
 
           {/* 트레이너별 성과 — 데스크톱 표 */}
           <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-6">
-            <table className="w-full text-sm min-w-[820px]">
+            <table className="w-full text-sm min-w-[900px]">
               <thead>
                 <tr className="text-left text-ink/50 text-xs border-b border-line/60">
                   <th className="px-5 py-3 font-medium">코치</th>
                   <th className="px-5 py-3 font-medium">담당 회원</th>
-                  <th className="px-5 py-3 font-medium">완료 세션</th>
+                  <th className="px-5 py-3 font-medium">1:1</th>
+                  <th className="px-5 py-3 font-medium">2:1</th>
                   <th className="px-5 py-3 font-medium">노쇼</th>
                   <th className="px-5 py-3 font-medium">매출</th>
                   <th className="px-5 py-3 font-medium">재등록율</th>
@@ -213,9 +297,10 @@ export default async function AdminDashboardPage({
                   <tr key={r.coachId} className="border-b border-line/40 last:border-0">
                     <td className="px-5 py-3 font-medium">{r.coachName}</td>
                     <td className="px-5 py-3 text-ink/70">{r.memberCount}명</td>
-                    <td className="px-5 py-3 text-ink/70">{r.completedSessions}회</td>
+                    <td className="px-5 py-3 text-ink/70">{r.sessionCount1on1}회</td>
+                    <td className="px-5 py-3 text-ink/70">{r.sessionCount2on1}회</td>
                     <td className="px-5 py-3 text-ink/70">{r.noShowCount}회</td>
-                    <td className="px-5 py-3 text-gold font-medium">{formatWon(r.revenue)}</td>
+                    <td className="px-5 py-3 text-gold-deep font-medium">{formatWon(r.revenue)}</td>
                     <td className="px-5 py-3 text-ink/70">{formatRate(r.reRegistrationRate)}</td>
                     <td className="px-5 py-3 text-ink/70">{r.consultationCount}명</td>
                     <td className="px-5 py-3 text-ink/70">{formatRate(r.consultationSuccessRate)}</td>
@@ -223,13 +308,55 @@ export default async function AdminDashboardPage({
                 ))}
                 {coachReports.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-5 py-10 text-center text-ink/40">
+                    <td colSpan={9} className="px-5 py-10 text-center text-ink/40">
                       코치가 없어요.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* 이번 달 방문 경로 (초진 문진표 기준) */}
+          <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-6">
+            <p className="text-sm font-medium mb-3">
+              이번 달 방문 경로 <span className="text-xs text-ink/40 font-normal">초진 문진표 기준 · 총 {visitChannelTotal}건</span>
+            </p>
+            {visitChannelTotal === 0 ? (
+              <p className="text-sm text-ink/40">이번 달 작성된 문진표가 없어요.</p>
+            ) : (
+              <div className="space-y-2">
+                {visitChannelRows.map((row) => (
+                  <div key={row.label} className="flex items-center gap-3">
+                    <span className="w-16 shrink-0 text-xs text-ink/60">{row.label}</span>
+                    <div className="flex-1 h-4 rounded-full bg-bone overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${(row.count / maxVisitChannelCount) * 100}%`,
+                          backgroundColor: colorForVisitChannel(row.value),
+                        }}
+                      />
+                    </div>
+                    <span className="w-8 shrink-0 text-right text-xs text-ink/70">{row.count}</span>
+                  </div>
+                ))}
+                {unknownVisitChannelCount > 0 && (
+                  <div className="flex items-center gap-3">
+                    <span className="w-16 shrink-0 text-xs text-ink/40">미입력</span>
+                    <div className="flex-1 h-4 rounded-full bg-bone overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-line"
+                        style={{ width: `${(unknownVisitChannelCount / maxVisitChannelCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-8 shrink-0 text-right text-xs text-ink/40">
+                      {unknownVisitChannelCount}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid lg:grid-cols-2 gap-4">
@@ -271,7 +398,7 @@ export default async function AdminDashboardPage({
                           <td className="py-2 pr-2 text-ink/50 whitespace-nowrap">
                             {p.totalSessions}회
                           </td>
-                          <td className="py-2 pr-2 text-gold font-medium whitespace-nowrap">
+                          <td className="py-2 pr-2 text-gold-deep font-medium whitespace-nowrap">
                             {formatWon(p.price)}
                           </td>
                           <td className="py-2 whitespace-nowrap">
@@ -294,7 +421,7 @@ export default async function AdminDashboardPage({
           </div>
 
       <p className="text-xs text-ink/40 mt-4 leading-relaxed">
-        매출은 그 달에 결제된 패키지 금액 합계이고, 완료 세션은 세션 상태가 &apos;완료&apos;인
+        매출은 그 달에 결제된 패키지 금액 합계이고, 수업수는 취소되지 않은 수업(노쇼·예정 포함)
         건수예요. 신규 등록은 첫 패키지를 이번 달에 구매한 회원, 재등록은 이미 패키지가 있던
         회원이 이번 달에 추가로 구매한 경우예요.
       </p>

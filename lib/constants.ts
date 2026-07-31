@@ -17,6 +17,25 @@ export const PURPOSE_LABELS: Record<string, string> = Object.fromEntries(
   PURPOSE_OPTIONS.map((option) => [option.value, option.label]),
 );
 
+export interface CoachColorStyle {
+  header: string;
+  headerText: string;
+  accent: string;
+}
+
+// 신나아짐 브랜드 톤(골드·세이지·코랄 + 보조 색)에서 파생한 코치 색상 팔레트.
+// Tailwind 기본 rainbow 팔레트 대신 브랜드와 어울리는 톤만 순환시킨다.
+// 스케줄표와 회원 관리의 고정 회원 시간표가 모두 이 팔레트를 공유해, 같은
+// 코치는 어디서든 같은 색으로 보인다.
+export const COACH_COLOR_PALETTE: CoachColorStyle[] = [
+  { header: "bg-gold/15", headerText: "text-gold-deep", accent: "border-l-gold" },
+  { header: "bg-sage/20", headerText: "text-[#3f6357]", accent: "border-l-sage" },
+  { header: "bg-coral/12", headerText: "text-[#a84a2c]", accent: "border-l-coral" },
+  { header: "bg-[#e6ecec]", headerText: "text-[#3d5a5c]", accent: "border-l-[#8fadaf]" },
+  { header: "bg-[#f1e3e0]", headerText: "text-[#8a5347]", accent: "border-l-[#c98f83]" },
+  { header: "bg-[#f3e9d2]", headerText: "text-[#8a6a1f]", accent: "border-l-[#cdae6a]" },
+];
+
 export function businessHours(): number[] {
   const hours: number[] = [];
   for (let h = BUSINESS_START_HOUR; h < BUSINESS_END_HOUR; h++) hours.push(h);

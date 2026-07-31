@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
-import { addPackage } from "@/lib/schedule";
+import { addPackage, getMemberById } from "@/lib/schedule";
+import { recordUndo } from "@/lib/undo";
 import type { PaymentMethod, PtType } from "@/lib/db";
 
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
@@ -43,5 +44,9 @@ export async function POST(
       ? (body.paymentMethod as PaymentMethod)
       : "card";
   const pkg = await addPackage(idNum, totalSessions, price, note || "재등록", ptType, paymentMethod);
+  const member = await getMemberById(idNum);
+  await recordUndo(`${member?.name ?? "회원"} 패키지 추가`, [
+    { op: "delete", table: "packages", id: pkg.id },
+  ]);
   return NextResponse.json({ package: pkg }, { status: 201 });
 }

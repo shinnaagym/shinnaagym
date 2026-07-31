@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { addCoach, listCoaches } from "@/lib/schedule";
+import { recordUndo } from "@/lib/undo";
 
 export async function GET() {
   if (!(await isAdminAuthed())) {
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const coach = await addCoach(name, phone);
+    await recordUndo(`${name} 코치 등록`, [{ op: "delete", table: "coaches", id: coach.id }]);
     return NextResponse.json({ coach }, { status: 201 });
   } catch (err: unknown) {
     if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505") {

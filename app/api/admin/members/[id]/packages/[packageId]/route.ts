@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { deletePackage, updatePackage } from "@/lib/schedule";
-import type { PaymentMethod, PtType } from "@/lib/db";
+import { query } from "@/lib/db";
+import { recordUndo } from "@/lib/undo";
+import type { PackageRow, PaymentMethod, PtType } from "@/lib/db";
 
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 const VALID_PAYMENT_METHODS: PaymentMethod[] = ["card", "transfer"];
@@ -45,7 +47,23 @@ export async function PATCH(
       ? (body.paymentMethod as PaymentMethod)
       : undefined;
 
+  const before = (await query<PackageRow>(`SELECT * FROM packages WHERE id = $1`, [idNum])).rows[0];
+  if (!before) {
+    return NextResponse.json({ error: "패키지를 찾을 수 없습니다." }, { status: 404 });
+  }
+
   const pkg = await updatePackage(idNum, { totalSessions, price, note, ptType, paymentMethod });
+
+  const prevValues: Record<string, unknown> = {};
+  if (totalSessions !== undefined) prevValues.total_sessions = before.total_sessions;
+  if (price !== undefined) prevValues.price = before.price;
+  if (note !== undefined) prevValues.note = before.note;
+  if (ptType !== undefined) prevValues.pt_type = before.pt_type;
+  if (paymentMethod !== undefined) prevValues.payment_method = before.payment_method;
+  if (Object.keys(prevValues).length > 0) {
+    await recordUndo("패키지 수정", [{ op: "update", table: "packages", id: idNum, data: prevValues }]);
+  }
+
   return NextResponse.json({ package: pkg });
 }
 
@@ -61,6 +79,10 @@ export async function DELETE(
   if (!Number.isInteger(idNum)) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
+  const before = (await query<PackageRow>(`SELECT * FROM packages WHERE id = $1`, [idNum])).rows[0];
   await deletePackage(idNum);
+  if (before) {
+    await recordUndo("패키지 삭제", [{ op: "insert", table: "packages", data: before }]);
+  }
   return NextResponse.json({ ok: true });
 }

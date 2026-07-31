@@ -9,7 +9,7 @@ export default async function AdminReservationsPage() {
   }
 
   const result = await query<ReservationRow>(
-    `SELECT * FROM reservations ORDER BY reservation_date ASC, reservation_hour ASC`,
+    `SELECT * FROM reservations ORDER BY created_at DESC`,
   );
 
   return (

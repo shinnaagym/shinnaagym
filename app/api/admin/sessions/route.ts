@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
-import { createSession, findOrCreateMemberByPhone, listSessionsInRange } from "@/lib/schedule";
+import {
+  createSession,
+  findOrCreateMemberByPhone,
+  getMemberById,
+  listSessionsInRange,
+} from "@/lib/schedule";
 import { isValidDateKey } from "@/lib/date";
+import { recordUndo } from "@/lib/undo";
 import type { PtType, SessionEntryType } from "@/lib/db";
 
 const VALID_ENTRY_TYPES: SessionEntryType[] = ["session", "consultation", "memo", "blocked"];
@@ -91,6 +97,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const session = await createSession({ memberId, coachId, date, hour, memo, entryType, ptType });
+
+    const member = memberId != null ? await getMemberById(memberId) : null;
+    const who = member ? `${member.name} 회원` : entryType === "memo" ? "메모" : "일정";
+    await recordUndo(`${who} ${date} ${hour}시 예약`, [
+      { op: "delete", table: "class_sessions", id: session.id },
+    ]);
+
     return NextResponse.json({ session }, { status: 201 });
   } catch (err: unknown) {
     if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505") {

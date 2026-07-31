@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -29,6 +29,17 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ko_KR",
   },
+  // 사파리에서 "홈 화면에 추가"로 설치했을 때 브라우저 주소창 없이 앱처럼
+  // 열리게 하는 설정. 홈 화면 아이콘 이름과 상단 상태바 스타일을 지정한다.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "신나아짐",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f6f1e7",
 };
 
 export default function RootLayout({

@@ -82,7 +82,7 @@ export default function Home() {
           </a>
         </div>
         <div className="relative mx-auto max-w-5xl px-6 pt-12 pb-16 sm:pt-16 sm:pb-24">
-          <p className="hero-fade-1 text-sm tracking-[0.2em] text-gold uppercase mb-6">
+          <p className="hero-fade-1 text-sm tracking-[0.2em] text-gold-light uppercase mb-6">
             Pre-Open Reservation
           </p>
           <h1 className="hero-fade-2 font-serif-display text-[1.9rem] sm:text-7xl leading-[1.3] sm:leading-[1.15] tracking-tight mb-8">
@@ -92,6 +92,22 @@ export default function Home() {
             <br />
             신나아짐에서 시작됩니다.
           </h1>
+          <div className="hero-fade-2 mb-6 flex flex-col items-start gap-3">
+            <div className="inline-flex items-baseline gap-2 rounded-2xl bg-black border border-gold/40 px-6 py-3 shadow-lg shadow-black/30">
+              <span className="font-serif-display text-3xl sm:text-4xl font-bold text-gold-light tracking-tight">
+                평생 20% 할인
+              </span>
+            </div>
+            <span className="inline-block rounded-full border border-gold/50 px-3 py-1 text-xs tracking-[0.15em] text-gold-light uppercase">
+              오픈 기념 특별 · 오픈 후 한 달간
+            </span>
+            <p className="text-xs text-gold-light/80 tracking-wide">
+              오픈 후 한 달간 진행되는 이벤트예요
+            </p>
+            <p className="text-sm text-sage">
+              선착순 15% 할인 + 그 이후 등록 시 추가 5%
+            </p>
+          </div>
           <p className="hero-fade-3 max-w-xl text-bone/80 leading-relaxed mb-3">
             물리치료사가 설계하는 프리미엄 PT, 신나아짐이 곧 문을 엽니다.
             오픈에 앞서 가장 먼저 예약하고 첫 회원이 되어주세요.
@@ -110,9 +126,9 @@ export default function Home() {
             <PulseLine className="w-full max-w-xl h-16 text-gold" />
             <a
               href="#reserve"
-              className="group inline-flex items-center gap-2 mt-12 rounded-full bg-gold text-bone px-8 py-3.5 font-medium tracking-wide shadow-lg shadow-gold/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-gold/30"
+              className="group inline-flex items-center gap-2 mt-12 rounded-full bg-gold-deep text-bone px-8 py-3.5 font-medium tracking-wide shadow-lg shadow-gold-deep/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-gold-deep/30"
             >
-              사전예약 하러 가기
+              지금 사전예약하기
               <span className="transition-transform duration-300 group-hover:translate-x-1">
                 →
               </span>
@@ -128,17 +144,19 @@ export default function Home() {
           </Reveal>
           <div className="grid gap-10 sm:grid-cols-[280px_1fr] items-start">
             <Reveal>
-              <Image
-                src="/trainer-shinjongsu.jpg"
-                alt={`신나아짐 대표 ${TRAINER_NAME}`}
-                width={472}
-                height={692}
-                className="w-full max-w-[280px] mx-auto sm:max-w-none rounded-2xl shadow-lg"
-              />
+              <div className="relative w-full max-w-[280px] mx-auto sm:max-w-none aspect-[4/5] rounded-2xl overflow-hidden shadow-lg">
+                <Image
+                  src="/trainer-shinjongsu.jpg"
+                  alt={`신나아짐 대표 ${TRAINER_NAME}`}
+                  fill
+                  sizes="(min-width: 640px) 280px, 280px"
+                  className="object-cover object-[center_18%] grayscale-[15%] sepia-[8%] contrast-[1.05]"
+                />
+              </div>
             </Reveal>
             <Reveal delayMs={100}>
               <p className="font-serif-display text-2xl mb-1">{TRAINER_NAME}</p>
-              <p className="text-xs tracking-[0.15em] text-gold uppercase mb-5">
+              <p className="text-xs tracking-[0.15em] text-gold-deep uppercase mb-5">
                 Physical Therapist
               </p>
               <p className="text-ink/70 leading-relaxed mb-8">{TRAINER_BIO}</p>
@@ -182,7 +200,7 @@ export default function Home() {
         <section className="bg-ink text-bone py-20 sm:py-24">
           <div className="mx-auto max-w-5xl px-6">
             <Reveal>
-              <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
+              <p className="text-sm tracking-[0.2em] text-gold-light uppercase mb-3">
                 How It Works
               </p>
               <h2 className="font-serif-display text-3xl mb-14">처음 오시는 날의 순서</h2>
@@ -215,7 +233,7 @@ export default function Home() {
           <div className="mx-auto max-w-5xl px-6 py-20">
             <Reveal>
               <PulseLine className="w-24 h-8 text-gold/70 mb-6" />
-              <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
+              <p className="text-sm tracking-[0.2em] text-gold-deep uppercase mb-3">
                 Reservation
               </p>
               <h2 className="font-serif-display text-3xl mb-3">사전예약 안내</h2>
@@ -233,14 +251,14 @@ export default function Home() {
           <div className="mx-auto max-w-5xl px-6 py-20">
             <Reveal>
               <PulseLine className="w-24 h-8 text-gold/70 mb-6" />
-              <p className="text-sm tracking-[0.2em] text-gold uppercase mb-3">
+              <p className="text-sm tracking-[0.2em] text-gold-deep uppercase mb-3">
                 Location
               </p>
               <h2 className="font-serif-display text-3xl mb-3">오시는 길</h2>
               <p className="text-ink/70 mb-10 leading-relaxed">
                 {STUDIO_ADDRESS}
                 <br />
-                문의 · <span className="text-gold font-medium">010-6859-6114</span>
+                문의 · <span className="text-gold-deep font-medium">010-6859-6114</span>
               </p>
             </Reveal>
             <Reveal delayMs={100}>
@@ -254,7 +272,7 @@ export default function Home() {
                     href={`https://map.naver.com/p/search/${encodeURIComponent(STUDIO_ADDRESS)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-6 inline-flex items-center gap-1.5 text-sm text-gold font-medium hover:underline"
+                    className="mt-6 inline-flex items-center gap-1.5 text-sm text-gold-deep font-medium hover:underline"
                   >
                     네이버 지도에서 길찾기
                     <span aria-hidden="true">→</span>
@@ -281,7 +299,7 @@ export default function Home() {
           <p>전 직원 물리치료사 면허 보유 · 프리미엄 PT 스튜디오</p>
           <p>{STUDIO_ADDRESS}</p>
           <p>
-            문의 · <span className="text-gold font-medium">010-6859-6114</span>
+            문의 · <span className="text-gold-deep font-medium">010-6859-6114</span>
           </p>
           <p>정확한 오픈일은 사전예약해주신 분들께 가장 먼저 안내드릴게요.</p>
         </div>
