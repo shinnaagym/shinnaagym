@@ -96,11 +96,16 @@ function SessionCellButton({
   goldenBellMemberIds,
   onEdit,
   onCreate,
+  mergedSessions,
+  onEditMerged,
 }: {
   session: SessionWithMember | undefined;
   goldenBellMemberIds: Set<number>;
   onEdit: (session: SessionWithMember) => void;
   onCreate: () => void;
+  /** 연속된 시간대를 하나로 합친 칸일 때, 그 안에 포함된 전체 항목(2개 이상). */
+  mergedSessions?: SessionWithMember[];
+  onEditMerged?: (sessions: SessionWithMember[]) => void;
 }) {
   if (!session) {
     return (
@@ -112,16 +117,22 @@ function SessionCellButton({
       </button>
     );
   }
+  const isMerged = !!mergedSessions && mergedSessions.length > 1;
   return (
     <button
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", String(session.id));
-        e.dataTransfer.effectAllowed = "move";
-      }}
-      onClick={() => onEdit(session)}
+      draggable={!isMerged}
+      onDragStart={
+        isMerged
+          ? undefined
+          : (e) => {
+              e.dataTransfer.setData("text/plain", String(session.id));
+              e.dataTransfer.effectAllowed = "move";
+            }
+      }
+      onClick={() => (isMerged ? onEditMerged?.(mergedSessions!) : onEdit(session))}
       className={[
-        "w-full rounded-lg border px-2 py-1.5 text-left text-xs transition hover:shadow-sm cursor-grab active:cursor-grabbing",
+        "w-full h-full rounded-lg border px-2 py-1.5 text-left text-xs transition hover:shadow-sm",
+        isMerged ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         entryStyle(session),
       ].join(" ")}
     >
@@ -196,6 +207,7 @@ export function ScheduleGrid({
     coachId: number;
   } | null>(null);
   const [editTarget, setEditTarget] = useState<SessionWithMember | null>(null);
+  const [mergedEditTarget, setMergedEditTarget] = useState<SessionWithMember[] | null>(null);
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
   const allGridScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -233,6 +245,50 @@ export function ScheduleGrid({
     }
     return map;
   }, [sessions]);
+
+  /** 개인 일정·수업 불가처럼 여러 시간을 한 번에 등록한 항목은 시간마다 별도
+      행으로 저장되지만, 내용이 같은 채로 연속된 시간대라면 스케줄표에서 하나의
+      칸으로 이어 붙여 보여준다(값은 followerCells에서 null 처리, leader만 표시). */
+  const spanInfoMap = useMemo(() => {
+    const map = new Map<string, { span: number; isFollower: boolean; sessions: SessionWithMember[] }>();
+    for (const d of dateKeys) {
+      const dh = dayHours[d];
+      if (!dh || dh.closed) continue;
+      for (const coach of coaches) {
+        let hour = dh.start;
+        while (hour < dh.end) {
+          const key = `${d}-${coach.id}-${hour}`;
+          const session = sessionMap.get(key);
+          if (!session || !isSimpleEntry(session)) {
+            hour += 1;
+            continue;
+          }
+          let runEnd = hour + 1;
+          const runSessions = [session];
+          while (runEnd < dh.end) {
+            const next = sessionMap.get(`${d}-${coach.id}-${runEnd}`);
+            if (
+              next &&
+              next.entry_type === session.entry_type &&
+              next.status === session.status &&
+              (next.memo || "") === (session.memo || "")
+            ) {
+              runSessions.push(next);
+              runEnd += 1;
+            } else {
+              break;
+            }
+          }
+          const span = runEnd - hour;
+          for (let h = hour; h < runEnd; h++) {
+            map.set(`${d}-${coach.id}-${h}`, { span, isFollower: h !== hour, sessions: runSessions });
+          }
+          hour = runEnd;
+        }
+      }
+    }
+    return map;
+  }, [dateKeys, dayHours, coaches, sessionMap]);
 
   /** "코치 전체"를 볼 때 KPI 카드에 쓰는, 전체 코치 합산 통계(이번 달/이번 주). */
   const totalStats = useMemo(() => {
@@ -477,11 +533,15 @@ export function ScheduleGrid({
                   {dateKeys.map((d) => {
                     const dh = dayHours[d];
                     const withinHours = !!dh && !dh.closed && hour >= dh.start && hour < dh.end;
-                    const session = sessionMap.get(`${d}-${singleCoach.id}-${hour}`);
+                    const key = `${d}-${singleCoach.id}-${hour}`;
+                    const session = sessionMap.get(key);
+                    const spanInfo = spanInfoMap.get(key);
+                    if (spanInfo?.isFollower) return null;
                     return (
                       <div
                         key={d}
                         className="border-b border-line/40 p-1"
+                        style={spanInfo && spanInfo.span > 1 ? { gridRow: `span ${spanInfo.span}` } : undefined}
                         onDragOver={withinHours ? (e) => e.preventDefault() : undefined}
                         onDrop={
                           withinHours
@@ -495,6 +555,8 @@ export function ScheduleGrid({
                             goldenBellMemberIds={goldenBellMemberIds}
                             onEdit={setEditTarget}
                             onCreate={() => setCreateTarget({ date: d, hour, coachId: singleCoach.id })}
+                            mergedSessions={spanInfo?.sessions}
+                            onEditMerged={setMergedEditTarget}
                           />
                         ) : (
                           <div className="w-full rounded-lg px-2 py-1.5 text-center text-[11px] text-ink/15">
@@ -637,9 +699,10 @@ export function ScheduleGrid({
                     const dh = dayHours[d];
                     const withinHours = !!dh && !dh.closed && hour >= dh.start && hour < dh.end;
                     return effectiveCoaches.map((coach, ci) => {
-                      const session = withinHours
-                        ? sessionMap.get(`${d}-${coach.id}-${hour}`)
-                        : undefined;
+                      const key = `${d}-${coach.id}-${hour}`;
+                      const session = withinHours ? sessionMap.get(key) : undefined;
+                      const spanInfo = withinHours ? spanInfoMap.get(key) : undefined;
+                      if (spanInfo?.isFollower) return null;
                       return (
                         <div
                           key={`${d}-${coach.id}`}
@@ -647,6 +710,7 @@ export function ScheduleGrid({
                             "border-b p-1",
                             ci === 0 ? "border-l-2 border-ink/25" : "border-l border-line/20",
                           ].join(" ")}
+                          style={spanInfo && spanInfo.span > 1 ? { gridRow: `span ${spanInfo.span}` } : undefined}
                           onDragOver={withinHours ? (e) => e.preventDefault() : undefined}
                           onDrop={
                             withinHours ? (e) => handleDropOnCell(e, d, hour, coach.id) : undefined
@@ -662,6 +726,8 @@ export function ScheduleGrid({
                               goldenBellMemberIds={goldenBellMemberIds}
                               onEdit={setEditTarget}
                               onCreate={() => setCreateTarget({ date: d, hour, coachId: coach.id })}
+                              mergedSessions={spanInfo?.sessions}
+                              onEditMerged={setMergedEditTarget}
                             />
                           )}
                         </div>
@@ -701,6 +767,19 @@ export function ScheduleGrid({
           onClose={() => setEditTarget(null)}
           onChanged={async () => {
             setEditTarget(null);
+            setLoading(true);
+            await refreshSessions();
+            setLoading(false);
+          }}
+        />
+      )}
+
+      {mergedEditTarget && (
+        <EditMergedBlockModal
+          sessions={mergedEditTarget}
+          onClose={() => setMergedEditTarget(null)}
+          onChanged={async () => {
+            setMergedEditTarget(null);
             setLoading(true);
             await refreshSessions();
             setLoading(false);
@@ -1471,6 +1550,103 @@ function EditSessionModal({
           className="w-full text-sm text-red-500 hover:underline mt-2"
         >
           기록 삭제
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/** 스케줄표에서 하나로 이어 붙여 보여준 연속 시간대(개인 일정·수업 불가)를
+    한 번에 수정·삭제하는 모달. 내부적으로는 여러 개의 시간별 행이지만, 이
+    화면에서는 하나의 일정처럼 다룬다. */
+function EditMergedBlockModal({
+  sessions,
+  onClose,
+  onChanged,
+}: {
+  sessions: SessionWithMember[];
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const first = sessions[0];
+  const last = sessions[sessions.length - 1];
+  const [memo, setMemo] = useState(first.memo);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const results = await Promise.all(
+        sessions.map((s) =>
+          fetch(`/api/admin/sessions/${s.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ memo }),
+          }),
+        ),
+      );
+      if (results.some((r) => !r.ok)) {
+        setError("일부 시간대 저장에 실패했어요.");
+        return;
+      }
+      onChanged();
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`${first.session_hour}:00~${last.session_hour + 1}:00 전체를 삭제할까요?`)) return;
+    setSubmitting(true);
+    try {
+      const results = await Promise.all(
+        sessions.map((s) => fetch(`/api/admin/sessions/${s.id}`, { method: "DELETE" })),
+      );
+      if (results.every((r) => r.ok)) onChanged();
+      else setError("일부 시간대 삭제에 실패했어요.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ModalShell
+      title={`${CATEGORY_LABELS[first.entry_type]} — ${first.session_date} ${first.session_hour}:00~${last.session_hour + 1}:00`}
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        <p className="text-xs text-ink/40">
+          연속된 {sessions.length}개 시간대를 하나로 묶어 보여주고 있어요. 여기서 수정·삭제하면
+          전체 시간대에 함께 적용돼요.
+        </p>
+        <div>
+          <label className="block text-sm font-medium mb-1.5">
+            {first.entry_type === "blocked" ? "사유" : "메모 내용"}
+          </label>
+          <input
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          />
+        </div>
+        {error && <p className="text-sm text-coral">{error}</p>}
+        <button
+          disabled={submitting}
+          onClick={handleSave}
+          className="w-full rounded-full bg-ink text-white py-2.5 text-sm font-medium hover:bg-coral transition disabled:opacity-50"
+        >
+          저장
+        </button>
+        <button
+          disabled={submitting}
+          onClick={handleDelete}
+          className="w-full text-sm text-red-500 hover:underline"
+        >
+          전체 시간대 삭제
         </button>
       </div>
     </ModalShell>
