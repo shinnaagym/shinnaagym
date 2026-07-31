@@ -11,6 +11,11 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   owner: "대표",
 };
 
+// weekday: 앱 전체에서 쓰는 관례대로 0=월요일 ~ 6=일요일.
+const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+
+export type DutyRoster = Record<number, { coachId: number; coachName: string }>;
+
 export function SettingsView({
   initialCoaches,
   initialHolidays,
@@ -18,6 +23,7 @@ export function SettingsView({
   buildId,
   initialDevices,
   currentDeviceId,
+  initialDutyRoster,
 }: {
   initialCoaches: CoachRow[];
   initialHolidays: HolidayRow[];
@@ -25,14 +31,32 @@ export function SettingsView({
   buildId: string;
   initialDevices: AdminDeviceRow[];
   currentDeviceId: string | null;
+  initialDutyRoster: DutyRoster;
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
+  const [dutyRoster, setDutyRoster] = useState(initialDutyRoster);
   const [newCoachName, setNewCoachName] = useState("");
   const [newCoachPhone, setNewCoachPhone] = useState("");
   const [newHolidayDate, setNewHolidayDate] = useState("");
   const [newHolidayName, setNewHolidayName] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  async function toggleDuty(weekday: number, coach: CoachRow) {
+    const isAssignedToThisCoach = dutyRoster[weekday]?.coachId === coach.id;
+    const nextCoachId = isAssignedToThisCoach ? null : coach.id;
+    setDutyRoster((prev) => {
+      const next = { ...prev };
+      if (nextCoachId === null) delete next[weekday];
+      else next[weekday] = { coachId: coach.id, coachName: coach.name };
+      return next;
+    });
+    await fetch("/api/admin/duty-roster", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekday, coachId: nextCoachId }),
+    });
+  }
 
   async function addCoach() {
     if (!newCoachName.trim()) return;
@@ -236,6 +260,46 @@ export function SettingsView({
           >
             추가
           </button>
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
+        <h2 className="font-display text-lg mb-1">당직자 설정</h2>
+        <p className="text-xs text-ink/50 mb-4">
+          요일마다 당직 코치를 지정하면 스케줄표 요일 아래에 표시돼요. 한 요일에는 한 명만
+          지정할 수 있어요(다른 코치를 선택하면 그 요일의 기존 지정은 해제돼요).
+        </p>
+        <div className="divide-y divide-line/50">
+          {coaches
+            .filter((c) => c.active)
+            .map((c) => (
+              <div key={c.id} className="py-2.5 flex items-center gap-3 flex-wrap">
+                <span className="text-sm w-16 shrink-0">{c.name}</span>
+                <div className="flex gap-1 flex-wrap">
+                  {WEEKDAY_LABELS.map((label, weekday) => {
+                    const active = dutyRoster[weekday]?.coachId === c.id;
+                    return (
+                      <button
+                        key={weekday}
+                        type="button"
+                        onClick={() => toggleDuty(weekday, c)}
+                        className={[
+                          "rounded-lg border w-9 h-9 text-xs font-medium transition",
+                          active
+                            ? "bg-ink text-white border-ink"
+                            : "border-line text-ink/60 hover:bg-bone",
+                        ].join(" ")}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          {coaches.filter((c) => c.active).length === 0 && (
+            <p className="text-sm text-ink/40 py-2.5">재직 중인 코치가 없어요.</p>
+          )}
         </div>
       </section>
 

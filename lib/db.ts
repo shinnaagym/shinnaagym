@@ -91,7 +91,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -329,6 +329,14 @@ function runFullMigration(): Promise<void> {
           revoked_at TIMESTAMPTZ
         );
 
+        -- 요일별 당직자(고정 담당 코치) 설정. 요일은 앱 전체에서 쓰는 관례대로
+        -- 0=월요일 ~ 6=일요일이며, 한 요일에는 코치 한 명만 지정할 수 있다
+        -- (PRIMARY KEY). 코치가 삭제되면 그 요일의 당직 지정도 함께 사라진다.
+        CREATE TABLE IF NOT EXISTS duty_roster (
+          weekday SMALLINT PRIMARY KEY,
+          coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE
+        );
+
         -- 급여 계산 결과 이력. coach_id는 나중에 코치가 삭제/개명되어도 당시 급여
         -- 명세를 그대로 보존할 수 있게 nullable로 두고, employee_name에 계산 당시
         -- 이름을 스냅샷으로 함께 저장한다. result에는 계산된 급여명세 전체(기본급/
@@ -524,6 +532,12 @@ export interface CoachRow {
   hired_at: string;
   is_team_lead: boolean;
   created_at: string;
+}
+
+/** weekday: 앱 전체에서 쓰는 관례대로 0=월요일 ~ 6=일요일. */
+export interface DutyRosterRow {
+  weekday: number;
+  coach_id: number;
 }
 
 export interface AdminDeviceRow {

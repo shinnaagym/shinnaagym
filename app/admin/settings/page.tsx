@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { getDeviceId, isAdminAuthed } from "@/lib/auth";
-import { getActiveMemberCountsByCoach, listCoaches, listHolidays } from "@/lib/schedule";
+import {
+  getActiveMemberCountsByCoach,
+  getDutyRoster,
+  listCoaches,
+  listHolidays,
+} from "@/lib/schedule";
 import { BUILD_ID } from "@/lib/build-info";
 import { listActiveDevices } from "@/lib/devices";
 import { SettingsView } from "./settings-view";
@@ -10,13 +15,15 @@ export default async function AdminSettingsPage() {
     redirect("/admin");
   }
 
-  const [coaches, holidays, memberCounts, devices, currentDeviceId] = await Promise.all([
-    listCoaches(),
-    listHolidays(),
-    getActiveMemberCountsByCoach(),
-    listActiveDevices(),
-    getDeviceId(),
-  ]);
+  const [coaches, holidays, memberCounts, devices, currentDeviceId, dutyRoster] =
+    await Promise.all([
+      listCoaches(),
+      listHolidays(),
+      getActiveMemberCountsByCoach(),
+      listActiveDevices(),
+      getDeviceId(),
+      getDutyRoster(),
+    ]);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -27,6 +34,7 @@ export default async function AdminSettingsPage() {
         buildId={BUILD_ID}
         initialDevices={devices}
         currentDeviceId={currentDeviceId ?? null}
+        initialDutyRoster={dutyRoster}
       />
     </div>
   );
