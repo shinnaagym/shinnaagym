@@ -259,7 +259,7 @@ export function AdminNav() {
 
         <nav
           ref={navScrollRef}
-          className="order-3 w-full sm:order-none sm:w-auto flex items-center gap-1 rounded-full bg-bone/70 p-1 overflow-x-auto"
+          className="order-3 w-full sm:order-none sm:w-auto flex items-center gap-0.5 rounded-full bg-bone/70 p-1 overflow-x-auto"
         >
           {tabs.map((tab) => {
             const active = pathname?.startsWith(tab.href);
@@ -273,7 +273,10 @@ export function AdminNav() {
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
                 style={{
-                  touchAction: "none",
+                  // 드래그 중일 때만 터치 스크롤을 완전히 막는다. 항상 "none"으로 두면
+                  // 탭들이 스크롤 영역 대부분을 차지해버려 평소에 옆으로 스와이프하는
+                  // 제스처 자체가 막혀버린다(가로 스크롤이 안 되는 문제의 원인이었음).
+                  touchAction: isDragging ? "none" : "pan-x",
                   WebkitTouchCallout: "none",
                   WebkitUserSelect: "none",
                   userSelect: "none",
@@ -290,7 +293,7 @@ export function AdminNav() {
                   draggable={false}
                   style={{ WebkitTouchCallout: "none" }}
                   className={[
-                    "block px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors select-none",
+                    "block px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors select-none",
                     active ? "bg-coral text-white shadow-sm" : "text-ink/60 hover:text-ink",
                     isDragging ? "opacity-80" : "",
                   ].join(" ")}
