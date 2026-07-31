@@ -57,6 +57,13 @@ function getPool(): Pool {
       ssl: /localhost|127\.0\.0\.1/.test(connectionString)
         ? false
         : { rejectUnauthorized: false },
+      // Vercel의 서버리스 함수는 요청이 몰리면 인스턴스가 여러 개로 늘어나고,
+      // 인스턴스마다 이 풀을 새로 만든다. 기본값(10)을 그대로 두면 직원·회원이
+      // 늘어 동시 접속이 많아졌을 때 인스턴스 수 × 10개의 커넥션이 한꺼번에
+      // Neon Postgres에 몰려 커넥션 한도 초과로 에러가 날 수 있다. 인스턴스당
+      // 상한을 낮게 잡고, 쓰지 않는 커넥션은 빨리 반납하도록 한다.
+      max: 3,
+      idleTimeoutMillis: 10_000,
     });
   }
   return pool;
