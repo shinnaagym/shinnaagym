@@ -1,8 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import type { AdminDeviceRow, CoachRow, EmploymentType, HolidayRow } from "@/lib/db";
+import type {
+  AdminDeviceRow,
+  CoachRow,
+  EmploymentType,
+  HolidayRow,
+  RecurringEventCycle,
+  RecurringEventRow,
+  SettingsMemoRow,
+} from "@/lib/db";
 import { SyncDiagnostics } from "./sync-diagnostics";
+import { MemoPad } from "../memo-pad";
+
+const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i); // 0~24시(종료 시각용 24 포함)
+
+// lib/recurring-events.ts는 서버 전용 DB 클라이언트(pg)를 물고 있어 클라이언트
+// 컴포넌트에서 import하면 번들이 깨지므로, 라벨만 이 파일에 그대로 복제해 둔다.
+const CYCLE_LABELS: Record<RecurringEventCycle, string> = {
+  monthly: "매달",
+  quarterly: "분기(3·6·9·12월)",
+};
 
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   regular: "정직원",
@@ -24,6 +42,8 @@ export function SettingsView({
   initialDevices,
   currentDeviceId,
   initialDutyRoster,
+  initialRecurringEvents,
+  initialSettingsMemos,
 }: {
   initialCoaches: CoachRow[];
   initialHolidays: HolidayRow[];
@@ -32,6 +52,8 @@ export function SettingsView({
   initialDevices: AdminDeviceRow[];
   currentDeviceId: string | null;
   initialDutyRoster: DutyRoster;
+  initialRecurringEvents: RecurringEventRow[];
+  initialSettingsMemos: SettingsMemoRow[];
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
@@ -40,6 +62,12 @@ export function SettingsView({
   const [newCoachPhone, setNewCoachPhone] = useState("");
   const [newHolidayDate, setNewHolidayDate] = useState("");
   const [newHolidayName, setNewHolidayName] = useState("");
+  const [recurringEvents, setRecurringEvents] = useState(initialRecurringEvents);
+  const [newEventName, setNewEventName] = useState("");
+  const [newEventCycle, setNewEventCycle] = useState<RecurringEventCycle>("monthly");
+  const [newEventDay, setNewEventDay] = useState(1);
+  const [newEventStartHour, setNewEventStartHour] = useState(12);
+  const [newEventEndHour, setNewEventEndHour] = useState(14);
   const [error, setError] = useState<string | null>(null);
 
   async function toggleDuty(weekday: number, coach: CoachRow) {
@@ -148,6 +176,78 @@ export function SettingsView({
   async function removeHoliday(date: string) {
     await fetch(`/api/admin/holidays?date=${date}`, { method: "DELETE" });
     setHolidays((prev) => prev.filter((h) => h.holiday_date !== date));
+  }
+
+  async function addRecurringEvent() {
+    if (!newEventName.trim()) {
+      setError("정기 일정 이름을 입력해주세요.");
+      return;
+    }
+    if (newEventStartHour >= newEventEndHour) {
+      setError("종료 시각은 시작 시각보다 늦어야 해요.");
+      return;
+    }
+    setError(null);
+    const res = await fetch("/api/admin/recurring-events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: newEventName.trim(),
+        cycle: newEventCycle,
+        dayOfMonth: newEventDay,
+        startHour: newEventStartHour,
+        endHour: newEventEndHour,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "정기 일정 등록에 실패했습니다.");
+      return;
+    }
+    setRecurringEvents((prev) => [...prev, data.event]);
+    setNewEventName("");
+    setNewEventCycle("monthly");
+    setNewEventDay(1);
+    setNewEventStartHour(12);
+    setNewEventEndHour(14);
+  }
+
+  async function patchRecurringEvent(
+    id: number,
+    patch: Partial<{
+      name: string;
+      cycle: RecurringEventCycle;
+      dayOfMonth: number;
+      startHour: number;
+      endHour: number;
+      enabled: boolean;
+    }>,
+  ) {
+    setRecurringEvents((prev) =>
+      prev.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              ...(patch.name !== undefined && { name: patch.name }),
+              ...(patch.cycle !== undefined && { cycle: patch.cycle }),
+              ...(patch.dayOfMonth !== undefined && { day_of_month: patch.dayOfMonth }),
+              ...(patch.startHour !== undefined && { start_hour: patch.startHour }),
+              ...(patch.endHour !== undefined && { end_hour: patch.endHour }),
+              ...(patch.enabled !== undefined && { enabled: patch.enabled }),
+            }
+          : e,
+      ),
+    );
+    await fetch(`/api/admin/recurring-events/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  }
+
+  async function removeRecurringEvent(id: number) {
+    setRecurringEvents((prev) => prev.filter((e) => e.id !== id));
+    await fetch(`/api/admin/recurring-events/${id}`, { method: "DELETE" });
   }
 
   return (
@@ -347,6 +447,173 @@ export function SettingsView({
         </div>
         {error && <p className="text-sm text-coral mt-3">{error}</p>}
       </section>
+
+      <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
+        <h2 className="font-display text-lg mb-1">정기 일정</h2>
+        <p className="text-xs text-ink/50 mb-4">
+          매달 또는 분기(3·6·9·12월)마다 같은 날짜·시간에 반복되는 일정이에요. 등록하면
+          재직 중인 코치 전원의 스케줄표에 자동으로 잡혀 그 시간엔 다른 예약을 받을 수
+          없어요. 날짜가 토·일요일이거나 공휴일 관리에 등록된 날이면 자동으로 그다음
+          평일로 미뤄져요(대체공휴일도 공휴일 관리에 등록해두면 함께 반영돼요).
+        </p>
+        <div className="divide-y divide-line/50">
+          {recurringEvents.map((ev) => (
+            <div key={ev.id} className="py-2.5 flex items-center gap-2 flex-wrap">
+              <input
+                defaultValue={ev.name}
+                onBlur={(e) => {
+                  const name = e.target.value.trim();
+                  if (name && name !== ev.name) patchRecurringEvent(ev.id, { name });
+                }}
+                className="w-28 min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+              />
+              <select
+                value={ev.cycle}
+                onChange={(e) =>
+                  patchRecurringEvent(ev.id, { cycle: e.target.value as RecurringEventCycle })
+                }
+                className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+              >
+                {(Object.keys(CYCLE_LABELS) as RecurringEventCycle[]).map((cycle) => (
+                  <option key={cycle} value={cycle}>
+                    {CYCLE_LABELS[cycle]}
+                  </option>
+                ))}
+              </select>
+              <span className="flex items-center gap-1 text-xs text-ink/60">
+                매
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={ev.day_of_month}
+                  onChange={(e) => {
+                    const day = Number(e.target.value);
+                    if (Number.isInteger(day) && day >= 1 && day <= 28) {
+                      patchRecurringEvent(ev.id, { dayOfMonth: day });
+                    }
+                  }}
+                  className="w-12 rounded-lg border border-line px-1.5 py-1.5 text-xs text-center outline-none focus:border-coral"
+                />
+                일
+              </span>
+              <span className="flex items-center gap-1 text-xs text-ink/60">
+                <select
+                  value={ev.start_hour}
+                  onChange={(e) =>
+                    patchRecurringEvent(ev.id, { startHour: Number(e.target.value) })
+                  }
+                  className="rounded-lg border border-line px-1.5 py-1.5 text-xs outline-none focus:border-coral"
+                >
+                  {HOUR_OPTIONS.slice(0, 24).map((h) => (
+                    <option key={h} value={h}>
+                      {h}시
+                    </option>
+                  ))}
+                </select>
+                ~
+                <select
+                  value={ev.end_hour}
+                  onChange={(e) => patchRecurringEvent(ev.id, { endHour: Number(e.target.value) })}
+                  className="rounded-lg border border-line px-1.5 py-1.5 text-xs outline-none focus:border-coral"
+                >
+                  {HOUR_OPTIONS.slice(1).map((h) => (
+                    <option key={h} value={h}>
+                      {h}시
+                    </option>
+                  ))}
+                </select>
+              </span>
+              <label className="flex items-center gap-1 text-xs text-ink/60">
+                <input
+                  type="checkbox"
+                  checked={ev.enabled}
+                  onChange={(e) => patchRecurringEvent(ev.id, { enabled: e.target.checked })}
+                />
+                사용
+              </label>
+              <button
+                onClick={() => removeRecurringEvent(ev.id)}
+                className="ml-auto shrink-0 text-xs text-red-400 hover:underline"
+              >
+                삭제
+              </button>
+            </div>
+          ))}
+          {recurringEvents.length === 0 && (
+            <p className="text-sm text-ink/40 py-2.5">등록된 정기 일정이 없어요.</p>
+          )}
+        </div>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 mt-4">
+          <input
+            value={newEventName}
+            onChange={(e) => setNewEventName(e.target.value)}
+            placeholder="이름 (예: 스터디)"
+            className="flex-1 min-w-0 sm:w-28 rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
+          />
+          <select
+            value={newEventCycle}
+            onChange={(e) => setNewEventCycle(e.target.value as RecurringEventCycle)}
+            className="rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral"
+          >
+            {(Object.keys(CYCLE_LABELS) as RecurringEventCycle[]).map((cycle) => (
+              <option key={cycle} value={cycle}>
+                {CYCLE_LABELS[cycle]}
+              </option>
+            ))}
+          </select>
+          <span className="flex items-center gap-1 text-sm text-ink/60">
+            매
+            <input
+              type="number"
+              min={1}
+              max={28}
+              value={newEventDay}
+              onChange={(e) => setNewEventDay(Number(e.target.value))}
+              className="w-14 rounded-lg border border-line px-2 py-2 text-sm text-center outline-none focus:border-coral"
+            />
+            일
+          </span>
+          <span className="flex items-center gap-1 text-sm text-ink/60">
+            <select
+              value={newEventStartHour}
+              onChange={(e) => setNewEventStartHour(Number(e.target.value))}
+              className="rounded-lg border border-line px-2 py-2 text-sm outline-none focus:border-coral"
+            >
+              {HOUR_OPTIONS.slice(0, 24).map((h) => (
+                <option key={h} value={h}>
+                  {h}시
+                </option>
+              ))}
+            </select>
+            ~
+            <select
+              value={newEventEndHour}
+              onChange={(e) => setNewEventEndHour(Number(e.target.value))}
+              className="rounded-lg border border-line px-2 py-2 text-sm outline-none focus:border-coral"
+            >
+              {HOUR_OPTIONS.slice(1).map((h) => (
+                <option key={h} value={h}>
+                  {h}시
+                </option>
+              ))}
+            </select>
+          </span>
+          <button
+            onClick={addRecurringEvent}
+            className="shrink-0 whitespace-nowrap rounded-full bg-ink text-white px-4 py-2 text-sm hover:bg-coral transition"
+          >
+            추가
+          </button>
+        </div>
+      </section>
+
+      <MemoPad
+        title="메모장"
+        initialMemos={initialSettingsMemos}
+        addUrl="/api/admin/settings-memos"
+        idToDeleteUrl={(id) => `/api/admin/settings-memos/${id}`}
+      />
     </div>
   );
 }

@@ -91,7 +91,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -304,6 +304,35 @@ function runFullMigration(): Promise<void> {
           content TEXT NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
+
+        -- 설정 페이지 전용 메모장. 스케줄표 메모장(schedule_memos)과는 완전히
+        -- 분리된 목록이다.
+        CREATE TABLE IF NOT EXISTS settings_memos (
+          id SERIAL PRIMARY KEY,
+          content TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
+        -- 매달/분기마다 반복되는 정기 일정(스터디, 독서 모임 등). cycle이
+        -- 'monthly'면 매달, 'quarterly'면 3·6·9·12월에 day_of_month일 발생하고,
+        -- 그 날짜가 주말이거나 공휴일이면 스케줄표 생성 시점에 다음 평일로 미뤄진다.
+        CREATE TABLE IF NOT EXISTS recurring_events (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          cycle TEXT NOT NULL DEFAULT 'monthly',
+          day_of_month INTEGER NOT NULL DEFAULT 1,
+          start_hour INTEGER NOT NULL,
+          end_hour INTEGER NOT NULL,
+          enabled BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+
+        INSERT INTO recurring_events (name, cycle, day_of_month, start_hour, end_hour)
+          SELECT * FROM (VALUES
+            ('스터디', 'monthly', 1, 12, 14),
+            ('독서 모임', 'quarterly', 1, 12, 14)
+          ) AS seed(name, cycle, day_of_month, start_hour, end_hour)
+          WHERE NOT EXISTS (SELECT 1 FROM recurring_events);
 
         -- 관리자 화면 상단 "뒤로가기" 버튼의 실행취소(undo) 기능이 쓰는 로그.
         -- 각 행은 사용자가 실행한 저장/등록/삭제 동작 하나를 되돌리는 데 필요한
@@ -825,5 +854,21 @@ export interface PayrollRecordRow {
 export interface ScheduleMemoRow {
   id: number;
   content: string;
+  created_at: string;
+}
+
+/** 설정 페이지 메모장 — 스케줄표 메모(ScheduleMemoRow)와 별개의 목록이지만 행 모양은 같다. */
+export type SettingsMemoRow = ScheduleMemoRow;
+
+export type RecurringEventCycle = "monthly" | "quarterly";
+
+export interface RecurringEventRow {
+  id: number;
+  name: string;
+  cycle: RecurringEventCycle;
+  day_of_month: number;
+  start_hour: number;
+  end_hour: number;
+  enabled: boolean;
   created_at: string;
 }
