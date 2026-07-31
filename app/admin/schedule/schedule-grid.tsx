@@ -137,13 +137,13 @@ function SessionCellButton({
       ].join(" ")}
     >
       {isSimpleEntry(session) ? (
-        <span className="font-medium block truncate">
+        <span className="font-medium block break-words leading-tight">
           {entryIcon(session)}
           {entryMainLabel(session)}
         </span>
       ) : (
         <>
-          <span className="font-medium block truncate">
+          <span className="font-medium block break-words leading-tight">
             {entryIcon(session)}
             {session.member_name}
             {progressLabel(session) && (
@@ -161,7 +161,9 @@ function SessionCellButton({
             <span className="block text-[10px] opacity-70">{STATUS_LABEL[session.status]}</span>
           )}
           {session.memo && (
-            <span className="block text-[10px] opacity-60 truncate">{session.memo}</span>
+            <span className="block text-[10px] opacity-60 break-words leading-tight">
+              {session.memo}
+            </span>
           )}
         </>
       )}
@@ -186,6 +188,7 @@ export function ScheduleGrid({
   holidayMap,
   coachStats,
   initialMemos,
+  dutyRoster,
 }: {
   weekStart: string;
   dateKeys: string[];
@@ -197,6 +200,8 @@ export function ScheduleGrid({
   holidayMap: Record<string, string>;
   coachStats: Record<number, CoachScheduleStats>;
   initialMemos: ScheduleMemoRow[];
+  /** weekday(0=월~6=일) -> 당직 코치. dateKeys 배열의 인덱스와 같은 규칙. */
+  dutyRoster: Record<number, { coachId: number; coachName: string }>;
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
@@ -521,6 +526,11 @@ export function ScheduleGrid({
                     {holidayMap[d] && !closed && (
                       <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
                     )}
+                    {dutyRoster[i] && (
+                      <p className="text-[9px] text-coral/80 truncate">
+                        당직 {dutyRoster[i].coachName}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -660,6 +670,11 @@ export function ScheduleGrid({
                     {closed && <p className="text-[9px] text-ink/30">휴무</p>}
                     {holidayMap[d] && !closed && (
                       <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
+                    )}
+                    {dutyRoster[i] && (
+                      <p className="text-[9px] text-coral/80 truncate">
+                        당직 {dutyRoster[i].coachName}
+                      </p>
                     )}
                   </div>
                 );

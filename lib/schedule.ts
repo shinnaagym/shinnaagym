@@ -75,6 +75,38 @@ export async function getActiveMemberCountsByCoach(): Promise<Record<number, num
   return Object.fromEntries(result.rows.map((r) => [r.coach_id, Number(r.count)]));
 }
 
+// ---- 당직자(요일별 고정 담당 코치) ----
+
+// 공휴일·코치 목록처럼 자주 바뀌지 않는 참조성 데이터라 같은 방식으로 캐싱한다.
+// weekday: 0=월요일 ~ 6=일요일.
+export const getDutyRoster = unstable_cache(
+  async (): Promise<Record<number, { coachId: number; coachName: string }>> => {
+    const result = await query<{ weekday: number; coach_id: number; coach_name: string }>(
+      `SELECT d.weekday, d.coach_id, c.name AS coach_name
+       FROM duty_roster d JOIN coaches c ON c.id = d.coach_id`,
+    );
+    return Object.fromEntries(
+      result.rows.map((r) => [r.weekday, { coachId: r.coach_id, coachName: r.coach_name }]),
+    );
+  },
+  ["duty-roster"],
+  { tags: ["duty-roster"], revalidate: 300 },
+);
+
+/** coachId가 null이면 해당 요일의 당직 지정을 해제한다. */
+export async function setDutyAssignment(weekday: number, coachId: number | null): Promise<void> {
+  if (coachId === null) {
+    await query(`DELETE FROM duty_roster WHERE weekday = $1`, [weekday]);
+  } else {
+    await query(
+      `INSERT INTO duty_roster (weekday, coach_id) VALUES ($1, $2)
+       ON CONFLICT (weekday) DO UPDATE SET coach_id = EXCLUDED.coach_id`,
+      [weekday, coachId],
+    );
+  }
+  revalidateTag("duty-roster", { expire: 0 });
+}
+
 // ---- 공휴일 ----
 
 // 공휴일도 코치 목록과 마찬가지로 자주 바뀌지 않는 참조성 데이터라 캐싱한다.
