@@ -12,6 +12,7 @@ import {
   listSessionsInRange,
 } from "@/lib/schedule";
 import { listScheduleMemos } from "@/lib/schedule-memos";
+import { ensureRecurringEventSessions } from "@/lib/recurring-events";
 import { ScheduleGrid } from "./schedule-grid";
 
 export default async function AdminSchedulePage({
@@ -31,6 +32,10 @@ export default async function AdminSchedulePage({
   const weekEnd = dateKeys[dateKeys.length - 1];
 
   const monthKey = koreaCurrentMonthKey();
+
+  // 스터디/독서 모임 같은 정기 일정의 이번 달·다음 달 발생분이 아직 스케줄표에
+  // 없으면 미리 채워 넣는다 — 세션 목록을 읽기 전에 끝나야 그리드에 바로 보인다.
+  await ensureRecurringEventSessions();
 
   const [coaches, members, sessions, dayHours, holidays, coachStats, memos, dutyRoster, dutyOverrides] =
     await Promise.all([

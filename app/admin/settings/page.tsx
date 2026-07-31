@@ -6,6 +6,8 @@ import {
   listCoaches,
   listHolidays,
 } from "@/lib/schedule";
+import { listRecurringEvents } from "@/lib/recurring-events";
+import { listSettingsMemos } from "@/lib/settings-memos";
 import { BUILD_ID } from "@/lib/build-info";
 import { listActiveDevices } from "@/lib/devices";
 import { SettingsView } from "./settings-view";
@@ -15,7 +17,7 @@ export default async function AdminSettingsPage() {
     redirect("/admin");
   }
 
-  const [coaches, holidays, memberCounts, devices, currentDeviceId, dutyRoster] =
+  const [coaches, holidays, memberCounts, devices, currentDeviceId, dutyRoster, recurringEvents, settingsMemos] =
     await Promise.all([
       listCoaches(),
       listHolidays(),
@@ -23,6 +25,8 @@ export default async function AdminSettingsPage() {
       listActiveDevices(),
       getDeviceId(),
       getDutyRoster(),
+      listRecurringEvents(),
+      listSettingsMemos(),
     ]);
 
   return (
@@ -35,6 +39,8 @@ export default async function AdminSettingsPage() {
         initialDevices={devices}
         currentDeviceId={currentDeviceId ?? null}
         initialDutyRoster={dutyRoster}
+        initialRecurringEvents={recurringEvents}
+        initialSettingsMemos={settingsMemos}
       />
     </div>
   );

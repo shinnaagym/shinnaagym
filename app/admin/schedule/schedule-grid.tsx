@@ -7,7 +7,7 @@ import { addDaysToKey, mondayOfWeek } from "@/lib/date";
 import type { CoachRow, PtType, ScheduleMemoRow, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { CoachScheduleStats, MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
-import { ScheduleMemoPad } from "./schedule-memo-pad";
+import { MemoPad } from "../memo-pad";
 
 type SessionWithMember = {
   id: number;
@@ -335,25 +335,6 @@ export function ScheduleGrid({
     );
   }, [coachStats]);
 
-  /** 코치 한 명을 필터로 골랐을 때(주간 보기) 이번 주 전체의 PT/2:1/상담 합계. */
-  const weeklySummary = useMemo(() => {
-    const map = new Map<number, { pt: number; pair: number; consultation: number }>();
-    for (const coach of visibleCoaches) {
-      map.set(coach.id, { pt: 0, pair: 0, consultation: 0 });
-    }
-    for (const s of sessions) {
-      const counts = map.get(s.coach_id);
-      if (!counts) continue;
-      if (s.entry_type === "session") {
-        if (s.pt_type === "2:1") counts.pair += 1;
-        else counts.pt += 1;
-      } else if (s.entry_type === "consultation") {
-        counts.consultation += 1;
-      }
-    }
-    return map;
-  }, [sessions, visibleCoaches]);
-
   /** "코치 전체" 주간 그리드를 열면 항상 월요일부터 보이는데, 오늘 요일이 화면
       밖에 있을 수 있어 처음부터 오늘 요일이 보이도록 가로 스크롤을 맞춰준다. */
   useEffect(() => {
@@ -567,7 +548,12 @@ export function ScheduleGrid({
         <p className="font-display text-lg">{formatWeekLabel(dateKeys)}</p>
       </div>
 
-      <ScheduleMemoPad initialMemos={initialMemos} />
+      <MemoPad
+        title="메모장"
+        initialMemos={initialMemos}
+        addUrl="/api/admin/schedule-memos"
+        idToDeleteUrl={(id) => `/api/admin/schedule-memos/${id}`}
+      />
 
       {/* 코치를 한 명만 선택하면 그 코치의 이번 주 전체를 한 번에 보여준다. */}
       {singleCoach ? (
@@ -674,42 +660,6 @@ export function ScheduleGrid({
                 </Fragment>
               ))}
             </div>
-          </div>
-
-          <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-ink/50 text-xs border-b border-line/60">
-                  <th className="px-3 py-2 font-medium">이번 주 구분</th>
-                  <th className="px-3 py-2 font-medium text-center">{singleCoach.name}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(
-                  [
-                    ["pt", "PT"],
-                    ["pair", "2:1"],
-                    ["consultation", "상담"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <tr key={key} className="border-b border-line/40 last:border-0">
-                    <td className="px-3 py-2 text-ink/60">{label}</td>
-                    <td className="px-3 py-2 text-center text-ink/70">
-                      {weeklySummary.get(singleCoach.id)?.[key] ?? 0}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="font-medium">
-                  <td className="px-3 py-2">총합</td>
-                  <td className="px-3 py-2 text-center">
-                    {(() => {
-                      const counts = weeklySummary.get(singleCoach.id);
-                      return counts ? counts.pt + counts.pair + counts.consultation : 0;
-                    })()}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         </>
       ) : (

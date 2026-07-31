@@ -10,8 +10,19 @@ function formatDateTime(iso: string): string {
   ).padStart(2, "0")}`;
 }
 
-/** 특정 날짜에 묶이지 않는 공용 스케줄 메모장 — 여러 메모를 누적해서 쓸 수 있다. */
-export function ScheduleMemoPad({ initialMemos }: { initialMemos: ScheduleMemoRow[] }) {
+/** 특정 화면 전용의 공용 메모장 — 여러 메모를 누적해서 쓸 수 있다. addUrl/idToDeleteUrl로
+    어느 메모 목록(스케줄표/설정 등)을 다룰지 지정한다. */
+export function MemoPad({
+  title,
+  initialMemos,
+  addUrl,
+  idToDeleteUrl,
+}: {
+  title: string;
+  initialMemos: ScheduleMemoRow[];
+  addUrl: string;
+  idToDeleteUrl: (id: number) => string;
+}) {
   const [memos, setMemos] = useState(initialMemos);
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -23,7 +34,7 @@ export function ScheduleMemoPad({ initialMemos }: { initialMemos: ScheduleMemoRo
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/schedule-memos", {
+      const res = await fetch(addUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: trimmed }),
@@ -44,12 +55,12 @@ export function ScheduleMemoPad({ initialMemos }: { initialMemos: ScheduleMemoRo
 
   async function removeMemo(id: number) {
     setMemos((prev) => prev.filter((m) => m.id !== id));
-    await fetch(`/api/admin/schedule-memos/${id}`, { method: "DELETE" });
+    await fetch(idToDeleteUrl(id), { method: "DELETE" });
   }
 
   return (
     <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4">
-      <p className="font-display text-base mb-3">메모장</p>
+      <p className="font-display text-base mb-3">{title}</p>
       <div className="flex gap-2 mb-3">
         <input
           value={content}
