@@ -6,7 +6,7 @@ import { query } from "@/lib/db";
 import { recordUndo } from "@/lib/undo";
 import type { ClassSessionRow, PtType, SessionStatus } from "@/lib/db";
 
-const VALID_STATUSES: SessionStatus[] = ["reserved", "no_show", "cancelled"];
+const VALID_STATUSES: SessionStatus[] = ["reserved", "no_show", "cancelled", "done"];
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
 
 export async function PATCH(
@@ -55,6 +55,9 @@ export async function PATCH(
   ).rows[0];
   if (!before) {
     return NextResponse.json({ error: "일정을 찾을 수 없습니다." }, { status: 404 });
+  }
+  if (status === "done" && before.entry_type !== "memo") {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
   try {
