@@ -213,6 +213,8 @@ export function ScheduleGrid({
   } | null>(null);
   const [editTarget, setEditTarget] = useState<SessionWithMember | null>(null);
   const [mergedEditTarget, setMergedEditTarget] = useState<SessionWithMember[] | null>(null);
+  const [duty, setDuty] = useState(dutyRoster);
+  const [dutyEditWeekday, setDutyEditWeekday] = useState<number | null>(null);
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
   const allGridScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -403,6 +405,22 @@ export function ScheduleGrid({
     router.push("/admin/schedule");
   }
 
+  async function assignDuty(weekday: number, coachId: number | null) {
+    const coach = coachId === null ? null : effectiveCoaches.find((c) => c.id === coachId);
+    setDuty((prev) => {
+      const next = { ...prev };
+      if (coachId === null || !coach) delete next[weekday];
+      else next[weekday] = { coachId, coachName: coach.name };
+      return next;
+    });
+    setDutyEditWeekday(null);
+    await fetch("/api/admin/duty-roster", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekday, coachId }),
+    });
+  }
+
   return (
     <div>
       {/* KPI 카드 — 코치를 한 명 선택하면 그 코치의, "코치 전체"면 전체 합산 이번 달/이번 주 통계를 보여준다. */}
@@ -526,11 +544,16 @@ export function ScheduleGrid({
                     {holidayMap[d] && !closed && (
                       <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
                     )}
-                    {dutyRoster[i] && (
-                      <p className="text-[9px] text-coral/80 truncate">
-                        당직 {dutyRoster[i].coachName}
-                      </p>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDutyEditWeekday(i)}
+                      className={[
+                        "text-[9px] truncate block w-full hover:underline",
+                        duty[i] ? "text-coral/80" : "text-ink/30",
+                      ].join(" ")}
+                    >
+                      {duty[i] ? `당직 ${duty[i].coachName}` : "당직 지정"}
+                    </button>
                   </div>
                 );
               })}
@@ -671,11 +694,16 @@ export function ScheduleGrid({
                     {holidayMap[d] && !closed && (
                       <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
                     )}
-                    {dutyRoster[i] && (
-                      <p className="text-[9px] text-coral/80 truncate">
-                        당직 {dutyRoster[i].coachName}
-                      </p>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDutyEditWeekday(i)}
+                      className={[
+                        "text-[9px] truncate block w-full hover:underline",
+                        duty[i] ? "text-coral/80" : "text-ink/30",
+                      ].join(" ")}
+                    >
+                      {duty[i] ? `당직 ${duty[i].coachName}` : "당직 지정"}
+                    </button>
                   </div>
                 );
               })}
@@ -799,6 +827,17 @@ export function ScheduleGrid({
             await refreshSessions();
             setLoading(false);
           }}
+        />
+      )}
+
+      {dutyEditWeekday !== null && (
+        <DutyEditModal
+          weekday={dutyEditWeekday}
+          weekdayLabel={WEEKDAY_LABELS[dutyEditWeekday]}
+          coaches={effectiveCoaches}
+          current={duty[dutyEditWeekday]?.coachId ?? null}
+          onClose={() => setDutyEditWeekday(null)}
+          onAssign={assignDuty}
         />
       )}
 
@@ -1663,6 +1702,65 @@ function EditMergedBlockModal({
         >
           전체 시간대 삭제
         </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+/** 스케줄표 요일 헤더의 "당직 OOO" 표시를 눌렀을 때 뜨는, 그 요일의 당직자를
+    바꾸는 모달. 요일 단위 설정이라 매주 반복 적용된다(특정 날짜 하루만
+    바꾸는 기능이 아님을 안내 문구로 알려준다). */
+function DutyEditModal({
+  weekday,
+  weekdayLabel,
+  coaches,
+  current,
+  onClose,
+  onAssign,
+}: {
+  weekday: number;
+  weekdayLabel: string;
+  coaches: CoachRow[];
+  current: number | null;
+  onClose: () => void;
+  onAssign: (weekday: number, coachId: number | null) => void;
+}) {
+  return (
+    <ModalShell title={`${weekdayLabel}요일 당직자`} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-xs text-ink/50">
+          여기서 바꾸면 매주 {weekdayLabel}요일에 반복 적용돼요(이번 주만 바뀌는 게
+          아니에요).
+        </p>
+        <div className="space-y-2">
+          {coaches.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onAssign(weekday, c.id)}
+              className={[
+                "w-full rounded-lg border px-3.5 py-2.5 text-left text-sm transition",
+                current === c.id
+                  ? "bg-ink text-white border-ink"
+                  : "border-line hover:bg-bone",
+              ].join(" ")}
+            >
+              {c.name}
+            </button>
+          ))}
+          {coaches.length === 0 && (
+            <p className="text-sm text-ink/40 py-2">재직 중인 코치가 없어요.</p>
+          )}
+        </div>
+        {current !== null && (
+          <button
+            type="button"
+            onClick={() => onAssign(weekday, null)}
+            className="w-full rounded-full border border-line py-2.5 text-sm text-red-500 hover:bg-red-50 transition"
+          >
+            당직 해제
+          </button>
+        )}
       </div>
     </ModalShell>
   );
