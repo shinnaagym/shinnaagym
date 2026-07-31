@@ -69,6 +69,29 @@ export function AdminNav() {
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const draggingRef = useRef(false);
   const suppressClickRef = useRef(false);
+  const navScrollRef = useRef<HTMLElement | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const autoScrollDirRef = useRef<0 | 1 | -1>(0);
+  const autoScrollFrameRef = useRef<number | null>(null);
+  const tabsRef = useRef(tabs);
+  const draggingHrefRef = useRef<string | null>(null);
+
+  // rAF 자동 스크롤 루프는 마운트 시점의 클로저를 그대로 재스케줄하며 도는
+  // 재귀 호출이라, tabs/draggingHref state를 직접 참조하면 값이 고정돼버린다
+  // (stale closure). 최신 값을 ref에 미러링해두고 루프에서는 ref로 읽는다.
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+  useEffect(() => {
+    draggingHrefRef.current = draggingHref;
+  }, [draggingHref]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      if (autoScrollFrameRef.current !== null) cancelAnimationFrame(autoScrollFrameRef.current);
+    };
+  }, []);
 
   function persistOrder(next: Tab[]) {
     setTabs(next);
@@ -86,9 +109,73 @@ export function AdminNav() {
     }
   }
 
+  const EDGE_ZONE_PX = 44;
+  const AUTO_SCROLL_SPEED = 12; // px per animation frame
+
+  /** 드래그 중인 탭이 현재 (clientX, clientY) 아래의 탭과 겹치면 순서를 바꾼다.
+      pointermove 이벤트뿐 아니라, 가장자리 자동 스크롤 중(손가락은 멈춰 있어도
+      탭들이 밀려 지나가는 동안)에도 매 프레임 다시 계산해야 순서가 계속 맞는다. */
+  function applySwapAt(clientX: number, clientY: number) {
+    const dragHref = draggingHrefRef.current;
+    if (!dragHref) return;
+    const el = document.elementFromPoint(clientX, clientY);
+    const overHref = el?.closest<HTMLElement>("[data-tab-href]")?.dataset.tabHref;
+    if (!overHref || overHref === dragHref) return;
+    const current = tabsRef.current;
+    const fromIdx = current.findIndex((t) => t.href === dragHref);
+    const toIdx = current.findIndex((t) => t.href === overHref);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const next = [...current];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setTabs(next);
+  }
+
+  function stopAutoScroll() {
+    autoScrollDirRef.current = 0;
+    if (autoScrollFrameRef.current !== null) {
+      cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
+  }
+
+  function stepAutoScroll() {
+    const container = navScrollRef.current;
+    const dir = autoScrollDirRef.current;
+    if (!container || dir === 0 || !draggingRef.current) {
+      autoScrollFrameRef.current = null;
+      return;
+    }
+    container.scrollLeft += dir * AUTO_SCROLL_SPEED;
+    const p = lastPointerRef.current;
+    if (p) applySwapAt(p.x, p.y);
+    autoScrollFrameRef.current = requestAnimationFrame(stepAutoScroll);
+  }
+
+  /** 스크롤 가능한 탭 목록 안에서, 화면 밖으로 밀려난 탭에도 드래그로 이동할
+      수 있도록 손가락/커서가 좌우 가장자리 근처에 있으면 자동으로 스크롤한다. */
+  function updateAutoScroll(clientX: number) {
+    const container = navScrollRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    let dir: 0 | 1 | -1 = 0;
+    if (clientX < rect.left + EDGE_ZONE_PX) dir = -1;
+    else if (clientX > rect.right - EDGE_ZONE_PX) dir = 1;
+    autoScrollDirRef.current = dir;
+    if (dir !== 0 && autoScrollFrameRef.current === null) {
+      autoScrollFrameRef.current = requestAnimationFrame(stepAutoScroll);
+    }
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>, href: string) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    // 포인터 캡처를 명시적으로 잡아둔다 — 특히 마우스/트랙패드는 브라우저가
+    // 자동으로 캡처해주지 않아, 캡처 없이는 커서가 이 탭의 영역을 벗어나는
+    // 순간 이 요소에 등록된 move/up 핸들러가 더 이상 호출되지 않아 드래그가
+    // 끊겨버린다(터치는 보통 암묵적 캡처가 있어 덜 두드러지지만 기기마다 다르다).
+    e.currentTarget.setPointerCapture(e.pointerId);
     pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    lastPointerRef.current = { x: e.clientX, y: e.clientY };
     clearLongPressTimer();
     longPressTimerRef.current = setTimeout(() => {
       draggingRef.current = true;
@@ -107,29 +194,24 @@ export function AdminNav() {
       return;
     }
     e.preventDefault();
-    const dragHref = draggingHref;
-    if (!dragHref) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const overHref = el?.closest<HTMLElement>("[data-tab-href]")?.dataset.tabHref;
-    if (!overHref || overHref === dragHref) return;
-    const fromIdx = tabs.findIndex((t) => t.href === dragHref);
-    const toIdx = tabs.findIndex((t) => t.href === overHref);
-    if (fromIdx === -1 || toIdx === -1) return;
-    const next = [...tabs];
-    const [moved] = next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, moved);
-    setTabs(next);
+    lastPointerRef.current = { x: e.clientX, y: e.clientY };
+    updateAutoScroll(e.clientX);
+    applySwapAt(e.clientX, e.clientY);
   }
 
-  function endDrag() {
+  function endDrag(e: React.PointerEvent<HTMLDivElement>) {
     clearLongPressTimer();
+    stopAutoScroll();
     if (draggingRef.current) {
-      persistOrder(tabs);
+      persistOrder(tabsRef.current);
       suppressClickRef.current = true;
       // 드래그 직후 발생하는 클릭(탭 이동) 한 번만 무시하고 바로 해제한다.
       setTimeout(() => {
         suppressClickRef.current = false;
       }, 0);
+    }
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
     }
     draggingRef.current = false;
     setDraggingHref(null);
@@ -175,7 +257,10 @@ export function AdminNav() {
           <span className="text-xs text-ink/40 hidden sm:inline">관리자</span>
         </Link>
 
-        <nav className="order-3 w-full sm:order-none sm:w-auto flex items-center gap-1 rounded-full bg-bone/70 p-1 overflow-x-auto">
+        <nav
+          ref={navScrollRef}
+          className="order-3 w-full sm:order-none sm:w-auto flex items-center gap-1 rounded-full bg-bone/70 p-1 overflow-x-auto"
+        >
           {tabs.map((tab) => {
             const active = pathname?.startsWith(tab.href);
             const isDragging = draggingHref === tab.href;
@@ -187,7 +272,12 @@ export function AdminNav() {
                 onPointerMove={handlePointerMove}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
-                style={{ touchAction: "none" }}
+                style={{
+                  touchAction: "none",
+                  WebkitTouchCallout: "none",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                }}
                 className={[
                   "shrink-0 rounded-full transition-transform",
                   isDragging ? "scale-105 shadow-md z-10" : "",
