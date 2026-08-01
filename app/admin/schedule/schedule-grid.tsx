@@ -502,6 +502,12 @@ export function ScheduleGrid({
     router.push("/admin/schedule");
   }
 
+  /** 연/월을 고르면 그 달 1일이 속한 주로 바로 이동한다(1일이 아니어도
+      서버에서 mondayOfWeek로 그 주의 월요일을 계산해준다). */
+  function goToYearMonth(year: number, month: number) {
+    router.push(`/admin/schedule?week=${year}-${String(month).padStart(2, "0")}-01`);
+  }
+
   /** 스케줄표에서 당직을 바꾸면 항상 "이번 주(이 날짜)만"의 예외로 저장한다
       (요일 반복 기본값은 설정 페이지에서만 바꾼다). coachId가 undefined면
       이 날짜의 예외를 지워 요일 기본값으로 되돌린다. */
@@ -588,6 +594,38 @@ export function ScheduleGrid({
           >
             다음 주 ›
           </button>
+          {(() => {
+            const [wsYear, wsMonth] = weekStart.split("-").map(Number);
+            const currentYear = Number(today.split("-")[0]);
+            const YEAR_RANGE = 2;
+            const years = Array.from({ length: YEAR_RANGE * 2 + 1 }, (_, i) => currentYear - YEAR_RANGE + i);
+            return (
+              <span className="flex items-center gap-1">
+                <select
+                  value={wsYear}
+                  onChange={(e) => goToYearMonth(Number(e.target.value), wsMonth)}
+                  className="rounded-full border border-line bg-white px-3 py-1.5 text-sm outline-none"
+                >
+                  {years.map((y) => (
+                    <option key={y} value={y}>
+                      {y}년
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={wsMonth}
+                  onChange={(e) => goToYearMonth(wsYear, Number(e.target.value))}
+                  className="rounded-full border border-line bg-white px-3 py-1.5 text-sm outline-none"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={m}>
+                      {m}월
+                    </option>
+                  ))}
+                </select>
+              </span>
+            );
+          })()}
           {effectiveCoaches.length > 1 && (
             <select
               value={coachFilter}
@@ -1581,6 +1619,23 @@ function EditSessionModal({
   const [moveDate, setMoveDate] = useState(session.session_date);
   const [moveHour, setMoveHour] = useState(session.session_hour);
   const [moveCoachId, setMoveCoachId] = useState(session.coach_id);
+  const [memberSessions, setMemberSessions] = useState<SessionWithMember[] | null>(null);
+
+  // PT 수업 칸을 열면, 그 회원이 다른 날짜·시간에도 예약이 잡혀 있는지 바로
+  // 보이도록 예약 내역을 함께 불러온다.
+  useEffect(() => {
+    if (session.entry_type !== "session" || session.member_id === null) return;
+    let cancelled = false;
+    fetch(`/api/admin/members/${session.member_id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setMemberSessions(data.sessions ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session.entry_type, session.member_id]);
 
   async function patch(body: Record<string, unknown>) {
     setSubmitting(true);
@@ -1728,6 +1783,32 @@ function EditSessionModal({
                   {t}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {session.entry_type === "session" && session.member_id !== null && (
+          <div>
+            <p className="text-sm font-medium mb-1.5">예약 내역</p>
+            <div className="max-h-32 overflow-y-auto space-y-0.5 rounded-lg border border-line/50 px-2.5 py-2">
+              {memberSessions === null ? (
+                <p className="text-[11px] text-ink/40">불러오는 중...</p>
+              ) : (
+                (() => {
+                  const others = memberSessions.filter((s) => s.id !== session.id);
+                  if (others.length === 0) {
+                    return <p className="text-[11px] text-ink/40">다른 예약 내역이 없어요.</p>;
+                  }
+                  return others.map((s) => (
+                    <div key={s.id} className="flex justify-between text-[11px] text-ink/60">
+                      <span>
+                        {s.session_date} {s.session_hour}:00
+                      </span>
+                      <span>{STATUS_LABEL[s.status]}</span>
+                    </div>
+                  ));
+                })()
+              )}
             </div>
           </div>
         )}
