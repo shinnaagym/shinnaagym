@@ -17,6 +17,28 @@ export const PURPOSE_LABELS: Record<string, string> = Object.fromEntries(
   PURPOSE_OPTIONS.map((option) => [option.value, option.label]),
 );
 
+// PT 일지에서 운동마다 고르는 운동도구. select로 만들면 아이폰/아이패드에서
+// 탭할 때 자동으로 휠(다이얼) 형태로 뜬다.
+export const PT_LOG_EQUIPMENT_OPTIONS = [
+  { value: "bodyweight", label: "맨몸" },
+  { value: "dumbbell", label: "덤벨" },
+  { value: "barbell", label: "바벨" },
+  { value: "kettlebell", label: "케틀벨" },
+  { value: "smith_machine", label: "스미스머신" },
+  { value: "bulgarian_bag", label: "불가리안백" },
+  { value: "theraband", label: "세라밴드" },
+  { value: "loop_band", label: "루프밴드" },
+] as const;
+
+export type PtLogEquipmentValue = (typeof PT_LOG_EQUIPMENT_OPTIONS)[number]["value"];
+
+export const PT_LOG_EQUIPMENT_LABELS: Record<string, string> = Object.fromEntries(
+  PT_LOG_EQUIPMENT_OPTIONS.map((option) => [option.value, option.label]),
+);
+
+// 통증 척도·운동수행 능력 공통 0~10 척도.
+export const PT_LOG_SCALE_OPTIONS = Array.from({ length: 11 }, (_, i) => i);
+
 export interface CoachColorStyle {
   header: string;
   headerText: string;
