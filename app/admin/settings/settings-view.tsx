@@ -252,10 +252,11 @@ export function SettingsView({
 
   return (
     <div className="space-y-6">
-      <SyncDiagnostics
-        buildId={buildId}
-        initialDevices={initialDevices}
-        currentDeviceId={currentDeviceId}
+      <MemoPad
+        title="메모장"
+        initialMemos={initialSettingsMemos}
+        addUrl="/api/admin/settings-memos"
+        idToDeleteUrl={(id) => `/api/admin/settings-memos/${id}`}
       />
 
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
@@ -608,11 +609,10 @@ export function SettingsView({
         </div>
       </section>
 
-      <MemoPad
-        title="메모장"
-        initialMemos={initialSettingsMemos}
-        addUrl="/api/admin/settings-memos"
-        idToDeleteUrl={(id) => `/api/admin/settings-memos/${id}`}
+      <SyncDiagnostics
+        buildId={buildId}
+        initialDevices={initialDevices}
+        currentDeviceId={currentDeviceId}
       />
     </div>
   );

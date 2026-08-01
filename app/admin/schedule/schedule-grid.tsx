@@ -102,6 +102,7 @@ function SessionCellButton({
   onCreate,
   mergedSessions,
   onEditMerged,
+  onContextMenu,
 }: {
   session: SessionWithMember | undefined;
   goldenBellMemberIds: Set<number>;
@@ -110,6 +111,7 @@ function SessionCellButton({
   /** 연속된 시간대를 하나로 합친 칸일 때, 그 안에 포함된 전체 항목(2개 이상). */
   mergedSessions?: SessionWithMember[];
   onEditMerged?: (sessions: SessionWithMember[]) => void;
+  onContextMenu?: (e: React.MouseEvent, sessions: SessionWithMember[]) => void;
 }) {
   if (!session) {
     return (
@@ -131,6 +133,8 @@ function SessionCellButton({
         e.dataTransfer.effectAllowed = "move";
       }}
       onClick={() => (isMerged ? onEditMerged?.(mergedSessions!) : onEdit(session))}
+      onContextMenu={(e) => onContextMenu?.(e, isMerged ? mergedSessions! : [session])}
+      style={{ WebkitTouchCallout: "none" }}
       className={[
         "w-full h-full rounded-lg border px-2 py-1.5 text-left text-xs transition hover:shadow-sm cursor-grab active:cursor-grabbing",
         entryStyle(session),
@@ -217,6 +221,11 @@ export function ScheduleGrid({
   } | null>(null);
   const [editTarget, setEditTarget] = useState<SessionWithMember | null>(null);
   const [mergedEditTarget, setMergedEditTarget] = useState<SessionWithMember[] | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    sessions: SessionWithMember[];
+  } | null>(null);
   const [dutyRosterState] = useState(dutyRoster);
   const [dutyOverridesState, setDutyOverridesState] = useState(dutyOverrides);
   const [dutyEditDate, setDutyEditDate] = useState<{ date: string; weekday: number } | null>(null);
@@ -358,6 +367,51 @@ export function ScheduleGrid({
       setSessions(data.sessions ?? []);
     }
   }
+
+  /** 일정 칸을 오른쪽 클릭(또는 길게 눌러)하면 종류별 자주 쓰는 동작만 모은
+      빠른 메뉴를 띄운다. PT 수업은 노쇼/취소/삭제, 개인 일정은 완료 처리/삭제,
+      수업 불가는 삭제만 — 상담처럼 여기서 다루지 않는 종류는 기본 동작(브라우저
+      메뉴)을 그대로 둔다. */
+  function openQuickMenu(e: React.MouseEvent, sessionsForMenu: SessionWithMember[]) {
+    const first = sessionsForMenu[0];
+    if (first.entry_type !== "session" && first.entry_type !== "memo" && first.entry_type !== "blocked") {
+      return;
+    }
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, sessions: sessionsForMenu });
+  }
+
+  async function quickPatch(sessionsForMenu: SessionWithMember[], body: Record<string, unknown>) {
+    setContextMenu(null);
+    await Promise.all(
+      sessionsForMenu.map((s) =>
+        fetch(`/api/admin/sessions/${s.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      ),
+    );
+    await refreshSessions();
+  }
+
+  async function quickDelete(sessionsForMenu: SessionWithMember[]) {
+    setContextMenu(null);
+    const confirmMessage =
+      sessionsForMenu.length > 1 ? "이 시간대 전체를 완전히 삭제할까요?" : "이 일정을 완전히 삭제할까요?";
+    if (!confirm(confirmMessage)) return;
+    await Promise.all(sessionsForMenu.map((s) => fetch(`/api/admin/sessions/${s.id}`, { method: "DELETE" })));
+    await refreshSessions();
+  }
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [contextMenu]);
 
   /** 일정 pill을 드래그해서 다른 시간/코치 칸에 놓으면 그 칸으로 이동시킨다.
       개인 일정·수업 불가처럼 여러 시간이 하나로 합쳐진 칸이면, 안에 포함된
@@ -648,6 +702,7 @@ export function ScheduleGrid({
                             onCreate={() => setCreateTarget({ date: d, hour, coachId: singleCoach.id })}
                             mergedSessions={spanInfo?.sessions}
                             onEditMerged={setMergedEditTarget}
+                            onContextMenu={openQuickMenu}
                           />
                         ) : (
                           <div className="w-full rounded-lg px-2 py-1.5 text-center text-[11px] text-ink/15">
@@ -804,6 +859,7 @@ export function ScheduleGrid({
                               onCreate={() => setCreateTarget({ date: d, hour, coachId: coach.id })}
                               mergedSessions={spanInfo?.sessions}
                               onEditMerged={setMergedEditTarget}
+                              onContextMenu={openQuickMenu}
                             />
                           )}
                         </div>
@@ -861,6 +917,77 @@ export function ScheduleGrid({
             setLoading(false);
           }}
         />
+      )}
+
+      {contextMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setContextMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setContextMenu(null);
+            }}
+          />
+          <div
+            className="fixed z-50 min-w-[140px] overflow-hidden rounded-xl border border-line bg-white py-1.5 shadow-lg"
+            style={{
+              left: Math.min(contextMenu.x, window.innerWidth - 160),
+              top: Math.min(contextMenu.y, window.innerHeight - 160),
+            }}
+          >
+            {contextMenu.sessions[0].entry_type === "session" && (
+              <>
+                <button
+                  onClick={() => quickPatch(contextMenu.sessions, { status: "no_show" })}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                >
+                  노쇼 처리
+                </button>
+                <button
+                  onClick={() => quickPatch(contextMenu.sessions, { status: "cancelled" })}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                >
+                  취소 처리
+                </button>
+                <button
+                  onClick={() => quickDelete(contextMenu.sessions)}
+                  className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-bone transition"
+                >
+                  기록 삭제
+                </button>
+              </>
+            )}
+            {contextMenu.sessions[0].entry_type === "memo" && (
+              <>
+                <button
+                  onClick={() =>
+                    quickPatch(contextMenu.sessions, {
+                      status: contextMenu.sessions[0].status === "done" ? "reserved" : "done",
+                    })
+                  }
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                >
+                  {contextMenu.sessions[0].status === "done" ? "완료 취소" : "완료 처리"}
+                </button>
+                <button
+                  onClick={() => quickDelete(contextMenu.sessions)}
+                  className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-bone transition"
+                >
+                  삭제
+                </button>
+              </>
+            )}
+            {contextMenu.sessions[0].entry_type === "blocked" && (
+              <button
+                onClick={() => quickDelete(contextMenu.sessions)}
+                className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-bone transition"
+              >
+                삭제
+              </button>
+            )}
+          </div>
+        </>
       )}
 
       {dutyEditDate && (

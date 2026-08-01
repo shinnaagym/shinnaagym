@@ -33,6 +33,8 @@ export function SyncDiagnostics({
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [loggingOutId, setLoggingOutId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoggingOut, setBulkLoggingOut] = useState(false);
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshDevices = useCallback(async () => {
@@ -100,8 +102,56 @@ export function SyncDiagnostics({
         return;
       }
       setDevices((prev) => prev.filter((d) => d.device_id !== deviceId));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deviceId);
+        return next;
+      });
     } finally {
       setLoggingOutId(null);
+    }
+  }
+
+  function toggleSelect(deviceId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(deviceId)) next.delete(deviceId);
+      else next.add(deviceId);
+      return next;
+    });
+  }
+
+  const allSelected = devices.length > 0 && devices.every((d) => selectedIds.has(d.device_id));
+
+  function toggleSelectAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(devices.map((d) => d.device_id)));
+  }
+
+  /** 체크한 기기들을 한 번에 로그아웃한다. 전부 선택하면 "전체 로그아웃",
+      일부만 선택하면 "부분 로그아웃"이 되는 셈이라 버튼은 하나로 충분하다. */
+  async function handleBulkLogout() {
+    if (selectedIds.size === 0) return;
+    const includesSelf = currentDeviceId !== null && selectedIds.has(currentDeviceId);
+    if (
+      !confirm(
+        `선택한 기기 ${selectedIds.size}대를 로그아웃할까요?${includesSelf ? " (이 기기도 포함되어 있어요)" : ""}`,
+      )
+    ) {
+      return;
+    }
+    setBulkLoggingOut(true);
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) => fetch(`/api/admin/devices/${id}/logout`, { method: "POST" })),
+      );
+      if (includesSelf) {
+        window.location.href = "/admin";
+        return;
+      }
+      setDevices((prev) => prev.filter((d) => !selectedIds.has(d.device_id)));
+      setSelectedIds(new Set());
+    } finally {
+      setBulkLoggingOut(false);
     }
   }
 
@@ -137,6 +187,21 @@ export function SyncDiagnostics({
 
       <h3 className="font-display text-base mt-6 mb-1">최근 접속 기기</h3>
       <p className="text-xs text-ink/50 mb-3">구버전 기기가 있다면 로그아웃 후 다시 로그인해 최신 버전으로 갱신해주세요.</p>
+      {devices.length > 0 && (
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+          <label className="flex items-center gap-2 text-xs text-ink/50">
+            <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+            전체 선택
+          </label>
+          <button
+            onClick={handleBulkLogout}
+            disabled={selectedIds.size === 0 || bulkLoggingOut}
+            className="shrink-0 rounded-full border border-line px-3 py-1 text-xs text-ink/60 hover:bg-bone transition disabled:opacity-50"
+          >
+            선택 로그아웃{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+          </button>
+        </div>
+      )}
       <div className="divide-y divide-line/50">
         {devices.map((d) => {
           const isThisDevice = d.device_id === currentDeviceId;
@@ -144,6 +209,11 @@ export function SyncDiagnostics({
           return (
             <div key={d.device_id} className="flex items-center justify-between gap-3 py-2.5 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(d.device_id)}
+                  onChange={() => toggleSelect(d.device_id)}
+                />
                 <span className="text-sm">{d.device_label}</span>
                 <span className="text-xs text-ink/40 font-mono">{shortId(d.device_id)}</span>
                 {isThisDevice && (
