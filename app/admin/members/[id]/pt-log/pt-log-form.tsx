@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
-import { PT_LOG_EQUIPMENT_OPTIONS, PT_LOG_SCALE_OPTIONS } from "@/lib/constants";
+import { PT_LOG_EQUIPMENT_OPTIONS } from "@/lib/constants";
 
 interface SetGroupInput {
   weight: string;
@@ -29,8 +29,6 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
   const router = useRouter();
   const [logDate, setLogDate] = useState(() => koreaTodayKey());
   const [memo, setMemo] = useState("");
-  const [painNote, setPainNote] = useState("");
-  const [painScale, setPainScale] = useState("");
   const [exercises, setExercises] = useState<ExerciseInput[]>([emptyExercise()]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -95,8 +93,6 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
         body: JSON.stringify({
           logDate,
           memo,
-          painNote,
-          painScale: painScale === "" ? null : Number(painScale),
           exercises: cleanedExercises,
         }),
       });
@@ -140,57 +136,20 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
             className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
           />
         </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1.5">통증 척도</label>
-          <p className="text-xs text-ink/40 mb-1.5">
-            평가 기록의 통증 척도 그래프에 같이 표시돼요.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              value={painNote}
-              onChange={(e) => setPainNote(e.target.value)}
-              placeholder="통증 부위 · 유발 동작 (예: 무릎, 오버헤드스쿼트)"
-              className="rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-            />
-            <select
-              value={painScale}
-              onChange={(e) => setPainScale(e.target.value)}
-              className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
-            >
-              <option value="">점수(0~10) 선택 안 함</option>
-              {PT_LOG_SCALE_OPTIONS.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-medium mb-1">운동수행 능력</p>
-          <p className="text-xs text-ink/40">
-            아래 운동 기록(무게·횟수)으로 자동 계산돼 평가 기록의 운동 수행능력 그래프(e1RM)에
-            반영돼요. 따로 입력할 필요 없어요.
-          </p>
-        </div>
+        <p className="text-xs text-ink/40">
+          통증 척도·운동수행 능력은 PT 일지 목록의 그래프에서 &quot;+ 기록추가&quot;로 바로 남길 수
+          있어요.
+        </p>
       </div>
 
       <div className="space-y-3 mb-4">
         {exercises.map((ex, exIndex) => (
           <div key={exIndex} className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4">
-            <div className="flex items-center justify-between mb-3 gap-2">
-              <input
-                value={ex.name}
-                onChange={(e) => updateExercise(exIndex, { name: e.target.value })}
-                placeholder="운동 이름 (예: 스쿼트)"
-                className="flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-              />
+            <div className="flex items-center mb-3 gap-2">
               <select
                 value={ex.equipment}
                 onChange={(e) => updateExercise(exIndex, { equipment: e.target.value })}
-                className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+                className="w-24 shrink-0 rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none focus:border-coral"
               >
                 {PT_LOG_EQUIPMENT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -198,11 +157,17 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
                   </option>
                 ))}
               </select>
+              <input
+                value={ex.name}
+                onChange={(e) => updateExercise(exIndex, { name: e.target.value })}
+                placeholder="운동 이름 (예: 스쿼트)"
+                className="min-w-0 flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
               {exercises.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeExercise(exIndex)}
-                  className="text-ink/40 hover:text-coral text-sm shrink-0"
+                  className="shrink-0 text-ink/40 hover:text-coral text-sm"
                   aria-label="운동 삭제"
                 >
                   ×
@@ -212,14 +177,14 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
 
             <div className="space-y-2">
               {ex.groups.map((g, groupIndex) => (
-                <div key={groupIndex} className="flex items-center gap-2">
+                <div key={groupIndex} className="flex items-center gap-1.5">
                   <input
                     type="number"
                     inputMode="decimal"
                     value={g.weight}
                     onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
                     placeholder="무게(kg)"
-                    className="w-24 rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+                    className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                   />
                   <input
                     type="number"
@@ -227,7 +192,7 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
                     value={g.reps}
                     onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
                     placeholder="횟수"
-                    className="w-20 rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+                    className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                   />
                   <input
                     type="number"
@@ -235,13 +200,13 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
                     value={g.sets}
                     onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
                     placeholder="세트"
-                    className="w-20 rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+                    className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                   />
                   {ex.groups.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeGroup(exIndex, groupIndex)}
-                      className="text-ink/40 hover:text-coral text-sm shrink-0"
+                      className="shrink-0 text-ink/40 hover:text-coral text-sm"
                       aria-label="세트 그룹 삭제"
                     >
                       ×
