@@ -75,6 +75,8 @@ export function AdminNav() {
   const autoScrollFrameRef = useRef<number | null>(null);
   const tabsRef = useRef(tabs);
   const draggingHrefRef = useRef<string | null>(null);
+  const pointerElRef = useRef<HTMLElement | null>(null);
+  const pointerIdRef = useRef<number | null>(null);
 
   // rAF 자동 스크롤 루프는 마운트 시점의 클로저를 그대로 재스케줄하며 도는
   // 재귀 호출이라, tabs/draggingHref state를 직접 참조하면 값이 고정돼버린다
@@ -169,17 +171,22 @@ export function AdminNav() {
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>, href: string) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    // 포인터 캡처를 명시적으로 잡아둔다 — 특히 마우스/트랙패드는 브라우저가
-    // 자동으로 캡처해주지 않아, 캡처 없이는 커서가 이 탭의 영역을 벗어나는
-    // 순간 이 요소에 등록된 move/up 핸들러가 더 이상 호출되지 않아 드래그가
-    // 끊겨버린다(터치는 보통 암묵적 캡처가 있어 덜 두드러지지만 기기마다 다르다).
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // 포인터 캡처는 실제로 드래그가 시작될 때(롱프레스 타이머가 끝났을 때)만 잡는다.
+    // pointerdown 시점에 바로 잡아버리면, 그냥 짧게 탭/클릭했을 뿐인데도 그 뒤에
+    // 오는 click 이벤트의 타깃이 이 래퍼 div로 강제로 바뀌어버려서(포인터 캡처
+    // 중엔 click도 캡처한 요소로 리타깃됨) 정작 안쪽 <Link>는 클릭을 받지
+    // 못하고, 탭을 눌러도 페이지 이동이 전혀 안 되는 문제가 있었다.
+    pointerElRef.current = e.currentTarget;
+    pointerIdRef.current = e.pointerId;
     pointerStartRef.current = { x: e.clientX, y: e.clientY };
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
     clearLongPressTimer();
     longPressTimerRef.current = setTimeout(() => {
       draggingRef.current = true;
       setDraggingHref(href);
+      if (pointerElRef.current && pointerIdRef.current !== null) {
+        pointerElRef.current.setPointerCapture(pointerIdRef.current);
+      }
     }, LONG_PRESS_MS);
   }
 
@@ -213,6 +220,8 @@ export function AdminNav() {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
+    pointerElRef.current = null;
+    pointerIdRef.current = null;
     draggingRef.current = false;
     setDraggingHref(null);
     pointerStartRef.current = null;
