@@ -150,36 +150,37 @@ export async function ensureRecurringEventSessions(): Promise<void> {
       }
     }
 
+    // 코치 수 × 시간대 수만큼 하나씩 개별 쿼리를 날리면(예: 코치 5명 × 2시간 ×
+    // 일정 2개 × 2개월 = 수십 번의 순차 왕복) 스케줄표를 열 때마다 이 함수
+    // 하나가 로딩을 눈에 띄게 늦춘다. unnest로 코치×시간 조합을 한 번의
+    // 쿼리에 다 실어 보낸다 — 일정당 최대 쿼리 1개(진 일정은 정리용 DELETE
+    // 1개까지)로 끝난다.
+    const coachIds = coaches.map((c) => c.id);
+    const hoursOf = (event: RecurringEventRow) =>
+      Array.from({ length: event.end_hour - event.start_hour }, (_, i) => event.start_hour + i);
+
     for (const event of applicable) {
       const occurrenceDate = occurrenceDateByEventId.get(event.id)!;
       const isWinner = winnerByDate.get(occurrenceDate)?.id === event.id;
-      if (!isWinner) {
-        for (const coach of coaches) {
-          for (let hour = event.start_hour; hour < event.end_hour; hour++) {
-            await query(
-              `DELETE FROM class_sessions
-               WHERE coach_id = $1 AND session_date = $2 AND session_hour = $3
-                 AND entry_type = 'memo' AND memo = $4`,
-              [coach.id, occurrenceDate, hour, event.name],
-            );
-          }
-        }
-      }
+      if (isWinner) continue;
+      await query(
+        `DELETE FROM class_sessions
+         WHERE coach_id = ANY($1::int[]) AND session_date = $2 AND session_hour = ANY($3::int[])
+           AND entry_type = 'memo' AND memo = $4`,
+        [coachIds, occurrenceDate, hoursOf(event), event.name],
+      );
     }
 
     for (const event of applicable) {
       const occurrenceDate = occurrenceDateByEventId.get(event.id)!;
       if (winnerByDate.get(occurrenceDate)?.id !== event.id) continue;
-      for (const coach of coaches) {
-        for (let hour = event.start_hour; hour < event.end_hour; hour++) {
-          await query(
-            `INSERT INTO class_sessions (coach_id, session_date, session_hour, memo, entry_type)
-             VALUES ($1, $2, $3, $4, 'memo')
-             ON CONFLICT (coach_id, session_date, session_hour) DO NOTHING`,
-            [coach.id, occurrenceDate, hour, event.name],
-          );
-        }
-      }
+      await query(
+        `INSERT INTO class_sessions (coach_id, session_date, session_hour, memo, entry_type)
+         SELECT c, $2::text, h, $4::text, 'memo'
+         FROM unnest($1::int[]) AS c, unnest($3::int[]) AS h
+         ON CONFLICT (coach_id, session_date, session_hour) DO NOTHING`,
+        [coachIds, occurrenceDate, hoursOf(event), event.name],
+      );
     }
   }
 }
