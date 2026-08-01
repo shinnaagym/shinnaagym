@@ -113,6 +113,15 @@ export function SettingsView({
     });
   }
 
+  async function updateCoachBirthday(id: number, birthday: string) {
+    setCoaches((prev) => prev.map((c) => (c.id === id ? { ...c, birthday } : c)));
+    await fetch(`/api/admin/coaches/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ birthday }),
+    });
+  }
+
   async function updateCoachEmployment(
     id: number,
     patch: Partial<Pick<CoachRow, "employment_type" | "hired_at" | "is_team_lead">>,
@@ -290,6 +299,15 @@ export function SettingsView({
                     onBlur={(e) => updateCoachPhone(c.id, e.target.value.trim())}
                     className="w-40 rounded-lg border border-line px-2.5 py-1 text-xs outline-none focus:border-coral"
                   />
+                  <span className="flex items-center gap-1 text-[11px] text-ink/40">
+                    생일
+                    <input
+                      type="date"
+                      defaultValue={c.birthday}
+                      onChange={(e) => updateCoachBirthday(c.id, e.target.value)}
+                      className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-coral"
+                    />
+                  </span>
                 </div>
                 <button
                   onClick={() => toggleCoach(c)}
@@ -326,18 +344,6 @@ export function SettingsView({
                   onChange={(e) => updateCoachEmployment(c.id, { hired_at: e.target.value })}
                   className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-coral"
                 />
-                {c.employment_type === "regular" && (
-                  <label className="flex items-center gap-1 text-xs text-ink/60">
-                    <input
-                      type="checkbox"
-                      checked={c.is_team_lead}
-                      onChange={(e) =>
-                        updateCoachEmployment(c.id, { is_team_lead: e.target.checked })
-                      }
-                    />
-                    팀장
-                  </label>
-                )}
               </div>
             </div>
           ))}

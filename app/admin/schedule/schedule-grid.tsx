@@ -258,6 +258,12 @@ export function ScheduleGrid({
   }, [coaches]);
 
   /** 잔여 3회 이하인 활성 회원 — 스케줄표 pill에 재등록 골든벨을 표시하기 위함. */
+  /** 날짜(YYYY-MM-DD) -> 그날이 생일인 재직 코치 이름들. 연도는 무시하고 월·일만 비교한다. */
+  function birthdayCoachNamesFor(dateKey: string): string[] {
+    const monthDay = dateKey.slice(5);
+    return effectiveCoaches.filter((c) => c.birthday && c.birthday.slice(5) === monthDay).map((c) => c.name);
+  }
+
   const goldenBellMemberIds = useMemo(() => {
     const set = new Set<number>();
     for (const m of members) {
@@ -645,6 +651,11 @@ export function ScheduleGrid({
                     {holidayMap[d] && !closed && (
                       <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
                     )}
+                    {birthdayCoachNamesFor(d).length > 0 && (
+                      <p className="text-[9px] text-gold-deep truncate">
+                        🎂 {birthdayCoachNamesFor(d).join(", ")} 생일
+                      </p>
+                    )}
                     {(() => {
                       const resolved = resolveDuty(d, i);
                       const label =
@@ -770,6 +781,11 @@ export function ScheduleGrid({
                     {closed && <p className="text-[9px] text-ink/30">휴무</p>}
                     {holidayMap[d] && !closed && (
                       <p className="text-[9px] text-coral/70 truncate">{holidayMap[d]}</p>
+                    )}
+                    {birthdayCoachNamesFor(d).length > 0 && (
+                      <p className="text-[9px] text-gold-deep truncate">
+                        🎂 {birthdayCoachNamesFor(d).join(", ")} 생일
+                      </p>
                     )}
                     {(() => {
                       const resolved = resolveDuty(d, i);

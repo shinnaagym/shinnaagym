@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
-import { setCoachActive, setCoachEmploymentInfo, setCoachPhone } from "@/lib/schedule";
+import { setCoachActive, setCoachBirthday, setCoachEmploymentInfo, setCoachPhone } from "@/lib/schedule";
 import { query } from "@/lib/db";
 import { recordUndo } from "@/lib/undo";
 import type { CoachRow, EmploymentType } from "@/lib/db";
@@ -23,6 +23,7 @@ export async function PATCH(
     | {
         active?: unknown;
         phone?: unknown;
+        birthday?: unknown;
         employmentType?: unknown;
         hiredAt?: unknown;
         isTeamLead?: unknown;
@@ -32,7 +33,12 @@ export async function PATCH(
     body?.employmentType !== undefined ||
     body?.hiredAt !== undefined ||
     body?.isTeamLead !== undefined;
-  if (body?.active === undefined && body?.phone === undefined && !hasEmploymentInfo) {
+  if (
+    body?.active === undefined &&
+    body?.phone === undefined &&
+    body?.birthday === undefined &&
+    !hasEmploymentInfo
+  ) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
   const before = (await query<CoachRow>(`SELECT * FROM coaches WHERE id = $1`, [idNum])).rows[0];
@@ -52,6 +58,12 @@ export async function PATCH(
     }
     await setCoachPhone(idNum, body.phone.trim());
   }
+  if (body.birthday !== undefined) {
+    if (typeof body.birthday !== "string") {
+      return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+    }
+    await setCoachBirthday(idNum, body.birthday);
+  }
   if (hasEmploymentInfo) {
     const employmentType =
       typeof body.employmentType === "string" &&
@@ -67,6 +79,7 @@ export async function PATCH(
   const prevValues: Record<string, unknown> = {};
   if (body.active !== undefined) prevValues.active = before.active;
   if (body.phone !== undefined) prevValues.phone = before.phone;
+  if (body.birthday !== undefined) prevValues.birthday = before.birthday;
   if (hasEmploymentInfo) {
     prevValues.employment_type = before.employment_type;
     prevValues.hired_at = before.hired_at;
