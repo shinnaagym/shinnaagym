@@ -54,6 +54,11 @@ export async function setCoachPhone(id: number, phone: string): Promise<void> {
   revalidateTag("coaches", { expire: 0 });
 }
 
+export async function setCoachBirthday(id: number, birthday: string): Promise<void> {
+  await query(`UPDATE coaches SET birthday = $2 WHERE id = $1`, [id, birthday]);
+  revalidateTag("coaches", { expire: 0 });
+}
+
 export async function setCoachEmploymentInfo(
   id: number,
   info: { employmentType: EmploymentType; hiredAt: string; isTeamLead: boolean },
