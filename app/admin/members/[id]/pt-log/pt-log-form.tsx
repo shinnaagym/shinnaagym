@@ -28,8 +28,9 @@ function emptyExercise(): ExerciseInput {
 export function PtLogForm({ memberId, memberName }: { memberId: number; memberName: string }) {
   const router = useRouter();
   const [logDate, setLogDate] = useState(() => koreaTodayKey());
+  const [memo, setMemo] = useState("");
+  const [painNote, setPainNote] = useState("");
   const [painScale, setPainScale] = useState("");
-  const [performanceScale, setPerformanceScale] = useState("");
   const [exercises, setExercises] = useState<ExerciseInput[]>([emptyExercise()]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -93,8 +94,9 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           logDate,
+          memo,
+          painNote,
           painScale: painScale === "" ? null : Number(painScale),
-          performanceScale: performanceScale === "" ? null : Number(performanceScale),
           exercises: cleanedExercises,
         }),
       });
@@ -127,15 +129,36 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
             className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium mb-1.5">통증 척도 (0~10)</label>
+
+        <div>
+          <label className="block text-sm font-medium mb-1.5">메모</label>
+          <textarea
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            rows={2}
+            placeholder="오늘 컨디션, 특이사항 등"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1.5">통증 척도</label>
+          <p className="text-xs text-ink/40 mb-1.5">
+            평가 기록의 통증 척도 그래프에 같이 표시돼요.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              value={painNote}
+              onChange={(e) => setPainNote(e.target.value)}
+              placeholder="통증 부위 · 유발 동작 (예: 무릎, 오버헤드스쿼트)"
+              className="rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
             <select
               value={painScale}
               onChange={(e) => setPainScale(e.target.value)}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+              className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
             >
-              <option value="">선택 안 함</option>
+              <option value="">점수(0~10) 선택 안 함</option>
               {PT_LOG_SCALE_OPTIONS.map((v) => (
                 <option key={v} value={v}>
                   {v}
@@ -143,21 +166,14 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5">운동수행 능력 (0~10)</label>
-            <select
-              value={performanceScale}
-              onChange={(e) => setPerformanceScale(e.target.value)}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
-            >
-              <option value="">선택 안 함</option>
-              {PT_LOG_SCALE_OPTIONS.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium mb-1">운동수행 능력</p>
+          <p className="text-xs text-ink/40">
+            아래 운동 기록(무게·횟수)으로 자동 계산돼 평가 기록의 운동 수행능력 그래프(e1RM)에
+            반영돼요. 따로 입력할 필요 없어요.
+          </p>
         </div>
       </div>
 
