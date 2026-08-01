@@ -4,6 +4,7 @@ import type { PtLogExercise, PtLogRow } from "./db";
 export interface CreatePtLogInput {
   memberId: number;
   logDate: string;
+  memo?: string;
   painScale?: number | null;
   performanceScale?: number | null;
   exercises?: PtLogExercise[];
@@ -11,12 +12,13 @@ export interface CreatePtLogInput {
 
 export async function createPtLog(input: CreatePtLogInput): Promise<PtLogRow> {
   const result = await query<PtLogRow>(
-    `INSERT INTO pt_logs (member_id, log_date, pain_scale, performance_scale, exercises)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO pt_logs (member_id, log_date, memo, pain_scale, performance_scale, exercises)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
     [
       input.memberId,
       input.logDate,
+      input.memo ?? "",
       input.painScale ?? null,
       input.performanceScale ?? null,
       JSON.stringify(input.exercises ?? []),

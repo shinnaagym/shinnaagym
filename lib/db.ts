@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -422,6 +422,7 @@ function runFullMigration(): Promise<void> {
           id SERIAL PRIMARY KEY,
           member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
           log_date TEXT NOT NULL,
+          memo TEXT NOT NULL DEFAULT '',
           pain_scale INTEGER,
           performance_scale INTEGER,
           exercises JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -508,6 +509,7 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE members ADD COLUMN IF NOT EXISTS improvement_direction TEXT NOT NULL DEFAULT '';
             ALTER TABLE members ADD COLUMN IF NOT EXISTS followup_updated_at TIMESTAMPTZ;
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS visit_channel_other TEXT NOT NULL DEFAULT '';
+            ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS memo TEXT NOT NULL DEFAULT '';
 
             -- "수업 완료" 상태 개념을 없애고 취소되지 않은 수업은 모두 "예약"으로 단순화했다
             -- (SCHEMA_VERSION 2). 기존에 자동/수동으로 'completed'가 된 기록을 'reserved'로
@@ -790,6 +792,7 @@ export interface PtLogRow {
   id: number;
   member_id: number;
   log_date: string;
+  memo: string;
   pain_scale: number | null;
   performance_scale: number | null;
   exercises: PtLogExercise[];

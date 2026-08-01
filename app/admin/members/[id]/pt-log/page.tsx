@@ -3,8 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
+import { listAssessmentsByMember } from "@/lib/assessments";
 import { PT_LOG_EQUIPMENT_LABELS } from "@/lib/constants";
-import { PtLogScoreChart } from "./pt-log-charts";
+import { AssessmentPainChart } from "../assessment/pain-chart";
+import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { DeletePtLogButton } from "@/app/components/DeletePtLogButton";
 import type { PtLogExercise } from "@/lib/db";
 
@@ -42,7 +44,11 @@ export default async function PtLogHistoryPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const [member, ptLogs] = await Promise.all([getMemberById(idNum), listPtLogsByMember(idNum)]);
+  const [member, ptLogs, assessments] = await Promise.all([
+    getMemberById(idNum),
+    listPtLogsByMember(idNum),
+    listAssessmentsByMember(idNum),
+  ]);
   if (!member) {
     notFound();
   }
@@ -63,14 +69,11 @@ export default async function PtLogHistoryPage({
         + 새 PT 일지 작성
       </Link>
 
-      <PtLogScoreChart title="통증 척도 그래프" ptLogs={ptLogs} field="pain_scale" memberId={idNum} color="#e2734f" />
-      <PtLogScoreChart
-        title="운동수행 능력 그래프"
-        ptLogs={ptLogs}
-        field="performance_scale"
-        memberId={idNum}
-        color="#3fa796"
-      />
+      {/* 통증 척도·운동수행 능력 그래프는 평가 기록(평가지)과 같은 데이터를
+          쓴다 — PT 일지에서 기록해도, 평가 기록 화면에서 기록해도 같은
+          그래프에 반영된다. */}
+      <AssessmentPainChart assessments={assessments} memberId={idNum} />
+      <ExercisePerformanceChart assessments={assessments} memberId={idNum} />
 
       {ptLogs.length === 0 ? (
         <div className="rounded-2xl bg-white border border-line/60 px-5 py-10 text-center text-ink/40">
@@ -86,12 +89,13 @@ export default async function PtLogHistoryPage({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">{log.log_date || formatDateTime(log.created_at)}</p>
-                  <p className="text-xs text-ink/50 mt-0.5">
-                    {log.pain_scale != null && `통증 ${log.pain_scale}/10`}
-                    {log.pain_scale != null && log.performance_scale != null && " · "}
-                    {log.performance_scale != null && `수행능력 ${log.performance_scale}/10`}
-                    {log.pain_scale == null && log.performance_scale == null && "점수 기록 없음"}
-                  </p>
+                  {(log.pain_scale != null || log.memo) && (
+                    <p className="text-xs text-ink/50 mt-0.5">
+                      {log.pain_scale != null && `통증 ${log.pain_scale}/10`}
+                      {log.pain_scale != null && log.memo && " · "}
+                      {log.memo}
+                    </p>
+                  )}
                 </div>
               </div>
               {log.exercises.length > 0 && (
