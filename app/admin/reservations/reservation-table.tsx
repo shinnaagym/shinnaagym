@@ -1,8 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PURPOSE_LABELS } from "@/lib/constants";
 import type { ReservationRow } from "@/lib/db";
+
+type SortKey = "reservation_date" | "created_at";
+type SortDir = "asc" | "desc";
+
+function SortHeader({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}) {
+  return (
+    <th className="px-4 py-3 font-medium">
+      <button type="button" onClick={onClick} className="flex items-center gap-1 hover:text-coral">
+        {label}
+        <span className={active ? "text-coral" : "text-ink/30"}>{dir === "asc" ? "▲" : "▼"}</span>
+      </button>
+    </th>
+  );
+}
 
 export function ReservationTable({
   initialReservations,
@@ -11,6 +35,31 @@ export function ReservationTable({
 }) {
   const [reservations, setReservations] = useState(initialReservations);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedReservations = useMemo(() => {
+    const sortValue = (r: ReservationRow) =>
+      sortKey === "reservation_date"
+        ? `${r.reservation_date}T${String(r.reservation_hour).padStart(2, "0")}`
+        : r.created_at;
+    return [...reservations].sort((a, b) => {
+      const av = sortValue(a);
+      const bv = sortValue(b);
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [reservations, sortKey, sortDir]);
 
   async function handleDelete(id: number) {
     if (!confirm("이 예약을 취소(삭제)할까요?")) return;
@@ -39,19 +88,29 @@ export function ReservationTable({
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-bone text-left">
-                <th className="px-4 py-3 font-medium">날짜</th>
+                <SortHeader
+                  label="날짜"
+                  active={sortKey === "reservation_date"}
+                  dir={sortKey === "reservation_date" ? sortDir : "asc"}
+                  onClick={() => toggleSort("reservation_date")}
+                />
                 <th className="px-4 py-3 font-medium">시간</th>
                 <th className="px-4 py-3 font-medium">성함</th>
                 <th className="px-4 py-3 font-medium">나이</th>
                 <th className="px-4 py-3 font-medium">연락처</th>
                 <th className="px-4 py-3 font-medium">운동 목적</th>
                 <th className="px-4 py-3 font-medium">설명</th>
-                <th className="px-4 py-3 font-medium">신청 시각</th>
+                <SortHeader
+                  label="신청 시각"
+                  active={sortKey === "created_at"}
+                  dir={sortKey === "created_at" ? sortDir : "asc"}
+                  onClick={() => toggleSort("created_at")}
+                />
                 <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
             <tbody>
-              {reservations.map((r) => (
+              {sortedReservations.map((r) => (
                 <tr key={r.id} className="border-t border-line align-top">
                   <td className="px-4 py-3 whitespace-nowrap">{r.reservation_date}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
