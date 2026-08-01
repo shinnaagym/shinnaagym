@@ -131,9 +131,45 @@ export async function ensureRecurringEventSessions(): Promise<void> {
 
   for (const monthKey of monthKeys) {
     const month = Number(monthKey.slice(5, 7));
-    for (const event of events) {
-      if (!CYCLE_MONTHS[event.cycle].includes(month)) continue;
+
+    // 매달 반복(monthly)과 분기 반복(quarterly)이 같은 달에 겹치면(3·6·9·12월)
+    // 분기 일정을 우선한다. 이 달에 적용되는 일정들의 발생일을 먼저 전부
+    // 계산해 날짜별 "승자"를 정하고 — 승자가 없는(=이미 진 monthly) 일정은
+    // 자기 이름으로 남아있을 수 있는 예전 행을 지우기부터 한 다음에 승자를
+    // 넣는다. 승자를 먼저 넣어버리면 그 순간엔 아직 자리가 안 비어있어
+    // ON CONFLICT DO NOTHING에 막혀 승자 자신도 못 들어가는 문제가 있었다.
+    const applicable = events.filter((e) => CYCLE_MONTHS[e.cycle].includes(month));
+    const occurrenceDateByEventId = new Map<number, string>();
+    const winnerByDate = new Map<string, RecurringEventRow>();
+    for (const event of applicable) {
       const occurrenceDate = computeOccurrenceDate(monthKey, event.day_of_month, holidaySet);
+      occurrenceDateByEventId.set(event.id, occurrenceDate);
+      const current = winnerByDate.get(occurrenceDate);
+      if (!current || (current.cycle === "monthly" && event.cycle !== "monthly")) {
+        winnerByDate.set(occurrenceDate, event);
+      }
+    }
+
+    for (const event of applicable) {
+      const occurrenceDate = occurrenceDateByEventId.get(event.id)!;
+      const isWinner = winnerByDate.get(occurrenceDate)?.id === event.id;
+      if (!isWinner) {
+        for (const coach of coaches) {
+          for (let hour = event.start_hour; hour < event.end_hour; hour++) {
+            await query(
+              `DELETE FROM class_sessions
+               WHERE coach_id = $1 AND session_date = $2 AND session_hour = $3
+                 AND entry_type = 'memo' AND memo = $4`,
+              [coach.id, occurrenceDate, hour, event.name],
+            );
+          }
+        }
+      }
+    }
+
+    for (const event of applicable) {
+      const occurrenceDate = occurrenceDateByEventId.get(event.id)!;
+      if (winnerByDate.get(occurrenceDate)?.id !== event.id) continue;
       for (const coach of coaches) {
         for (let hour = event.start_hour; hour < event.end_hour; hour++) {
           await query(

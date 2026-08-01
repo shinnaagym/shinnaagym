@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { COACH_COLOR_PALETTE, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
-import { addDaysToKey, mondayOfWeek } from "@/lib/date";
+import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import type { CoachRow, PtType, ScheduleMemoRow, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { CoachScheduleStats, MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
@@ -95,6 +95,17 @@ function progressLabel(session: SessionWithMember): string | null {
   return `${session.ordinal ?? "-"}/${total}`;
 }
 
+/** 재등록 골든벨은 회원 단위 자격(잔여 ≤ 3회)뿐 아니라, 이 세션 pill 자체의
+    회차도 "총 회차 - 이 회차 ≤ 3"이어야 뜬다 — 그래야 예: "3/10"(잔여 7회
+    시점)처럼 한참 이른 회차의 pill에까지 종 아이콘이 잘못 붙는 일이 없다. */
+function isGoldenBellSession(session: SessionWithMember, goldenBellMemberIds: Set<number>): boolean {
+  if (session.entry_type !== "session" || session.member_id === null) return false;
+  if (!goldenBellMemberIds.has(session.member_id)) return false;
+  const total = Number(session.total_sessions);
+  if (!total || session.ordinal === null) return false;
+  return total - session.ordinal <= 3;
+}
+
 function SessionCellButton({
   session,
   goldenBellMemberIds,
@@ -153,13 +164,11 @@ function SessionCellButton({
             {progressLabel(session) && (
               <span className="ml-1 font-normal opacity-70">{progressLabel(session)}</span>
             )}
-            {session.entry_type === "session" &&
-              session.member_id !== null &&
-              goldenBellMemberIds.has(session.member_id) && (
-                <span className="ml-1" title="재등록 골든타임 — 잔여 3회 이하">
-                  🔔
-                </span>
-              )}
+            {isGoldenBellSession(session, goldenBellMemberIds) && (
+              <span className="ml-1" title="재등록 골든타임 — 잔여 3회 이하">
+                🔔
+              </span>
+            )}
           </span>
           {session.status !== "reserved" && (
             <span className="block text-[10px] opacity-70">{STATUS_LABEL[session.status]}</span>
@@ -1795,9 +1804,15 @@ function EditSessionModal({
                 <p className="text-[11px] text-ink/40">불러오는 중...</p>
               ) : (
                 (() => {
-                  const others = memberSessions.filter((s) => s.id !== session.id);
+                  const todayKey = koreaTodayKey();
+                  const others = memberSessions
+                    .filter((s) => s.id !== session.id && s.session_date >= todayKey)
+                    .sort(
+                      (a, b) =>
+                        a.session_date.localeCompare(b.session_date) || a.session_hour - b.session_hour,
+                    );
                   if (others.length === 0) {
-                    return <p className="text-[11px] text-ink/40">다른 예약 내역이 없어요.</p>;
+                    return <p className="text-[11px] text-ink/40">앞으로 예정된 다른 예약이 없어요.</p>;
                   }
                   return others.map((s) => (
                     <div key={s.id} className="flex justify-between text-[11px] text-ink/60">
