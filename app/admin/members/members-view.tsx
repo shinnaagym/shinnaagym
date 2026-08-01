@@ -1898,15 +1898,6 @@ function MemberDetailModal({
               className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
             />
           </Field>
-          <Field label="가능한 요일·시간">
-            <input
-              value={availableTimes}
-              onChange={(e) => setAvailableTimes(e.target.value)}
-              placeholder="예: 화·목 오전 10시"
-              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral mb-2"
-            />
-            <AvailabilityGridPicker onChange={setAvailableTimes} />
-          </Field>
           <Field label="운동 목적 / 특이사항">
             <textarea
               value={notes}
@@ -1915,62 +1906,6 @@ function MemberDetailModal({
               className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
             />
           </Field>
-        </div>
-
-        <div>
-          <p className="text-sm font-medium mb-2">고정 시간대</p>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {fixedSlots.length === 0 && (
-              <p className="text-xs text-ink/40">등록된 고정 시간대가 없어요.</p>
-            )}
-            {fixedSlots.map((slot) => (
-              <span
-                key={slot.id}
-                className="flex items-center gap-1 rounded-full bg-bone/70 px-2.5 py-1 text-xs"
-              >
-                {FIXED_SLOT_WEEKDAY_LABELS[slot.weekday] ?? "?"} {slot.hour}시
-                <button
-                  onClick={() => removeSlot(slot.id)}
-                  className="text-ink/40 hover:text-coral"
-                  aria-label="삭제"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <select
-              value={newSlotWeekday}
-              onChange={(e) => setNewSlotWeekday(Number(e.target.value))}
-              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
-            >
-              {FIXED_SLOT_WEEKDAY_LABELS.map((label, idx) => (
-                <option key={label} value={idx}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={newSlotHour}
-              onChange={(e) => setNewSlotHour(Number(e.target.value))}
-              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
-            >
-              {SCHEDULE_HOUR_ROWS.map((hour) => (
-                <option key={hour} value={hour}>
-                  {hour}시
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={addSlot}
-              disabled={savingSlot}
-              className="flex-1 rounded-lg border border-coral text-coral text-sm font-medium hover:bg-coral/5 transition disabled:opacity-50"
-            >
-              추가
-            </button>
-          </div>
-          {slotError && <p className="text-xs text-coral mt-1">{slotError}</p>}
         </div>
 
         <div>
@@ -2103,6 +2038,72 @@ function MemberDetailModal({
               <p className="text-xs text-ink/40">아직 세션 기록이 없어요.</p>
             )}
           </div>
+        </div>
+
+        <Field label="가능한 요일·시간">
+          <input
+            value={availableTimes}
+            onChange={(e) => setAvailableTimes(e.target.value)}
+            placeholder="예: 화·목 오전 10시"
+            className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral mb-2"
+          />
+          <AvailabilityGridPicker onChange={setAvailableTimes} />
+        </Field>
+
+        <div>
+          <p className="text-sm font-medium mb-2">고정 시간대</p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {fixedSlots.length === 0 && (
+              <p className="text-xs text-ink/40">등록된 고정 시간대가 없어요.</p>
+            )}
+            {fixedSlots.map((slot) => (
+              <span
+                key={slot.id}
+                className="flex items-center gap-1 rounded-full bg-bone/70 px-2.5 py-1 text-xs"
+              >
+                {FIXED_SLOT_WEEKDAY_LABELS[slot.weekday] ?? "?"} {slot.hour}시
+                <button
+                  onClick={() => removeSlot(slot.id)}
+                  className="text-ink/40 hover:text-coral"
+                  aria-label="삭제"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={newSlotWeekday}
+              onChange={(e) => setNewSlotWeekday(Number(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
+            >
+              {FIXED_SLOT_WEEKDAY_LABELS.map((label, idx) => (
+                <option key={label} value={idx}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={newSlotHour}
+              onChange={(e) => setNewSlotHour(Number(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
+            >
+              {SCHEDULE_HOUR_ROWS.map((hour) => (
+                <option key={hour} value={hour}>
+                  {hour}시
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={addSlot}
+              disabled={savingSlot}
+              className="flex-1 rounded-lg border border-coral text-coral text-sm font-medium hover:bg-coral/5 transition disabled:opacity-50"
+            >
+              추가
+            </button>
+          </div>
+          {slotError && <p className="text-xs text-coral mt-1">{slotError}</p>}
         </div>
 
         {error && <p className="text-sm text-coral">{error}</p>}
