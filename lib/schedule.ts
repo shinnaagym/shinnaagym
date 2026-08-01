@@ -451,6 +451,17 @@ export async function addFixedSlotWithBackfill(
     throw new Error("담당 코치를 먼저 지정해주세요.");
   }
 
+  // 한 시간대에는 코치당 회원 한 명만 고정 배정할 수 있다.
+  const conflict = await query<{ member_name: string }>(
+    `SELECT m.name as member_name FROM fixed_slots f
+     JOIN members m ON m.id = f.member_id
+     WHERE m.coach_id = $1 AND f.weekday = $2 AND f.hour = $3 AND f.member_id <> $4`,
+    [member.coach_id, weekday, hour, memberId],
+  );
+  if (conflict.rows.length > 0) {
+    throw new Error(`이미 이 시간대에 ${conflict.rows[0].member_name} 회원이 배정되어 있어요.`);
+  }
+
   const slot = await addFixedSlot(memberId, weekday, hour);
 
   const unallocated = await getUnallocatedSessionCount(memberId);
