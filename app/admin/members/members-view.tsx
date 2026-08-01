@@ -589,18 +589,27 @@ export function MembersView({
                       </span>
                     )}
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5 text-xs">
-                    <span
-                      className={[
-                        "flex h-4 w-4 items-center justify-center rounded border",
-                        m.has_next_week_session
-                          ? "border-sage bg-sage text-white"
-                          : "border-line text-transparent",
-                      ].join(" ")}
+                  <div className="mt-2 flex items-center justify-between gap-1.5 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={[
+                          "flex h-4 w-4 items-center justify-center rounded border",
+                          m.has_next_week_session
+                            ? "border-sage bg-sage text-white"
+                            : "border-line text-transparent",
+                        ].join(" ")}
+                      >
+                        ✓
+                      </span>
+                      <span className="text-ink/50">다음주 수업 예약</span>
+                    </div>
+                    <Link
+                      href={`/admin/members/${m.id}/pt-log`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
                     >
-                      ✓
-                    </span>
-                    <span className="text-ink/50">다음주 수업 예약</span>
+                      PT 일지
+                    </Link>
                   </div>
                 </div>
               );
@@ -669,6 +678,13 @@ export function MembersView({
                             className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
                           >
                             평가 기록
+                          </Link>
+                          <Link
+                            href={`/admin/members/${m.id}/pt-log`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
+                          >
+                            PT 일지
                           </Link>
                         </div>
                       </td>

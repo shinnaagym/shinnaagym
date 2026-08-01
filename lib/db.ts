@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -409,6 +409,25 @@ function runFullMigration(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_payroll_records_year_month ON payroll_records(year_month);
         CREATE INDEX IF NOT EXISTS idx_payroll_records_coach_id ON payroll_records(coach_id);
+
+        -- PT 세션마다 남기는 운동 일지. 통증 척도·운동수행 능력은 그날 세션 전체에
+        -- 대한 주관적 점수 하나씩(0~10)이고, exercises에는 그날 수행한 운동 목록
+        -- (운동명·운동도구·무게/횟수/세트 그룹)을 JSON으로 저장한다. 평가 기록
+        -- (assessments)은 정기적인 임상 재평가용이라 매 수업마다 채우기엔 무겁기
+        -- 때문에, 가볍게 매번 남기는 이 용도로는 별도 테이블을 둔다. 같은 날짜에
+        -- 여러 건이 있을 수 있고(빠른 점수 기록 + 상세 운동 기록을 따로 남기는
+        -- 경우 등), 통증/수행능력 그래프에서 날짜별로 묶어 표시한다 — 평가 기록의
+        -- 통증 척도 그래프와 같은 방식.
+        CREATE TABLE IF NOT EXISTS pt_logs (
+          id SERIAL PRIMARY KEY,
+          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          log_date TEXT NOT NULL,
+          pain_scale INTEGER,
+          performance_scale INTEGER,
+          exercises JSONB NOT NULL DEFAULT '[]'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_pt_logs_member_id ON pt_logs(member_id);
 
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
@@ -753,6 +772,28 @@ export interface PainMovementEntry {
   nrsBest: number | null;
   nrsWorst: number | null;
   nrsCurrent: number | null;
+}
+
+export interface PtLogSetGroup {
+  weight: number | null;
+  reps: number | null;
+  sets: number | null;
+}
+
+export interface PtLogExercise {
+  name: string;
+  equipment: string;
+  groups: PtLogSetGroup[];
+}
+
+export interface PtLogRow {
+  id: number;
+  member_id: number;
+  log_date: string;
+  pain_scale: number | null;
+  performance_scale: number | null;
+  exercises: PtLogExercise[];
+  created_at: string;
 }
 
 export interface IntakeQuestionnaireRow {
