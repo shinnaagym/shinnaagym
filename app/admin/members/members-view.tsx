@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import Link from "next/link";
 import type {
   CoachRow,
@@ -30,7 +31,192 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   transfer: "계좌이체",
 };
 const FIXED_SLOT_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토"];
-const FIXED_SLOT_CAPACITY = 3;
+const FIXED_SLOT_CAPACITY = 1;
+
+type MemberSortKey = "name" | "remaining" | "type" | "nextWeek";
+type SortDir = "asc" | "desc";
+
+function SortHeader({
+  label,
+  active,
+  dir,
+  onClick,
+  center,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+  center?: boolean;
+}) {
+  return (
+    <th className={["px-5 py-3 font-medium", center ? "text-center" : ""].filter(Boolean).join(" ")}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={["flex items-center gap-1 hover:text-coral", center ? "mx-auto" : ""].filter(Boolean).join(" ")}
+      >
+        {label}
+        <span className={active ? "text-coral" : "text-ink/30"}>{dir === "asc" ? "▲" : "▼"}</span>
+      </button>
+    </th>
+  );
+}
+
+function cellKey(weekday: number, hour: number): string {
+  return `${weekday}-${hour}`;
+}
+
+/** 선택된 요일·시간 셀들을 "월 9~11시, 14시, 수 10시" 형태의 읽기 쉬운 텍스트로 변환. */
+function formatAvailability(selected: Set<string>): string {
+  const byWeekday = new Map<number, number[]>();
+  for (const key of selected) {
+    const [weekday, hour] = key.split("-").map(Number);
+    const hours = byWeekday.get(weekday) ?? [];
+    hours.push(hour);
+    byWeekday.set(weekday, hours);
+  }
+  const parts: string[] = [];
+  for (let weekday = 0; weekday < FIXED_SLOT_WEEKDAY_LABELS.length; weekday++) {
+    const hours = byWeekday.get(weekday);
+    if (!hours || hours.length === 0) continue;
+    hours.sort((a, b) => a - b);
+    const ranges: string[] = [];
+    let start = hours[0];
+    let prev = hours[0];
+    for (let i = 1; i <= hours.length; i++) {
+      const h = hours[i];
+      if (h === prev + 1) {
+        prev = h;
+        continue;
+      }
+      ranges.push(start === prev ? `${start}시` : `${start}~${prev}시`);
+      if (h !== undefined) {
+        start = h;
+        prev = h;
+      }
+    }
+    parts.push(`${FIXED_SLOT_WEEKDAY_LABELS[weekday]} ${ranges.join(", ")}`);
+  }
+  return parts.join(", ");
+}
+
+/** "가능한 요일·시간"을 드래그로 복수 선택할 수 있는 주간 시간표. 선택 결과를
+    읽기 쉬운 텍스트로 변환해 부모의 텍스트 입력값을 갱신한다(기존 자유 텍스트는
+    직접 수정도 계속 가능). */
+function AvailabilityGridPicker({ onChange }: { onChange: (text: string) => void }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+  const paintModeRef = useRef<"add" | "remove" | null>(null);
+  const [isPainting, setIsPainting] = useState(false);
+
+  function applyCell(weekday: number, hour: number, mode: "add" | "remove") {
+    const key = cellKey(weekday, hour);
+    const has = selectedRef.current.has(key);
+    if ((mode === "add" && has) || (mode === "remove" && !has)) return;
+    const next = new Set(selectedRef.current);
+    if (mode === "add") next.add(key);
+    else next.delete(key);
+    selectedRef.current = next;
+    setSelected(next);
+    onChange(formatAvailability(next));
+  }
+
+  function handlePointerDown(weekday: number, hour: number) {
+    const mode: "add" | "remove" = selectedRef.current.has(cellKey(weekday, hour)) ? "remove" : "add";
+    paintModeRef.current = mode;
+    setIsPainting(true);
+    applyCell(weekday, hour, mode);
+  }
+
+  function handlePointerMove(e: ReactPointerEvent) {
+    if (!paintModeRef.current) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const cellEl = el?.closest<HTMLElement>("[data-weekday]");
+    if (!cellEl) return;
+    const weekday = Number(cellEl.dataset.weekday);
+    const hour = Number(cellEl.dataset.hour);
+    applyCell(weekday, hour, paintModeRef.current);
+  }
+
+  useEffect(() => {
+    function endPaint() {
+      paintModeRef.current = null;
+      setIsPainting(false);
+    }
+    window.addEventListener("pointerup", endPaint);
+    window.addEventListener("pointercancel", endPaint);
+    return () => {
+      window.removeEventListener("pointerup", endPaint);
+      window.removeEventListener("pointercancel", endPaint);
+    };
+  }, []);
+
+  function clearAll() {
+    const next = new Set<string>();
+    selectedRef.current = next;
+    setSelected(next);
+    onChange("");
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs text-ink/40">표를 드래그하면 여러 칸을 한 번에 선택할 수 있어요.</p>
+        {selected.size > 0 && (
+          <button type="button" onClick={clearAll} className="text-xs text-coral hover:underline shrink-0">
+            선택 지우기
+          </button>
+        )}
+      </div>
+      <div
+        className="rounded-xl border border-line overflow-x-auto select-none"
+        style={{ touchAction: isPainting ? "none" : "auto" }}
+        onPointerMove={handlePointerMove}
+      >
+        <table className="w-full text-[11px] border-collapse min-w-[420px]">
+          <thead>
+            <tr className="text-ink/50 border-b border-line/60">
+              <th className="px-1.5 py-1 font-medium w-10">시간</th>
+              {FIXED_SLOT_WEEKDAY_LABELS.map((label) => (
+                <th key={label} className="px-1.5 py-1 font-medium text-center">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {SCHEDULE_HOUR_ROWS.map((hour) => (
+              <tr key={hour} className="border-b border-line/20 last:border-0">
+                <td className="px-1.5 py-1 text-ink/40 whitespace-nowrap">{hour}시</td>
+                {FIXED_SLOT_WEEKDAY_LABELS.map((_, weekday) => {
+                  const active = selected.has(cellKey(weekday, hour));
+                  return (
+                    <td
+                      key={weekday}
+                      data-weekday={weekday}
+                      data-hour={hour}
+                      onPointerDown={() => handlePointerDown(weekday, hour)}
+                      className={[
+                        "px-1.5 py-1 text-center cursor-pointer border-l border-line/10",
+                        active ? "bg-coral text-white" : "hover:bg-bone/60",
+                      ].join(" ")}
+                    >
+                      {active ? "✓" : ""}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 type SessionSummary = {
   id: number;
@@ -191,6 +377,17 @@ export function MembersView({
   const [statusFilter, setStatusFilter] = useState<MemberStatus | "all">("active");
   const [showCreate, setShowCreate] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(initialOpenId ?? null);
+  const [sortKey, setSortKey] = useState<MemberSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function toggleSort(key: MemberSortKey) {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
@@ -204,6 +401,29 @@ export function MembersView({
       return true;
     });
   }, [members, search, coachFilter, statusFilter]);
+
+  const sortedFiltered = useMemo(() => {
+    if (!sortKey) return filtered;
+    const sortValue = (m: MemberWithProgress): number | string => {
+      switch (sortKey) {
+        case "name":
+          return m.name;
+        case "remaining":
+          return m.total_sessions - m.done_count;
+        case "type":
+          return m.package_count < 2 ? 0 : 1;
+        case "nextWeek":
+          return m.has_next_week_session ? 1 : 0;
+      }
+    };
+    return [...filtered].sort((a, b) => {
+      const av = sortValue(a);
+      const bv = sortValue(b);
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filtered, sortKey, sortDir]);
 
   /** 초진/재등록, 그리고 그중 소개로 온 회원 수를 따로 집계한다(현재 필터 적용 목록 기준).
       초=현재 패키지가 첫 패키지, 재=재등록(2번째 이상 패키지), 소개(초)/소개(재)=그중 소개(referrer)로 온 경우. */
@@ -297,7 +517,7 @@ export function MembersView({
         <>
           {/* 모바일: 카드 목록 (좁은 화면에서 표 가로 스크롤 대신) */}
           <div className="grid gap-3 sm:hidden">
-            {filtered.map((m) => {
+            {sortedFiltered.map((m) => {
               const remaining = m.total_sessions - m.done_count;
               const pct =
                 m.total_sessions > 0
@@ -392,17 +612,38 @@ export function MembersView({
             <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="text-left text-ink/50 text-xs border-b border-line/60">
-                  <th className="px-5 py-3 font-medium">이름</th>
+                  <SortHeader
+                    label="이름"
+                    active={sortKey === "name"}
+                    dir={sortKey === "name" ? sortDir : "asc"}
+                    onClick={() => toggleSort("name")}
+                  />
                   <th className="px-5 py-3 font-medium">담당</th>
                   <th className="px-5 py-3 font-medium">진행</th>
-                  <th className="px-5 py-3 font-medium">잔여</th>
-                  <th className="px-5 py-3 font-medium">초/재</th>
+                  <SortHeader
+                    label="잔여"
+                    active={sortKey === "remaining"}
+                    dir={sortKey === "remaining" ? sortDir : "asc"}
+                    onClick={() => toggleSort("remaining")}
+                  />
+                  <SortHeader
+                    label="초/재"
+                    active={sortKey === "type"}
+                    dir={sortKey === "type" ? sortDir : "asc"}
+                    onClick={() => toggleSort("type")}
+                  />
                   <th className="px-5 py-3 font-medium">상태</th>
-                  <th className="px-5 py-3 font-medium text-center">다음주</th>
+                  <SortHeader
+                    label="다음주"
+                    active={sortKey === "nextWeek"}
+                    dir={sortKey === "nextWeek" ? sortDir : "asc"}
+                    onClick={() => toggleSort("nextWeek")}
+                    center
+                  />
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((m) => {
+                {sortedFiltered.map((m) => {
                   const remaining = m.total_sessions - m.done_count;
                   const pct =
                     m.total_sessions > 0
@@ -586,14 +827,6 @@ function FixedSlotSchedule({
     return map;
   }, [scopedSlots]);
 
-  const hourTotals = useMemo(() => {
-    const totals = new Map<number, number>();
-    for (const slot of scopedSlots) {
-      totals.set(slot.hour, (totals.get(slot.hour) ?? 0) + 1);
-    }
-    return totals;
-  }, [scopedSlots]);
-
   return (
     <div className="mt-10">
       <div className="flex items-center gap-2 mb-1">
@@ -603,7 +836,7 @@ function FixedSlotSchedule({
         <span className="text-xs text-ink/40">시간대별 고정 회원 배정 현황</span>
       </div>
       <p className="text-xs text-ink/40 mb-3">
-        한 시간대에 일주일 합계 {FIXED_SLOT_CAPACITY}명을 초과하면 붉은색으로 표시돼요.
+        한 시간대에는 회원 한 명만 배정할 수 있어요. 기존에 중복 배정된 시간대는 붉은색으로 표시돼요.
       </p>
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
         <table className="w-full text-xs min-w-[720px] border-collapse">
@@ -619,12 +852,12 @@ function FixedSlotSchedule({
           </thead>
           <tbody>
             {SCHEDULE_HOUR_ROWS.map((hour) => {
-              const over = (hourTotals.get(hour) ?? 0) > FIXED_SLOT_CAPACITY;
               return (
               <tr key={hour} className="border-b border-line/30 last:border-0">
                 <td className="px-3 py-2.5 text-ink/50 whitespace-nowrap">{hour}시</td>
                 {FIXED_SLOT_WEEKDAY_LABELS.map((_, weekday) => {
                   const entries = byCell.get(`${weekday}-${hour}`) ?? [];
+                  const over = entries.length > FIXED_SLOT_CAPACITY;
                   return (
                     <td key={weekday} className="px-3 py-2.5 align-top">
                       {entries.length > 0 && (
@@ -971,8 +1204,9 @@ function CreateMemberModal({
             value={availableTimes}
             onChange={(e) => setAvailableTimes(e.target.value)}
             placeholder="예: 화·목 오전 10시"
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral mb-2"
           />
+          <AvailabilityGridPicker onChange={setAvailableTimes} />
         </Field>
         <Field label="PT 유형">
           <PtTypeToggle value={ptType} onChange={setPtType} />
@@ -1669,8 +1903,9 @@ function MemberDetailModal({
               value={availableTimes}
               onChange={(e) => setAvailableTimes(e.target.value)}
               placeholder="예: 화·목 오전 10시"
-              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral mb-2"
             />
+            <AvailabilityGridPicker onChange={setAvailableTimes} />
           </Field>
           <Field label="운동 목적 / 특이사항">
             <textarea
