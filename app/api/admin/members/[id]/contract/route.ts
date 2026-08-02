@@ -79,6 +79,8 @@ export async function POST(
         optionNote?: unknown;
         startDate?: unknown;
         privacyConsent?: unknown;
+        companionName?: unknown;
+        companionPhone?: unknown;
       }
     | null;
 
@@ -102,6 +104,8 @@ export async function POST(
   const optionNote = typeof body?.optionNote === "string" ? body.optionNote.trim() : "";
   const startDate = typeof body?.startDate === "string" ? body.startDate.trim() : "";
   const privacyConsent = body?.privacyConsent === true;
+  const companionName = typeof body?.companionName === "string" ? body.companionName.trim() : "";
+  const companionPhone = typeof body?.companionPhone === "string" ? body.companionPhone.trim() : "";
 
   const contract = await createContract({
     memberId: idNum,
@@ -120,6 +124,8 @@ export async function POST(
     optionNote,
     startDate,
     privacyConsent,
+    companionName,
+    companionPhone,
   });
 
   await recordUndo(`${member.name} 계약서 작성`, [

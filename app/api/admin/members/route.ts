@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
         optionNote?: unknown;
         startDate?: unknown;
         privacyConsent?: unknown;
+        companionName?: unknown;
+        companionPhone?: unknown;
       }
     | null;
 
@@ -100,6 +102,8 @@ export async function POST(req: NextRequest) {
   const optionNote = typeof body?.optionNote === "string" ? body.optionNote.trim() : "";
   const startDate = typeof body?.startDate === "string" ? body.startDate.trim() : "";
   const privacyConsent = body?.privacyConsent === true;
+  const companionName = typeof body?.companionName === "string" ? body.companionName.trim() : "";
+  const companionPhone = typeof body?.companionPhone === "string" ? body.companionPhone.trim() : "";
 
   // 같은 연락처로 상담 단계(초진 문진표/평가지 등)에서 이미 만들어진 회원 레코드가
   // 있으면 새로 만들지 않고 그 회원에 패키지·계약서를 연결한다 — 상담 시 작성한
@@ -145,6 +149,8 @@ export async function POST(req: NextRequest) {
     optionNote,
     startDate,
     privacyConsent,
+    companionName,
+    companionPhone,
   });
 
   if (existingMember) {

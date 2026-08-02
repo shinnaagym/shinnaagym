@@ -41,6 +41,8 @@ export interface ContractDocumentData {
   option_note: string;
   start_date: string;
   privacy_consent: boolean;
+  companion_name: string;
+  companion_phone: string;
 }
 
 // 회원 개인 계약서 페이지(/my/[token]/contract)와 관리자 계약서 보기 모달이
@@ -93,6 +95,18 @@ export function ContractDocument({
               <p>Premium {contract.pt_type} PT</p>
             </div>
           </div>
+          {contract.pt_type === "2:1" && (contract.companion_name || contract.companion_phone) && (
+            <div className="grid grid-cols-2 divide-x divide-line/60">
+              <div className="px-4 py-3">
+                <p className="text-xs text-ink/40 mb-0.5">함께 등록하는 분 성명</p>
+                <p>{contract.companion_name || "-"}</p>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-xs text-ink/40 mb-0.5">함께 등록하는 분 연락처</p>
+                <p>{contract.companion_phone || "-"}</p>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 divide-x divide-line/60">
             <div className="px-4 py-3">
               <p className="text-xs text-ink/40 mb-0.5">주민등록번호(앞자리)</p>

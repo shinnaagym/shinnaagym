@@ -1701,6 +1701,15 @@ function EditSessionModal({
     }
   }
 
+  async function handleDeleteOther(id: number, dateLabel: string) {
+    if (!confirm(`${dateLabel} 예약을 삭제할까요?`)) return;
+    const res = await fetch(`/api/admin/sessions/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMemberSessions((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+      onChanged();
+    }
+  }
+
   if (isSimpleEntry(session)) {
     return (
       <ModalShell
@@ -1837,11 +1846,20 @@ function EditSessionModal({
                     return <p className="text-[11px] text-ink/40">앞으로 예정된 다른 예약이 없어요.</p>;
                   }
                   return others.map((s) => (
-                    <div key={s.id} className="flex justify-between text-[11px] text-ink/60">
+                    <div key={s.id} className="flex items-center justify-between text-[11px] text-ink/60">
                       <span>
                         {s.session_date} {s.session_hour}:00
                       </span>
-                      <span>{STATUS_LABEL[s.status]}</span>
+                      <span className="flex items-center gap-2">
+                        {STATUS_LABEL[s.status]}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOther(s.id, `${s.session_date} ${s.session_hour}:00`)}
+                          className="text-ink/40 hover:text-coral"
+                        >
+                          삭제
+                        </button>
+                      </span>
                     </div>
                   ));
                 })()

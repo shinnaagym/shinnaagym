@@ -1133,6 +1133,8 @@ function CreateMemberModal({
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [companionName, setCompanionName] = useState("");
+  const [companionPhone, setCompanionPhone] = useState("");
   const [coachId, setCoachId] = useState<number | "">(coaches[0]?.id ?? "");
   const [referrer, setReferrer] = useState("");
   const [availableTimes, setAvailableTimes] = useState("");
@@ -1198,6 +1200,8 @@ function CreateMemberModal({
           optionNote,
           startDate,
           privacyConsent,
+          companionName: ptType === "2:1" ? companionName : "",
+          companionPhone: ptType === "2:1" ? companionPhone : "",
         }),
       });
       const data = await res.json();
@@ -1216,6 +1220,9 @@ function CreateMemberModal({
   return (
     <ModalShell title="신규 회원 등록" onClose={onClose}>
       <div className="space-y-4">
+        <Field label="PT 유형">
+          <PtTypeToggle value={ptType} onChange={setPtType} />
+        </Field>
         <Field label="이름 *">
           <input
             value={name}
@@ -1231,6 +1238,29 @@ function CreateMemberModal({
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
           />
         </Field>
+        {ptType === "2:1" && (
+          <div className="rounded-xl border border-line/60 bg-bone/30 px-4 py-3 space-y-3">
+            <p className="text-xs text-ink/50">
+              2:1 수업이라 함께 등록하는 분의 인적사항도 계약서에 함께 기록돼요. (별도
+              회원으로 등록되지는 않아요.)
+            </p>
+            <Field label="함께 등록하는 분 이름">
+              <input
+                value={companionName}
+                onChange={(e) => setCompanionName(e.target.value)}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 연락처">
+              <input
+                value={companionPhone}
+                onChange={(e) => setCompanionPhone(e.target.value)}
+                placeholder="010-"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="담당 코치">
             <select
@@ -1263,9 +1293,6 @@ function CreateMemberModal({
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral mb-2"
           />
           <AvailabilityGridPicker onChange={setAvailableTimes} />
-        </Field>
-        <Field label="PT 유형">
-          <PtTypeToggle value={ptType} onChange={setPtType} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="등록 횟수 *">
@@ -1369,6 +1396,8 @@ function WriteContractModal({
   const [optionNote, setOptionNote] = useState("");
   const [startDate, setStartDate] = useState("");
   const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [companionName, setCompanionName] = useState("");
+  const [companionPhone, setCompanionPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -1396,6 +1425,8 @@ function WriteContractModal({
           optionNote,
           startDate,
           privacyConsent,
+          companionName,
+          companionPhone,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1421,6 +1452,29 @@ function WriteContractModal({
             {formatWon(latestPackage.price)} · {PAYMENT_METHOD_LABELS[latestPackage.payment_method]}
           </p>
         </div>
+        {latestPackage.pt_type === "2:1" && (
+          <div className="rounded-xl border border-line/60 bg-bone/30 px-4 py-3 space-y-3">
+            <p className="text-xs text-ink/50">
+              2:1 수업이라 함께 등록하는 분의 인적사항도 계약서에 함께 기록돼요. (별도
+              회원으로 등록되지는 않아요.)
+            </p>
+            <Field label="함께 등록하는 분 이름">
+              <input
+                value={companionName}
+                onChange={(e) => setCompanionName(e.target.value)}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 연락처">
+              <input
+                value={companionPhone}
+                onChange={(e) => setCompanionPhone(e.target.value)}
+                placeholder="010-"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+          </div>
+        )}
         <ContractFieldsFieldset
           rrnFront={rrnFront}
           onRrnFrontChange={setRrnFront}
