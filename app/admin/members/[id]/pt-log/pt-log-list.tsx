@@ -119,6 +119,7 @@ export function PtLogList({ ptLogs, editable = true }: { ptLogs: PtLogRow[]; edi
                 <div className="absolute top-4 right-5 flex items-center gap-2 text-xs">
                   <Link
                     href={`/admin/members/${log.member_id}/pt-log/${log.id}/edit`}
+                    prefetch={false}
                     className="text-ink/40 hover:text-coral"
                   >
                     수정

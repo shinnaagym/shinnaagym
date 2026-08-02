@@ -652,6 +652,7 @@ export function MembersView({
                     </div>
                     <Link
                       href={`/admin/members/${m.id}/pt-log`}
+                      prefetch={false}
                       onClick={(e) => e.stopPropagation()}
                       className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
                     >
@@ -719,8 +720,12 @@ export function MembersView({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {m.name}
                           {m.referrer && <ReferrerBadge referrer={m.referrer} />}
+                          {/* 회원 수만큼 반복 렌더링되는 링크라 prefetch를 꺼서
+                              목록을 열 때마다 전원 분량의 PT일지 페이지가
+                              한꺼번에 백그라운드로 조회되지 않게 한다. */}
                           <Link
                             href={`/admin/members/${m.id}/pt-log`}
+                            prefetch={false}
                             onClick={(e) => e.stopPropagation()}
                             className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
                           >

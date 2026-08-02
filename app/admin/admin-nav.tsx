@@ -5,6 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+// 탭 링크는 기본 prefetch를 꺼둔다. 이 nav는 모든 관리자 페이지에서 항상
+// 화면에 보이는데, 각 탭이 DB를 조회하는 동적(ƒ) 페이지라서 기본 prefetch를
+// 켜두면 페이지를 열 때마다 나머지 10개 탭의 RSC 요청이 전부 백그라운드로
+// 날아가 서버리스/DB에 불필요한 부하를 준다.
 const DEFAULT_TABS = [
   { href: "/admin/dashboard", label: "대시보드" },
   { href: "/admin/schedule", label: "스케줄" },
@@ -300,6 +304,7 @@ export function AdminNav() {
               >
                 <Link
                   href={tab.href}
+                  prefetch={false}
                   onClick={handleTabClick}
                   onContextMenu={(e) => e.preventDefault()}
                   draggable={false}
