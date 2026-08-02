@@ -9,7 +9,7 @@ import type { AssessmentRow } from "@/lib/db";
 import { ChartZoomModal } from "@/app/components/ChartZoomModal";
 
 const WIDTH = 640;
-const HEIGHT = 220;
+const HEIGHT = 640;
 const PAD_LEFT = 36;
 const PAD_RIGHT = 16;
 const PAD_TOP = 16;
