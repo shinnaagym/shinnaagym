@@ -25,10 +25,10 @@ export const PT_LOG_EQUIPMENT_OPTIONS = [
   { value: "barbell", label: "바벨" },
   { value: "kettlebell", label: "케틀벨" },
   { value: "cable", label: "케이블" },
+  { value: "small_equipment", label: "소도구" },
   { value: "hex_bar", label: "헥스바" },
   { value: "smith_machine", label: "스미스머신" },
   { value: "bulgarian_bag", label: "불가리안백" },
-  { value: "small_equipment", label: "소도구" },
 ] as const;
 
 export type PtLogEquipmentValue = (typeof PT_LOG_EQUIPMENT_OPTIONS)[number]["value"];

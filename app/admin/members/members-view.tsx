@@ -937,7 +937,9 @@ function FixedSlotSchedule({
                 <td className="px-3 py-2.5 text-ink/50 whitespace-nowrap">{hour}시</td>
                 {FIXED_SLOT_WEEKDAY_LABELS.map((_, weekday) => {
                   const entries = byCell.get(`${weekday}-${hour}`) ?? [];
-                  const over = entries.length > FIXED_SLOT_CAPACITY;
+                  // "전체" 보기에서는 같은 시간대에 코치마다 자기 회원이 있는 게 당연하니
+                  // 겹침으로 보지 않는다. 한 코치가 겹치게 배정된 경우에만 표시한다.
+                  const over = coachFilter !== "all" && entries.length > FIXED_SLOT_CAPACITY;
                   return (
                     <td key={weekday} className="px-3 py-2.5 align-top">
                       {entries.length > 0 && (

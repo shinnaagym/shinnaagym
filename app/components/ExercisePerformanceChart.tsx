@@ -32,10 +32,10 @@ const SERIES_COLORS = [
 ];
 
 // RPE(체감 강도)가 높을수록 점을 훨씬 크게 그려 한눈에 "힘들었던 세트"가
-// 눈에 띄게 한다. RPE 10과 RPE 1의 반지름이 정확히 10배 차이 나도록 선형
+// 눈에 띄게 한다. RPE 10과 RPE 1의 반지름이 정확히 5배 차이 나도록 선형
 // 보간한다. RPE를 기록하지 않은 점(기존 데이터 등)은 중간값 정도의 크기로 둔다.
 const RPE_MIN_RADIUS = 2;
-const RPE_MAX_RADIUS = 20;
+const RPE_MAX_RADIUS = 10;
 const RPE_DEFAULT_RADIUS = 4;
 function radiusForRpe(rpe: number | null): number {
   if (rpe == null) return RPE_DEFAULT_RADIUS;
