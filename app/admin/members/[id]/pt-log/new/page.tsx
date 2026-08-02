@@ -1,7 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
+import { listPtLogsByMember } from "@/lib/pt-logs";
+import { listAssessmentsByMember } from "@/lib/assessments";
 import { PtLogForm } from "../pt-log-form";
+import { pastExerciseNames } from "../past-exercise-names";
 
 export default async function NewPtLogPage({
   params,
@@ -16,14 +19,22 @@ export default async function NewPtLogPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const member = await getMemberById(idNum);
+  const [member, ptLogs, assessments] = await Promise.all([
+    getMemberById(idNum),
+    listPtLogsByMember(idNum),
+    listAssessmentsByMember(idNum),
+  ]);
   if (!member) {
     notFound();
   }
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
-      <PtLogForm memberId={idNum} memberName={member.name} />
+      <PtLogForm
+        memberId={idNum}
+        memberName={member.name}
+        pastExercises={pastExerciseNames(ptLogs, assessments)}
+      />
     </div>
   );
 }
