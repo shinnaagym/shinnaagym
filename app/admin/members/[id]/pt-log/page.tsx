@@ -4,9 +4,11 @@ import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { PT_LOG_EQUIPMENT_LABELS } from "@/lib/constants";
 import { AssessmentPainChart } from "../assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
+import { ImprovementDirectionNote } from "../assessment/improvement-direction-note";
 import { PainTriggerSection } from "./pain-trigger-section";
 import { ExercisePerformanceSection } from "./exercise-performance-section";
 import { DeletePtLogButton } from "@/app/components/DeletePtLogButton";
@@ -46,10 +48,11 @@ export default async function PtLogHistoryPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const [member, ptLogs, assessments] = await Promise.all([
+  const [member, ptLogs, assessments, intake] = await Promise.all([
     getMemberById(idNum),
     listPtLogsByMember(idNum),
     listAssessmentsByMember(idNum),
+    getIntakeQuestionnaireByMember(idNum),
   ]);
   if (!member) {
     notFound();
@@ -87,6 +90,28 @@ export default async function PtLogHistoryPage({
       >
         + 새 PT 일지 작성
       </Link>
+
+      <Link
+        href={`/admin/members/${idNum}/intake`}
+        className="flex items-center justify-between rounded-2xl border border-line bg-white/60 px-5 py-4 mb-4 hover:border-coral/40 transition"
+      >
+        <div>
+          <p className="font-medium">📋 초진 문진표</p>
+          <p className="text-xs text-ink/50 mt-0.5">
+            {intake ? "작성 완료 · 내용 확인/수정" : "아직 작성되지 않았어요 · 작성하기"}
+          </p>
+        </div>
+        <span className="text-ink/30">→</span>
+      </Link>
+
+      <Link
+        href={`/admin/members/${idNum}/assessment/new`}
+        className="block text-center rounded-full bg-coral text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition mb-6"
+      >
+        + 새 평가 작성
+      </Link>
+
+      <ImprovementDirectionNote memberId={idNum} initialValue={member.improvement_direction} />
 
       {/* 통증 척도·운동수행 능력 그래프는 평가 기록(평가지)과 같은 데이터를
           쓴다 — PT 일지에서 기록해도, 평가 기록 화면에서 기록해도 같은
