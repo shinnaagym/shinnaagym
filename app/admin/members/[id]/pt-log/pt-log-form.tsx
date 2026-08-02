@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
-import { PT_LOG_EQUIPMENT_OPTIONS } from "@/lib/constants";
-import type { PtLogSetGroup } from "@/lib/db";
+import { PT_LOG_EQUIPMENT_LABELS, PT_LOG_EQUIPMENT_OPTIONS } from "@/lib/constants";
+import type { PastExerciseRecord } from "./past-exercise-names";
 
 interface SetGroupInput {
   weight: string;
@@ -51,9 +51,9 @@ export function PtLogForm({
   ptLogId?: number;
   initialData?: PtLogFormInitialData;
   pastExercises?: string[];
-  /** 운동 이름 -> 가장 최근에 그 운동을 했을 때의 세트 그룹. 무게·횟수·세트
+  /** 운동 이름 -> 가장 최근에 그 운동을 했을 때의 도구·세트 그룹. 무게·횟수·세트
       입력란에 회색 placeholder("지난번엔 이랬다")로만 보여주고 값으로 채우진 않는다. */
-  pastExerciseGroups?: Record<string, PtLogSetGroup[]>;
+  pastExerciseGroups?: Record<string, PastExerciseRecord>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -69,6 +69,26 @@ export function PtLogForm({
 
   function updateExercise(index: number, patch: Partial<ExerciseInput>) {
     setExercises((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+  }
+
+  /** 운동 이름을 과거에 기록한 이름과 정확히 일치하게 바꾸면, 그때 세트 그룹이
+      여러 개였을 경우 지금 칸에도 똑같은 개수만큼 빈 그룹을 미리 만들어둔다
+      (값은 비운 채, placeholder로만 과거 기록을 보여줌). 이미 뭔가 입력해둔
+      그룹이 있으면 건드리지 않는다. */
+  function updateExerciseName(index: number, name: string) {
+    setExercises((prev) =>
+      prev.map((e, i) => {
+        if (i !== index) return e;
+        const past = pastExerciseGroups[name.trim()];
+        const allEmpty = e.groups.every((g) => g.weight === "" && g.reps === "" && g.sets === "");
+        if (past && allEmpty && past.groups.length > e.groups.length) {
+          const groups = [...e.groups];
+          while (groups.length < past.groups.length) groups.push(emptyGroup());
+          return { ...e, name, groups };
+        }
+        return { ...e, name };
+      }),
+    );
   }
 
   function updateGroup(exIndex: number, groupIndex: number, patch: Partial<SetGroupInput>) {
@@ -199,7 +219,7 @@ export function PtLogForm({
               <div className="relative min-w-0 flex-1">
                 <input
                   value={ex.name}
-                  onChange={(e) => updateExercise(exIndex, { name: e.target.value })}
+                  onChange={(e) => updateExerciseName(exIndex, e.target.value)}
                   onFocus={() => setSuggestIndex(exIndex)}
                   onBlur={() => setTimeout(() => setSuggestIndex(null), 150)}
                   placeholder="운동 이름 (예: 스쿼트)"
@@ -221,7 +241,7 @@ export function PtLogForm({
                               type="button"
                               onMouseDown={(e) => {
                                 e.preventDefault();
-                                updateExercise(exIndex, { name });
+                                updateExerciseName(exIndex, name);
                                 setSuggestIndex(null);
                               }}
                               className="block w-full text-left px-3 py-2 text-sm hover:bg-bone/60"
@@ -248,7 +268,12 @@ export function PtLogForm({
 
             <div className="space-y-2">
               {ex.groups.map((g, groupIndex) => {
-                const pastGroup = pastExerciseGroups[ex.name.trim()]?.[groupIndex];
+                const pastRecord = pastExerciseGroups[ex.name.trim()];
+                const pastGroup = pastRecord?.groups[groupIndex];
+                const weightPlaceholder =
+                  pastGroup?.weight != null
+                    ? `(${PT_LOG_EQUIPMENT_LABELS[pastRecord!.equipment] ?? pastRecord!.equipment}) ${pastGroup.weight}kg`
+                    : "무게(kg)";
                 return (
                 <div key={groupIndex} className="flex items-center gap-1.5">
                   <input
@@ -256,7 +281,7 @@ export function PtLogForm({
                     inputMode="decimal"
                     value={g.weight}
                     onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
-                    placeholder={pastGroup?.weight != null ? String(pastGroup.weight) : "무게(kg)"}
+                    placeholder={weightPlaceholder}
                     className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                   />
                   <input
