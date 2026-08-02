@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -430,6 +430,17 @@ function runFullMigration(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_pt_logs_member_id ON pt_logs(member_id);
 
+        -- 코치별 근무시간(평일/토요일 각각 시작~종료 시각). 코치가 이 표에 행이
+        -- 없으면 제한 없음(스튜디오 영업시간 전체가 근무시간)으로 취급해,
+        -- 스케줄표에 회색 표시가 나타나지 않는다. 코치가 삭제되면 함께 삭제된다.
+        CREATE TABLE IF NOT EXISTS coach_working_hours (
+          coach_id INTEGER PRIMARY KEY REFERENCES coaches(id) ON DELETE CASCADE,
+          weekday_start SMALLINT NOT NULL,
+          weekday_end SMALLINT NOT NULL,
+          saturday_start SMALLINT NOT NULL,
+          saturday_end SMALLINT NOT NULL
+        );
+
         INSERT INTO coaches (name) VALUES ('신종수')
         ON CONFLICT (name) DO NOTHING;
         `,
@@ -612,6 +623,15 @@ export interface CoachRow {
 export interface DutyRosterRow {
   weekday: number;
   coach_id: number;
+}
+
+/** 코치별 근무시간. 행이 없는 코치는 제한 없음(스튜디오 영업시간 전체가 근무시간). */
+export interface CoachWorkingHoursRow {
+  coach_id: number;
+  weekday_start: number;
+  weekday_end: number;
+  saturday_start: number;
+  saturday_end: number;
 }
 
 /** coach_id가 null이면 "이 날짜는 당직자 없음"을 명시적으로 저장한 것. */

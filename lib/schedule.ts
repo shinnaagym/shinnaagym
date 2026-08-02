@@ -151,6 +151,61 @@ export async function setDutyOverride(
   }
 }
 
+// ---- 코치별 근무시간(평일/토요일) ----
+
+export interface CoachWorkingHours {
+  weekdayStart: number;
+  weekdayEnd: number;
+  saturdayStart: number;
+  saturdayEnd: number;
+}
+
+// 코치 목록과 마찬가지로 자주 바뀌지 않는 참조성 데이터라 캐싱한다.
+export const getCoachWorkingHours = unstable_cache(
+  async (): Promise<Record<number, CoachWorkingHours>> => {
+    const result = await query<{
+      coach_id: number;
+      weekday_start: number;
+      weekday_end: number;
+      saturday_start: number;
+      saturday_end: number;
+    }>(`SELECT * FROM coach_working_hours`);
+    return Object.fromEntries(
+      result.rows.map((r) => [
+        r.coach_id,
+        {
+          weekdayStart: r.weekday_start,
+          weekdayEnd: r.weekday_end,
+          saturdayStart: r.saturday_start,
+          saturdayEnd: r.saturday_end,
+        },
+      ]),
+    );
+  },
+  ["coach-working-hours"],
+  { tags: ["coach-working-hours"], revalidate: 300 },
+);
+
+/** hours가 null이면 그 코치의 근무시간 제한을 지워 "제한 없음"으로 되돌린다. */
+export async function setCoachWorkingHours(
+  coachId: number,
+  hours: CoachWorkingHours | null,
+): Promise<void> {
+  if (hours === null) {
+    await query(`DELETE FROM coach_working_hours WHERE coach_id = $1`, [coachId]);
+  } else {
+    await query(
+      `INSERT INTO coach_working_hours (coach_id, weekday_start, weekday_end, saturday_start, saturday_end)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (coach_id) DO UPDATE SET
+         weekday_start = EXCLUDED.weekday_start, weekday_end = EXCLUDED.weekday_end,
+         saturday_start = EXCLUDED.saturday_start, saturday_end = EXCLUDED.saturday_end`,
+      [coachId, hours.weekdayStart, hours.weekdayEnd, hours.saturdayStart, hours.saturdayEnd],
+    );
+  }
+  revalidateTag("coach-working-hours", { expire: 0 });
+}
+
 // ---- 공휴일 ----
 
 // 공휴일도 코치 목록과 마찬가지로 자주 바뀌지 않는 참조성 데이터라 캐싱한다.

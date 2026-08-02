@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getDeviceId, isAdminAuthed } from "@/lib/auth";
 import {
   getActiveMemberCountsByCoach,
+  getCoachWorkingHours,
   getDutyRoster,
   listCoaches,
   listHolidays,
@@ -17,17 +18,27 @@ export default async function AdminSettingsPage() {
     redirect("/admin");
   }
 
-  const [coaches, holidays, memberCounts, devices, currentDeviceId, dutyRoster, recurringEvents, settingsMemos] =
-    await Promise.all([
-      listCoaches(),
-      listHolidays(),
-      getActiveMemberCountsByCoach(),
-      listActiveDevices(),
-      getDeviceId(),
-      getDutyRoster(),
-      listRecurringEvents(),
-      listSettingsMemos(),
-    ]);
+  const [
+    coaches,
+    holidays,
+    memberCounts,
+    devices,
+    currentDeviceId,
+    dutyRoster,
+    recurringEvents,
+    settingsMemos,
+    coachWorkingHours,
+  ] = await Promise.all([
+    listCoaches(),
+    listHolidays(),
+    getActiveMemberCountsByCoach(),
+    listActiveDevices(),
+    getDeviceId(),
+    getDutyRoster(),
+    listRecurringEvents(),
+    listSettingsMemos(),
+    getCoachWorkingHours(),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -41,6 +52,7 @@ export default async function AdminSettingsPage() {
         initialDutyRoster={dutyRoster}
         initialRecurringEvents={recurringEvents}
         initialSettingsMemos={settingsMemos}
+        initialCoachWorkingHours={coachWorkingHours}
       />
     </div>
   );

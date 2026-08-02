@@ -3,6 +3,7 @@ import { isAdminAuthed } from "@/lib/auth";
 import { addDaysToKey, koreaCurrentMonthKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import {
   getAllCoachScheduleStats,
+  getCoachWorkingHours,
   getDayHoursForRange,
   getDutyOverridesForDates,
   getDutyRoster,
@@ -37,18 +38,29 @@ export default async function AdminSchedulePage({
   // 없으면 미리 채워 넣는다 — 세션 목록을 읽기 전에 끝나야 그리드에 바로 보인다.
   await ensureRecurringEventSessions();
 
-  const [coaches, members, sessions, dayHours, holidays, coachStats, memos, dutyRoster, dutyOverrides] =
-    await Promise.all([
-      listCoaches(),
-      listMembersWithProgress(),
-      listSessionsInRange(weekStart, weekEnd),
-      getDayHoursForRange(dateKeys),
-      listHolidays(),
-      getAllCoachScheduleStats(monthKey, weekStart, weekEnd),
-      listScheduleMemos(),
-      getDutyRoster(),
-      getDutyOverridesForDates(dateKeys),
-    ]);
+  const [
+    coaches,
+    members,
+    sessions,
+    dayHours,
+    holidays,
+    coachStats,
+    memos,
+    dutyRoster,
+    dutyOverrides,
+    coachWorkingHours,
+  ] = await Promise.all([
+    listCoaches(),
+    listMembersWithProgress(),
+    listSessionsInRange(weekStart, weekEnd),
+    getDayHoursForRange(dateKeys),
+    listHolidays(),
+    getAllCoachScheduleStats(monthKey, weekStart, weekEnd),
+    listScheduleMemos(),
+    getDutyRoster(),
+    getDutyOverridesForDates(dateKeys),
+    getCoachWorkingHours(),
+  ]);
 
   const holidayMap = Object.fromEntries(
     holidays
@@ -72,6 +84,7 @@ export default async function AdminSchedulePage({
         initialMemos={memos}
         dutyRoster={dutyRoster}
         dutyOverrides={dutyOverrides}
+        coachWorkingHours={coachWorkingHours}
       />
     </div>
   );
