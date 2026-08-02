@@ -5,35 +5,12 @@ import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
-import { PT_LOG_EQUIPMENT_LABELS } from "@/lib/constants";
 import { AssessmentPainChart } from "../assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { ImprovementDirectionNote } from "../assessment/improvement-direction-note";
 import { PainTriggerSection } from "./pain-trigger-section";
 import { ExercisePerformanceSection } from "./exercise-performance-section";
-import { DeletePtLogButton } from "@/app/components/DeletePtLogButton";
-import type { PtLogExercise } from "@/lib/db";
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
-
-function exerciseSummary(e: PtLogExercise): string {
-  const equipmentLabel = PT_LOG_EQUIPMENT_LABELS[e.equipment] ?? e.equipment;
-  const groups =
-    e.groups
-      .map((g) => {
-        const parts: string[] = [];
-        if (g.weight != null) parts.push(`${g.weight}kg`);
-        if (g.reps != null) parts.push(`${g.reps}회`);
-        if (g.sets != null) parts.push(`${g.sets}set`);
-        return parts.join(" ");
-      })
-      .filter((s) => s.length > 0)
-      .join(", ") || "-";
-  return `${e.name} (${equipmentLabel}) — ${groups}`;
-}
+import { PtLogList } from "./pt-log-list";
 
 export default async function PtLogHistoryPage({
   params,
@@ -123,44 +100,7 @@ export default async function PtLogHistoryPage({
       <ExercisePerformanceChart assessments={assessments} />
       <ExercisePerformanceSection memberId={idNum} pastExercises={pastExercises} />
 
-      {ptLogs.length === 0 ? (
-        <div className="rounded-2xl bg-white border border-line/60 px-5 py-10 text-center text-ink/40">
-          아직 작성된 PT 일지가 없어요.
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {ptLogs.map((log) => (
-            <li
-              key={log.id}
-              className="relative rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4 pr-16"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{log.log_date || formatDateTime(log.created_at)}</p>
-                  {(log.pain_scale != null || log.memo) && (
-                    <p className="text-xs text-ink/50 mt-0.5">
-                      {log.pain_scale != null && `통증 ${log.pain_scale}/10`}
-                      {log.pain_scale != null && log.memo && " · "}
-                      {log.memo}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {log.exercises.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-line/50 space-y-1 text-sm text-ink/70">
-                  {log.exercises.map((e, i) => (
-                    <p key={i}>{exerciseSummary(e)}</p>
-                  ))}
-                </div>
-              )}
-              <DeletePtLogButton
-                ptLogId={log.id}
-                className="absolute top-4 right-5 text-xs text-ink/40 hover:text-coral"
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+      <PtLogList ptLogs={ptLogs} />
     </div>
   );
 }
