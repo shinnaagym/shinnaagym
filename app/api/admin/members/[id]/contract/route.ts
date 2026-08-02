@@ -81,6 +81,8 @@ export async function POST(
         privacyConsent?: unknown;
         companionName?: unknown;
         companionPhone?: unknown;
+        companionRrnFront?: unknown;
+        companionAddress?: unknown;
       }
     | null;
 
@@ -106,6 +108,10 @@ export async function POST(
   const privacyConsent = body?.privacyConsent === true;
   const companionName = typeof body?.companionName === "string" ? body.companionName.trim() : "";
   const companionPhone = typeof body?.companionPhone === "string" ? body.companionPhone.trim() : "";
+  const companionRrnFront =
+    typeof body?.companionRrnFront === "string" ? body.companionRrnFront.trim() : "";
+  const companionAddress =
+    typeof body?.companionAddress === "string" ? body.companionAddress.trim() : "";
 
   const contract = await createContract({
     memberId: idNum,
@@ -126,6 +132,8 @@ export async function POST(
     privacyConsent,
     companionName,
     companionPhone,
+    companionRrnFront,
+    companionAddress,
   });
 
   await recordUndo(`${member.name} 계약서 작성`, [

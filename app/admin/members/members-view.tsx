@@ -1135,6 +1135,8 @@ function CreateMemberModal({
   const [phone, setPhone] = useState("");
   const [companionName, setCompanionName] = useState("");
   const [companionPhone, setCompanionPhone] = useState("");
+  const [companionRrnFront, setCompanionRrnFront] = useState("");
+  const [companionAddress, setCompanionAddress] = useState("");
   const [coachId, setCoachId] = useState<number | "">(coaches[0]?.id ?? "");
   const [referrer, setReferrer] = useState("");
   const [availableTimes, setAvailableTimes] = useState("");
@@ -1202,6 +1204,8 @@ function CreateMemberModal({
           privacyConsent,
           companionName: ptType === "2:1" ? companionName : "",
           companionPhone: ptType === "2:1" ? companionPhone : "",
+          companionRrnFront: ptType === "2:1" ? companionRrnFront : "",
+          companionAddress: ptType === "2:1" ? companionAddress : "",
         }),
       });
       const data = await res.json();
@@ -1256,6 +1260,21 @@ function CreateMemberModal({
                 value={companionPhone}
                 onChange={(e) => setCompanionPhone(e.target.value)}
                 placeholder="010-"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 주민등록번호 (앞자리)">
+              <input
+                value={companionRrnFront}
+                onChange={(e) => setCompanionRrnFront(e.target.value)}
+                placeholder="예: 900101"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 주소">
+              <input
+                value={companionAddress}
+                onChange={(e) => setCompanionAddress(e.target.value)}
                 className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
               />
             </Field>
@@ -1398,6 +1417,8 @@ function WriteContractModal({
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [companionName, setCompanionName] = useState("");
   const [companionPhone, setCompanionPhone] = useState("");
+  const [companionRrnFront, setCompanionRrnFront] = useState("");
+  const [companionAddress, setCompanionAddress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -1427,6 +1448,8 @@ function WriteContractModal({
           privacyConsent,
           companionName,
           companionPhone,
+          companionRrnFront,
+          companionAddress,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1470,6 +1493,21 @@ function WriteContractModal({
                 value={companionPhone}
                 onChange={(e) => setCompanionPhone(e.target.value)}
                 placeholder="010-"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 주민등록번호 (앞자리)">
+              <input
+                value={companionRrnFront}
+                onChange={(e) => setCompanionRrnFront(e.target.value)}
+                placeholder="예: 900101"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 주소">
+              <input
+                value={companionAddress}
+                onChange={(e) => setCompanionAddress(e.target.value)}
                 className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
               />
             </Field>
@@ -1521,7 +1559,7 @@ function ContractViewModal({
 }) {
   const [data, setData] = useState<{
     member: { name: string; phone: string };
-    contract: ContractRow & { rrn_front: string };
+    contract: ContractRow & { rrn_front: string; companion_rrn_front: string };
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 

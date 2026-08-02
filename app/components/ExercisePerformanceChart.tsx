@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { computeE1rm } from "@/lib/exercise-performance";
 import { koreaTodayKey } from "@/lib/date";
-import { svgToPngDataUrl } from "@/lib/chart-image";
+import { appendSummaryToSvgClone, svgToPngDataUrl } from "@/lib/chart-image";
 import type { AssessmentRow } from "@/lib/db";
 import { ChartZoomModal } from "@/app/components/ChartZoomModal";
 
@@ -238,7 +238,17 @@ export function ExercisePerformanceChart({
     setZoomOpen(true);
     setZoomLoading(true);
     try {
-      const dataUrl = await svgToPngDataUrl(svgRef.current);
+      // 인라인 그래프 자체는 예전 크기를 유지하고, 확대·이미지 저장용으로만
+      // "처음→최근 요약"을 덧붙인 별도 SVG를 만들어 캡처한다.
+      const exportSvg = appendSummaryToSvgClone(
+        svgRef.current,
+        summaryLines,
+        series.map((s) => s.color),
+        PAD_LEFT,
+        WIDTH,
+        HEIGHT,
+      );
+      const dataUrl = await svgToPngDataUrl(exportSvg);
       setZoomImage(dataUrl);
     } catch {
       setZoomOpen(false);
@@ -322,9 +332,9 @@ export function ExercisePerformanceChart({
     return d.trim();
   }
 
-  // "이 운동이 이렇게 좋아졌다"를 그래프 밑에 항상 보이게 요약한다. 확대·이미지
-  // 저장 시에도 이 SVG 안에 함께 들어있어야 캡처되므로, HTML이 아니라 SVG
-  // 텍스트로 그려서 svgToPngDataUrl로 내보낼 때도 그대로 포함되게 한다.
+  // "이 운동이 이렇게 좋아졌다" 요약. 화면에 항상 보이는 인라인 그래프에는 넣지
+  // 않고(글자 수가 늘어도 그래프 크기가 예전 그대로 유지되도록), 확대·이미지
+  // 저장 시 handleZoom에서 appendSummaryToSvgClone으로만 덧붙인다.
   function summaryLineFor(s: Series): string {
     const points = s.values.filter((v): v is ExercisePoint => v != null);
     if (points.length === 0) return `${s.name} — 기록 없음`;
@@ -335,10 +345,6 @@ export function ExercisePerformanceChart({
     return `${s.name} — e1RM ${trend}`;
   }
   const summaryLines = series.map(summaryLineFor);
-  const SUMMARY_LINE_HEIGHT = 15;
-  const summaryTop = HEIGHT + 14;
-  const totalHeight =
-    summaryLines.length > 0 ? summaryTop + summaryLines.length * SUMMARY_LINE_HEIGHT : HEIGHT;
 
   function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -419,7 +425,7 @@ export function ExercisePerformanceChart({
       <div className="relative cursor-zoom-in" onClick={handleZoom} title="탭하여 확대 · 이미지 저장">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${WIDTH} ${totalHeight}`}
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="w-full touch-none"
           onPointerMove={handlePointerMove}
           onPointerLeave={() => setHoverIndex(null)}
@@ -490,39 +496,6 @@ export function ExercisePerformanceChart({
               )}
             </g>
           ))}
-
-          {summaryLines.length > 0 && (
-            <g>
-              <line
-                x1={PAD_LEFT}
-                x2={WIDTH - PAD_RIGHT}
-                y1={HEIGHT + 2}
-                y2={HEIGHT + 2}
-                stroke="#e5e0d3"
-                strokeWidth={1}
-              />
-              {summaryLines.map((line, i) => (
-                <g key={i}>
-                  <rect
-                    x={PAD_LEFT}
-                    y={summaryTop + i * SUMMARY_LINE_HEIGHT - 7}
-                    width={8}
-                    height={8}
-                    rx={2}
-                    fill={series[i].color}
-                  />
-                  <text
-                    x={PAD_LEFT + 13}
-                    y={summaryTop + i * SUMMARY_LINE_HEIGHT}
-                    fontSize={10}
-                    fill="#4a4638"
-                  >
-                    {line}
-                  </text>
-                </g>
-              ))}
-            </g>
-          )}
         </svg>
 
         {hoverIndex != null && hoveredValues.length > 0 && (

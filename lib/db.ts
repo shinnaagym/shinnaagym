@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -523,6 +523,8 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS memo TEXT NOT NULL DEFAULT '';
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS companion_name TEXT NOT NULL DEFAULT '';
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS companion_phone TEXT NOT NULL DEFAULT '';
+            ALTER TABLE contracts ADD COLUMN IF NOT EXISTS companion_rrn_front_encrypted TEXT NOT NULL DEFAULT '';
+            ALTER TABLE contracts ADD COLUMN IF NOT EXISTS companion_address TEXT NOT NULL DEFAULT '';
 
             -- "수업 완료" 상태 개념을 없애고 취소되지 않은 수업은 모두 "예약"으로 단순화했다
             -- (SCHEMA_VERSION 2). 기존에 자동/수동으로 'completed'가 된 기록을 'reserved'로
@@ -734,6 +736,10 @@ export interface ContractRow {
   companion_name: string;
   /** 2:1 계약일 때 함께 등록하는 분의 연락처. */
   companion_phone: string;
+  /** 2:1 계약일 때 함께 등록하는 분의 주민등록번호 앞자리(암호화 저장). */
+  companion_rrn_front_encrypted: string;
+  /** 2:1 계약일 때 함께 등록하는 분의 주소. */
+  companion_address: string;
   signature_data_url: string | null;
   signed_at: string | null;
   created_at: string;
