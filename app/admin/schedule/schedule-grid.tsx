@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { COACH_COLOR_PALETTE, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import type { CoachRow, PtType, ScheduleMemoRow, SessionEntryType, SessionStatus } from "@/lib/db";
-import type { CoachScheduleStats, MemberWithProgress } from "@/lib/schedule";
+import type { CoachScheduleStats, CoachWorkingHours, MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
 import { MemoPad } from "../memo-pad";
 
@@ -203,6 +203,7 @@ export function ScheduleGrid({
   initialMemos,
   dutyRoster,
   dutyOverrides,
+  coachWorkingHours,
 }: {
   weekStart: string;
   dateKeys: string[];
@@ -219,6 +220,8 @@ export function ScheduleGrid({
   /** 날짜(YYYY-MM-DD) -> 그 날짜만의 당직 예외(이번 주만 변경 등). coachId가
       null이면 그 날짜는 당직자 없음을 명시적으로 나타낸다. */
   dutyOverrides: Record<string, { coachId: number | null; coachName: string | null }>;
+  /** 코치별 근무시간(평일/토요일). 값이 없는 코치는 제한 없음으로 취급한다. */
+  coachWorkingHours: Record<number, CoachWorkingHours>;
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
@@ -249,6 +252,17 @@ export function ScheduleGrid({
   function resolveDuty(date: string, weekday: number): { coachId: number | null; coachName: string | null } | null {
     if (date in dutyOverridesState) return dutyOverridesState[date];
     return dutyRosterState[weekday] ?? null;
+  }
+
+  /** 코치의 근무시간 설정 밖인지를 판단한다. 설정이 없는 코치는 항상 false(제한
+      없음). 공휴일은 토요일과 같은 단축 운영이라 토요일 근무시간을 기준으로 본다. */
+  function isOutsideWorkingHours(coachId: number, date: string, hour: number): boolean {
+    const wh = coachWorkingHours[coachId];
+    if (!wh) return false;
+    const useSaturdayHours = dateKeys.indexOf(date) === 5 || !!holidayMap[date];
+    return useSaturdayHours
+      ? hour < wh.saturdayStart || hour >= wh.saturdayEnd
+      : hour < wh.weekdayStart || hour >= wh.weekdayEnd;
   }
 
   const visibleCoaches =
@@ -736,6 +750,8 @@ export function ScheduleGrid({
                   {dateKeys.map((d) => {
                     const dh = dayHours[d];
                     const withinHours = !!dh && !dh.closed && hour >= dh.start && hour < dh.end;
+                    const outsideWorkingHours =
+                      withinHours && isOutsideWorkingHours(singleCoach.id, d, hour);
                     const key = `${d}-${singleCoach.id}-${hour}`;
                     const session = sessionMap.get(key);
                     const spanInfo = spanInfoMap.get(key);
@@ -743,7 +759,10 @@ export function ScheduleGrid({
                     return (
                       <div
                         key={d}
-                        className="border-b border-line/40 p-1"
+                        className={[
+                          "border-b border-line/40 p-1",
+                          outsideWorkingHours ? "bg-line/25" : "",
+                        ].join(" ")}
                         style={spanInfo && spanInfo.span > 1 ? { gridRow: `span ${spanInfo.span}` } : undefined}
                         onDragOver={withinHours ? (e) => e.preventDefault() : undefined}
                         onDrop={
@@ -893,6 +912,8 @@ export function ScheduleGrid({
                     const dh = dayHours[d];
                     const withinHours = !!dh && !dh.closed && hour >= dh.start && hour < dh.end;
                     return effectiveCoaches.map((coach, ci) => {
+                      const outsideWorkingHours =
+                        withinHours && isOutsideWorkingHours(coach.id, d, hour);
                       const key = `${d}-${coach.id}-${hour}`;
                       const session = withinHours ? sessionMap.get(key) : undefined;
                       const spanInfo = withinHours ? spanInfoMap.get(key) : undefined;
@@ -903,6 +924,7 @@ export function ScheduleGrid({
                           className={[
                             "border-b p-1",
                             ci === 0 ? "border-l-2 border-ink/25" : "border-l border-line/20",
+                            outsideWorkingHours ? "bg-line/25" : "",
                           ].join(" ")}
                           style={spanInfo && spanInfo.span > 1 ? { gridRow: `span ${spanInfo.span}` } : undefined}
                           onDragOver={withinHours ? (e) => e.preventDefault() : undefined}

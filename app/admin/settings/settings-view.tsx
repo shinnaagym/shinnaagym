@@ -34,6 +34,113 @@ const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 
 export type DutyRoster = Record<number, { coachId: number; coachName: string }>;
 
+// lib/schedule.ts는 서버 전용 DB 클라이언트(pg)를 물고 있어 클라이언트 컴포넌트에서
+// import하면 번들이 깨지므로, 타입만 이 파일에 그대로 복제해 둔다(DutyRoster와 동일한 이유).
+export interface CoachWorkingHours {
+  weekdayStart: number;
+  weekdayEnd: number;
+  saturdayStart: number;
+  saturdayEnd: number;
+}
+
+const DEFAULT_WORKING_HOURS: CoachWorkingHours = {
+  weekdayStart: 9,
+  weekdayEnd: 22,
+  saturdayStart: 9,
+  saturdayEnd: 15,
+};
+
+function HourSelect({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (hour: number) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-coral"
+    >
+      {HOUR_OPTIONS.map((h) => (
+        <option key={h} value={h}>
+          {h}시
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** 코치 한 명의 평일/토요일 근무시간을 편집하는 행. 저장 전까지는 로컬 상태로만
+    수정하다가 "저장"을 눌러야 반영된다 — 4개 값이 서로 맞물려 있어(종료가 시작보다
+    늦어야 함) 값 하나 바뀔 때마다 바로 저장하면 중간에 잘못된 조합이 저장될 수 있다. */
+function CoachWorkingHoursRow({
+  coachName,
+  saved,
+  onSave,
+  onClear,
+}: {
+  coachName: string;
+  saved: CoachWorkingHours | undefined;
+  onSave: (hours: CoachWorkingHours) => void;
+  onClear: () => void;
+}) {
+  const [draft, setDraft] = useState<CoachWorkingHours>(saved ?? DEFAULT_WORKING_HOURS);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved ?? DEFAULT_WORKING_HOURS);
+
+  return (
+    <div className="py-2.5 flex items-center gap-3 flex-wrap">
+      <span className="text-sm w-16 shrink-0">{coachName}</span>
+      <span className="flex items-center gap-1 text-[11px] text-ink/40">
+        평일
+        <HourSelect
+          value={draft.weekdayStart}
+          onChange={(h) => setDraft((d) => ({ ...d, weekdayStart: h }))}
+        />
+        ~
+        <HourSelect
+          value={draft.weekdayEnd}
+          onChange={(h) => setDraft((d) => ({ ...d, weekdayEnd: h }))}
+        />
+      </span>
+      <span className="flex items-center gap-1 text-[11px] text-ink/40">
+        토요일
+        <HourSelect
+          value={draft.saturdayStart}
+          onChange={(h) => setDraft((d) => ({ ...d, saturdayStart: h }))}
+        />
+        ~
+        <HourSelect
+          value={draft.saturdayEnd}
+          onChange={(h) => setDraft((d) => ({ ...d, saturdayEnd: h }))}
+        />
+      </span>
+      {dirty && (
+        <button
+          type="button"
+          onClick={() => onSave(draft)}
+          className="rounded-full bg-ink text-white px-3 py-1 text-xs hover:bg-coral transition"
+        >
+          저장
+        </button>
+      )}
+      {saved && !dirty && (
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(DEFAULT_WORKING_HOURS);
+            onClear();
+          }}
+          className="text-[11px] text-ink/40 hover:text-coral"
+        >
+          제한 없음으로 초기화
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SettingsView({
   initialCoaches,
   initialHolidays,
@@ -44,6 +151,7 @@ export function SettingsView({
   initialDutyRoster,
   initialRecurringEvents,
   initialSettingsMemos,
+  initialCoachWorkingHours,
 }: {
   initialCoaches: CoachRow[];
   initialHolidays: HolidayRow[];
@@ -54,10 +162,12 @@ export function SettingsView({
   initialDutyRoster: DutyRoster;
   initialRecurringEvents: RecurringEventRow[];
   initialSettingsMemos: SettingsMemoRow[];
+  initialCoachWorkingHours: Record<number, CoachWorkingHours>;
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
   const [dutyRoster, setDutyRoster] = useState(initialDutyRoster);
+  const [coachWorkingHours, setCoachWorkingHours] = useState(initialCoachWorkingHours);
   const [newCoachName, setNewCoachName] = useState("");
   const [newCoachPhone, setNewCoachPhone] = useState("");
   const [newHolidayDate, setNewHolidayDate] = useState("");
@@ -83,6 +193,33 @@ export function SettingsView({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ weekday, coachId: nextCoachId }),
+    });
+  }
+
+  async function saveCoachWorkingHours(coachId: number, hours: CoachWorkingHours) {
+    if (hours.weekdayStart >= hours.weekdayEnd || hours.saturdayStart >= hours.saturdayEnd) {
+      setError("종료 시각은 시작 시각보다 늦어야 해요.");
+      return;
+    }
+    setError(null);
+    setCoachWorkingHours((prev) => ({ ...prev, [coachId]: hours }));
+    await fetch("/api/admin/coach-working-hours", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coachId, ...hours }),
+    });
+  }
+
+  async function clearCoachWorkingHours(coachId: number) {
+    setCoachWorkingHours((prev) => {
+      const next = { ...prev };
+      delete next[coachId];
+      return next;
+    });
+    await fetch("/api/admin/coach-working-hours", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coachId, clear: true }),
     });
   }
 
@@ -403,6 +540,31 @@ export function SettingsView({
                   })}
                 </div>
               </div>
+            ))}
+          {coaches.filter((c) => c.active).length === 0 && (
+            <p className="text-sm text-ink/40 py-2.5">재직 중인 코치가 없어요.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
+        <h2 className="font-display text-lg mb-1">근무시간 설정</h2>
+        <p className="text-xs text-ink/50 mb-4">
+          코치별로 평일·토요일 근무시간을 정해두면, 스케줄표에서 그 시간 외 칸이 회색으로
+          표시돼요(예약 자체가 막히진 않아요). 설정하지 않은 코치는 스튜디오 영업시간 전체가
+          근무시간으로 취급돼 회색 표시가 나타나지 않아요.
+        </p>
+        <div className="divide-y divide-line/50">
+          {coaches
+            .filter((c) => c.active)
+            .map((c) => (
+              <CoachWorkingHoursRow
+                key={c.id}
+                coachName={c.name}
+                saved={coachWorkingHours[c.id]}
+                onSave={(hours) => saveCoachWorkingHours(c.id, hours)}
+                onClear={() => clearCoachWorkingHours(c.id)}
+              />
             ))}
           {coaches.filter((c) => c.active).length === 0 && (
             <p className="text-sm text-ink/40 py-2.5">재직 중인 코치가 없어요.</p>
