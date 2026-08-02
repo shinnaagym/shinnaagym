@@ -61,6 +61,14 @@ const PROCESS_STEPS = [
 export default function Home() {
   return (
     <>
+      {/* 세리프 제목 폰트(Gowun Batang)는 이 페이지에서만 쓰이므로 여기서만
+          불러온다 — app/layout.tsx 참고. */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap"
+      />
       <header className="relative overflow-hidden bg-ink text-bone">
         <div
           aria-hidden="true"
