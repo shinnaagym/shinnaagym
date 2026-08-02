@@ -46,6 +46,7 @@ export default async function EditPtLogPage({
                     sets: g.sets == null ? "" : String(g.sets),
                   }))
                 : [{ weight: "", reps: "", sets: "" }],
+            note: e.note ?? "",
           })),
         }}
       />

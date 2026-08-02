@@ -15,6 +15,7 @@ interface ExerciseInput {
   name: string;
   equipment: string;
   groups: SetGroupInput[];
+  note: string;
 }
 
 function emptyGroup(): SetGroupInput {
@@ -22,7 +23,12 @@ function emptyGroup(): SetGroupInput {
 }
 
 function emptyExercise(): ExerciseInput {
-  return { name: "", equipment: PT_LOG_EQUIPMENT_OPTIONS[0].value, groups: [emptyGroup()] };
+  return {
+    name: "",
+    equipment: PT_LOG_EQUIPMENT_OPTIONS[0].value,
+    groups: [emptyGroup()],
+    note: "",
+  };
 }
 
 export interface PtLogFormInitialData {
@@ -101,6 +107,7 @@ export function PtLogForm({
             reps: g.reps === "" ? null : Number(g.reps),
             sets: g.sets === "" ? null : Number(g.sets),
           })),
+        note: e.note.trim(),
       }));
 
     setSubmitting(true);
@@ -245,6 +252,13 @@ export function PtLogForm({
                 + 세트 그룹 추가 (같은 운동, 다른 무게)
               </button>
             </div>
+
+            <input
+              value={ex.note}
+              onChange={(e) => updateExercise(exIndex, { note: e.target.value })}
+              placeholder="특이사항 (예: 자세 보정, 통증 반응 등)"
+              className="w-full mt-3 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            />
           </div>
         ))}
 

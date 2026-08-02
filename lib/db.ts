@@ -806,6 +806,8 @@ export interface PtLogExercise {
   name: string;
   equipment: string;
   groups: PtLogSetGroup[];
+  /** 그 운동에 대한 특이사항(자세 보정, 통증 반응 등 짧은 메모). */
+  note: string;
 }
 
 export interface PtLogRow {

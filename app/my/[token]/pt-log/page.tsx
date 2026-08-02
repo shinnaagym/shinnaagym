@@ -29,10 +29,12 @@ export default async function MyPtLogHistoryPage({
         <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">PT Log</p>
         <h1 className="font-display text-3xl mb-6">{member.name}님의 PT 일지</h1>
 
+        <div className="mb-8">
+          <PtLogList ptLogs={ptLogs} editable={false} />
+        </div>
+
         <AssessmentPainChart assessments={assessments} />
         <ExercisePerformanceChart assessments={assessments} />
-
-        <PtLogList ptLogs={ptLogs} editable={false} />
 
         <Link href={`/my/${token}`} className="block text-center text-sm text-ink/50 hover:text-ink mt-6">
           ← 내 예약으로 돌아가기

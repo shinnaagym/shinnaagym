@@ -33,7 +33,8 @@ export function parseExercises(raw: unknown): PtLogExercise[] {
         typeof obj.equipment === "string" && VALID_EQUIPMENT.has(obj.equipment)
           ? obj.equipment
           : "bodyweight";
-      return { name, equipment, groups: parseSetGroups(obj.groups) };
+      const note = typeof obj.note === "string" ? obj.note.trim() : "";
+      return { name, equipment, groups: parseSetGroups(obj.groups), note };
     })
     .filter((e) => e.name.length > 0);
 }
