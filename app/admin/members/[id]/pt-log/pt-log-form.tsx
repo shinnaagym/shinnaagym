@@ -11,6 +11,9 @@ interface SetGroupInput {
   weight: string;
   reps: string;
   sets: string;
+  /** 체크하면 이 세트의 무게·횟수·RPE를 운동 수행능력(e1RM) 그래프에도 반영한다. */
+  trackPerformance: boolean;
+  rpe: string;
 }
 
 interface ExerciseInput {
@@ -21,7 +24,7 @@ interface ExerciseInput {
 }
 
 function emptyGroup(): SetGroupInput {
-  return { weight: "", reps: "", sets: "" };
+  return { weight: "", reps: "", sets: "", trackPerformance: false, rpe: "" };
 }
 
 function emptyExercise(): ExerciseInput {
@@ -143,6 +146,19 @@ export function PtLogForm({
         note: e.note.trim(),
       }));
 
+    // 체크해둔 세트는 운동 수행능력(e1RM) 그래프용 평가 기록으로도 함께 남긴다.
+    const performanceEntries = exercises.flatMap((e) =>
+      e.groups
+        .filter((g) => g.trackPerformance && g.rpe !== "")
+        .map((g) => ({
+          exercise: e.name.trim(),
+          note: "",
+          weight: g.weight === "" ? null : Number(g.weight),
+          reps: g.reps === "" ? null : Number(g.reps),
+          rpe: Number(g.rpe),
+        })),
+    );
+
     setSubmitting(true);
     setError(null);
     try {
@@ -162,6 +178,13 @@ export function PtLogForm({
         const data = await res.json().catch(() => null);
         setError(data?.error ?? "저장에 실패했어요.");
         return;
+      }
+      if (performanceEntries.length > 0) {
+        await fetch(`/api/admin/members/${memberId}/assessments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ evaluatedAt: logDate, exercisePerformance: performanceEntries }),
+        });
       }
       router.push(`/admin/members/${memberId}/pt-log`);
       router.refresh();
@@ -279,40 +302,65 @@ export function PtLogForm({
                     ? `(${PT_LOG_EQUIPMENT_LABELS[ex.equipment] ?? ex.equipment}) ${pastGroup.weight}kg`
                     : "무게(kg)";
                 return (
-                <div key={groupIndex} className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={g.weight}
-                    onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
-                    placeholder={weightPlaceholder}
-                    className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
-                  />
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={g.reps}
-                    onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
-                    placeholder={pastGroup?.reps != null ? String(pastGroup.reps) : "횟수"}
-                    className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
-                  />
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={g.sets}
-                    onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
-                    placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
-                    className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
-                  />
-                  {ex.groups.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeGroup(exIndex, groupIndex)}
-                      className="shrink-0 text-ink/40 hover:text-coral text-sm"
-                      aria-label="세트 그룹 삭제"
+                <div key={groupIndex} className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={g.weight}
+                      onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
+                      placeholder={weightPlaceholder}
+                      className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                    />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={g.reps}
+                      onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
+                      placeholder={pastGroup?.reps != null ? String(pastGroup.reps) : "횟수"}
+                      className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                    />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={g.sets}
+                      onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
+                      placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
+                      className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                    />
+                    <input
+                      type="checkbox"
+                      checked={g.trackPerformance}
+                      onChange={(e) =>
+                        updateGroup(exIndex, groupIndex, { trackPerformance: e.target.checked })
+                      }
+                      title="이 세트를 운동 수행능력(e1RM) 그래프에 반영"
+                      className="shrink-0"
+                    />
+                    {ex.groups.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeGroup(exIndex, groupIndex)}
+                        className="shrink-0 text-ink/40 hover:text-coral text-sm"
+                        aria-label="세트 그룹 삭제"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  {g.trackPerformance && (
+                    <select
+                      value={g.rpe}
+                      onChange={(e) => updateGroup(exIndex, groupIndex, { rpe: e.target.value })}
+                      className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-coral"
                     >
-                      ×
-                    </button>
+                      <option value="">RPE 선택 — 운동 수행능력 그래프에 반영돼요</option>
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
+                        <option key={v} value={v}>
+                          RPE {v}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 </div>
                 );
