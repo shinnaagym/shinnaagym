@@ -26,6 +26,17 @@ import {
 } from "@/lib/prom-instruments";
 import { Accordion, PromAccordion } from "@/app/components/PromAccordion";
 import {
+  criterionIcon,
+  odiCriterion,
+  ndiCriterion,
+  quickdashCriterion,
+  koos12Criterion,
+  faamAdlCriterion,
+  faamSportsCriterion,
+  startbackCriterion,
+  type Criterion,
+} from "@/lib/performance-criteria";
+import {
   PainTriggerRow,
   ExercisePerformanceRow,
   inputClass,
@@ -120,18 +131,6 @@ const MovementRow = memo(function MovementRow({
     </div>
   );
 });
-
-interface Criterion {
-  label: string;
-  value: string;
-  status: "pass" | "fail" | "unknown";
-}
-
-function criterionIcon(status: Criterion["status"]): string {
-  if (status === "pass") return "✅";
-  if (status === "fail") return "⚠️";
-  return "–";
-}
 
 export interface AssessmentInitialData {
   evaluatorName: string;
@@ -292,41 +291,13 @@ export function AssessmentForm({
   const functionalTestsPainFreeCount = FUNCTIONAL_TESTS.filter((t) => functionalTestPainFree[t.key]).length;
 
   const performanceCriteria: Criterion[] = [
-    {
-      label: "ODI(요추 기능장애) ≤ 20%",
-      value: odiScore == null ? "미입력" : `${odiScore}%`,
-      status: odiScore == null ? "unknown" : odiScore <= 20 ? "pass" : "fail",
-    },
-    {
-      label: "NDI(경추 기능장애) ≤ 15%",
-      value: ndiScore == null ? "미입력" : `${ndiScore}%`,
-      status: ndiScore == null ? "unknown" : ndiScore <= 15 ? "pass" : "fail",
-    },
-    {
-      label: "QuickDASH(상지 기능장애) ≤ 15",
-      value: quickdashScore == null ? "미입력" : `${quickdashScore}`,
-      status: quickdashScore == null ? "unknown" : quickdashScore <= 15 ? "pass" : "fail",
-    },
-    {
-      label: "KOOS-12(무릎) ≥ 80",
-      value: koos12Score == null ? "미입력" : `${koos12Score}`,
-      status: koos12Score == null ? "unknown" : koos12Score >= 80 ? "pass" : "fail",
-    },
-    {
-      label: "FAAM ADL(발·발목 일상) ≥ 90%",
-      value: faamAdlScore == null ? "미입력" : `${faamAdlScore}%`,
-      status: faamAdlScore == null ? "unknown" : faamAdlScore >= 90 ? "pass" : "fail",
-    },
-    {
-      label: "FAAM 스포츠 ≥ 80%",
-      value: faamSportsScore == null ? "미입력" : `${faamSportsScore}%`,
-      status: faamSportsScore == null ? "unknown" : faamSportsScore >= 80 ? "pass" : "fail",
-    },
-    {
-      label: "STarT Back 총점 ≤ 3",
-      value: startBackScore == null ? "미입력" : `${startBackScore.total}점`,
-      status: startBackScore == null ? "unknown" : startBackScore.total <= 3 ? "pass" : "fail",
-    },
+    odiCriterion(odiScore),
+    ndiCriterion(ndiScore),
+    quickdashCriterion(quickdashScore),
+    koos12Criterion(koos12Score),
+    faamAdlCriterion(faamAdlScore),
+    faamSportsCriterion(faamSportsScore),
+    startbackCriterion(startBackScore),
     {
       label: "기능적 움직임 검사 5개 모두 무통",
       value: `${functionalTestsPainFreeCount}/${FUNCTIONAL_TESTS.length}`,
