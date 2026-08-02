@@ -24,17 +24,26 @@ export const PT_LOG_EQUIPMENT_OPTIONS = [
   { value: "dumbbell", label: "덤벨" },
   { value: "barbell", label: "바벨" },
   { value: "kettlebell", label: "케틀벨" },
+  { value: "cable", label: "케이블" },
+  { value: "hex_bar", label: "헥스바" },
   { value: "smith_machine", label: "스미스머신" },
   { value: "bulgarian_bag", label: "불가리안백" },
-  { value: "theraband", label: "세라밴드" },
-  { value: "loop_band", label: "루프밴드" },
+  { value: "small_equipment", label: "소도구" },
 ] as const;
 
 export type PtLogEquipmentValue = (typeof PT_LOG_EQUIPMENT_OPTIONS)[number]["value"];
 
-export const PT_LOG_EQUIPMENT_LABELS: Record<string, string> = Object.fromEntries(
-  PT_LOG_EQUIPMENT_OPTIONS.map((option) => [option.value, option.label]),
-);
+// 세라밴드·루프밴드는 선택지에서 뺐지만, 예전에 그 도구로 저장된 PT 일지
+// 기록은 여전히 남아있으므로 라벨 표시만은 계속 되게 해준다.
+const LEGACY_PT_LOG_EQUIPMENT_LABELS: Record<string, string> = {
+  theraband: "세라밴드",
+  loop_band: "루프밴드",
+};
+
+export const PT_LOG_EQUIPMENT_LABELS: Record<string, string> = {
+  ...LEGACY_PT_LOG_EQUIPMENT_LABELS,
+  ...Object.fromEntries(PT_LOG_EQUIPMENT_OPTIONS.map((option) => [option.value, option.label])),
+};
 
 // 통증 척도·운동수행 능력 공통 0~10 척도.
 export const PT_LOG_SCALE_OPTIONS = Array.from({ length: 11 }, (_, i) => i);

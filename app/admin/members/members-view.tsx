@@ -901,10 +901,25 @@ function FixedSlotSchedule({
         <span className="text-xs text-ink/40">시간대별 고정 회원 배정 현황</span>
       </div>
       <p className="text-xs text-ink/40 mb-3">
-        한 시간대에는 회원 한 명만 배정할 수 있어요. 기존에 중복 배정된 시간대는 붉은색으로 표시돼요.
+        한 시간대에는 회원 한 명만 배정할 수 있어요. 기존에 중복 배정된 시간대는 옅은 붉은색 칸으로 표시돼요.
       </p>
+      {coachFilter === "all" && coaches.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-3 text-xs text-ink/60">
+          {coaches.map((c) => {
+            const style = coachColorMap.get(c.id);
+            return (
+              <span key={c.id} className="flex items-center gap-1.5">
+                <span
+                  className={["inline-block h-2.5 w-2.5 rounded-full", style?.header ?? "bg-sage/15"].join(" ")}
+                />
+                {c.name}
+              </span>
+            );
+          })}
+        </div>
+      )}
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
-        <table className="w-full text-xs min-w-[720px] border-collapse">
+        <table className="w-full table-fixed text-xs min-w-[720px] border-collapse">
           <thead>
             <tr className="text-left text-ink/50 border-b border-line/60">
               <th className="px-3 py-2.5 font-medium w-14">시간</th>
@@ -933,13 +948,14 @@ function FixedSlotSchedule({
                           ].join(" ")}
                         >
                           {entries.map((entry, i) => {
+                            // 중복 배정된 칸이어도 배지 자체는 담당 코치 색을 그대로 유지해서
+                            // "어느 코치의 회원끼리 겹쳤는지"를 한눈에 구분할 수 있게 한다.
+                            // 겹쳤다는 사실 자체는 칸 배경(bg-red-50)만으로 표시한다.
                             const coachStyle =
                               entry.coachId != null ? coachColorMap.get(entry.coachId) : undefined;
-                            const pillClass = over
-                              ? "bg-red-100 text-red-600"
-                              : coachStyle
-                                ? `${coachStyle.header} ${coachStyle.headerText}`
-                                : "bg-sage/15 text-ink/70";
+                            const pillClass = coachStyle
+                              ? `${coachStyle.header} ${coachStyle.headerText}`
+                              : "bg-sage/15 text-ink/70";
                             return (
                               <span
                                 key={`${entry.name}-${i}`}
