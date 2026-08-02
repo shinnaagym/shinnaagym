@@ -1,6 +1,7 @@
 import { query } from "./db";
 import type { ContractEntryType, ContractRow, PaymentMethod, PtType, VisitChannel } from "./db";
 import { decryptText, encryptText } from "./crypto";
+import { getMemberById, updateMember } from "./schedule";
 
 export interface CreateContractInput {
   memberId: number;
@@ -61,7 +62,21 @@ export async function createContract(input: CreateContractInput): Promise<Contra
       input.companionPrivacyConsent ?? false,
     ],
   );
-  return result.rows[0];
+  const contract = result.rows[0];
+
+  // 계약서의 "방문 경로: 소개"에 이름을 적었는데 회원의 "소개해주신 분"이 아직
+  // 비어있으면 그 이름을 그대로 채워준다 — 회원 관리 목록의 "소개: OOO" 배지가
+  // 계약서에 적은 것과 별개로 다시 입력해야만 뜨던 문제를 없앤다. 이미 다른
+  // 값이 적혀 있으면 덮어쓰지 않는다.
+  const referrerName = input.visitChannelReferrerName?.trim();
+  if (input.visitChannel === "referral" && referrerName) {
+    const member = await getMemberById(input.memberId);
+    if (member && !member.referrer) {
+      await updateMember(input.memberId, { referrer: referrerName });
+    }
+  }
+
+  return contract;
 }
 
 /** 회원의 가장 최근 계약서 한 건(복호화된 주민등록번호 앞자리 포함). */
