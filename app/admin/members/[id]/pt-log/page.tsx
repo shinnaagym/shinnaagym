@@ -3,10 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
-import { listAssessmentsByMember } from "@/lib/assessments";
+import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { PT_LOG_EQUIPMENT_LABELS } from "@/lib/constants";
 import { AssessmentPainChart } from "../assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
+import { PainTriggerSection } from "./pain-trigger-section";
+import { ExercisePerformanceSection } from "./exercise-performance-section";
 import { DeletePtLogButton } from "@/app/components/DeletePtLogButton";
 import type { PtLogExercise } from "@/lib/db";
 
@@ -53,6 +55,23 @@ export default async function PtLogHistoryPage({
     notFound();
   }
 
+  const pastPainTriggerNotes = Array.from(
+    new Set(
+      assessments
+        .flatMap((a) => getPainTriggerEntries(a))
+        .map((e) => e.note)
+        .filter((note) => note.length > 0),
+    ),
+  );
+  const pastExercises = Array.from(
+    new Set(
+      assessments
+        .flatMap((a) => a.exercise_performance)
+        .map((e) => e.exercise)
+        .filter((exercise) => exercise.length > 0),
+    ),
+  );
+
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
@@ -71,9 +90,13 @@ export default async function PtLogHistoryPage({
 
       {/* 통증 척도·운동수행 능력 그래프는 평가 기록(평가지)과 같은 데이터를
           쓴다 — PT 일지에서 기록해도, 평가 기록 화면에서 기록해도 같은
-          그래프에 반영된다. */}
-      <AssessmentPainChart assessments={assessments} memberId={idNum} />
-      <ExercisePerformanceChart assessments={assessments} memberId={idNum} />
+          그래프에 반영된다. 그래프 자체 "+ 기록추가" 대신, 평가 기록 작성
+          폼과 같은 입력 섹션을 그래프 바로 아래에 항상 띄워둔다. */}
+      <AssessmentPainChart assessments={assessments} />
+      <PainTriggerSection memberId={idNum} pastNotes={pastPainTriggerNotes} />
+
+      <ExercisePerformanceChart assessments={assessments} />
+      <ExercisePerformanceSection memberId={idNum} pastExercises={pastExercises} />
 
       {ptLogs.length === 0 ? (
         <div className="rounded-2xl bg-white border border-line/60 px-5 py-10 text-center text-ink/40">

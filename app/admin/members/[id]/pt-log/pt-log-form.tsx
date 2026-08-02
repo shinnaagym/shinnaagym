@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
-import { PT_LOG_EQUIPMENT_OPTIONS } from "@/lib/constants";
+import { PT_LOG_EQUIPMENT_LABELS, PT_LOG_EQUIPMENT_OPTIONS } from "@/lib/constants";
+import { computeE1rm } from "@/lib/exercise-performance";
 
 interface SetGroupInput {
   weight: string;
@@ -15,6 +16,10 @@ interface ExerciseInput {
   name: string;
   equipment: string;
   groups: SetGroupInput[];
+  showRpePicker: boolean;
+  recordedRpe: number | null;
+  recordError: string | null;
+  recording: boolean;
 }
 
 function emptyGroup(): SetGroupInput {
@@ -22,7 +27,28 @@ function emptyGroup(): SetGroupInput {
 }
 
 function emptyExercise(): ExerciseInput {
-  return { name: "", equipment: PT_LOG_EQUIPMENT_OPTIONS[0].value, groups: [emptyGroup()] };
+  return {
+    name: "",
+    equipment: PT_LOG_EQUIPMENT_OPTIONS[0].value,
+    groups: [emptyGroup()],
+    showRpePicker: false,
+    recordedRpe: null,
+    recordError: null,
+    recording: false,
+  };
+}
+
+/** 현재 입력된 세트 그룹 중 e1RM이 가장 높은(가장 무거운) 탑세트를 고른다. */
+function bestGroup(groups: SetGroupInput[]): { weight: number; reps: number } | null {
+  let best: { weight: number; reps: number; e1rm: number } | null = null;
+  for (const g of groups) {
+    const weight = g.weight === "" ? null : Number(g.weight);
+    const reps = g.reps === "" ? null : Number(g.reps);
+    const e1rm = computeE1rm(weight, reps);
+    if (e1rm == null || weight == null || reps == null) continue;
+    if (!best || e1rm > best.e1rm) best = { weight, reps, e1rm };
+  }
+  return best ? { weight: best.weight, reps: best.reps } : null;
 }
 
 export function PtLogForm({ memberId, memberName }: { memberId: number; memberName: string }) {
@@ -67,6 +93,48 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
         i === exIndex ? { ...e, groups: e.groups.filter((_, gi) => gi !== groupIndex) } : e,
       ),
     );
+  }
+
+  async function recordRpe(exIndex: number, rpe: number) {
+    const ex = exercises[exIndex];
+    if (!ex.name.trim()) {
+      updateExercise(exIndex, { recordError: "운동 이름을 먼저 입력해주세요." });
+      return;
+    }
+    const top = bestGroup(ex.groups);
+    if (!top) {
+      updateExercise(exIndex, { recordError: "무게·횟수를 먼저 입력해주세요." });
+      return;
+    }
+    updateExercise(exIndex, { recording: true, recordError: null });
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}/assessments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evaluatedAt: logDate,
+          exercisePerformance: [
+            {
+              exercise: ex.name.trim(),
+              note: PT_LOG_EQUIPMENT_LABELS[ex.equipment] ?? ex.equipment,
+              weight: top.weight,
+              reps: top.reps,
+              rpe,
+            },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        updateExercise(exIndex, { recordError: data?.error ?? "기록에 실패했어요." });
+        return;
+      }
+      updateExercise(exIndex, { showRpePicker: false, recordedRpe: rpe, recordError: null });
+    } catch {
+      updateExercise(exIndex, { recordError: "네트워크 오류가 발생했어요." });
+    } finally {
+      updateExercise(exIndex, { recording: false });
+    }
   }
 
   async function handleSubmit() {
@@ -122,7 +190,7 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
             type="date"
             value={logDate}
             onChange={(e) => setLogDate(e.target.value)}
-            className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+            className="block w-full max-w-full box-border rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral appearance-none"
           />
         </div>
 
@@ -214,13 +282,43 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
                   )}
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={() => addGroup(exIndex)}
-                className="text-xs text-coral hover:underline"
-              >
-                + 세트 그룹 추가 (같은 운동, 다른 무게)
-              </button>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => addGroup(exIndex)}
+                  className="text-xs text-coral hover:underline"
+                >
+                  + 세트 그룹 추가 (같은 운동, 다른 무게)
+                </button>
+
+                {ex.showRpePicker ? (
+                  <select
+                    autoFocus
+                    disabled={ex.recording}
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) recordRpe(exIndex, Number(e.target.value));
+                    }}
+                    className="rounded-full border border-coral text-coral px-3 py-1 text-xs outline-none disabled:opacity-50"
+                  >
+                    <option value="">RPE 선택</option>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
+                      <option key={v} value={v}>
+                        RPE {v}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => updateExercise(exIndex, { showRpePicker: true, recordError: null })}
+                    className="rounded-full border border-coral text-coral px-3 py-1 text-xs font-medium hover:bg-coral/5 transition"
+                  >
+                    {ex.recordedRpe != null ? `✓ RPE ${ex.recordedRpe} 기록됨 · 다시 기록` : "기록"}
+                  </button>
+                )}
+              </div>
+              {ex.recordError && <p className="text-xs text-coral">{ex.recordError}</p>}
             </div>
           </div>
         ))}
