@@ -111,6 +111,7 @@ function SessionCellButton({
   goldenBellMemberIds,
   onEdit,
   onCreate,
+  onEmptyContextMenu,
   mergedSessions,
   onEditMerged,
   onContextMenu,
@@ -119,6 +120,8 @@ function SessionCellButton({
   goldenBellMemberIds: Set<number>;
   onEdit: (session: SessionWithMember) => void;
   onCreate: () => void;
+  /** 빈 칸을 우클릭했을 때 — 복사해둔 일정이 있으면 "여기에 붙여넣기" 메뉴를 띄운다. */
+  onEmptyContextMenu?: (e: React.MouseEvent) => void;
   /** 연속된 시간대를 하나로 합친 칸일 때, 그 안에 포함된 전체 항목(2개 이상). */
   mergedSessions?: SessionWithMember[];
   onEditMerged?: (sessions: SessionWithMember[]) => void;
@@ -128,6 +131,7 @@ function SessionCellButton({
     return (
       <button
         onClick={onCreate}
+        onContextMenu={onEmptyContextMenu}
         className="w-full rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-xs text-ink/30 hover:text-coral hover:border-coral transition truncate"
       >
         + 추가
@@ -233,11 +237,14 @@ export function ScheduleGrid({
   } | null>(null);
   const [editTarget, setEditTarget] = useState<SessionWithMember | null>(null);
   const [mergedEditTarget, setMergedEditTarget] = useState<SessionWithMember[] | null>(null);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    sessions: SessionWithMember[];
-  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<
+    | { kind: "entry"; x: number; y: number; sessions: SessionWithMember[] }
+    | { kind: "empty"; x: number; y: number; date: string; hour: number; coachId: number }
+    | null
+  >(null);
+  /** "복사"로 담아둔 일정(들). 다른 빈 칸에 우클릭하면 여기 담긴 내용을
+      그대로 붙여넣을 수 있다. */
+  const [clipboard, setClipboard] = useState<SessionWithMember[] | null>(null);
   const [dutyRosterState] = useState(dutyRoster);
   const [dutyOverridesState, setDutyOverridesState] = useState(dutyOverrides);
   const [dutyEditDate, setDutyEditDate] = useState<{ date: string; weekday: number } | null>(null);
@@ -407,7 +414,72 @@ export function ScheduleGrid({
       return;
     }
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, sessions: sessionsForMenu });
+    setContextMenu({ kind: "entry", x: e.clientX, y: e.clientY, sessions: sessionsForMenu });
+  }
+
+  /** 빈 칸을 우클릭했을 때: 복사해둔 일정이 있을 때만 "여기에 붙여넣기" 메뉴를
+      띄운다. 복사한 게 없으면 평소처럼 브라우저 기본 메뉴를 그대로 둔다. */
+  function openPasteMenu(e: React.MouseEvent, date: string, hour: number, coachId: number) {
+    if (!clipboard) return;
+    e.preventDefault();
+    setContextMenu({ kind: "empty", x: e.clientX, y: e.clientY, date, hour, coachId });
+  }
+
+  function copyToClipboard(sessionsForMenu: SessionWithMember[]) {
+    setContextMenu(null);
+    setClipboard(sessionsForMenu);
+  }
+
+  /** 복사해둔 일정(들)을 대상 칸에 붙여넣는다. 여러 시간이 합쳐진 칸(개인
+      일정·수업 불가)이면 리더와의 시간차를 유지한 채 한꺼번에 붙여넣는다.
+      상태는 항상 "예약"으로 새로 시작한다(취소·노쇼 상태까지 복사하지 않음). */
+  async function pasteClipboard(targetDate: string, targetHour: number, targetCoachId: number) {
+    setContextMenu(null);
+    if (!clipboard) return;
+
+    const leaderHour = Math.min(...clipboard.map((s) => s.session_hour));
+    const targets = clipboard.map((s) => ({
+      hour: targetHour + (s.session_hour - leaderHour),
+      source: s,
+    }));
+
+    const dh = dayHours[targetDate];
+    if (targets.some((t) => !dh || dh.closed || t.hour < dh.start || t.hour >= dh.end)) {
+      alert("영업 시간을 벗어난 시간이에요.");
+      return;
+    }
+    for (const t of targets) {
+      if (sessionMap.get(`${targetDate}-${targetCoachId}-${t.hour}`)) {
+        alert("이미 일정이 있는 시간이에요.");
+        return;
+      }
+    }
+
+    setLoading(true);
+    const results = await Promise.all(
+      targets.map((t) =>
+        fetch("/api/admin/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            memberId: t.source.member_id,
+            coachId: targetCoachId,
+            date: targetDate,
+            hour: t.hour,
+            memo: t.source.memo,
+            entryType: t.source.entry_type,
+            ptType: t.source.pt_type,
+          }),
+        }),
+      ),
+    );
+    const failed = results.find((r) => !r.ok);
+    if (failed) {
+      const data = await failed.json().catch(() => ({}));
+      alert(data.error ?? "붙여넣기 중 오류가 발생했습니다.");
+    }
+    await refreshSessions();
+    setLoading(false);
   }
 
   async function quickPatch(sessionsForMenu: SessionWithMember[], body: Record<string, unknown>) {
@@ -777,6 +849,7 @@ export function ScheduleGrid({
                             goldenBellMemberIds={goldenBellMemberIds}
                             onEdit={setEditTarget}
                             onCreate={() => setCreateTarget({ date: d, hour, coachId: singleCoach.id })}
+                            onEmptyContextMenu={(e) => openPasteMenu(e, d, hour, singleCoach.id)}
                             mergedSessions={spanInfo?.sessions}
                             onEditMerged={setMergedEditTarget}
                             onContextMenu={openQuickMenu}
@@ -942,6 +1015,7 @@ export function ScheduleGrid({
                               goldenBellMemberIds={goldenBellMemberIds}
                               onEdit={setEditTarget}
                               onCreate={() => setCreateTarget({ date: d, hour, coachId: coach.id })}
+                              onEmptyContextMenu={(e) => openPasteMenu(e, d, hour, coach.id)}
                               mergedSessions={spanInfo?.sessions}
                               onEditMerged={setMergedEditTarget}
                               onContextMenu={openQuickMenu}
@@ -1021,8 +1095,14 @@ export function ScheduleGrid({
               top: Math.min(contextMenu.y, window.innerHeight - 160),
             }}
           >
-            {contextMenu.sessions[0].entry_type === "session" && (
+            {contextMenu.kind === "entry" && contextMenu.sessions[0].entry_type === "session" && (
               <>
+                <button
+                  onClick={() => copyToClipboard(contextMenu.sessions)}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                >
+                  복사
+                </button>
                 <button
                   onClick={() => quickPatch(contextMenu.sessions, { status: "no_show" })}
                   className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
@@ -1043,8 +1123,14 @@ export function ScheduleGrid({
                 </button>
               </>
             )}
-            {contextMenu.sessions[0].entry_type === "memo" && (
+            {contextMenu.kind === "entry" && contextMenu.sessions[0].entry_type === "memo" && (
               <>
+                <button
+                  onClick={() => copyToClipboard(contextMenu.sessions)}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                >
+                  복사
+                </button>
                 <button
                   onClick={() =>
                     quickPatch(contextMenu.sessions, {
@@ -1063,12 +1149,28 @@ export function ScheduleGrid({
                 </button>
               </>
             )}
-            {contextMenu.sessions[0].entry_type === "blocked" && (
+            {contextMenu.kind === "entry" && contextMenu.sessions[0].entry_type === "blocked" && (
+              <>
+                <button
+                  onClick={() => copyToClipboard(contextMenu.sessions)}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                >
+                  복사
+                </button>
+                <button
+                  onClick={() => quickDelete(contextMenu.sessions)}
+                  className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-bone transition"
+                >
+                  삭제
+                </button>
+              </>
+            )}
+            {contextMenu.kind === "empty" && (
               <button
-                onClick={() => quickDelete(contextMenu.sessions)}
-                className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-bone transition"
+                onClick={() => pasteClipboard(contextMenu.date, contextMenu.hour, contextMenu.coachId)}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
               >
-                삭제
+                여기에 붙여넣기
               </button>
             )}
           </div>
