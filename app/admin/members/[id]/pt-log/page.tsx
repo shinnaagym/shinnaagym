@@ -75,6 +75,10 @@ export default async function PtLogHistoryPage({
         + 새 평가 작성
       </Link>
 
+      <div className="mb-4">
+        <PtLogList ptLogs={ptLogs} />
+      </div>
+
       <Link
         href={`/admin/members/${idNum}/intake`}
         className="flex items-center justify-between rounded-2xl border border-line bg-white/60 px-5 py-4 mb-4 hover:border-coral/40 transition"
@@ -99,8 +103,6 @@ export default async function PtLogHistoryPage({
 
       <ExercisePerformanceChart assessments={assessments} />
       <ExercisePerformanceSection memberId={idNum} pastExercises={pastExercises} />
-
-      <PtLogList ptLogs={ptLogs} />
     </div>
   );
 }

@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
-import { getPtLogById } from "@/lib/pt-logs";
+import { getPtLogById, listPtLogsByMember } from "@/lib/pt-logs";
+import { listAssessmentsByMember } from "@/lib/assessments";
 import { PtLogForm } from "../../pt-log-form";
+import { pastExerciseNames } from "../../past-exercise-names";
 
 export default async function EditPtLogPage({
   params,
@@ -18,7 +20,12 @@ export default async function EditPtLogPage({
   if (!Number.isInteger(idNum) || !Number.isInteger(logIdNum)) {
     notFound();
   }
-  const [member, ptLog] = await Promise.all([getMemberById(idNum), getPtLogById(logIdNum)]);
+  const [member, ptLog, ptLogs, assessments] = await Promise.all([
+    getMemberById(idNum),
+    getPtLogById(logIdNum),
+    listPtLogsByMember(idNum),
+    listAssessmentsByMember(idNum),
+  ]);
   if (!member) {
     notFound();
   }
@@ -32,6 +39,7 @@ export default async function EditPtLogPage({
         memberId={idNum}
         memberName={member.name}
         ptLogId={logIdNum}
+        pastExercises={pastExerciseNames(ptLogs, assessments)}
         initialData={{
           logDate: ptLog.log_date,
           memo: ptLog.memo,

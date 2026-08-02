@@ -42,11 +42,13 @@ export function PtLogForm({
   memberName,
   ptLogId,
   initialData,
+  pastExercises = [],
 }: {
   memberId: number;
   memberName: string;
   ptLogId?: number;
   initialData?: PtLogFormInitialData;
+  pastExercises?: string[];
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -57,6 +59,8 @@ export function PtLogForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // 이름 입력 중 자동완성 목록을 띄울 운동의 인덱스. 한 번에 한 칸만 연다.
+  const [suggestIndex, setSuggestIndex] = useState<number | null>(null);
 
   function updateExercise(index: number, patch: Partial<ExerciseInput>) {
     setExercises((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
@@ -187,12 +191,44 @@ export function PtLogForm({
                   </option>
                 ))}
               </select>
-              <input
-                value={ex.name}
-                onChange={(e) => updateExercise(exIndex, { name: e.target.value })}
-                placeholder="운동 이름 (예: 스쿼트)"
-                className="min-w-0 flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-              />
+              <div className="relative min-w-0 flex-1">
+                <input
+                  value={ex.name}
+                  onChange={(e) => updateExercise(exIndex, { name: e.target.value })}
+                  onFocus={() => setSuggestIndex(exIndex)}
+                  onBlur={() => setTimeout(() => setSuggestIndex(null), 150)}
+                  placeholder="운동 이름 (예: 스쿼트)"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                />
+                {suggestIndex === exIndex &&
+                  ex.name.trim().length > 0 &&
+                  (() => {
+                    const query = ex.name.trim();
+                    const matches = pastExercises
+                      .filter((name) => name !== query && name.includes(query))
+                      .slice(0, 6);
+                    if (matches.length === 0) return null;
+                    return (
+                      <ul className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-line bg-white shadow-md overflow-hidden">
+                        {matches.map((name) => (
+                          <li key={name}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                updateExercise(exIndex, { name });
+                                setSuggestIndex(null);
+                              }}
+                              className="block w-full text-left px-3 py-2 text-sm hover:bg-bone/60"
+                            >
+                              {name}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  })()}
+              </div>
               {exercises.length > 1 && (
                 <button
                   type="button"
