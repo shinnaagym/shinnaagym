@@ -1142,6 +1142,7 @@ function CreateMemberModal({
   const [companionPhone, setCompanionPhone] = useState("");
   const [companionRrnFront, setCompanionRrnFront] = useState("");
   const [companionAddress, setCompanionAddress] = useState("");
+  const [companionPrivacyConsent, setCompanionPrivacyConsent] = useState(false);
   const [coachId, setCoachId] = useState<number | "">(coaches[0]?.id ?? "");
   const [referrer, setReferrer] = useState("");
   const [availableTimes, setAvailableTimes] = useState("");
@@ -1211,6 +1212,7 @@ function CreateMemberModal({
           companionPhone: ptType === "2:1" ? companionPhone : "",
           companionRrnFront: ptType === "2:1" ? companionRrnFront : "",
           companionAddress: ptType === "2:1" ? companionAddress : "",
+          companionPrivacyConsent: ptType === "2:1" ? companionPrivacyConsent : false,
         }),
       });
       const data = await res.json();
@@ -1311,6 +1313,14 @@ function CreateMemberModal({
                 className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
               />
             </Field>
+            <label className="flex items-center gap-2 text-sm text-ink/70">
+              <input
+                type="checkbox"
+                checked={companionPrivacyConsent}
+                onChange={(e) => setCompanionPrivacyConsent(e.target.checked)}
+              />
+              함께 등록하는 분 개인정보(민감정보 포함) 수집·이용에 동의합니다.
+            </label>
           </div>
         )}
 
@@ -1425,6 +1435,7 @@ function WriteContractModal({
   const [companionPhone, setCompanionPhone] = useState("");
   const [companionRrnFront, setCompanionRrnFront] = useState("");
   const [companionAddress, setCompanionAddress] = useState("");
+  const [companionPrivacyConsent, setCompanionPrivacyConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -1456,6 +1467,7 @@ function WriteContractModal({
           companionPhone,
           companionRrnFront,
           companionAddress,
+          companionPrivacyConsent,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1517,6 +1529,14 @@ function WriteContractModal({
                 className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
               />
             </Field>
+            <label className="flex items-center gap-2 text-sm text-ink/70">
+              <input
+                type="checkbox"
+                checked={companionPrivacyConsent}
+                onChange={(e) => setCompanionPrivacyConsent(e.target.checked)}
+              />
+              함께 등록하는 분 개인정보(민감정보 포함) 수집·이용에 동의합니다.
+            </label>
           </div>
         )}
         <ContractFieldsFieldset
