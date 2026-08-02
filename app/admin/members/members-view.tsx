@@ -63,6 +63,34 @@ function SortHeader({
   );
 }
 
+// 데스크톱 표의 SortHeader와 같은 정렬 상태를 쓰는 모바일 카드 목록용 정렬
+// 칩. 표 헤더가 없는 모바일에서는 이 칩 목록으로 같은 정렬을 적용한다.
+function SortChip({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition",
+        active ? "border-coral text-coral bg-coral/5" : "border-line text-ink/60 hover:bg-bone",
+      ].join(" ")}
+    >
+      {label}
+      <span className={active ? "text-coral" : "text-ink/30"}>{dir === "asc" ? "▲" : "▼"}</span>
+    </button>
+  );
+}
+
 function cellKey(weekday: number, hour: number): string {
   return `${weekday}-${hour}`;
 }
@@ -516,6 +544,32 @@ export function MembersView({
       ) : (
         <>
           {/* 모바일: 카드 목록 (좁은 화면에서 표 가로 스크롤 대신) */}
+          <div className="flex items-center gap-1.5 flex-wrap mb-3 sm:hidden">
+            <SortChip
+              label="이름"
+              active={sortKey === "name"}
+              dir={sortKey === "name" ? sortDir : "asc"}
+              onClick={() => toggleSort("name")}
+            />
+            <SortChip
+              label="잔여"
+              active={sortKey === "remaining"}
+              dir={sortKey === "remaining" ? sortDir : "asc"}
+              onClick={() => toggleSort("remaining")}
+            />
+            <SortChip
+              label="초/재"
+              active={sortKey === "type"}
+              dir={sortKey === "type" ? sortDir : "asc"}
+              onClick={() => toggleSort("type")}
+            />
+            <SortChip
+              label="다음주"
+              active={sortKey === "nextWeek"}
+              dir={sortKey === "nextWeek" ? sortDir : "asc"}
+              onClick={() => toggleSort("nextWeek")}
+            />
+          </div>
           <div className="grid gap-3 sm:hidden">
             {sortedFiltered.map((m) => {
               const remaining = m.total_sessions - m.done_count;
