@@ -255,9 +255,51 @@ export function shortRegionLabel(regionLabel: string): string {
   return regionLabel.split(" (")[0];
 }
 
-/** "폄 (경추)"처럼 부위를 함께 표기한 동작 라벨을 반환한다. */
+/** "(경추) 폄"처럼 부위를 앞에, 동작을 뒤에 표기한 라벨을 반환한다. */
 export function movementLabelWithRegion(movementId: string): string {
   const found = findMovementLabel(movementId);
   if (!found) return movementId;
-  return `${found.ko} (${shortRegionLabel(found.region)})`;
+  return `(${shortRegionLabel(found.region)}) ${found.ko}`;
+}
+
+// AssessmentMovementEntry는 lib/db.ts에 있지만, 그 파일은 서버 전용 pg
+// 클라이언트를 물고 있어 클라이언트 컴포넌트에서 import할 수 없다. 이 함수는
+// 클라이언트(회원 페이지)·서버(관리자 페이지) 양쪽에서 똑같이 써야 해서, 필요한
+// 필드만 구조로 받는다.
+interface MovementEntryLike {
+  romPassive: string;
+  romActive: string;
+  compensation: string;
+  painPassive: string;
+  painActive: string;
+}
+
+/**
+ * 통증이 있거나(수동·능동 중 하나 이상) 보상패턴이 적힌 동작을, 관절·동작
+ * 순서로 이름을 붙이고 해당 가동범위·통증 강도를 함께 보여주는 문구로
+ * 변환한다. 수동·능동 모두 통증이 있고 강도가 다르면 각각 한 줄씩 반환한다.
+ */
+export function flaggedMovementSummaries(
+  movements: Record<string, MovementEntryLike>,
+): string[] {
+  const lines: string[] = [];
+  for (const [movementId, entry] of Object.entries(movements)) {
+    const label = movementLabelWithRegion(movementId);
+    const hasPassivePain = entry.painPassive !== "" && entry.painPassive != null;
+    const hasActivePain = entry.painActive !== "" && entry.painActive != null;
+    if (hasPassivePain) {
+      const romPart = entry.romPassive ? ` · 가동범위 ${entry.romPassive}` : "";
+      const compPart = entry.compensation ? `${entry.compensation} · ` : "";
+      lines.push(`${label}${romPart} — ${compPart}수동 시 통증 · 통증 ${entry.painPassive}/10`);
+    }
+    if (hasActivePain) {
+      const romPart = entry.romActive ? ` · 가동범위 ${entry.romActive}` : "";
+      const compPart = entry.compensation ? `${entry.compensation} · ` : "";
+      lines.push(`${label}${romPart} — ${compPart}능동 시 통증 · 통증 ${entry.painActive}/10`);
+    }
+    if (!hasPassivePain && !hasActivePain && entry.compensation.trim().length > 0) {
+      lines.push(`${label} — ${entry.compensation}`);
+    }
+  }
+  return lines;
 }

@@ -4,8 +4,11 @@ import { memo } from "react";
 import { NRS_PAIN_OPTIONS } from "@/lib/assessment-movements";
 import type { ExercisePerformanceEntry } from "@/lib/db";
 
+// h-10을 명시하는 이유: <input type="date">는 브라우저 자체 달력 아이콘 때문에
+// 같은 padding을 준 일반 텍스트 input보다 몇 px 더 높게 렌더링되는 경우가 있어,
+// 높이를 고정해두지 않으면 같은 줄에 나란히 둔 입력칸들의 세로 정렬이 어긋난다.
 export function inputClass(): string {
-  return "w-full rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral";
+  return "w-full h-10 rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral";
 }
 
 export interface PainTriggerFormEntry {

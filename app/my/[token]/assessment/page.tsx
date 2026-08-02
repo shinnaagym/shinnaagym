@@ -3,29 +3,13 @@ import { notFound } from "next/navigation";
 import { getMemberByToken } from "@/lib/schedule";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
-import { movementLabelWithRegion } from "@/lib/assessment-movements";
+import { flaggedMovementSummaries } from "@/lib/assessment-movements";
 import { AssessmentPainChart } from "@/app/admin/members/[id]/assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
-import type { AssessmentRow } from "@/lib/db";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
-
-function flaggedMovementSummaries(assessment: AssessmentRow): string[] {
-  return Object.entries(assessment.movements)
-    .filter(
-      ([, entry]) =>
-        entry.compensation.trim().length > 0 || (entry.painScale && Number(entry.painScale) > 0),
-    )
-    .map(([movementId, entry]) => {
-      const label = movementLabelWithRegion(movementId);
-      const parts: string[] = [];
-      if (entry.compensation) parts.push(entry.compensation);
-      if (entry.painScale) parts.push(`통증 ${entry.painScale}/10`);
-      return `${label} — ${parts.join(" · ")}`;
-    });
 }
 
 export default async function MyAssessmentHistoryPage({
@@ -73,7 +57,7 @@ export default async function MyAssessmentHistoryPage({
             <ExercisePerformanceChart assessments={assessments} />
             <ul className="space-y-2">
               {assessments.map((a) => {
-                const flagged = flaggedMovementSummaries(a);
+                const flagged = flaggedMovementSummaries(a.movements);
                 const painTriggers = getPainTriggerEntries(a);
                 const exercisePerformance = a.exercise_performance;
                 const maxPain = painTriggers.reduce<number | null>(

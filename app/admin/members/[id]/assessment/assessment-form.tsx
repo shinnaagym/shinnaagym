@@ -48,16 +48,18 @@ interface MovementEntry {
   romPassive: string;
   romActive: string;
   strength: string;
-  painScale: string;
   compensation: string;
+  painPassive: string;
+  painActive: string;
 }
 
 const EMPTY_ENTRY: MovementEntry = {
   romPassive: "",
   romActive: "",
   strength: "",
-  painScale: "",
   compensation: "",
+  painPassive: "",
+  painActive: "",
 };
 
 const EMPTY_FUNCTIONAL_NOTES: Record<FunctionalTestKey, string> = {
@@ -78,7 +80,7 @@ const MovementRow = memo(function MovementRow({
   onChange: (id: string, patch: Partial<MovementEntry>) => void;
 }) {
   return (
-    <div className="border-t border-line/50 px-3 py-3 sm:grid sm:grid-cols-[1fr_0.55fr_0.55fr_88px_88px_1.1fr] sm:items-center sm:gap-2 sm:py-2">
+    <div className="border-t border-line/50 px-3 py-3 sm:grid sm:grid-cols-[1fr_0.55fr_0.55fr_88px_150px_1.1fr] sm:items-center sm:gap-2 sm:py-2">
       <p className="text-sm font-medium mb-2 sm:mb-0">
         {movement.ko} <span className="text-xs text-ink/40">({movement.en})</span>
       </p>
@@ -96,31 +98,65 @@ const MovementRow = memo(function MovementRow({
           className={inputClass()}
         />
       </div>
-      <div className="grid grid-cols-2 gap-2 mt-2 sm:contents sm:mt-0">
-        <select
-          value={entry.strength}
-          onChange={(e) => onChange(movement.id, { strength: e.target.value })}
-          className={inputClass() + " bg-white"}
-        >
-          <option value="">근력</option>
-          {MMT_STRENGTH_OPTIONS.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
-        <select
-          value={entry.painScale}
-          onChange={(e) => onChange(movement.id, { painScale: e.target.value })}
-          className={inputClass() + " bg-white"}
-        >
-          <option value="">통증</option>
-          {NRS_PAIN_OPTIONS.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
+      <select
+        value={entry.strength}
+        onChange={(e) => onChange(movement.id, { strength: e.target.value })}
+        className={inputClass() + " bg-white mt-2 sm:mt-0"}
+      >
+        <option value="">근력</option>
+        {MMT_STRENGTH_OPTIONS.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
+      </select>
+      <div className="flex flex-col gap-1 mt-2 sm:mt-0">
+        <label className="flex items-center gap-1 text-xs text-ink/60">
+          <input
+            type="checkbox"
+            checked={entry.painPassive !== ""}
+            onChange={(e) =>
+              onChange(movement.id, { painPassive: e.target.checked ? entry.painPassive || "5" : "" })
+            }
+          />
+          수동
+          {entry.painPassive !== "" && (
+            <select
+              value={entry.painPassive}
+              onChange={(e) => onChange(movement.id, { painPassive: e.target.value })}
+              className="rounded-lg border border-line bg-white px-1.5 py-1 text-xs outline-none focus:border-coral"
+            >
+              {NRS_PAIN_OPTIONS.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          )}
+        </label>
+        <label className="flex items-center gap-1 text-xs text-ink/60">
+          <input
+            type="checkbox"
+            checked={entry.painActive !== ""}
+            onChange={(e) =>
+              onChange(movement.id, { painActive: e.target.checked ? entry.painActive || "5" : "" })
+            }
+          />
+          능동
+          {entry.painActive !== "" && (
+            <select
+              value={entry.painActive}
+              onChange={(e) => onChange(movement.id, { painActive: e.target.value })}
+              className="rounded-lg border border-line bg-white px-1.5 py-1 text-xs outline-none focus:border-coral"
+            >
+              {NRS_PAIN_OPTIONS.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          )}
+        </label>
       </div>
       <input
         value={entry.compensation}
@@ -495,7 +531,7 @@ export function AssessmentForm({
           isOpen={openRegions.has(region.key)}
           onToggle={() => toggleRegion(region.key)}
         >
-          <div className="hidden sm:grid sm:grid-cols-[1fr_0.55fr_0.55fr_88px_88px_1.1fr] sm:gap-2 px-3 py-2 text-xs text-ink/40 border-t border-line/50 bg-bone/30">
+          <div className="hidden sm:grid sm:grid-cols-[1fr_0.55fr_0.55fr_88px_150px_1.1fr] sm:gap-2 px-3 py-2 text-xs text-ink/40 border-t border-line/50 bg-bone/30">
             <span>동작</span>
             <span>가동범위(수동)</span>
             <span>가동범위(능동)</span>

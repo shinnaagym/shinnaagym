@@ -737,8 +737,11 @@ export interface AssessmentMovementEntry {
   romPassive: string;
   romActive: string;
   strength: string;
-  painScale: string;
   compensation: string;
+  /** 수동 가동 시 통증 척도(NRS 0~10). 빈 문자열이면 수동 시 통증 체크 해제. */
+  painPassive: string;
+  /** 능동 가동 시 통증 척도(NRS 0~10). 빈 문자열이면 능동 시 통증 체크 해제. */
+  painActive: string;
 }
 
 export type AssessmentMovements = Record<string, AssessmentMovementEntry>;
