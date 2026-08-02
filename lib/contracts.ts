@@ -24,6 +24,7 @@ export interface CreateContractInput {
   companionPhone?: string;
   companionRrnFront?: string;
   companionAddress?: string;
+  companionPrivacyConsent?: boolean;
 }
 
 export async function createContract(input: CreateContractInput): Promise<ContractRow> {
@@ -32,8 +33,9 @@ export async function createContract(input: CreateContractInput): Promise<Contra
        member_id, entry_type, pt_type, total_sessions, price, payment_method,
        rrn_front_encrypted, address, visit_channel, visit_channel_referrer_name,
        visit_channel_other, purposes, purpose_other, option_note, start_date, privacy_consent,
-       companion_name, companion_phone, companion_rrn_front_encrypted, companion_address
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+       companion_name, companion_phone, companion_rrn_front_encrypted, companion_address,
+       companion_privacy_consent
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
      RETURNING *`,
     [
       input.memberId,
@@ -56,6 +58,7 @@ export async function createContract(input: CreateContractInput): Promise<Contra
       input.companionPhone ?? "",
       encryptText(input.companionRrnFront ?? ""),
       input.companionAddress ?? "",
+      input.companionPrivacyConsent ?? false,
     ],
   );
   return result.rows[0];

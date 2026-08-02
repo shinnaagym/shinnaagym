@@ -45,6 +45,7 @@ export interface ContractDocumentData {
   companion_phone: string;
   companion_rrn_front: string;
   companion_address: string;
+  companion_privacy_consent: boolean;
 }
 
 // 회원 개인 계약서 페이지(/my/[token]/contract)와 관리자 계약서 보기 모달이
@@ -122,6 +123,10 @@ export function ContractDocument({
                     <p className="text-xs text-ink/40 mb-0.5">함께 등록하는 분 주소</p>
                     <p>{contract.companion_address || "-"}</p>
                   </div>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-xs text-ink/40 mb-0.5">함께 등록하는 분 개인정보 수집·이용 동의</p>
+                  <p>{contract.companion_privacy_consent ? "동의함" : "동의하지 않음"}</p>
                 </div>
               </>
             )}
