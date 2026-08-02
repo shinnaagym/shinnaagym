@@ -32,6 +32,16 @@ import {
 import { PromAccordion } from "@/app/components/PromAccordion";
 import { PrintButton } from "@/app/components/PrintButton";
 import { BodyPainDiagram } from "@/app/components/BodyPainDiagram";
+import {
+  criterionIcon,
+  odiCriterion,
+  ndiCriterion,
+  quickdashCriterion,
+  koos12Criterion,
+  faamAdlCriterion,
+  faamSportsCriterion,
+  startbackCriterion,
+} from "@/lib/performance-criteria";
 import type { PainMovementEntry } from "@/lib/db";
 import { EMPTY_INTAKE_FORM_STATE, EMPTY_PAIN_MOVEMENT, type IntakeFormState } from "./intake-form-state";
 
@@ -283,6 +293,18 @@ export function IntakeForm({
   const faamAdlScore = computeFaamScore(form.faamAdlAnswers);
   const faamSportsScore = computeFaamScore(form.faamSportsAnswers);
   const startBackScore = computeStartBackScore(form.startbackAnswers);
+
+  // 선택한 부위에 해당하는 퍼포먼스 단계 전환 기준만 걸러서 표준 설문(PROM) 바로
+  // 아래에 보여준다 — PAIN_REGIONS의 promKeys 매핑을 그대로 재사용한다.
+  const visibleCriteria = [
+    { key: "odi", criterion: odiCriterion(odiScore) },
+    { key: "ndi", criterion: ndiCriterion(ndiScore) },
+    { key: "quickdash", criterion: quickdashCriterion(quickdashScore) },
+    { key: "koos12", criterion: koos12Criterion(koos12Score) },
+    { key: "faamAdl", criterion: faamAdlCriterion(faamAdlScore) },
+    { key: "faamSports", criterion: faamSportsCriterion(faamSportsScore) },
+    { key: "startback", criterion: startbackCriterion(startBackScore) },
+  ].filter((c) => visiblePromKeys.has(c.key));
 
   const setOdiAnswer = (key: string, v: number) =>
     patch({ odiAnswers: { ...form.odiAnswers, [key]: v } });
@@ -775,6 +797,23 @@ export function IntakeForm({
             </button>
           ))}
         </div>
+
+        {visibleCriteria.length > 0 && (
+          <div className="rounded-xl border border-line/60 bg-bone/40 px-4 py-3 mt-3">
+            <p className="text-sm font-medium mb-2">퍼포먼스 단계 전환 기준</p>
+            <ul className="divide-y divide-line/50">
+              {visibleCriteria.map((c) => (
+                <li key={c.key} className="flex items-center justify-between py-1.5 text-sm">
+                  <span className="flex items-center gap-2">
+                    <span>{criterionIcon(c.criterion.status)}</span>
+                    {c.criterion.label}
+                  </span>
+                  <span className="text-ink/50">{c.criterion.value}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </SectionCard>
 
       {visiblePromKeys.has("odi") && (
