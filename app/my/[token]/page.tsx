@@ -11,6 +11,7 @@ import {
 } from "@/lib/schedule";
 import { getLatestContractByMember } from "@/lib/contracts";
 import { listAssessmentsByMember } from "@/lib/assessments";
+import { listPtLogsByMember } from "@/lib/pt-logs";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { listNotices } from "@/lib/notices";
 import { koreaTodayKey } from "@/lib/date";
@@ -60,7 +61,7 @@ export default async function MyReservationPage({
     notFound();
   }
 
-  const [progress, sessions, availability, coaches, contract, assessments, intake, notices] =
+  const [progress, sessions, availability, coaches, contract, assessments, ptLogs, intake, notices] =
     await Promise.all([
       computeMemberProgress(member.id),
       listMemberSessions(member.id),
@@ -70,6 +71,7 @@ export default async function MyReservationPage({
       listCoaches(),
       getLatestContractByMember(member.id),
       listAssessmentsByMember(member.id),
+      listPtLogsByMember(member.id),
       getIntakeQuestionnaireByMember(member.id),
       listNotices(),
     ]);
@@ -192,12 +194,27 @@ export default async function MyReservationPage({
         {assessments.length > 0 && (
           <Link
             href={`/my/${token}/assessment`}
-            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10 hover:border-coral/40 transition"
+            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-4 hover:border-coral/40 transition"
           >
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-display text-lg mb-1">🧍 신체 평가지</p>
                 <p className="text-sm text-ink/60">{assessments.length}건 · 내용 확인하기</p>
+              </div>
+              <span className="text-ink/30">→</span>
+            </div>
+          </Link>
+        )}
+
+        {ptLogs.length > 0 && (
+          <Link
+            href={`/my/${token}/pt-log`}
+            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-10 hover:border-coral/40 transition"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-display text-lg mb-1">🏋️ PT 일지</p>
+                <p className="text-sm text-ink/60">{ptLogs.length}건 · 내용 확인하기</p>
               </div>
               <span className="text-ink/30">→</span>
             </div>

@@ -598,13 +598,6 @@ export function MembersView({
                       {m.referrer && <ReferrerBadge referrer={m.referrer} />}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <Link
-                        href={`/admin/members/${m.id}/assessment`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
-                      >
-                        평가 기록
-                      </Link>
                       <span
                         className={[
                           "rounded-full px-2.5 py-0.5 text-xs shrink-0",
@@ -726,13 +719,6 @@ export function MembersView({
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {m.name}
                           {m.referrer && <ReferrerBadge referrer={m.referrer} />}
-                          <Link
-                            href={`/admin/members/${m.id}/assessment`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
-                          >
-                            평가 기록
-                          </Link>
                           <Link
                             href={`/admin/members/${m.id}/pt-log`}
                             onClick={(e) => e.stopPropagation()}
