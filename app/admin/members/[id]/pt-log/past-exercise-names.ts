@@ -1,4 +1,4 @@
-import type { AssessmentRow, PtLogRow } from "@/lib/db";
+import type { AssessmentRow, PtLogRow, PtLogSetGroup } from "@/lib/db";
 
 /** 회원의 PT 일지·평가지에 그동안 기록된 운동 이름을 자동완성용으로 모은다. */
 export function pastExerciseNames(ptLogs: PtLogRow[], assessments: AssessmentRow[]): string[] {
@@ -14,4 +14,20 @@ export function pastExerciseNames(ptLogs: PtLogRow[], assessments: AssessmentRow
     }
   }
   return Array.from(names);
+}
+
+/** 운동 이름 -> 가장 최근 PT 일지에서 그 운동을 기록했을 때의 세트 그룹.
+    ptLogs는 이미 최신순(log_date DESC)으로 정렬돼 있으므로, 이름마다 처음
+    만나는 값이 곧 가장 최근 기록이다. 무게·횟수·세트 입력란에 회색 placeholder로
+    "지난번엔 이렇게 했었다"를 보여주는 용도라 확정 값이 아니다. */
+export function pastExerciseGroups(ptLogs: PtLogRow[]): Record<string, PtLogSetGroup[]> {
+  const result: Record<string, PtLogSetGroup[]> = {};
+  for (const log of ptLogs) {
+    for (const exercise of log.exercises) {
+      if (exercise.name && !(exercise.name in result) && exercise.groups.length > 0) {
+        result[exercise.name] = exercise.groups;
+      }
+    }
+  }
+  return result;
 }
