@@ -1487,8 +1487,8 @@ function ContractViewModal({
   useEffect(load, [memberId]);
 
   function handleSigned() {
-    load();
     onSigned?.();
+    onClose();
   }
 
   return (

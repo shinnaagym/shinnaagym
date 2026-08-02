@@ -35,13 +35,19 @@ export function parseMovements(raw: unknown): AssessmentMovements {
       typeof entry.strength === "string" && VALID_STRENGTH_VALUES.has(entry.strength)
         ? entry.strength
         : "";
-    const painScale =
-      typeof entry.painScale === "string" && VALID_PAIN_SCALE_VALUES.has(entry.painScale)
-        ? entry.painScale
+    const painPassive =
+      typeof entry.painPassive === "string" && VALID_PAIN_SCALE_VALUES.has(entry.painPassive)
+        ? entry.painPassive
+        : "";
+    const painActive =
+      typeof entry.painActive === "string" && VALID_PAIN_SCALE_VALUES.has(entry.painActive)
+        ? entry.painActive
         : "";
     const compensation = typeof entry.compensation === "string" ? entry.compensation.trim() : "";
-    if (!romPassive && !romActive && !strength && !painScale && !compensation) continue;
-    movements[key] = { romPassive, romActive, strength, painScale, compensation };
+    if (!romPassive && !romActive && !strength && !painPassive && !painActive && !compensation) {
+      continue;
+    }
+    movements[key] = { romPassive, romActive, strength, compensation, painPassive, painActive };
   }
   return movements;
 }

@@ -131,9 +131,19 @@ function QuickAddPainForm({
       if (seriesKey.startsWith("note:")) {
         body.painTriggers = [{ note: seriesKey.slice(5), painScale: Number(painScale) }];
       } else {
-        const movementId = seriesKey.slice("movement:".length);
+        const rest = seriesKey.slice("movement:".length);
+        const lastColon = rest.lastIndexOf(":");
+        const movementId = rest.slice(0, lastColon);
+        const romType = rest.slice(lastColon + 1); // "passive" | "active"
         body.movements = {
-          [movementId]: { romPassive: "", romActive: "", strength: "", painScale, compensation: "" },
+          [movementId]: {
+            romPassive: "",
+            romActive: "",
+            strength: "",
+            compensation: "",
+            painPassive: romType === "passive" ? painScale : "",
+            painActive: romType === "active" ? painScale : "",
+          },
         };
       }
       const res = await fetch(`/api/admin/members/${memberId}/assessments`, {
@@ -257,11 +267,22 @@ export function AssessmentPainChart({
     return notes;
   }, [dayGroups]);
 
-  const movementIds = useMemo(() => {
+  const passiveMovementIds = useMemo(() => {
     const idsWithData = new Set<string>();
     for (const g of dayGroups) {
       for (const [id, entry] of Object.entries(g.movements)) {
-        if (entry.painScale) idsWithData.add(id);
+        if (entry.painPassive) idsWithData.add(id);
+      }
+    }
+    const order = ASSESSMENT_REGIONS.flatMap((r) => r.movements.map((m) => m.id));
+    return order.filter((id) => idsWithData.has(id));
+  }, [dayGroups]);
+
+  const activeMovementIds = useMemo(() => {
+    const idsWithData = new Set<string>();
+    for (const g of dayGroups) {
+      for (const [id, entry] of Object.entries(g.movements)) {
+        if (entry.painActive) idsWithData.add(id);
       }
     }
     const order = ASSESSMENT_REGIONS.flatMap((r) => r.movements.map((m) => m.id));
@@ -280,11 +301,20 @@ export function AssessmentPainChart({
       color: SERIES_COLORS[i % SERIES_COLORS.length],
       values: dayGroups.map((g) => g.painTriggers[note] ?? null),
     })),
-    ...movementIds.map((id, i) => ({
-      key: `movement:${id}`,
-      label: movementLabelWithRegion(id),
+    ...passiveMovementIds.map((id, i) => ({
+      key: `movement:${id}:passive`,
+      label: `${movementLabelWithRegion(id)} · 수동`,
       color: SERIES_COLORS[(painTriggerNotes.length + i) % SERIES_COLORS.length],
-      values: dayGroups.map((g) => parsePainScale(g.movements[id]?.painScale)),
+      values: dayGroups.map((g) => parsePainScale(g.movements[id]?.painPassive)),
+    })),
+    ...activeMovementIds.map((id, i) => ({
+      key: `movement:${id}:active`,
+      label: `${movementLabelWithRegion(id)} · 능동`,
+      color:
+        SERIES_COLORS[
+          (painTriggerNotes.length + passiveMovementIds.length + i) % SERIES_COLORS.length
+        ],
+      values: dayGroups.map((g) => parsePainScale(g.movements[id]?.painActive)),
     })),
   ];
 

@@ -256,7 +256,15 @@ export function AssessmentDocument({
                         {entry?.strength ? MMT_STRENGTH_LABELS[entry.strength] ?? entry.strength : "-"}
                       </td>
                       <td className="px-3 py-2 text-ink/70">
-                        {entry?.painScale ? `${entry.painScale} / 10` : "-"}
+                        {entry?.painPassive || entry?.painActive ? (
+                          <>
+                            {entry?.painPassive && <span>수동 {entry.painPassive}/10</span>}
+                            {entry?.painPassive && entry?.painActive && <span>, </span>}
+                            {entry?.painActive && <span>능동 {entry.painActive}/10</span>}
+                          </>
+                        ) : (
+                          "-"
+                        )}
                       </td>
                       <td className="px-3 py-2 text-ink/70">{entry?.compensation || "-"}</td>
                     </tr>
