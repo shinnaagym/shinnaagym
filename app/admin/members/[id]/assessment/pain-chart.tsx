@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ASSESSMENT_REGIONS, NRS_PAIN_OPTIONS, movementLabelWithRegion } from "@/lib/assessment-movements";
 import { koreaTodayKey } from "@/lib/date";
-import { svgToPngDataUrl } from "@/lib/chart-image";
+import { appendSummaryToSvgClone, svgToPngDataUrl } from "@/lib/chart-image";
 import type { AssessmentMovements, AssessmentRow, PainTriggerEntry } from "@/lib/db";
 import { ChartZoomModal } from "@/app/components/ChartZoomModal";
 
@@ -274,7 +274,17 @@ export function AssessmentPainChart({
     setZoomOpen(true);
     setZoomLoading(true);
     try {
-      const dataUrl = await svgToPngDataUrl(svgRef.current);
+      // 인라인 그래프 자체는 예전 크기를 유지하고, 확대·이미지 저장용으로만
+      // "처음→최근 요약"을 덧붙인 별도 SVG를 만들어 캡처한다.
+      const exportSvg = appendSummaryToSvgClone(
+        svgRef.current,
+        summaryLines,
+        series.map((s) => s.color),
+        PAD_LEFT,
+        WIDTH,
+        HEIGHT,
+      );
+      const dataUrl = await svgToPngDataUrl(exportSvg);
       setZoomImage(dataUrl);
     } catch {
       setZoomOpen(false);
@@ -396,13 +406,10 @@ export function AssessmentPainChart({
     }
   }
 
-  // "이 동작이 이렇게 좋아졌다"를 그래프 밑에 항상 보이게 요약한다. 확대·이미지
-  // 저장 시에도 이 SVG 안에 함께 들어있어야 캡처되므로, HTML이 아니라 SVG
-  // 텍스트로 그려서 svgToPngDataUrl로 내보낼 때도 그대로 포함되게 한다.
+  // "이 동작이 이렇게 좋아졌다" 요약. 화면에 항상 보이는 인라인 그래프에는 넣지
+  // 않고(글자 수가 늘어도 그래프 크기가 예전 그대로 유지되도록), 확대·이미지
+  // 저장 시 handleZoom에서 appendSummaryToSvgClone으로만 덧붙인다.
   const summaryLines = series.map((s) => summaryLineFor(s, dayGroupsFiltered));
-  const SUMMARY_LINE_HEIGHT = 15;
-  const summaryTop = HEIGHT + 14;
-  const totalHeight = summaryLines.length > 0 ? summaryTop + summaryLines.length * SUMMARY_LINE_HEIGHT : HEIGHT;
 
   // 데이터가 없는 날짜는 건너뛰고, 있는 점끼리만 이어서 하나의 연속된 선으로 그린다.
   function pathFor(si: number): string {
@@ -481,7 +488,7 @@ export function AssessmentPainChart({
       <div className="relative cursor-zoom-in" onClick={handleZoom} title="탭하여 확대 · 이미지 저장">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${WIDTH} ${totalHeight}`}
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="w-full touch-none"
           onPointerMove={handlePointerMove}
           onPointerLeave={() => setHoverIndex(null)}
@@ -553,39 +560,6 @@ export function AssessmentPainChart({
               )}
             </g>
           ))}
-
-          {summaryLines.length > 0 && (
-            <g>
-              <line
-                x1={PAD_LEFT}
-                x2={WIDTH - PAD_RIGHT}
-                y1={HEIGHT + 2}
-                y2={HEIGHT + 2}
-                stroke="#e5e0d3"
-                strokeWidth={1}
-              />
-              {summaryLines.map((line, i) => (
-                <g key={i}>
-                  <rect
-                    x={PAD_LEFT}
-                    y={summaryTop + i * SUMMARY_LINE_HEIGHT - 7}
-                    width={8}
-                    height={8}
-                    rx={2}
-                    fill={series[i].color}
-                  />
-                  <text
-                    x={PAD_LEFT + 13}
-                    y={summaryTop + i * SUMMARY_LINE_HEIGHT}
-                    fontSize={10}
-                    fill="#4a4638"
-                  >
-                    {line}
-                  </text>
-                </g>
-              ))}
-            </g>
-          )}
         </svg>
 
         {hoverIndex != null && hoveredValues.length > 0 && (

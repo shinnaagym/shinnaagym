@@ -1,3 +1,60 @@
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * 화면에 항상 보이는 인라인 그래프는 글자 수와 무관하게 예전 크기를 그대로
+ * 유지해야 해서, "처음→최근 요약" 같은 상세 문구는 인라인 SVG에는 넣지 않는다.
+ * 대신 확대(줌)·이미지 저장 시에만 이 함수로 원본 SVG를 복제해 아래쪽에 여백을
+ * 늘리고 요약 줄을 추가한 새 SVG를 만들어, svgToPngDataUrl로 캡처한다.
+ */
+export function appendSummaryToSvgClone(
+  original: SVGSVGElement,
+  lines: string[],
+  colors: string[],
+  padLeft: number,
+  width: number,
+  height: number,
+): SVGSVGElement {
+  const clone = original.cloneNode(true) as SVGSVGElement;
+  if (lines.length === 0) return clone;
+
+  const lineHeight = 15;
+  const top = height + 14;
+  const totalHeight = top + lines.length * lineHeight + 4;
+  clone.setAttribute("viewBox", `0 0 ${width} ${totalHeight}`);
+
+  const divider = document.createElementNS(SVG_NS, "line");
+  divider.setAttribute("x1", String(padLeft));
+  divider.setAttribute("x2", String(width - 16));
+  divider.setAttribute("y1", String(height + 2));
+  divider.setAttribute("y2", String(height + 2));
+  divider.setAttribute("stroke", "#e5e0d3");
+  divider.setAttribute("stroke-width", "1");
+  clone.appendChild(divider);
+
+  lines.forEach((line, i) => {
+    const y = top + i * lineHeight;
+
+    const swatch = document.createElementNS(SVG_NS, "rect");
+    swatch.setAttribute("x", String(padLeft));
+    swatch.setAttribute("y", String(y - 7));
+    swatch.setAttribute("width", "8");
+    swatch.setAttribute("height", "8");
+    swatch.setAttribute("rx", "2");
+    swatch.setAttribute("fill", colors[i] ?? "#4a4638");
+    clone.appendChild(swatch);
+
+    const text = document.createElementNS(SVG_NS, "text");
+    text.setAttribute("x", String(padLeft + 13));
+    text.setAttribute("y", String(y));
+    text.setAttribute("font-size", "10");
+    text.setAttribute("fill", "#4a4638");
+    text.textContent = line;
+    clone.appendChild(text);
+  });
+
+  return clone;
+}
+
 // 그래프를 확대해서 보여줄 때, 화면에 그려진 SVG를 그대로 캡처해 PNG로 바꿔주는
 // 헬퍼. <svg>를 그대로 확대해서 보여주면 모바일에서 "이미지 저장"(길게 누르기)이
 // 동작하지 않는 브라우저가 많아, PNG로 변환한 뒤 <img>로 보여줘야 저장이 된다.
