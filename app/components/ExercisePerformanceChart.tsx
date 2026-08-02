@@ -85,7 +85,10 @@ function buildDayGroups(assessments: AssessmentRow[]): DayGroup[] {
     byDate.set(dateKey, byExercise);
   }
 
+  // 그 날짜의 평가에 유효한 운동 수행능력 기록이 하나도 없으면(다른 항목만
+  // 기록된 경우 등) x축에서 빼서, 실제 기록이 있는 날짜만 표시한다.
   return Array.from(byDate.entries())
+    .filter(([, byExercise]) => Object.keys(byExercise).length > 0)
     .map(([dateKey, byExercise]) => ({ dateKey, byExercise }))
     .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 }
@@ -319,6 +322,24 @@ export function ExercisePerformanceChart({
     return d.trim();
   }
 
+  // "이 운동이 이렇게 좋아졌다"를 그래프 밑에 항상 보이게 요약한다. 확대·이미지
+  // 저장 시에도 이 SVG 안에 함께 들어있어야 캡처되므로, HTML이 아니라 SVG
+  // 텍스트로 그려서 svgToPngDataUrl로 내보낼 때도 그대로 포함되게 한다.
+  function summaryLineFor(s: Series): string {
+    const points = s.values.filter((v): v is ExercisePoint => v != null);
+    if (points.length === 0) return `${s.name} — 기록 없음`;
+    const first = points[0];
+    const last = points[points.length - 1];
+    const trend =
+      first.e1rm === last.e1rm ? `${last.e1rm}kg` : `${first.e1rm}kg → ${last.e1rm}kg`;
+    return `${s.name} — e1RM ${trend}`;
+  }
+  const summaryLines = series.map(summaryLineFor);
+  const SUMMARY_LINE_HEIGHT = 15;
+  const summaryTop = HEIGHT + 14;
+  const totalHeight =
+    summaryLines.length > 0 ? summaryTop + summaryLines.length * SUMMARY_LINE_HEIGHT : HEIGHT;
+
   function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const relX = ((e.clientX - rect.left) / rect.width) * WIDTH;
@@ -398,7 +419,7 @@ export function ExercisePerformanceChart({
       <div className="relative cursor-zoom-in" onClick={handleZoom} title="탭하여 확대 · 이미지 저장">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          viewBox={`0 0 ${WIDTH} ${totalHeight}`}
           className="w-full touch-none"
           onPointerMove={handlePointerMove}
           onPointerLeave={() => setHoverIndex(null)}
@@ -469,6 +490,39 @@ export function ExercisePerformanceChart({
               )}
             </g>
           ))}
+
+          {summaryLines.length > 0 && (
+            <g>
+              <line
+                x1={PAD_LEFT}
+                x2={WIDTH - PAD_RIGHT}
+                y1={HEIGHT + 2}
+                y2={HEIGHT + 2}
+                stroke="#e5e0d3"
+                strokeWidth={1}
+              />
+              {summaryLines.map((line, i) => (
+                <g key={i}>
+                  <rect
+                    x={PAD_LEFT}
+                    y={summaryTop + i * SUMMARY_LINE_HEIGHT - 7}
+                    width={8}
+                    height={8}
+                    rx={2}
+                    fill={series[i].color}
+                  />
+                  <text
+                    x={PAD_LEFT + 13}
+                    y={summaryTop + i * SUMMARY_LINE_HEIGHT}
+                    fontSize={10}
+                    fill="#4a4638"
+                  >
+                    {line}
+                  </text>
+                </g>
+              ))}
+            </g>
+          )}
         </svg>
 
         {hoverIndex != null && hoveredValues.length > 0 && (

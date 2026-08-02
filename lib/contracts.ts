@@ -19,6 +19,9 @@ export interface CreateContractInput {
   optionNote?: string;
   startDate?: string;
   privacyConsent?: boolean;
+  /** 2:1 계약일 때 함께 등록하는 분의 이름·연락처(별도 회원으로는 등록되지 않음). */
+  companionName?: string;
+  companionPhone?: string;
 }
 
 export async function createContract(input: CreateContractInput): Promise<ContractRow> {
@@ -26,8 +29,9 @@ export async function createContract(input: CreateContractInput): Promise<Contra
     `INSERT INTO contracts (
        member_id, entry_type, pt_type, total_sessions, price, payment_method,
        rrn_front_encrypted, address, visit_channel, visit_channel_referrer_name,
-       visit_channel_other, purposes, purpose_other, option_note, start_date, privacy_consent
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       visit_channel_other, purposes, purpose_other, option_note, start_date, privacy_consent,
+       companion_name, companion_phone
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      RETURNING *`,
     [
       input.memberId,
@@ -46,6 +50,8 @@ export async function createContract(input: CreateContractInput): Promise<Contra
       input.optionNote ?? "",
       input.startDate ?? "",
       input.privacyConsent ?? false,
+      input.companionName ?? "",
+      input.companionPhone ?? "",
     ],
   );
   return result.rows[0];

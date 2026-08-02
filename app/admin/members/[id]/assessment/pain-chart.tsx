@@ -58,6 +58,38 @@ function getPainTriggerEntriesLocal(a: AssessmentRow): PainTriggerEntry[] {
   return [];
 }
 
+function firstLastNonNull(values: (number | null)[]): { first: number; last: number } | null {
+  const nonNull = values.filter((v): v is number => v != null);
+  if (nonNull.length === 0) return null;
+  return { first: nonNull[0], last: nonNull[nonNull.length - 1] };
+}
+
+/** 시리즈 키(movement:{id}:passive|active)에서 가동범위 값을 뽑아온다.
+    통증 체크가 없어도 가동범위만 기록됐을 수 있어, 통증 값과 별개로 마지막
+    기록된 가동범위를 찾는다. */
+function lastRomFor(key: string, dayGroups: DayGroup[]): string | null {
+  if (!key.startsWith("movement:")) return null;
+  const rest = key.slice("movement:".length);
+  const lastColon = rest.lastIndexOf(":");
+  const movementId = rest.slice(0, lastColon);
+  const romType = rest.slice(lastColon + 1);
+  for (let i = dayGroups.length - 1; i >= 0; i--) {
+    const entry = dayGroups[i].movements[movementId];
+    const rom = romType === "passive" ? entry?.romPassive : entry?.romActive;
+    if (rom) return rom;
+  }
+  return null;
+}
+
+/** 한눈에 "이 동작이 이렇게 좋아졌다"를 알 수 있도록, 시리즈마다 처음→최근
+    통증 추이(그리고 동작이면 가동범위)를 한 줄 문구로 만든다. */
+function summaryLineFor(s: Series, dayGroups: DayGroup[]): string {
+  const fl = firstLastNonNull(s.values);
+  const trend = !fl ? "-" : fl.first === fl.last ? `${fl.last}/10` : `${fl.first}/10 → ${fl.last}/10`;
+  const rom = lastRomFor(s.key, dayGroups);
+  return `${s.label} — 통증 ${trend}${rom ? ` · 가동범위 ${rom}` : ""}`;
+}
+
 interface DayGroup {
   dateKey: string;
   movements: AssessmentMovements;
@@ -291,10 +323,7 @@ export function AssessmentPainChart({
 
   if (dayGroups.length === 0) return null;
 
-  const dateLabels = dayGroups.map((g) => shortDateLabel(g.dateKey));
-  const fullDates = dayGroups.map((g) => g.dateKey);
-
-  const series: Series[] = [
+  const rawSeries: Series[] = [
     ...painTriggerNotes.map((note, i) => ({
       key: `note:${note}`,
       label: note,
@@ -318,7 +347,20 @@ export function AssessmentPainChart({
     })),
   ];
 
-  const n = dayGroups.length;
+  // 어떤 시리즈에도 값이 없는 날짜(예: 그날 평가에 통증과 무관한 항목만
+  // 기록된 경우)는 x축에서 아예 빼서, 실제 기록이 있는 날짜만 표시한다.
+  const keepIdx = dayGroups.map((_, i) => rawSeries.some((s) => s.values[i] != null));
+  const dayGroupsFiltered = dayGroups.filter((_, i) => keepIdx[i]);
+  if (dayGroupsFiltered.length === 0) return null;
+
+  const dateLabels = dayGroupsFiltered.map((g) => shortDateLabel(g.dateKey));
+  const fullDates = dayGroupsFiltered.map((g) => g.dateKey);
+  const series: Series[] = rawSeries.map((s) => ({
+    ...s,
+    values: s.values.filter((_, i) => keepIdx[i]),
+  }));
+
+  const n = dayGroupsFiltered.length;
   const plotWidth = WIDTH - PAD_LEFT - PAD_RIGHT;
   const plotHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
   const xStep = n > 1 ? plotWidth / (n - 1) : 0;
@@ -353,6 +395,14 @@ export function AssessmentPainChart({
       });
     }
   }
+
+  // "이 동작이 이렇게 좋아졌다"를 그래프 밑에 항상 보이게 요약한다. 확대·이미지
+  // 저장 시에도 이 SVG 안에 함께 들어있어야 캡처되므로, HTML이 아니라 SVG
+  // 텍스트로 그려서 svgToPngDataUrl로 내보낼 때도 그대로 포함되게 한다.
+  const summaryLines = series.map((s) => summaryLineFor(s, dayGroupsFiltered));
+  const SUMMARY_LINE_HEIGHT = 15;
+  const summaryTop = HEIGHT + 14;
+  const totalHeight = summaryLines.length > 0 ? summaryTop + summaryLines.length * SUMMARY_LINE_HEIGHT : HEIGHT;
 
   // 데이터가 없는 날짜는 건너뛰고, 있는 점끼리만 이어서 하나의 연속된 선으로 그린다.
   function pathFor(si: number): string {
@@ -431,7 +481,7 @@ export function AssessmentPainChart({
       <div className="relative cursor-zoom-in" onClick={handleZoom} title="탭하여 확대 · 이미지 저장">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          viewBox={`0 0 ${WIDTH} ${totalHeight}`}
           className="w-full touch-none"
           onPointerMove={handlePointerMove}
           onPointerLeave={() => setHoverIndex(null)}
@@ -503,6 +553,39 @@ export function AssessmentPainChart({
               )}
             </g>
           ))}
+
+          {summaryLines.length > 0 && (
+            <g>
+              <line
+                x1={PAD_LEFT}
+                x2={WIDTH - PAD_RIGHT}
+                y1={HEIGHT + 2}
+                y2={HEIGHT + 2}
+                stroke="#e5e0d3"
+                strokeWidth={1}
+              />
+              {summaryLines.map((line, i) => (
+                <g key={i}>
+                  <rect
+                    x={PAD_LEFT}
+                    y={summaryTop + i * SUMMARY_LINE_HEIGHT - 7}
+                    width={8}
+                    height={8}
+                    rx={2}
+                    fill={series[i].color}
+                  />
+                  <text
+                    x={PAD_LEFT + 13}
+                    y={summaryTop + i * SUMMARY_LINE_HEIGHT}
+                    fontSize={10}
+                    fill="#4a4638"
+                  >
+                    {line}
+                  </text>
+                </g>
+              ))}
+            </g>
+          )}
         </svg>
 
         {hoverIndex != null && hoveredValues.length > 0 && (
