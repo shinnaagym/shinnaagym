@@ -840,7 +840,11 @@ export function MembersView({
               fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
               onClose={() => setDetailId(null)}
               onChanged={refresh}
-              initialShowContractView={initialShowContractView}
+              // 계약서 화면으로 바로 열기(초기 URL의 ?contract=1)는 그 딥링크가
+              // 가리킨 회원(initialOpenId)에만 적용한다. 그 상태로 목록에서 다른
+              // 회원 행을 눌러도 페이지 prop은 그대로라, 매칭 없이 넘기면 이후에
+              // 클릭하는 회원마다 계속 계약서 화면부터 열리는 문제가 있었다.
+              initialShowContractView={detailId === initialOpenId ? initialShowContractView : false}
             />
           );
         })()}
@@ -924,7 +928,7 @@ function FixedSlotSchedule({
                       {entries.length > 0 && (
                         <div
                           className={[
-                            "flex flex-wrap gap-1 rounded-lg px-1.5 py-1",
+                            "flex flex-wrap justify-center gap-1 rounded-lg px-1.5 py-1",
                             over ? "bg-red-50" : "",
                           ].join(" ")}
                         >
@@ -1166,6 +1170,21 @@ function CreateMemberModal({
   const [startDate, setStartDate] = useState("");
   const [privacyConsent, setPrivacyConsent] = useState(false);
 
+  // 고정 시간대 — 아직 회원이 만들어지기 전이라 바로 저장할 수 없으므로, 등록
+  // 버튼을 누를 때까지는 로컬에만 담아뒀다가 회원 생성이 끝난 뒤 한꺼번에 등록한다.
+  const [newFixedSlots, setNewFixedSlots] = useState<{ weekday: number; hour: number }[]>([]);
+  const [newSlotWeekday, setNewSlotWeekday] = useState(0);
+  const [newSlotHour, setNewSlotHour] = useState(SCHEDULE_HOUR_ROWS[0]);
+
+  function addFixedSlotDraft() {
+    if (newFixedSlots.some((s) => s.weekday === newSlotWeekday && s.hour === newSlotHour)) return;
+    setNewFixedSlots((prev) => [...prev, { weekday: newSlotWeekday, hour: newSlotHour }]);
+  }
+
+  function removeFixedSlotDraft(weekday: number, hour: number) {
+    setNewFixedSlots((prev) => prev.filter((s) => !(s.weekday === weekday && s.hour === hour)));
+  }
+
   function togglePurpose(value: string) {
     setPurposes((prev) =>
       prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value],
@@ -1219,6 +1238,13 @@ function CreateMemberModal({
       if (!res.ok) {
         setError(data.error ?? "등록에 실패했습니다.");
         return;
+      }
+      for (const slot of newFixedSlots) {
+        await fetch("/api/admin/fixed-slots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ memberId: data.member.id, weekday: slot.weekday, hour: slot.hour }),
+        });
       }
       onCreated(data.member.id);
     } catch {
@@ -1357,6 +1383,61 @@ function CreateMemberModal({
           />
           <AvailabilityGridPicker onChange={setAvailableTimes} />
         </Field>
+        <div>
+          <p className="text-sm font-medium mb-2">고정 시간대</p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {newFixedSlots.length === 0 && (
+              <p className="text-xs text-ink/40">등록된 고정 시간대가 없어요.</p>
+            )}
+            {newFixedSlots.map((slot) => (
+              <span
+                key={`${slot.weekday}-${slot.hour}`}
+                className="flex items-center gap-1 rounded-full bg-bone/70 px-2.5 py-1 text-xs"
+              >
+                {FIXED_SLOT_WEEKDAY_LABELS[slot.weekday] ?? "?"} {slot.hour}시
+                <button
+                  type="button"
+                  onClick={() => removeFixedSlotDraft(slot.weekday, slot.hour)}
+                  className="text-ink/40 hover:text-coral"
+                  aria-label="삭제"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={newSlotWeekday}
+              onChange={(e) => setNewSlotWeekday(Number(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
+            >
+              {FIXED_SLOT_WEEKDAY_LABELS.map((label, idx) => (
+                <option key={label} value={idx}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={newSlotHour}
+              onChange={(e) => setNewSlotHour(Number(e.target.value))}
+              className="rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none"
+            >
+              {SCHEDULE_HOUR_ROWS.map((hour) => (
+                <option key={hour} value={hour}>
+                  {hour}시
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={addFixedSlotDraft}
+              className="flex-1 rounded-lg border border-coral text-coral text-sm font-medium hover:bg-coral/5 transition"
+            >
+              추가
+            </button>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="등록 횟수 *">
             <input
