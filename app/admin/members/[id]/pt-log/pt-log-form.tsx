@@ -25,11 +25,30 @@ function emptyExercise(): ExerciseInput {
   return { name: "", equipment: PT_LOG_EQUIPMENT_OPTIONS[0].value, groups: [emptyGroup()] };
 }
 
-export function PtLogForm({ memberId, memberName }: { memberId: number; memberName: string }) {
+export interface PtLogFormInitialData {
+  logDate: string;
+  memo: string;
+  exercises: ExerciseInput[];
+}
+
+export function PtLogForm({
+  memberId,
+  memberName,
+  ptLogId,
+  initialData,
+}: {
+  memberId: number;
+  memberName: string;
+  ptLogId?: number;
+  initialData?: PtLogFormInitialData;
+}) {
   const router = useRouter();
-  const [logDate, setLogDate] = useState(() => koreaTodayKey());
-  const [memo, setMemo] = useState("");
-  const [exercises, setExercises] = useState<ExerciseInput[]>([emptyExercise()]);
+  const isEditing = ptLogId != null;
+  const [logDate, setLogDate] = useState(() => initialData?.logDate ?? koreaTodayKey());
+  const [memo, setMemo] = useState(() => initialData?.memo ?? "");
+  const [exercises, setExercises] = useState<ExerciseInput[]>(
+    () => initialData?.exercises ?? [emptyExercise()],
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -87,8 +106,11 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/members/${memberId}/pt-logs`, {
-        method: "POST",
+      const url = isEditing
+        ? `/api/admin/pt-logs/${ptLogId}`
+        : `/api/admin/members/${memberId}/pt-logs`;
+      const res = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           logDate,
@@ -113,7 +135,9 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
   return (
     <div>
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">PT Log</p>
-      <h1 className="font-display text-2xl mb-6">{memberName}님의 새 PT 일지</h1>
+      <h1 className="font-display text-2xl mb-6">
+        {memberName}님의 {isEditing ? "PT 일지 수정" : "새 PT 일지"}
+      </h1>
 
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-4 space-y-4">
         <div>
@@ -249,7 +273,7 @@ export function PtLogForm({ memberId, memberName }: { memberId: number; memberNa
           disabled={submitting}
           className="flex-1 rounded-full bg-ink text-white py-2.5 text-sm font-medium hover:bg-coral transition disabled:opacity-50"
         >
-          {submitting ? "저장 중..." : "저장"}
+          {submitting ? "저장 중..." : isEditing ? "수정 저장" : "저장"}
         </button>
       </div>
     </div>

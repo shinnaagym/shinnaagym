@@ -41,6 +41,22 @@ export async function getPtLogById(id: number): Promise<PtLogRow | null> {
   return result.rows[0] ?? null;
 }
 
+export interface UpdatePtLogInput {
+  logDate: string;
+  memo?: string;
+  exercises?: PtLogExercise[];
+}
+
+export async function updatePtLog(id: number, input: UpdatePtLogInput): Promise<PtLogRow> {
+  const result = await query<PtLogRow>(
+    `UPDATE pt_logs SET log_date = $2, memo = $3, exercises = $4
+     WHERE id = $1
+     RETURNING *`,
+    [id, input.logDate, input.memo ?? "", JSON.stringify(input.exercises ?? [])],
+  );
+  return result.rows[0];
+}
+
 export async function deletePtLog(id: number): Promise<void> {
   await query(`DELETE FROM pt_logs WHERE id = $1`, [id]);
 }

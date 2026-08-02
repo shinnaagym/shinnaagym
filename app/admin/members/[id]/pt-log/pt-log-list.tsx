@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { koreaCurrentMonthKey } from "@/lib/date";
 import { PT_LOG_EQUIPMENT_LABELS } from "@/lib/constants";
 import { DeletePtLogButton } from "@/app/components/DeletePtLogButton";
@@ -89,7 +90,7 @@ export function PtLogList({ ptLogs, editable = true }: { ptLogs: PtLogRow[]; edi
               key={log.id}
               className={[
                 "relative rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4",
-                editable ? "pr-16" : "",
+                editable ? "pr-28" : "",
               ].join(" ")}
             >
               <div className="flex items-center justify-between">
@@ -112,10 +113,15 @@ export function PtLogList({ ptLogs, editable = true }: { ptLogs: PtLogRow[]; edi
                 </div>
               )}
               {editable && (
-                <DeletePtLogButton
-                  ptLogId={log.id}
-                  className="absolute top-4 right-5 text-xs text-ink/40 hover:text-coral"
-                />
+                <div className="absolute top-4 right-5 flex items-center gap-2 text-xs">
+                  <Link
+                    href={`/admin/members/${log.member_id}/pt-log/${log.id}/edit`}
+                    className="text-ink/40 hover:text-coral"
+                  >
+                    수정
+                  </Link>
+                  <DeletePtLogButton ptLogId={log.id} className="text-ink/40 hover:text-coral" />
+                </div>
               )}
             </li>
           ))}
