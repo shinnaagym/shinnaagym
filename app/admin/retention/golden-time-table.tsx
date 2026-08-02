@@ -172,6 +172,7 @@ export function GoldenTimeTable({ members }: { members: GoldenMember[] }) {
                   <td className="py-2.5 px-3 text-center whitespace-nowrap">
                     <Link
                       href={`/admin/members?open=${m.id}`}
+                      prefetch={false}
                       className="inline-block rounded-full bg-ink text-white px-3 py-1.5 text-xs hover:bg-coral transition"
                     >
                       결제

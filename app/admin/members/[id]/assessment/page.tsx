@@ -93,6 +93,7 @@ export default async function AssessmentHistoryPage({
               <li key={a.id} className="relative">
                 <Link
                   href={`/admin/members/${idNum}/assessment/${a.id}`}
+                  prefetch={false}
                   className="block rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4 pr-16 hover:border-coral/40 transition"
                 >
                   <div className="flex items-center justify-between">
