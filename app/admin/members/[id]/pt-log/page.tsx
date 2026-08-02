@@ -92,6 +92,13 @@ export default async function PtLogHistoryPage({
       </Link>
 
       <Link
+        href={`/admin/members/${idNum}/assessment/new`}
+        className="block text-center rounded-full bg-ink text-white px-4 py-2.5 text-sm font-medium hover:bg-coral transition mb-4"
+      >
+        + 새 평가 작성
+      </Link>
+
+      <Link
         href={`/admin/members/${idNum}/intake`}
         className="flex items-center justify-between rounded-2xl border border-line bg-white/60 px-5 py-4 mb-4 hover:border-coral/40 transition"
       >
@@ -102,13 +109,6 @@ export default async function PtLogHistoryPage({
           </p>
         </div>
         <span className="text-ink/30">→</span>
-      </Link>
-
-      <Link
-        href={`/admin/members/${idNum}/assessment/new`}
-        className="block text-center rounded-full bg-coral text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition mb-6"
-      >
-        + 새 평가 작성
       </Link>
 
       <ImprovementDirectionNote memberId={idNum} initialValue={member.improvement_direction} />
