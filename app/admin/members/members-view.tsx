@@ -1224,23 +1224,51 @@ function CreateMemberModal({
   return (
     <ModalShell title="신규 회원 등록" onClose={onClose}>
       <div className="space-y-4">
+        <div className="rounded-xl border border-line/60 bg-bone/30 px-4 py-3 space-y-3">
+          <p className="text-sm font-medium text-ink/70">계약서 정보</p>
+          <Field label="이름 *">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+          <Field label="연락처">
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="010-"
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+          <ContractFieldsFieldset
+            rrnFront={rrnFront}
+            onRrnFrontChange={setRrnFront}
+            address={address}
+            onAddressChange={setAddress}
+            visitChannel={visitChannel}
+            onVisitChannelChange={setVisitChannel}
+            visitChannelReferrerName={visitChannelReferrerName}
+            onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
+            visitChannelOther={visitChannelOther}
+            onVisitChannelOtherChange={setVisitChannelOther}
+            purposes={purposes}
+            onTogglePurpose={togglePurpose}
+            purposeOther={purposeOther}
+            onPurposeOtherChange={setPurposeOther}
+            startDate={startDate}
+            onStartDateChange={setStartDate}
+            optionNote={optionNote}
+            onOptionNoteChange={setOptionNote}
+            privacyConsent={privacyConsent}
+            onPrivacyConsentChange={setPrivacyConsent}
+            showPurpose={false}
+            showOptionNote={false}
+          />
+        </div>
+
         <Field label="PT 유형">
           <PtTypeToggle value={ptType} onChange={setPtType} />
-        </Field>
-        <Field label="이름 *">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-          />
-        </Field>
-        <Field label="연락처">
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="010-"
-            className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-          />
         </Field>
         {ptType === "2:1" && (
           <div className="rounded-xl border border-line/60 bg-bone/30 px-4 py-3 space-y-3">
@@ -1280,34 +1308,6 @@ function CreateMemberModal({
             </Field>
           </div>
         )}
-
-        <div className="border-t border-line/60 pt-4 space-y-4">
-          <p className="text-sm font-medium text-ink/70">계약서 정보</p>
-          <ContractFieldsFieldset
-            rrnFront={rrnFront}
-            onRrnFrontChange={setRrnFront}
-            address={address}
-            onAddressChange={setAddress}
-            visitChannel={visitChannel}
-            onVisitChannelChange={setVisitChannel}
-            visitChannelReferrerName={visitChannelReferrerName}
-            onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
-            visitChannelOther={visitChannelOther}
-            onVisitChannelOtherChange={setVisitChannelOther}
-            purposes={purposes}
-            onTogglePurpose={togglePurpose}
-            purposeOther={purposeOther}
-            onPurposeOtherChange={setPurposeOther}
-            startDate={startDate}
-            onStartDateChange={setStartDate}
-            optionNote={optionNote}
-            onOptionNoteChange={setOptionNote}
-            privacyConsent={privacyConsent}
-            onPrivacyConsentChange={setPrivacyConsent}
-            showPurpose={false}
-            showOptionNote={false}
-          />
-        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="담당 코치">
