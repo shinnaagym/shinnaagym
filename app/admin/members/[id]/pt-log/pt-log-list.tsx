@@ -106,9 +106,12 @@ export function PtLogList({ ptLogs, editable = true }: { ptLogs: PtLogRow[]; edi
                 </div>
               </div>
               {log.exercises.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-line/50 space-y-1 text-sm text-ink/70">
+                <div className="mt-3 pt-3 border-t border-line/50 space-y-1.5 text-sm text-ink/70">
                   {log.exercises.map((e, i) => (
-                    <p key={i}>{exerciseSummary(e)}</p>
+                    <div key={i}>
+                      <p>{exerciseSummary(e)}</p>
+                      {e.note && <p className="text-xs text-ink/45 mt-0.5">특이사항 · {e.note}</p>}
+                    </div>
                   ))}
                 </div>
               )}
