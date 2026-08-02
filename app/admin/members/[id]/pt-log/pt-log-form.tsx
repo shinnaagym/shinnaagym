@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
 import { PT_LOG_EQUIPMENT_OPTIONS } from "@/lib/constants";
+import type { PtLogSetGroup } from "@/lib/db";
 
 interface SetGroupInput {
   weight: string;
@@ -43,12 +44,16 @@ export function PtLogForm({
   ptLogId,
   initialData,
   pastExercises = [],
+  pastExerciseGroups = {},
 }: {
   memberId: number;
   memberName: string;
   ptLogId?: number;
   initialData?: PtLogFormInitialData;
   pastExercises?: string[];
+  /** 운동 이름 -> 가장 최근에 그 운동을 했을 때의 세트 그룹. 무게·횟수·세트
+      입력란에 회색 placeholder("지난번엔 이랬다")로만 보여주고 값으로 채우진 않는다. */
+  pastExerciseGroups?: Record<string, PtLogSetGroup[]>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -242,14 +247,16 @@ export function PtLogForm({
             </div>
 
             <div className="space-y-2">
-              {ex.groups.map((g, groupIndex) => (
+              {ex.groups.map((g, groupIndex) => {
+                const pastGroup = pastExerciseGroups[ex.name.trim()]?.[groupIndex];
+                return (
                 <div key={groupIndex} className="flex items-center gap-1.5">
                   <input
                     type="number"
                     inputMode="decimal"
                     value={g.weight}
                     onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
-                    placeholder="무게(kg)"
+                    placeholder={pastGroup?.weight != null ? String(pastGroup.weight) : "무게(kg)"}
                     className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                   />
                   <input
@@ -257,7 +264,7 @@ export function PtLogForm({
                     inputMode="numeric"
                     value={g.reps}
                     onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
-                    placeholder="횟수"
+                    placeholder={pastGroup?.reps != null ? String(pastGroup.reps) : "횟수"}
                     className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                   />
                   <input
@@ -265,7 +272,7 @@ export function PtLogForm({
                     inputMode="numeric"
                     value={g.sets}
                     onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
-                    placeholder="세트"
+                    placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
                     className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                   />
                   {ex.groups.length > 1 && (
@@ -279,7 +286,8 @@ export function PtLogForm({
                     </button>
                   )}
                 </div>
-              ))}
+                );
+              })}
               <button
                 type="button"
                 onClick={() => addGroup(exIndex)}
