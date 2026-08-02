@@ -14,6 +14,10 @@ const pretendard = localFont({
 // 폰트 파일을 직접 내려받는데, Vercel 빌드 환경에서 그 요청이 실패하면
 // 빌드 자체가 통째로 실패한다(실제로 이 문제로 배포가 깨진 적이 있음).
 // 브라우저가 런타임에 직접 불러오는 방식으로 바꿔 빌드 시 네트워크 의존을 없앤다.
+// 이 폰트는 공개 사전예약 홈페이지(app/page.tsx)에서만 쓰이므로, 렌더링을
+// 막는 <link>는 여기(모든 페이지에 적용되는 루트 레이아웃)가 아니라 그
+// 페이지에서만 불러온다 — /admin 하위 페이지들이 쓰지도 않는 외부 폰트
+// 요청을 매번 기다릴 이유가 없다.
 
 const SITE_TITLE = "신나아짐 예약 사이트";
 const SITE_DESCRIPTION =
@@ -49,14 +53,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${pretendard.variable} h-full antialiased`}>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap"
-        />
-      </head>
       <body className="min-h-full flex flex-col bg-paper text-ink">{children}</body>
     </html>
   );
