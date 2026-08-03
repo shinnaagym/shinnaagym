@@ -475,7 +475,7 @@ export function SettingsView({
                   )}
                   <input
                     defaultValue={c.phone}
-                    placeholder="연락처 (예: 010-0000-0000)"
+                    placeholder="010-0000-0000"
                     onBlur={(e) => updateCoachPhone(c.id, e.target.value.trim())}
                     className="w-40 rounded-lg border border-line px-2.5 py-1 text-xs outline-none focus:border-coral"
                   />

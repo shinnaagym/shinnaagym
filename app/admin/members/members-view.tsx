@@ -473,6 +473,10 @@ export function MembersView({
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
+      // 상담 단계(패키지 결제 전)에서 자동 등록된 lead는 회원 관리 목록에 노출하지
+      // 않는다. 스케줄표의 "결제" 버튼으로 ?open=id 딥링크될 때는 members 원본
+      // 배열에서 바로 찾으므로 이 필터의 영향을 받지 않는다.
+      if (m.is_lead) return false;
       if (search && !m.name.includes(search)) return false;
       if (coachFilter === "unassigned") {
         if (m.coach_id !== null) return false;
