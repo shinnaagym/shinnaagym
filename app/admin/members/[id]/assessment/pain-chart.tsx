@@ -333,7 +333,23 @@ export function AssessmentPainChart({
     return order.filter((id) => idsWithData.has(id));
   }, [dayGroups]);
 
-  if (dayGroups.length === 0) return null;
+  if (dayGroups.length === 0) {
+    return (
+      <div className="rounded-2xl border border-line/60 bg-white shadow-sm px-5 py-4 mb-4">
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <p className="font-display text-base">통증 척도 그래프</p>
+          <DisclosureToggle
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            label={expanded ? "통증 척도 그래프 접기" : "통증 척도 그래프 펼치기"}
+          />
+        </div>
+        {expanded && (
+          <p className="text-sm text-ink/40 text-center py-6">아직 기록된 통증 척도가 없어요.</p>
+        )}
+      </div>
+    );
+  }
 
   const rawSeries: Series[] = [
     ...painTriggerNotes.map((note, i) => ({
@@ -363,7 +379,23 @@ export function AssessmentPainChart({
   // 기록된 경우)는 x축에서 아예 빼서, 실제 기록이 있는 날짜만 표시한다.
   const keepIdx = dayGroups.map((_, i) => rawSeries.some((s) => s.values[i] != null));
   const dayGroupsFiltered = dayGroups.filter((_, i) => keepIdx[i]);
-  if (dayGroupsFiltered.length === 0) return null;
+  if (dayGroupsFiltered.length === 0) {
+    return (
+      <div className="rounded-2xl border border-line/60 bg-white shadow-sm px-5 py-4 mb-4">
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <p className="font-display text-base">통증 척도 그래프</p>
+          <DisclosureToggle
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            label={expanded ? "통증 척도 그래프 접기" : "통증 척도 그래프 펼치기"}
+          />
+        </div>
+        {expanded && (
+          <p className="text-sm text-ink/40 text-center py-6">아직 기록된 통증 척도가 없어요.</p>
+        )}
+      </div>
+    );
+  }
 
   const dateLabels = dayGroupsFiltered.map((g) => shortDateLabel(g.dateKey));
   const fullDates = dayGroupsFiltered.map((g) => g.dateKey);
