@@ -514,7 +514,7 @@ export function PtLogForm({
                     pastGroup?.reps != null ? String(pastGroup.reps) : "횟수 / 시간(초)";
                   return (
                   <div key={groupIndex} className="space-y-1.5">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <input
                         type="text"
                         value={g.weight}
@@ -527,7 +527,7 @@ export function PtLogForm({
                         value={g.reps}
                         onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
                         placeholder={repsPlaceholder}
-                        className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                        className="min-w-0 flex-[1] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                       />
                       <input
                         type="number"
@@ -535,18 +535,21 @@ export function PtLogForm({
                         value={g.sets}
                         onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
                         placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
-                        className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                        className="min-w-0 flex-[1] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                       />
                       {kind === "pt_log" && (
-                        <input
-                          type="checkbox"
-                          checked={g.trackPerformance}
-                          onChange={(e) =>
-                            updateGroup(exIndex, groupIndex, { trackPerformance: e.target.checked })
-                          }
-                          title="이 세트를 운동 수행능력(e1RM) 그래프에 반영"
-                          className="shrink-0"
-                        />
+                        <label className="flex items-center gap-1 shrink-0 text-[11px] text-ink/50 whitespace-nowrap">
+                          그래프 기록
+                          <input
+                            type="checkbox"
+                            checked={g.trackPerformance}
+                            onChange={(e) =>
+                              updateGroup(exIndex, groupIndex, { trackPerformance: e.target.checked })
+                            }
+                            title="이 세트를 운동 수행능력(e1RM) 그래프에 반영"
+                            className="shrink-0"
+                          />
+                        </label>
                       )}
                       {ex.groups.length > 1 && (
                         <button

@@ -1447,6 +1447,39 @@ export async function listPackagePurchases(yearMonth: string): Promise<PackagePu
   }));
 }
 
+export interface RefundEntry {
+  id: number;
+  refundedAt: string;
+  memberName: string;
+  amount: number;
+}
+
+// 별도의 환불 테이블은 없다 — 환불은 회원 상세의 "환불" 버튼(=완전 삭제를 겸함)을
+// 통해서만 일어나, undo_log에 "{이름} 회원 환불 후 삭제 ({금액}원)" 형태의
+// 설명으로만 남는다. 여기서 그 문구를 파싱해 이번 달 환불 내역으로 보여준다.
+// 실행취소(undone = true)된 건은 환불이 되돌려진 것이므로 제외한다.
+export async function listRefundsForMonth(yearMonth: string): Promise<RefundEntry[]> {
+  const result = await query<{ id: number; description: string; created_at: string }>(
+    `SELECT id, description, created_at FROM undo_log
+     WHERE undone = false AND description LIKE '%회원 환불 후 삭제%'
+       AND to_char(created_at, 'YYYY-MM') = $1
+     ORDER BY created_at DESC`,
+    [yearMonth],
+  );
+  const entries: RefundEntry[] = [];
+  for (const r of result.rows) {
+    const m = r.description.match(/^(.+) 회원 환불 후 삭제 \(([\d,]+)원\)$/);
+    if (!m) continue;
+    entries.push({
+      id: r.id,
+      refundedAt: r.created_at,
+      memberName: m[1],
+      amount: Number(m[2].replace(/,/g, "")),
+    });
+  }
+  return entries;
+}
+
 /** 회원 화면용: 담당 코치의 향후 N일 가능/마감 시간대 (다른 회원 이름은 노출하지 않음). */
 export interface AvailabilityDay {
   date: string;

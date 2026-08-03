@@ -1110,6 +1110,18 @@ export function ScheduleGrid({
                 >
                   복사
                 </button>
+                {contextMenu.sessions[0].member_id !== null && (
+                  <button
+                    onClick={() => {
+                      const memberId = contextMenu.sessions[0].member_id;
+                      setContextMenu(null);
+                      router.push(`/admin/members/${memberId}/pt-log`);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                  >
+                    PT 일지
+                  </button>
+                )}
                 <button
                   onClick={() => quickPatch(contextMenu.sessions, { status: "no_show" })}
                   className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
@@ -1750,6 +1762,7 @@ function EditSessionModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const router = useRouter();
   const [memo, setMemo] = useState(session.memo);
   const [coachId, setCoachId] = useState(session.coach_id);
   const [ptType, setPtType] = useState<PtType>(session.pt_type);
@@ -2016,6 +2029,16 @@ function EditSessionModal({
             메모·담당 저장
           </button>
         </div>
+
+        {session.member_id !== null && (
+          <button
+            type="button"
+            onClick={() => router.push(`/admin/members/${session.member_id}/pt-log`)}
+            className="w-full rounded-full border border-line py-2.5 text-sm font-medium hover:border-coral/40 hover:text-coral transition"
+          >
+            📋 PT 일지
+          </button>
+        )}
 
         <MoveSessionSection
           coaches={coaches}
