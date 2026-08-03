@@ -15,10 +15,17 @@ import {
 import { getLatestContractByMember, listContractsByMember } from "@/lib/contracts";
 import { listAssessmentsByMember } from "@/lib/assessments";
 import { listPtLogsByMember } from "@/lib/pt-logs";
+import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { koreaTodayKey } from "@/lib/date";
 import { recordUndo, type UndoOp } from "@/lib/undo";
-import type { AssessmentRow, IntakeQuestionnaireRow, MemberStatus, PtLogRow } from "@/lib/db";
+import type {
+  AssessmentRow,
+  IntakeQuestionnaireRow,
+  MemberStatus,
+  PersonalExerciseRow,
+  PtLogRow,
+} from "@/lib/db";
 
 // JSONB 배열 컬럼(pain_triggers/exercise_performance, exercises, pain_movements/
 // pain_characteristics)은 pg가 JS 배열을 Postgres 네이티브 배열 리터럴로 오인하지
@@ -32,6 +39,9 @@ function assessmentRowForSql(a: AssessmentRow): Record<string, unknown> {
   };
 }
 function ptLogRowForSql(row: PtLogRow): Record<string, unknown> {
+  return { ...row, exercises: JSON.stringify(row.exercises) };
+}
+function personalExerciseRowForSql(row: PersonalExerciseRow): Record<string, unknown> {
   return { ...row, exercises: JSON.stringify(row.exercises) };
 }
 function intakeRowForSql(row: IntakeQuestionnaireRow): Record<string, unknown> {
@@ -206,11 +216,12 @@ export async function DELETE(
   // PT 일지 메모·초진 문진표 같은 개인정보/기록은 함께 지운다. 앞으로 예정된
   // 예약은 회원이 없어졌으니 지워서 그 시간대를 다른 회원이 다시 쓸 수 있게 한다.
   const today = koreaTodayKey();
-  const [contracts, assessments, ptLogs, intake, fixedSlots, packages, pastSessionIds] =
+  const [contracts, assessments, ptLogs, personalExercises, intake, fixedSlots, packages, pastSessionIds] =
     await Promise.all([
       listContractsByMember(idNum),
       listAssessmentsByMember(idNum),
       listPtLogsByMember(idNum),
+      listPersonalExercisesByMember(idNum),
       getIntakeQuestionnaireByMember(idNum),
       listFixedSlotsByMember(idNum),
       listPackages(idNum),
@@ -232,6 +243,11 @@ export async function DELETE(
     ...contracts.map((c): UndoOp => ({ op: "insert", table: "contracts", data: c })),
     ...assessments.map((a): UndoOp => ({ op: "insert", table: "assessments", data: assessmentRowForSql(a) })),
     ...ptLogs.map((p): UndoOp => ({ op: "insert", table: "pt_logs", data: ptLogRowForSql(p) })),
+    ...personalExercises.map((p): UndoOp => ({
+      op: "insert",
+      table: "personal_exercises",
+      data: personalExerciseRowForSql(p),
+    })),
     ...(intake ? [{ op: "insert", table: "intake_questionnaires", data: intakeRowForSql(intake) } as UndoOp] : []),
     ...fixedSlots.map((f): UndoOp => ({ op: "insert", table: "fixed_slots", data: f })),
     ...deletedUpcomingSessions.map((s): UndoOp => ({ op: "insert", table: "class_sessions", data: s })),

@@ -36,6 +36,14 @@ interface ExerciseInput {
   note: string;
   /** equipment가 "circuit"일 때만 쓴다. */
   circuit: CircuitInput | null;
+  /** kind가 "personal_exercise"일 때만 쓰는 완료 체크. */
+  done: boolean;
+}
+
+/** 무게·횟수 칸이 순수 숫자인지 확인한다 — 숫자면 "kg"/placeholder에 단위를
+    붙이고, "밴드 3단계"처럼 자유 텍스트면 그대로 보여준다. */
+function isNumericText(s: string): boolean {
+  return /^-?\d+(\.\d+)?$/.test(s.trim());
 }
 
 function emptyGroup(): SetGroupInput {
@@ -65,6 +73,7 @@ function emptyExercise(): ExerciseInput {
     groups: [emptyGroup()],
     note: "",
     circuit: null,
+    done: false,
   };
 }
 
@@ -82,6 +91,8 @@ export function PtLogForm({
   pastExercises = [],
   pastExerciseGroups = {},
   pastCircuitEntries = {},
+  kind = "pt_log",
+  authToken,
 }: {
   memberId: number;
   memberName: string;
@@ -95,9 +106,18 @@ export function PtLogForm({
   /** 형식(AMRAP 등)별 과거 서킷 트레이닝 기록. "과거 운동이력" 다이얼에서 골라
       그대로 불러오는 용도. */
   pastCircuitEntries?: Record<string, PastCircuitEntry[]>;
+  /** "pt_log"(기본, 코치용 PT 일지)면 세트마다 운동 수행능력(e1RM) 반영 체크박스가
+      보이고, "personal_exercise"(회원 개인 운동)면 그 대신 운동마다 완료 체크박스가
+      보인다. */
+  kind?: "pt_log" | "personal_exercise";
+  /** 회원 개인 페이지(/my/[token])에서 쓸 때만 넘긴다 — 관리자 인증 없이 토큰으로
+      본인 개인 운동만 만들고 고칠 수 있는 /api/my/[token]/personal-exercises로
+      요청을 보낸다. 관리자 화면에서 개인 운동을 대신 기록할 때는 넘기지 않는다. */
+  authToken?: string;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
+  const kindLabel = kind === "personal_exercise" ? "개인 운동" : "PT 일지";
   const [logDate, setLogDate] = useState(() => initialData?.logDate ?? koreaTodayKey());
   const [memo, setMemo] = useState(() => initialData?.memo ?? "");
   const [exercises, setExercises] = useState<ExerciseInput[]>(
@@ -180,6 +200,7 @@ export function PtLogForm({
   async function handleSubmit() {
     const cleanedExercises = exercises
       .map((e) => {
+        const done = kind === "personal_exercise" ? e.done : undefined;
         // 서킷 트레이닝은 이름을 직접 입력하지 않으므로 형식 이름(AMRAP 등)을
         // 이름으로 쓰고, 무게·횟수·세트 대신 circuit 기록을 담는다.
         if (e.equipment === "circuit" && e.circuit) {
@@ -188,6 +209,7 @@ export function PtLogForm({
             equipment: e.equipment,
             groups: [],
             note: e.note.trim(),
+            done,
             circuit: {
               type: e.circuit.type,
               minutes: e.circuit.minutes === "" ? null : Number(e.circuit.minutes),
@@ -202,34 +224,59 @@ export function PtLogForm({
           groups: e.groups
             .filter((g) => g.weight !== "" || g.reps !== "" || g.sets !== "")
             .map((g) => ({
-              weight: g.weight === "" ? null : Number(g.weight),
-              reps: g.reps === "" ? null : Number(g.reps),
+              weight: g.weight === "" ? null : g.weight.trim(),
+              reps: g.reps === "" ? null : g.reps.trim(),
               sets: g.sets === "" ? null : Number(g.sets),
             })),
           note: e.note.trim(),
+          done,
         };
       })
       .filter((e) => e.name.trim().length > 0);
 
     // 체크해둔 세트는 운동 수행능력(e1RM) 그래프용 평가 기록으로도 함께 남긴다.
-    const performanceEntries = exercises.flatMap((e) =>
-      e.groups
-        .filter((g) => g.trackPerformance && g.rpe !== "")
-        .map((g) => ({
-          exercise: e.name.trim(),
-          note: "",
-          weight: g.weight === "" ? null : Number(g.weight),
-          reps: g.reps === "" ? null : Number(g.reps),
-          rpe: Number(g.rpe),
-        })),
-    );
+    // 개인 운동에는 이 트래킹 UI 자체가 없다(코치가 감독하는 공식 기록만 반영).
+    const performanceEntries =
+      kind === "pt_log"
+        ? exercises.flatMap((e) =>
+            e.groups
+              .filter(
+                (g) =>
+                  g.trackPerformance &&
+                  g.rpe !== "" &&
+                  (g.weight === "" || isNumericText(g.weight)) &&
+                  (g.reps === "" || isNumericText(g.reps)),
+              )
+              .map((g) => ({
+                exercise: e.name.trim(),
+                note: "",
+                weight: g.weight === "" ? null : Number(g.weight),
+                reps: g.reps === "" ? null : Number(g.reps),
+                rpe: Number(g.rpe),
+              })),
+          )
+        : [];
 
     setSubmitting(true);
     setError(null);
     try {
-      const url = isEditing
-        ? `/api/admin/pt-logs/${ptLogId}`
-        : `/api/admin/members/${memberId}/pt-logs`;
+      // 회원 개인 페이지(authToken 있음)에서는 토큰 인증 라우트로, 관리자
+      // 화면에서는 관리자 라우트로 보낸다. PT 일지는 항상 관리자 전용이라
+      // authToken이 있을 일이 없다.
+      let url: string;
+      if (authToken) {
+        url = isEditing
+          ? `/api/my/${authToken}/personal-exercises/${ptLogId}`
+          : `/api/my/${authToken}/personal-exercises`;
+      } else if (kind === "personal_exercise") {
+        url = isEditing
+          ? `/api/admin/personal-exercises/${ptLogId}`
+          : `/api/admin/members/${memberId}/personal-exercises`;
+      } else {
+        url = isEditing
+          ? `/api/admin/pt-logs/${ptLogId}`
+          : `/api/admin/members/${memberId}/pt-logs`;
+      }
       const res = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -251,7 +298,10 @@ export function PtLogForm({
           body: JSON.stringify({ evaluatedAt: logDate, exercisePerformance: performanceEntries }),
         });
       }
-      router.push(`/admin/members/${memberId}/pt-log`);
+      const redirectHref = authToken
+        ? `/my/${authToken}/personal-exercise`
+        : `/admin/members/${memberId}/pt-log`;
+      router.push(redirectHref);
       router.refresh();
     } catch {
       setError("네트워크 오류가 발생했어요.");
@@ -262,9 +312,11 @@ export function PtLogForm({
 
   return (
     <div>
-      <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">PT Log</p>
+      <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">
+        {kind === "personal_exercise" ? "Personal Exercise" : "PT Log"}
+      </p>
       <h1 className="font-display text-2xl mb-6">
-        {memberName}님의 {isEditing ? "PT 일지 수정" : "새 PT 일지"}
+        {memberName}님의 {isEditing ? `${kindLabel} 수정` : `새 ${kindLabel}`}
       </h1>
 
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-4 space-y-4">
@@ -288,9 +340,11 @@ export function PtLogForm({
             className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
           />
         </div>
-        <p className="text-xs text-ink/40">
-          통증 척도·운동수행 능력은 PT 일지 목록의 그래프 아래 섹션에서 바로 남길 수 있어요.
-        </p>
+        {kind === "pt_log" && (
+          <p className="text-xs text-ink/40">
+            통증 척도·운동수행 능력은 PT 일지 목록의 그래프 아래 섹션에서 바로 남길 수 있어요.
+          </p>
+        )}
       </div>
 
       <div className="space-y-3 mb-4">
@@ -359,6 +413,16 @@ export function PtLogForm({
                       );
                     })()}
                 </div>
+              )}
+              {kind === "personal_exercise" && (
+                <label className="flex items-center gap-1 shrink-0 text-xs text-ink/60 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={ex.done}
+                    onChange={(e) => updateExercise(exIndex, { done: e.target.checked })}
+                  />
+                  완료
+                </label>
               )}
               {exercises.length > 1 && (
                 <button
@@ -440,25 +504,27 @@ export function PtLogForm({
                   const pastGroup = pastGroups?.[groupIndex];
                   const weightPlaceholder =
                     pastGroup?.weight != null
-                      ? `(${PT_LOG_EQUIPMENT_LABELS[ex.equipment] ?? ex.equipment}) ${pastGroup.weight}kg`
-                      : "무게(kg)";
+                      ? `(${PT_LOG_EQUIPMENT_LABELS[ex.equipment] ?? ex.equipment}) ${pastGroup.weight}${
+                          isNumericText(pastGroup.weight) ? "kg" : ""
+                        }`
+                      : "kg / 변형 동작";
+                  const repsPlaceholder =
+                    pastGroup?.reps != null ? String(pastGroup.reps) : "횟수 / 시간(초)";
                   return (
                   <div key={groupIndex} className="space-y-1.5">
                     <div className="flex items-center gap-1.5">
                       <input
-                        type="number"
-                        inputMode="decimal"
+                        type="text"
                         value={g.weight}
                         onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
                         placeholder={weightPlaceholder}
                         className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                       />
                       <input
-                        type="number"
-                        inputMode="numeric"
+                        type="text"
                         value={g.reps}
                         onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
-                        placeholder={pastGroup?.reps != null ? String(pastGroup.reps) : "횟수"}
+                        placeholder={repsPlaceholder}
                         className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                       />
                       <input
@@ -469,15 +535,17 @@ export function PtLogForm({
                         placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
                         className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                       />
-                      <input
-                        type="checkbox"
-                        checked={g.trackPerformance}
-                        onChange={(e) =>
-                          updateGroup(exIndex, groupIndex, { trackPerformance: e.target.checked })
-                        }
-                        title="이 세트를 운동 수행능력(e1RM) 그래프에 반영"
-                        className="shrink-0"
-                      />
+                      {kind === "pt_log" && (
+                        <input
+                          type="checkbox"
+                          checked={g.trackPerformance}
+                          onChange={(e) =>
+                            updateGroup(exIndex, groupIndex, { trackPerformance: e.target.checked })
+                          }
+                          title="이 세트를 운동 수행능력(e1RM) 그래프에 반영"
+                          className="shrink-0"
+                        />
+                      )}
                       {ex.groups.length > 1 && (
                         <button
                           type="button"

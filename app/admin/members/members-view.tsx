@@ -1915,6 +1915,7 @@ function MemberDetailModal({
   const [addPrice, setAddPrice] = useState("");
   const [addPtType, setAddPtType] = useState<PtType>("1:1");
   const [addPaymentMethod, setAddPaymentMethod] = useState<PaymentMethod>("card");
+  const [addOptionNote, setAddOptionNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -1991,6 +1992,7 @@ function MemberDetailModal({
             price: Number(addPrice || 0),
             ptType: addPtType,
             paymentMethod: addPaymentMethod,
+            note: addOptionNote,
           }),
         });
         if (!pkgRes.ok) {
@@ -2075,6 +2077,7 @@ function MemberDetailModal({
         price: Number(addPrice || 0),
         ptType: addPtType,
         paymentMethod: addPaymentMethod,
+        note: addOptionNote,
       }),
     });
     if (!res.ok) {
@@ -2086,6 +2089,7 @@ function MemberDetailModal({
     setAddPrice("");
     setAddPtType("1:1");
     setAddPaymentMethod("card");
+    setAddOptionNote("");
     onChanged();
     onClose();
   }
@@ -2391,6 +2395,16 @@ function MemberDetailModal({
               placeholder="결제금액"
               className="rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
             />
+          </div>
+          <div className="mt-2">
+            <Field label="옵션">
+              <input
+                value={addOptionNote}
+                onChange={(e) => setAddOptionNote(e.target.value)}
+                placeholder="할인 내역"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+            </Field>
           </div>
           <button
             onClick={handleAddPackage}

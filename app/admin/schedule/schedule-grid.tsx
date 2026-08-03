@@ -108,6 +108,7 @@ function isGoldenBellSession(session: SessionWithMember, goldenBellMemberIds: Se
 
 function SessionCellButton({
   session,
+  hour,
   goldenBellMemberIds,
   onEdit,
   onCreate,
@@ -117,6 +118,10 @@ function SessionCellButton({
   onContextMenu,
 }: {
   session: SessionWithMember | undefined;
+  /** 빈 칸 버튼에 "+9시 추가"처럼 시간을 표시하기 위함 — 요일별로 열이 나란히
+      있는 "이번 주 전체" 보기에서는 맨 왼쪽 칸에만 시간이 적혀 있어, 이 표시가
+      없으면 오른쪽 요일 열에서는 지금 몇 시 줄인지 알기 어렵다. */
+  hour: number;
   goldenBellMemberIds: Set<number>;
   onEdit: (session: SessionWithMember) => void;
   onCreate: () => void;
@@ -134,7 +139,7 @@ function SessionCellButton({
         onContextMenu={onEmptyContextMenu}
         className="w-full rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-xs text-ink/30 hover:text-coral hover:border-coral transition truncate"
       >
-        + 추가
+        + {hour}시 추가
       </button>
     );
   }
@@ -846,6 +851,7 @@ export function ScheduleGrid({
                         {withinHours ? (
                           <SessionCellButton
                             session={session}
+                            hour={hour}
                             goldenBellMemberIds={goldenBellMemberIds}
                             onEdit={setEditTarget}
                             onCreate={() => setCreateTarget({ date: d, hour, coachId: singleCoach.id })}
@@ -1012,6 +1018,7 @@ export function ScheduleGrid({
                           ) : (
                             <SessionCellButton
                               session={session}
+                              hour={hour}
                               goldenBellMemberIds={goldenBellMemberIds}
                               onEdit={setEditTarget}
                               onCreate={() => setCreateTarget({ date: d, hour, coachId: coach.id })}
