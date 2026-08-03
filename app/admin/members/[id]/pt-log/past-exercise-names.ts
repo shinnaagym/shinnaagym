@@ -1,4 +1,4 @@
-import type { AssessmentRow, PtLogRow, PtLogSetGroup } from "@/lib/db";
+import type { AssessmentRow, PtLogCircuit, PtLogRow, PtLogSetGroup } from "@/lib/db";
 
 /** 회원의 PT 일지·평가지에 그동안 기록된 운동 이름을 자동완성용으로 모은다. */
 export function pastExerciseNames(ptLogs: PtLogRow[], assessments: AssessmentRow[]): string[] {
@@ -33,6 +33,27 @@ export function pastExerciseGroups(ptLogs: PtLogRow[]): Record<string, PtLogSetG
       if (!exercise.name || exercise.groups.length === 0) continue;
       const key = pastExerciseGroupKey(exercise.name, exercise.equipment);
       if (!(key in result)) result[key] = exercise.groups;
+    }
+  }
+  return result;
+}
+
+export interface PastCircuitEntry {
+  logDate: string;
+  circuit: PtLogCircuit;
+}
+
+/** 형식(AMRAP/TIMECAP/For Time/EMOM)별로 과거 서킷 트레이닝 기록을 모은다.
+    ptLogs가 이미 최신순으로 정렬돼 있으므로 그대로 최신순 목록이 된다.
+    "과거 운동이력" 다이얼에서 형식에 맞는 지난 기록을 골라 그대로 불러오는 용도. */
+export function pastCircuitEntries(ptLogs: PtLogRow[]): Record<string, PastCircuitEntry[]> {
+  const result: Record<string, PastCircuitEntry[]> = {};
+  for (const log of ptLogs) {
+    for (const exercise of log.exercises) {
+      if (exercise.equipment !== "circuit" || !exercise.circuit) continue;
+      const type = exercise.circuit.type;
+      if (!result[type]) result[type] = [];
+      result[type].push({ logDate: log.log_date, circuit: exercise.circuit });
     }
   }
   return result;

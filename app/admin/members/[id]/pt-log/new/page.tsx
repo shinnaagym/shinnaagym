@@ -4,7 +4,7 @@ import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember } from "@/lib/assessments";
 import { PtLogForm } from "../pt-log-form";
-import { pastExerciseGroups, pastExerciseNames } from "../past-exercise-names";
+import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../past-exercise-names";
 
 export default async function NewPtLogPage({
   params,
@@ -35,6 +35,7 @@ export default async function NewPtLogPage({
         memberName={member.name}
         pastExercises={pastExerciseNames(ptLogs, assessments)}
         pastExerciseGroups={pastExerciseGroups(ptLogs)}
+        pastCircuitEntries={pastCircuitEntries(ptLogs)}
       />
     </div>
   );

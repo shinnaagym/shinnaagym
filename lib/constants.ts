@@ -50,12 +50,13 @@ export const PT_LOG_EQUIPMENT_LABELS: Record<string, string> = {
 };
 
 // 도구로 "서킷 트레이닝"을 고르면 운동 이름 칸 대신 이 네 가지 형식 중 하나를
-// 고르는 다이얼(select)이 뜬다.
+// 고르는 다이얼(select)이 뜬다. description은 다이얼 선택지에서만 label 옆에
+// 괄호로 덧붙여 보여주고, PT 일지 목록처럼 공간이 좁은 곳에는 label(짧은 이름)만 쓴다.
 export const PT_LOG_CIRCUIT_TYPE_OPTIONS = [
-  { value: "amrap", label: "AMRAP" },
-  { value: "timecap", label: "TIMECAP" },
-  { value: "for_time", label: "For Time" },
-  { value: "emom", label: "EMOM" },
+  { value: "amrap", label: "AMRAP", description: "최대한 많은 라운드" },
+  { value: "timecap", label: "TIMECAP", description: "주어진 시간까지" },
+  { value: "for_time", label: "For Time", description: "주어진 운동 다 걸리는 시간" },
+  { value: "emom", label: "EMOM", description: "1분마다 반복" },
 ] as const;
 
 export type PtLogCircuitType = (typeof PT_LOG_CIRCUIT_TYPE_OPTIONS)[number]["value"];
