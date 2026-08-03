@@ -3,15 +3,43 @@ import { isAdminAuthed } from "@/lib/auth";
 import {
   computeMemberProgress,
   deleteMember,
+  deleteUpcomingSessionsForMember,
   getMemberById,
+  listFixedSlotsByMember,
   listPackages,
   listMemberSessions,
+  listPastSessionIdsForMember,
   updateMember,
 } from "@/lib/schedule";
-import { getLatestContractByMember } from "@/lib/contracts";
+import { getLatestContractByMember, listContractsByMember } from "@/lib/contracts";
 import { listAssessmentsByMember } from "@/lib/assessments";
-import { recordUndo } from "@/lib/undo";
-import type { MemberStatus } from "@/lib/db";
+import { listPtLogsByMember } from "@/lib/pt-logs";
+import { getIntakeQuestionnaireByMember } from "@/lib/intake";
+import { koreaTodayKey } from "@/lib/date";
+import { recordUndo, type UndoOp } from "@/lib/undo";
+import type { AssessmentRow, IntakeQuestionnaireRow, MemberStatus, PtLogRow } from "@/lib/db";
+
+// JSONB 배열 컬럼(pain_triggers/exercise_performance, exercises, pain_movements/
+// pain_characteristics)은 pg가 JS 배열을 Postgres 네이티브 배열 리터럴로 오인하지
+// 않도록 직접 JSON.stringify해서 넘겨야 한다 — 다른 라우트의 실행취소 스냅샷과
+// 같은 이유(app/api/admin/pt-logs/[id]/route.ts 등 참고).
+function assessmentRowForSql(a: AssessmentRow): Record<string, unknown> {
+  return {
+    ...a,
+    pain_triggers: JSON.stringify(a.pain_triggers),
+    exercise_performance: JSON.stringify(a.exercise_performance),
+  };
+}
+function ptLogRowForSql(row: PtLogRow): Record<string, unknown> {
+  return { ...row, exercises: JSON.stringify(row.exercises) };
+}
+function intakeRowForSql(row: IntakeQuestionnaireRow): Record<string, unknown> {
+  return {
+    ...row,
+    pain_movements: JSON.stringify(row.pain_movements),
+    pain_characteristics: JSON.stringify(row.pain_characteristics),
+  };
+}
 
 export async function GET(
   _req: NextRequest,
@@ -163,16 +191,42 @@ export async function DELETE(
   if (!member) {
     return NextResponse.json({ error: "회원을 찾을 수 없습니다." }, { status: 404 });
   }
-  const packages = await listPackages(idNum);
-  if (packages.length > 0) {
-    return NextResponse.json(
-      { error: "결제 이력이 있는 회원은 삭제할 수 없어요. '비활성'으로 전환해주세요." },
-      { status: 400 },
-    );
-  }
+
+  // 회원을 지워도 PT 예약 내역·결제 내역은 정산·매출 기록으로 남긴다(member_id만
+  // NULL이 됨 — packages/class_sessions FK가 SET NULL로 되어있다). 계약서·평가지·
+  // PT 일지 메모·초진 문진표 같은 개인정보/기록은 함께 지운다. 앞으로 예정된
+  // 예약은 회원이 없어졌으니 지워서 그 시간대를 다른 회원이 다시 쓸 수 있게 한다.
+  const today = koreaTodayKey();
+  const [contracts, assessments, ptLogs, intake, fixedSlots, packages, pastSessionIds] =
+    await Promise.all([
+      listContractsByMember(idNum),
+      listAssessmentsByMember(idNum),
+      listPtLogsByMember(idNum),
+      getIntakeQuestionnaireByMember(idNum),
+      listFixedSlotsByMember(idNum),
+      listPackages(idNum),
+      listPastSessionIdsForMember(idNum, today),
+    ]);
+  const deletedUpcomingSessions = await deleteUpcomingSessionsForMember(idNum, today);
   await deleteMember(idNum);
-  await recordUndo(`${member.name} 회원 삭제`, [
+
+  const ops: UndoOp[] = [
     { op: "insert", table: "members", data: member },
-  ]);
-  return NextResponse.json({ ok: true });
+    ...contracts.map((c): UndoOp => ({ op: "insert", table: "contracts", data: c })),
+    ...assessments.map((a): UndoOp => ({ op: "insert", table: "assessments", data: assessmentRowForSql(a) })),
+    ...ptLogs.map((p): UndoOp => ({ op: "insert", table: "pt_logs", data: ptLogRowForSql(p) })),
+    ...(intake ? [{ op: "insert", table: "intake_questionnaires", data: intakeRowForSql(intake) } as UndoOp] : []),
+    ...fixedSlots.map((f): UndoOp => ({ op: "insert", table: "fixed_slots", data: f })),
+    ...deletedUpcomingSessions.map((s): UndoOp => ({ op: "insert", table: "class_sessions", data: s })),
+    ...pastSessionIds.map((sid): UndoOp => ({ op: "update", table: "class_sessions", id: sid, data: { member_id: idNum } })),
+    ...packages.map((p): UndoOp => ({ op: "update", table: "packages", id: p.id, data: { member_id: idNum } })),
+  ];
+  await recordUndo(`${member.name} 회원 완전 삭제`, ops);
+
+  return NextResponse.json({
+    ok: true,
+    keptPastSessions: pastSessionIds.length,
+    keptPackages: packages.length,
+    deletedUpcomingSessions: deletedUpcomingSessions.length,
+  });
 }

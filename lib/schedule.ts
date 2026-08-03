@@ -357,6 +357,33 @@ export async function deleteMember(id: number): Promise<void> {
   await query(`DELETE FROM members WHERE id = $1`, [id]);
 }
 
+/** 오늘(포함) 이후로 예정된 이 회원의 예약을 전부 지우고, 지운 행을 그대로 반환한다
+    (회원 삭제 처리의 일부 — 실행취소용 스냅샷). 회원이 없어졌으니 해당 시간대는
+    다른 회원이 다시 예약할 수 있도록 비워준다. */
+export async function deleteUpcomingSessionsForMember(
+  memberId: number,
+  todayKey: string,
+): Promise<ClassSessionRow[]> {
+  const result = await query<ClassSessionRow>(
+    `DELETE FROM class_sessions WHERE member_id = $1 AND session_date >= $2 RETURNING *`,
+    [memberId, todayKey],
+  );
+  return result.rows;
+}
+
+/** 이 회원의 지난 예약 id 목록(오늘 이전). 회원을 삭제해도 정산 기록으로 남기지만
+    (member_id는 NULL로), 실행취소 시 member_id를 되돌리려면 미리 id를 알아둬야 한다. */
+export async function listPastSessionIdsForMember(
+  memberId: number,
+  todayKey: string,
+): Promise<number[]> {
+  const result = await query<{ id: number }>(
+    `SELECT id FROM class_sessions WHERE member_id = $1 AND session_date < $2`,
+    [memberId, todayKey],
+  );
+  return result.rows.map((r) => r.id);
+}
+
 export async function listMembers(): Promise<MemberRow[]> {
   const result = await query<MemberRow>(`SELECT * FROM members ORDER BY name ASC`);
   return result.rows;

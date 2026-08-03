@@ -1951,9 +1951,11 @@ function MemberDetailModal({
   }
 
   function handleDeleteMember() {
-    if (data!.packages.length > 0) return;
     setConfirmState({
-      message: `${data!.member.name} 회원을 완전히 삭제할까요? 되돌릴 수 없어요.`,
+      message:
+        `${data!.member.name} 회원을 완전히 삭제할까요? 되돌릴 수 없어요.\n\n` +
+        `PT 예약 내역과 결제 내역은 정산 기록으로 남고, 계약서·평가지·PT일지·` +
+        `문진표와 앞으로 예정된 예약은 함께 삭제돼요.`,
       onConfirm: doDeleteMember,
     });
   }
@@ -2404,12 +2406,7 @@ function MemberDetailModal({
         <div className="flex gap-2">
           <button
             onClick={handleDeleteMember}
-            disabled={data.packages.length > 0 || saving}
-            title={
-              data.packages.length > 0
-                ? "결제 이력이 있는 회원은 삭제할 수 없어요. 상태를 '비활성'으로 바꿔주세요."
-                : undefined
-            }
+            disabled={saving}
             className="rounded-full border border-line px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent"
           >
             삭제
