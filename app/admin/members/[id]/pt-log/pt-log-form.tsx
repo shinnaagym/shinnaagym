@@ -41,9 +41,11 @@ interface ExerciseInput {
 }
 
 /** 무게·횟수 칸이 순수 숫자인지 확인한다 — 숫자면 "kg"/placeholder에 단위를
-    붙이고, "밴드 3단계"처럼 자유 텍스트면 그대로 보여준다. */
-function isNumericText(s: string): boolean {
-  return /^-?\d+(\.\d+)?$/.test(s.trim());
+    붙이고, "밴드 3단계"처럼 자유 텍스트면 그대로 보여준다. 자유 텍스트 기능이
+    생기기 전에 저장된 옛 기록은 weight/reps가 숫자로 남아있을 수 있어서,
+    String()로 먼저 바꿔주지 않으면 .trim()이 없어 페이지가 깨진다. */
+function isNumericText(s: string | number): boolean {
+  return /^-?\d+(\.\d+)?$/.test(String(s).trim());
 }
 
 function emptyGroup(): SetGroupInput {

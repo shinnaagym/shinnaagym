@@ -40,9 +40,11 @@ function monthLabel(monthKey: string): string {
 }
 
 /** 무게·횟수 칸이 순수 숫자면 "kg"/"회" 단위를 붙이고, "밴드 3단계"·"30초"처럼
-    자유 텍스트면 그대로 보여준다(단위를 잘못 덧붙이지 않도록). */
-function isNumericText(s: string): boolean {
-  return /^-?\d+(\.\d+)?$/.test(s.trim());
+    자유 텍스트면 그대로 보여준다(단위를 잘못 덧붙이지 않도록). 이 기능이 생기기
+    전에 저장된 옛 PT 일지는 weight/reps가 문자열이 아니라 숫자로 남아있어서,
+    String()로 먼저 바꿔주지 않으면 .trim()이 없어 페이지가 깨진다. */
+function isNumericText(s: string | number): boolean {
+  return /^-?\d+(\.\d+)?$/.test(String(s).trim());
 }
 
 export function exerciseSummary(e: PtLogExercise): string {
@@ -157,12 +159,12 @@ export function PtLogList({
               key={log.id}
               onClick={editable ? () => router.push(editHref) : undefined}
               className={[
-                "relative rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4",
-                editable ? "pr-36 cursor-pointer hover:border-coral/40 transition" : "",
+                "rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4",
+                editable ? "cursor-pointer hover:border-coral/40 transition" : "",
               ].join(" ")}
             >
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
                   <p className="font-medium">{log.log_date || formatDateTime(log.created_at)}</p>
                   {(log.pain_scale != null || log.memo) && (
                     <p className="text-xs text-ink/50 mt-0.5">
@@ -172,6 +174,23 @@ export function PtLogList({
                     </p>
                   )}
                 </div>
+                {editable && (
+                  <div className="flex items-center gap-3 text-xs shrink-0">
+                    <Link
+                      href={editHref}
+                      prefetch={false}
+                      className="rounded-full border border-line px-3 py-1 text-ink/50 hover:border-coral hover:text-coral transition"
+                    >
+                      수정
+                    </Link>
+                    <DeletePtLogButton
+                      ptLogId={log.id}
+                      endpoint={deleteEndpoint}
+                      confirmMessage={deleteConfirmMessage}
+                      className="rounded-full border border-line px-3 py-1 text-red-500 hover:bg-red-50 transition disabled:opacity-50"
+                    />
+                  </div>
+                )}
               </div>
               {log.exercises.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-line/50 space-y-1.5 text-sm text-ink/70">
@@ -188,23 +207,6 @@ export function PtLogList({
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-              {editable && (
-                <div className="absolute top-4 right-5 flex items-center gap-3 text-xs">
-                  <Link
-                    href={editHref}
-                    prefetch={false}
-                    className="rounded-full border border-line px-3 py-1 text-ink/50 hover:border-coral hover:text-coral transition"
-                  >
-                    수정
-                  </Link>
-                  <DeletePtLogButton
-                    ptLogId={log.id}
-                    endpoint={deleteEndpoint}
-                    confirmMessage={deleteConfirmMessage}
-                    className="rounded-full border border-line px-3 py-1 text-red-500 hover:bg-red-50 transition disabled:opacity-50"
-                  />
                 </div>
               )}
             </li>
