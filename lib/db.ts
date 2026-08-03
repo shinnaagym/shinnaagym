@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 18;
+const SCHEMA_VERSION = 19;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -590,6 +590,12 @@ function runFullMigration(): Promise<void> {
               WHERE weekday_ends IS NULL;
             ALTER TABLE coach_working_hours ALTER COLUMN weekday_starts SET NOT NULL;
             ALTER TABLE coach_working_hours ALTER COLUMN weekday_ends SET NOT NULL;
+
+            -- 상담 단계(초진 문진표·평가지 작성)에서 자동으로 만들어지는 회원 행은
+            -- 아직 결제 전이라 회원 관리 목록에 노출하지 않는다. 같은 연락처로 실제
+            -- 신규 등록(패키지 결제)이 이뤄지면 is_lead를 false로 승격해 그동안 쌓인
+            -- 문진표·평가지 기록이 그대로 이어붙은 채 목록에 나타난다.
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS is_lead BOOLEAN NOT NULL DEFAULT false;
             `,
           ),
           getPool().query(
@@ -723,6 +729,7 @@ export interface MemberRow {
   token: string;
   created_at: string;
   deleted_at: string | null;
+  is_lead: boolean;
 }
 
 export type PtType = "1:1" | "2:1";

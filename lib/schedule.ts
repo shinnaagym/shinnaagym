@@ -292,12 +292,14 @@ export interface MemberInput {
   followupStatus?: string;
   followupMemo?: string;
   improvementDirection?: string;
+  /** true면 결제 전 상담 단계로만 만들어, 회원 관리 목록에는 보이지 않는다. */
+  isLead?: boolean;
 }
 
 export async function createMember(input: MemberInput): Promise<MemberRow> {
   const result = await query<MemberRow>(
-    `INSERT INTO members (name, phone, coach_id, notes, referrer, available_times, token)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    `INSERT INTO members (name, phone, coach_id, notes, referrer, available_times, token, is_lead)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
     [
       input.name,
       input.phone,
@@ -306,6 +308,7 @@ export async function createMember(input: MemberInput): Promise<MemberRow> {
       input.referrer ?? "",
       input.availableTimes ?? "",
       generateMemberToken(),
+      input.isLead ?? false,
     ],
   );
   return result.rows[0];
@@ -351,6 +354,10 @@ export async function updateMember(
   if (input.followupMemo !== undefined) {
     fields.push(`followup_memo = $${++i}`);
     values.push(input.followupMemo);
+  }
+  if (input.isLead !== undefined) {
+    fields.push(`is_lead = $${++i}`);
+    values.push(input.isLead);
   }
   if (input.improvementDirection !== undefined) {
     fields.push(`improvement_direction = $${++i}`);
@@ -648,6 +655,9 @@ export async function addPackage(
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [memberId, totalSessions, price, note, ptType, paymentMethod],
   );
+  // 상담 단계(lead)였더라도 실제로 패키지를 결제하면 그 순간 정식 회원이므로
+  // 회원 관리 목록에 보이도록 승격한다.
+  await query(`UPDATE members SET is_lead = false WHERE id = $1 AND is_lead = true`, [memberId]);
   return result.rows[0];
 }
 
@@ -952,6 +962,7 @@ export async function findOrCreateMemberByPhone(input: {
     phone: input.phone,
     coachId: input.coachId,
     notes: input.notes ?? "",
+    isLead: true,
   });
 }
 

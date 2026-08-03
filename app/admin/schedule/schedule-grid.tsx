@@ -2007,7 +2007,7 @@ function EditSessionModal({
 
         {error && <p className="text-sm text-coral">{error}</p>}
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             disabled={submitting}
             onClick={() => patch({ status: "no_show" })}
@@ -2022,20 +2022,9 @@ function EditSessionModal({
           >
             취소 (차감 없음)
           </button>
-          <button
-            disabled={submitting}
-            onClick={() =>
-              patch(
-                session.entry_type === "session" ? { memo, coachId, ptType } : { memo, coachId },
-              )
-            }
-            className="rounded-full border border-line py-2 text-xs sm:text-sm hover:bg-bone transition disabled:opacity-50"
-          >
-            메모·담당 저장
-          </button>
         </div>
 
-        {session.member_id !== null && (
+        {session.entry_type === "session" && session.member_id !== null && (
           <button
             type="button"
             onClick={() => router.push(`/admin/members/${session.member_id}/pt-log`)}
@@ -2043,6 +2032,25 @@ function EditSessionModal({
           >
             📋 PT 일지
           </button>
+        )}
+
+        {session.entry_type === "consultation" && session.member_id !== null && (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => router.push(`/admin/members/${session.member_id}/intake`)}
+              className="rounded-full border border-line py-2.5 text-sm font-medium hover:border-coral/40 hover:text-coral transition"
+            >
+              📝 초진 문진표
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/admin/members/${session.member_id}/assessment/new`)}
+              className="rounded-full border border-line py-2.5 text-sm font-medium hover:border-coral/40 hover:text-coral transition"
+            >
+              🩺 평가지
+            </button>
+          </div>
         )}
 
         <MoveSessionSection
@@ -2059,13 +2067,42 @@ function EditSessionModal({
           onMove={() => patch({ date: moveDate, hour: moveHour, coachId: moveCoachId })}
         />
 
-        <button
-          disabled={submitting}
-          onClick={handleDelete}
-          className="w-full text-sm text-red-500 hover:underline mt-2"
+        <div
+          className={[
+            "grid gap-2 mt-2",
+            session.entry_type === "consultation" && session.member_id !== null
+              ? "grid-cols-3"
+              : "grid-cols-2",
+          ].join(" ")}
         >
-          기록 삭제
-        </button>
+          <button
+            disabled={submitting}
+            onClick={() =>
+              patch(
+                session.entry_type === "session" ? { memo, coachId, ptType } : { memo, coachId },
+              )
+            }
+            className="rounded-full border border-line py-2 text-xs sm:text-sm hover:bg-bone transition disabled:opacity-50"
+          >
+            메모·담당 저장
+          </button>
+          <button
+            disabled={submitting}
+            onClick={handleDelete}
+            className="rounded-full border border-red-200 text-red-500 py-2 text-xs sm:text-sm hover:bg-red-50 transition disabled:opacity-50"
+          >
+            기록 삭제
+          </button>
+          {session.entry_type === "consultation" && session.member_id !== null && (
+            <button
+              type="button"
+              onClick={() => router.push(`/admin/members?open=${session.member_id}`)}
+              className="rounded-full border border-coral text-coral py-2 text-xs sm:text-sm font-medium hover:bg-coral/5 transition"
+            >
+              💳 결제
+            </button>
+          )}
+        </div>
       </div>
     </ModalShell>
   );

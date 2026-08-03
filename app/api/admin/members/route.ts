@@ -120,7 +120,17 @@ export async function POST(req: NextRequest) {
   let member;
   const undoOps: UndoOp[] = [];
   if (existingMember) {
-    await updateMember(existingMember.id, { name, phone, coachId, notes, referrer, availableTimes });
+    // 상담 단계에서 만들어진 lead였다면 실제 결제로 이어졌으니 회원 관리 목록에
+    // 보이도록 승격한다.
+    await updateMember(existingMember.id, {
+      name,
+      phone,
+      coachId,
+      notes,
+      referrer,
+      availableTimes,
+      isLead: false,
+    });
     member = (await getMemberById(existingMember.id))!;
     // 이미 있던 회원을 되돌릴 때는 삭제하지 않고 수정 전 값으로만 복원한다.
     undoOps.push({
@@ -134,6 +144,7 @@ export async function POST(req: NextRequest) {
         notes: existingMember.notes,
         referrer: existingMember.referrer,
         available_times: existingMember.available_times,
+        is_lead: existingMember.is_lead,
       },
     });
   } else {

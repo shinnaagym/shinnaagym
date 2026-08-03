@@ -165,7 +165,7 @@ export function ExpensesView({
                     key={q.value}
                     type="button"
                     onClick={() => setAmount(String((Number(amount) || 0) + q.value))}
-                    className="flex-1 rounded-md border border-line bg-white px-1 py-1 text-[11px] text-ink/60 hover:bg-bone transition"
+                    className="flex-1 whitespace-nowrap rounded-md border border-line bg-white px-1 py-1 text-[11px] text-ink/60 hover:bg-bone transition"
                   >
                     {q.label}
                   </button>
