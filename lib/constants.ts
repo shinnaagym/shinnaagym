@@ -21,6 +21,7 @@ export const PURPOSE_LABELS: Record<string, string> = Object.fromEntries(
 // 탭할 때 자동으로 휠(다이얼) 형태로 뜬다.
 export const PT_LOG_EQUIPMENT_OPTIONS = [
   { value: "bodyweight", label: "맨몸" },
+  { value: "machine", label: "기구" },
   { value: "dumbbell", label: "덤벨" },
   { value: "barbell", label: "바벨" },
   { value: "kettlebell", label: "케틀벨" },
@@ -30,6 +31,7 @@ export const PT_LOG_EQUIPMENT_OPTIONS = [
   { value: "aqua_bag", label: "아쿠아백" },
   { value: "smith_machine", label: "스미스머신" },
   { value: "bulgarian_bag", label: "불가리안백" },
+  { value: "circuit", label: "서킷 트레이닝" },
   { value: "other", label: "기타" },
 ] as const;
 
@@ -45,6 +47,34 @@ const LEGACY_PT_LOG_EQUIPMENT_LABELS: Record<string, string> = {
 export const PT_LOG_EQUIPMENT_LABELS: Record<string, string> = {
   ...LEGACY_PT_LOG_EQUIPMENT_LABELS,
   ...Object.fromEntries(PT_LOG_EQUIPMENT_OPTIONS.map((option) => [option.value, option.label])),
+};
+
+// 도구로 "서킷 트레이닝"을 고르면 운동 이름 칸 대신 이 네 가지 형식 중 하나를
+// 고르는 다이얼(select)이 뜬다.
+export const PT_LOG_CIRCUIT_TYPE_OPTIONS = [
+  { value: "amrap", label: "AMRAP" },
+  { value: "timecap", label: "TIMECAP" },
+  { value: "for_time", label: "For Time" },
+  { value: "emom", label: "EMOM" },
+] as const;
+
+export type PtLogCircuitType = (typeof PT_LOG_CIRCUIT_TYPE_OPTIONS)[number]["value"];
+
+export const PT_LOG_CIRCUIT_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  PT_LOG_CIRCUIT_TYPE_OPTIONS.map((option) => [option.value, option.label]),
+);
+
+// 형식마다 시간·라운드 칸의 의미가 달라서(AMRAP은 제한시간 안에 완료한 라운드,
+// TIMECAP·For Time은 목표 라운드, EMOM은 라운드 개념이 없음) 라벨과 라운드 칸
+// 노출 여부를 여기서 갈라준다.
+export const PT_LOG_CIRCUIT_FIELD_CONFIG: Record<
+  string,
+  { minutesLabel: string; showRounds: boolean; roundsLabel: string }
+> = {
+  amrap: { minutesLabel: "제한 시간(분)", showRounds: true, roundsLabel: "완료한 라운드" },
+  timecap: { minutesLabel: "제한 시간(분)", showRounds: true, roundsLabel: "목표 라운드" },
+  for_time: { minutesLabel: "걸린 시간(분)", showRounds: true, roundsLabel: "목표 라운드" },
+  emom: { minutesLabel: "총 시간(분)", showRounds: false, roundsLabel: "" },
 };
 
 // 통증 척도·운동수행 능력 공통 0~10 척도.

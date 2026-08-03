@@ -3,7 +3,11 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { koreaCurrentMonthKey } from "@/lib/date";
-import { PT_LOG_EQUIPMENT_LABELS } from "@/lib/constants";
+import {
+  PT_LOG_EQUIPMENT_LABELS,
+  PT_LOG_CIRCUIT_TYPE_LABELS,
+  PT_LOG_CIRCUIT_FIELD_CONFIG,
+} from "@/lib/constants";
 import { DeletePtLogButton } from "@/app/components/DeletePtLogButton";
 import type { PtLogExercise, PtLogRow } from "@/lib/db";
 
@@ -22,6 +26,20 @@ function monthLabel(monthKey: string): string {
 }
 
 export function exerciseSummary(e: PtLogExercise): string {
+  if (e.equipment === "circuit" && e.circuit) {
+    const typeLabel = PT_LOG_CIRCUIT_TYPE_LABELS[e.circuit.type] ?? e.circuit.type;
+    const config = PT_LOG_CIRCUIT_FIELD_CONFIG[e.circuit.type];
+    const parts: string[] = [];
+    if (e.circuit.minutes != null) {
+      parts.push(`${config?.minutesLabel ?? "시간"} ${e.circuit.minutes}분`);
+    }
+    if (config?.showRounds && e.circuit.rounds != null) {
+      parts.push(`${config.roundsLabel} ${e.circuit.rounds}라운드`);
+    }
+    if (e.circuit.workout) parts.push(e.circuit.workout);
+    return parts.length > 0 ? `${typeLabel} — ${parts.join(" · ")}` : typeLabel;
+  }
+
   const groups =
     e.groups
       .map((g) => {

@@ -58,6 +58,14 @@ export default async function EditPtLogPage({
                   }))
                 : [{ weight: "", reps: "", sets: "", trackPerformance: false, rpe: "" }],
             note: e.note ?? "",
+            circuit: e.circuit
+              ? {
+                  type: e.circuit.type,
+                  minutes: e.circuit.minutes == null ? "" : String(e.circuit.minutes),
+                  rounds: e.circuit.rounds == null ? "" : String(e.circuit.rounds),
+                  workout: e.circuit.workout ?? "",
+                }
+              : null,
           })),
         }}
       />
