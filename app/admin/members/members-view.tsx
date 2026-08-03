@@ -132,7 +132,17 @@ function formatAvailability(selected: Set<string>): string {
 /** "가능한 요일·시간"을 드래그로 복수 선택할 수 있는 주간 시간표. 선택 결과를
     읽기 쉬운 텍스트로 변환해 부모의 텍스트 입력값을 갱신한다(기존 자유 텍스트는
     직접 수정도 계속 가능). */
-function AvailabilityGridPicker({ onChange }: { onChange: (text: string) => void }) {
+function AvailabilityGridPicker({
+  onChange,
+  lockable = false,
+}: {
+  onChange: (text: string) => void;
+  /** true면 기본은 잠금(보기 전용)이라 드래그가 안 먹고, "수정"을 눌러야 편집할
+      수 있다. "저장"을 누르면 다시 잠긴다 — 스크롤하다 실수로 칸을 건드려 값이
+      바뀌는 사고를 막기 위함(기존 회원 상세에서만 씀. 신규 등록 흐름은 아직 아무것도
+      저장된 게 없어 잠글 필요가 없다). */
+  lockable?: boolean;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const selectedRef = useRef(selected);
   useEffect(() => {
@@ -140,6 +150,7 @@ function AvailabilityGridPicker({ onChange }: { onChange: (text: string) => void
   }, [selected]);
   const paintModeRef = useRef<"add" | "remove" | null>(null);
   const [isPainting, setIsPainting] = useState(false);
+  const [locked, setLocked] = useState(lockable);
 
   function applyCell(weekday: number, hour: number, mode: "add" | "remove") {
     const key = cellKey(weekday, hour);
@@ -154,6 +165,7 @@ function AvailabilityGridPicker({ onChange }: { onChange: (text: string) => void
   }
 
   function handlePointerDown(weekday: number, hour: number) {
+    if (locked) return;
     const mode: "add" | "remove" = selectedRef.current.has(cellKey(weekday, hour)) ? "remove" : "add";
     paintModeRef.current = mode;
     setIsPainting(true);
@@ -161,7 +173,7 @@ function AvailabilityGridPicker({ onChange }: { onChange: (text: string) => void
   }
 
   function handlePointerMove(e: ReactPointerEvent) {
-    if (!paintModeRef.current) return;
+    if (locked || !paintModeRef.current) return;
     const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     const cellEl = el?.closest<HTMLElement>("[data-weekday]");
     if (!cellEl) return;
@@ -192,13 +204,28 @@ function AvailabilityGridPicker({ onChange }: { onChange: (text: string) => void
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <p className="text-xs text-ink/40">표를 드래그하면 여러 칸을 한 번에 선택할 수 있어요.</p>
-        {selected.size > 0 && (
-          <button type="button" onClick={clearAll} className="text-xs text-coral hover:underline shrink-0">
-            선택 지우기
-          </button>
-        )}
+      <div className="flex items-center justify-between mb-1.5 gap-2">
+        <p className="text-xs text-ink/40">
+          {locked
+            ? "수정을 눌러야 편집할 수 있어요."
+            : "표를 드래그하면 여러 칸을 한 번에 선택할 수 있어요."}
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          {!locked && selected.size > 0 && (
+            <button type="button" onClick={clearAll} className="text-xs text-coral hover:underline">
+              선택 지우기
+            </button>
+          )}
+          {lockable && (
+            <button
+              type="button"
+              onClick={() => setLocked((v) => !v)}
+              className="text-xs text-coral hover:underline"
+            >
+              {locked ? "수정" : "저장"}
+            </button>
+          )}
+        </div>
       </div>
       <div
         className="rounded-xl border border-line overflow-x-auto select-none"
@@ -229,8 +256,9 @@ function AvailabilityGridPicker({ onChange }: { onChange: (text: string) => void
                       data-hour={hour}
                       onPointerDown={() => handlePointerDown(weekday, hour)}
                       className={[
-                        "px-1.5 py-1 text-center cursor-pointer border-l border-line/10",
-                        active ? "bg-coral text-white" : "hover:bg-bone/60",
+                        "px-1.5 py-1 text-center border-l border-line/10",
+                        locked ? "cursor-default" : "cursor-pointer",
+                        active ? "bg-coral text-white" : locked ? "" : "hover:bg-bone/60",
                       ].join(" ")}
                     >
                       {active ? "✓" : ""}
@@ -2399,7 +2427,7 @@ function MemberDetailModal({
             placeholder="예: 화·목 오전 10시"
             className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral mb-2"
           />
-          <AvailabilityGridPicker onChange={setAvailableTimes} />
+          <AvailabilityGridPicker onChange={setAvailableTimes} lockable />
         </Field>
 
         <div>

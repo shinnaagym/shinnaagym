@@ -139,7 +139,9 @@ export async function POST(req: NextRequest) {
   } else {
     member = await createMember({ name, phone, coachId, notes, referrer, availableTimes });
   }
-  const pkg = await addPackage(member.id, totalSessions, price, "최초 등록", ptType, paymentMethod);
+  // 등록 폼의 "옵션" 입력은 결제·패키지 이력 목록에 바로 보이도록 패키지 메모에도 남긴다.
+  const packageNote = optionNote ? `최초 등록 · ${optionNote}` : "최초 등록";
+  const pkg = await addPackage(member.id, totalSessions, price, packageNote, ptType, paymentMethod);
   const contract = await createContract({
     memberId: member.id,
     entryType: "new",
