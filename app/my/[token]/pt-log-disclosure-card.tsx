@@ -11,7 +11,7 @@ export function PtLogDisclosureCard({ ptLogs }: { ptLogs: PtLogRow[] }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-2xl border border-line bg-white/60 px-6 py-5 mb-4">
+    <div className="rounded-2xl border border-line bg-white px-6 py-5 mb-4">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="font-display text-lg mb-1">🏋️ PT 일지</p>
