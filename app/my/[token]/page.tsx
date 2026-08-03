@@ -17,6 +17,7 @@ import { listNotices } from "@/lib/notices";
 import { koreaTodayKey } from "@/lib/date";
 import { AssessmentPainChart } from "@/app/admin/members/[id]/assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
+import { PtLogDisclosureCard } from "./pt-log-disclosure-card";
 
 // 담당 코치의 개인 연락처가 등록되지 않은 경우를 위한 기본(스튜디오) 문의 번호.
 const DEFAULT_STUDIO_PHONE = "010-6859-6114";
@@ -176,20 +177,7 @@ export default async function MyReservationPage({
           </>
         )}
 
-        {ptLogs.length > 0 && (
-          <Link
-            href={`/my/${token}/pt-log`}
-            className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-4 hover:border-coral/40 transition"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-display text-lg mb-1">🏋️ PT 일지</p>
-                <p className="text-sm text-ink/60">{ptLogs.length}건 · 내용 확인하기</p>
-              </div>
-              <span className="text-ink/30">→</span>
-            </div>
-          </Link>
-        )}
+        {ptLogs.length > 0 && <PtLogDisclosureCard ptLogs={ptLogs} />}
 
         {intake && (
           <Link
