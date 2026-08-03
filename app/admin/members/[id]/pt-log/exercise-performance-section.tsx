@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
 import { ExercisePerformanceRow } from "@/app/components/AssessmentEntryRows";
+import { DisclosureToggle } from "@/app/components/DisclosureToggle";
 import type { ExercisePerformanceEntry } from "@/lib/db";
 
 function emptyEntry(): ExercisePerformanceEntry {
@@ -26,6 +27,7 @@ export function ExercisePerformanceSection({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   function updateEntry(index: number, patch: Partial<ExercisePerformanceEntry>) {
     setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
@@ -73,48 +75,59 @@ export function ExercisePerformanceSection({
 
   return (
     <div className="rounded-2xl border border-line/60 bg-white shadow-sm px-5 py-4 mb-6">
-      <h2 className="font-display text-base mb-1">운동 수행능력 평가</h2>
-      <p className="text-xs text-ink/50 mb-3">
-        운동별로 현재 수행 가능한 수준을 기록해주세요. 여러 개면 하나씩 추가해주세요.
-      </p>
-      <div className="mb-3">
-        <label className="block text-xs text-ink/40 mb-1">날짜</label>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <h2 className="font-display text-base">운동 수행능력 평가</h2>
+        <DisclosureToggle
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+          label={expanded ? "운동 수행능력 평가 접기" : "운동 수행능력 평가 펼치기"}
         />
       </div>
-      {entries.map((entry, i) => (
-        <ExercisePerformanceRow
-          key={i}
-          index={i}
-          entry={entry}
-          pastExercises={pastExercises}
-          onChange={updateEntry}
-          onRemove={removeEntry}
-        />
-      ))}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          type="button"
-          onClick={addEntry}
-          className="rounded-full border border-line px-4 py-1.5 text-sm hover:border-coral/40 transition"
-        >
-          + 운동 수행능력 추가
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={submitting}
-          className="rounded-full bg-coral text-white px-4 py-1.5 text-sm hover:opacity-90 transition disabled:opacity-50"
-        >
-          {submitting ? "저장 중..." : "저장"}
-        </button>
-        {saved && <span className="text-xs text-sage">그래프에 반영됐어요.</span>}
-      </div>
-      {error && <p className="text-sm text-coral mt-2">{error}</p>}
+      {expanded && (
+        <>
+          <p className="text-xs text-ink/50 mb-3">
+            운동별로 현재 수행 가능한 수준을 기록해주세요. 여러 개면 하나씩 추가해주세요.
+          </p>
+          <div className="mb-3">
+            <label className="block text-xs text-ink/40 mb-1">날짜</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+            />
+          </div>
+          {entries.map((entry, i) => (
+            <ExercisePerformanceRow
+              key={i}
+              index={i}
+              entry={entry}
+              pastExercises={pastExercises}
+              onChange={updateEntry}
+              onRemove={removeEntry}
+            />
+          ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={addEntry}
+              className="rounded-full border border-line px-4 py-1.5 text-sm hover:border-coral/40 transition"
+            >
+              + 운동 수행능력 추가
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={submitting}
+              className="rounded-full bg-coral text-white px-4 py-1.5 text-sm hover:opacity-90 transition disabled:opacity-50"
+            >
+              {submitting ? "저장 중..." : "저장"}
+            </button>
+            {saved && <span className="text-xs text-sage">그래프에 반영됐어요.</span>}
+          </div>
+          {error && <p className="text-sm text-coral mt-2">{error}</p>}
+        </>
+      )}
     </div>
   );
 }
