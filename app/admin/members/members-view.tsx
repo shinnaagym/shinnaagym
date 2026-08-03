@@ -1784,6 +1784,12 @@ function MemberDetailModal({
   const [savingSlot, setSavingSlot] = useState(false);
   const [showWriteContract, setShowWriteContract] = useState(false);
   const [showContractView, setShowContractView] = useState(!!initialShowContractView);
+  // 삭제류 동작은 브라우저 기본 confirm() 대신 이 상태로 재확인 모달을 띄운다.
+  // iOS에서 "홈 화면에 추가"로 설치한 PWA(standalone) 모드에서는 window.confirm이
+  // 동작하지 않거나 무시돼서, 실수로 되돌릴 수 없는 삭제가 바로 일어나는 문제가 있었다.
+  const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void } | null>(
+    null,
+  );
 
   async function addSlot() {
     if (!data?.member.coach_id) {
@@ -1944,9 +1950,16 @@ function MemberDetailModal({
     }
   }
 
-  async function handleDeleteMember() {
+  function handleDeleteMember() {
     if (data!.packages.length > 0) return;
-    if (!confirm(`${data!.member.name} 회원을 완전히 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setConfirmState({
+      message: `${data!.member.name} 회원을 완전히 삭제할까요? 되돌릴 수 없어요.`,
+      onConfirm: doDeleteMember,
+    });
+  }
+
+  async function doDeleteMember() {
+    setConfirmState(null);
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/members/${memberId}`, { method: "DELETE" });
@@ -2028,8 +2041,15 @@ function MemberDetailModal({
     onChanged();
   }
 
-  async function deletePkg(pkgId: number) {
-    if (!confirm("이 결제 기록을 삭제할까요?")) return;
+  function deletePkg(pkgId: number) {
+    setConfirmState({
+      message: "이 결제 기록을 삭제할까요?",
+      onConfirm: () => doDeletePkg(pkgId),
+    });
+  }
+
+  async function doDeletePkg(pkgId: number) {
+    setConfirmState(null);
     const res = await fetch(`/api/admin/members/${memberId}/packages/${pkgId}`, {
       method: "DELETE",
     });
@@ -2434,6 +2454,33 @@ function MemberDetailModal({
           )
         }
       />
+    )}
+    {confirmState && (
+      <div
+        className="fixed inset-0 z-30 flex items-center justify-center bg-ink/50 px-4"
+        onClick={() => setConfirmState(null)}
+      >
+        <div
+          className="w-full max-w-sm rounded-2xl bg-white shadow-xl p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm mb-5 whitespace-pre-line">{confirmState.message}</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmState(null)}
+              className="flex-1 rounded-full border border-line py-2 text-sm hover:bg-bone transition"
+            >
+              취소
+            </button>
+            <button
+              onClick={confirmState.onConfirm}
+              className="flex-1 rounded-full bg-coral text-white py-2 text-sm font-medium hover:opacity-90 transition"
+            >
+              삭제
+            </button>
+          </div>
+        </div>
+      </div>
     )}
     </>
   );
