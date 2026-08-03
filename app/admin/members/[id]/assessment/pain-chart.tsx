@@ -7,6 +7,7 @@ import { koreaTodayKey } from "@/lib/date";
 import { appendSummaryToSvgClone, svgToPngDataUrl } from "@/lib/chart-image";
 import type { AssessmentMovements, AssessmentRow, PainTriggerEntry } from "@/lib/db";
 import { ChartZoomModal } from "@/app/components/ChartZoomModal";
+import { DisclosureToggle } from "@/app/components/DisclosureToggle";
 
 const WIDTH = 640;
 const HEIGHT = 640;
@@ -264,6 +265,7 @@ export function AssessmentPainChart({
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomLoading, setZoomLoading] = useState(false);
@@ -455,17 +457,26 @@ export function AssessmentPainChart({
       `}</style>
       <div className="flex items-center justify-between mb-2 gap-2">
         <p className="font-display text-base">통증 척도 그래프</p>
-        {memberId != null && series.length > 0 && !showAddForm && (
-          <button
-            type="button"
-            onClick={() => setShowAddForm(true)}
-            className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
-          >
-            + 기록추가
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {memberId != null && series.length > 0 && !showAddForm && expanded && (
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
+            >
+              + 기록추가
+            </button>
+          )}
+          <DisclosureToggle
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            label={expanded ? "통증 척도 그래프 접기" : "통증 척도 그래프 펼치기"}
+          />
+        </div>
       </div>
 
+      {expanded && (
+        <>
       {memberId != null && showAddForm && series.length > 0 && (
         <QuickAddPainForm
           memberId={memberId}
@@ -579,6 +590,8 @@ export function AssessmentPainChart({
           </div>
         )}
       </div>
+        </>
+      )}
 
       <ChartZoomModal
         open={zoomOpen}
