@@ -832,12 +832,22 @@ export interface PtLogSetGroup {
   sets: number | null;
 }
 
+export interface PtLogCircuit {
+  type: string;
+  minutes: number | null;
+  rounds: number | null;
+  /** 주어진 운동(자유 텍스트). 예: "스쿼트 10개, 버피 10개". */
+  workout: string;
+}
+
 export interface PtLogExercise {
   name: string;
   equipment: string;
   groups: PtLogSetGroup[];
   /** 그 운동에 대한 특이사항(자세 보정, 통증 반응 등 짧은 메모). */
   note: string;
+  /** equipment가 "circuit"(서킷 트레이닝)일 때만 쓰는 AMRAP/TIMECAP/For Time/EMOM 기록. */
+  circuit?: PtLogCircuit | null;
 }
 
 export interface PtLogRow {

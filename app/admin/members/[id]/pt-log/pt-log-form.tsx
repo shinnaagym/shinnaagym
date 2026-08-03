@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
-import { PT_LOG_EQUIPMENT_LABELS, PT_LOG_EQUIPMENT_OPTIONS } from "@/lib/constants";
+import {
+  PT_LOG_EQUIPMENT_LABELS,
+  PT_LOG_EQUIPMENT_OPTIONS,
+  PT_LOG_CIRCUIT_TYPE_OPTIONS,
+  PT_LOG_CIRCUIT_TYPE_LABELS,
+  PT_LOG_CIRCUIT_FIELD_CONFIG,
+} from "@/lib/constants";
 import { pastExerciseGroupKey } from "./past-exercise-names";
 import type { PtLogSetGroup } from "@/lib/db";
 
@@ -16,15 +22,28 @@ interface SetGroupInput {
   rpe: string;
 }
 
+interface CircuitInput {
+  type: string;
+  minutes: string;
+  rounds: string;
+  workout: string;
+}
+
 interface ExerciseInput {
   name: string;
   equipment: string;
   groups: SetGroupInput[];
   note: string;
+  /** equipment가 "circuit"일 때만 쓴다. */
+  circuit: CircuitInput | null;
 }
 
 function emptyGroup(): SetGroupInput {
   return { weight: "", reps: "", sets: "", trackPerformance: false, rpe: "" };
+}
+
+function emptyCircuit(): CircuitInput {
+  return { type: PT_LOG_CIRCUIT_TYPE_OPTIONS[0].value, minutes: "", rounds: "", workout: "" };
 }
 
 function emptyExercise(): ExerciseInput {
@@ -33,6 +52,7 @@ function emptyExercise(): ExerciseInput {
     equipment: PT_LOG_EQUIPMENT_OPTIONS[0].value,
     groups: [emptyGroup()],
     note: "",
+    circuit: null,
   };
 }
 
@@ -86,6 +106,11 @@ export function PtLogForm({
       prev.map((e, i) => {
         if (i !== index) return e;
         const next = { ...e, ...patch };
+        if (patch.equipment !== undefined) {
+          // 서킷 트레이닝으로 바꾸면 형식 다이얼(AMRAP 등) 상태를 새로 만들고,
+          // 서킷에서 다른 도구로 바꾸면 서킷 기록은 지운다.
+          next.circuit = patch.equipment === "circuit" ? (e.circuit ?? emptyCircuit()) : null;
+        }
         const past = pastExerciseGroups[pastExerciseGroupKey(next.name.trim(), next.equipment)];
         const allEmpty = next.groups.every((g) => g.weight === "" && g.reps === "" && g.sets === "");
         if (past && allEmpty && past.length > next.groups.length) {
@@ -95,6 +120,12 @@ export function PtLogForm({
         }
         return next;
       }),
+    );
+  }
+
+  function updateCircuit(exIndex: number, patch: Partial<CircuitInput>) {
+    setExercises((prev) =>
+      prev.map((e, i) => (i === exIndex && e.circuit ? { ...e, circuit: { ...e.circuit, ...patch } } : e)),
     );
   }
 
@@ -132,19 +163,37 @@ export function PtLogForm({
 
   async function handleSubmit() {
     const cleanedExercises = exercises
-      .filter((e) => e.name.trim().length > 0)
-      .map((e) => ({
-        name: e.name.trim(),
-        equipment: e.equipment,
-        groups: e.groups
-          .filter((g) => g.weight !== "" || g.reps !== "" || g.sets !== "")
-          .map((g) => ({
-            weight: g.weight === "" ? null : Number(g.weight),
-            reps: g.reps === "" ? null : Number(g.reps),
-            sets: g.sets === "" ? null : Number(g.sets),
-          })),
-        note: e.note.trim(),
-      }));
+      .map((e) => {
+        // 서킷 트레이닝은 이름을 직접 입력하지 않으므로 형식 이름(AMRAP 등)을
+        // 이름으로 쓰고, 무게·횟수·세트 대신 circuit 기록을 담는다.
+        if (e.equipment === "circuit" && e.circuit) {
+          return {
+            name: PT_LOG_CIRCUIT_TYPE_LABELS[e.circuit.type] ?? e.circuit.type,
+            equipment: e.equipment,
+            groups: [],
+            note: e.note.trim(),
+            circuit: {
+              type: e.circuit.type,
+              minutes: e.circuit.minutes === "" ? null : Number(e.circuit.minutes),
+              rounds: e.circuit.rounds === "" ? null : Number(e.circuit.rounds),
+              workout: e.circuit.workout.trim(),
+            },
+          };
+        }
+        return {
+          name: e.name.trim(),
+          equipment: e.equipment,
+          groups: e.groups
+            .filter((g) => g.weight !== "" || g.reps !== "" || g.sets !== "")
+            .map((g) => ({
+              weight: g.weight === "" ? null : Number(g.weight),
+              reps: g.reps === "" ? null : Number(g.reps),
+              sets: g.sets === "" ? null : Number(g.sets),
+            })),
+          note: e.note.trim(),
+        };
+      })
+      .filter((e) => e.name.trim().length > 0);
 
     // 체크해둔 세트는 운동 수행능력(e1RM) 그래프용 평가 기록으로도 함께 남긴다.
     const performanceEntries = exercises.flatMap((e) =>
@@ -243,44 +292,58 @@ export function PtLogForm({
                   </option>
                 ))}
               </select>
-              <div className="relative min-w-0 flex-1">
-                <input
-                  value={ex.name}
-                  onChange={(e) => updateExerciseNameOrEquipment(exIndex, { name: e.target.value })}
-                  onFocus={() => setSuggestIndex(exIndex)}
-                  onBlur={() => setTimeout(() => setSuggestIndex(null), 150)}
-                  placeholder="운동 이름 (예: 스쿼트)"
-                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-                />
-                {suggestIndex === exIndex &&
-                  ex.name.trim().length > 0 &&
-                  (() => {
-                    const query = ex.name.trim();
-                    const matches = pastExercises
-                      .filter((name) => name !== query && name.includes(query))
-                      .slice(0, 6);
-                    if (matches.length === 0) return null;
-                    return (
-                      <ul className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-line bg-white shadow-md overflow-hidden">
-                        {matches.map((name) => (
-                          <li key={name}>
-                            <button
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                updateExerciseNameOrEquipment(exIndex, { name });
-                                setSuggestIndex(null);
-                              }}
-                              className="block w-full text-left px-3 py-2 text-sm hover:bg-bone/60"
-                            >
-                              {name}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    );
-                  })()}
-              </div>
+              {ex.equipment === "circuit" ? (
+                <select
+                  value={ex.circuit?.type ?? PT_LOG_CIRCUIT_TYPE_OPTIONS[0].value}
+                  onChange={(e) => updateCircuit(exIndex, { type: e.target.value })}
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+                >
+                  {PT_LOG_CIRCUIT_TYPE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="relative min-w-0 flex-1">
+                  <input
+                    value={ex.name}
+                    onChange={(e) => updateExerciseNameOrEquipment(exIndex, { name: e.target.value })}
+                    onFocus={() => setSuggestIndex(exIndex)}
+                    onBlur={() => setTimeout(() => setSuggestIndex(null), 150)}
+                    placeholder="운동 이름 (예: 스쿼트)"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                  />
+                  {suggestIndex === exIndex &&
+                    ex.name.trim().length > 0 &&
+                    (() => {
+                      const query = ex.name.trim();
+                      const matches = pastExercises
+                        .filter((name) => name !== query && name.includes(query))
+                        .slice(0, 6);
+                      if (matches.length === 0) return null;
+                      return (
+                        <ul className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-line bg-white shadow-md overflow-hidden">
+                          {matches.map((name) => (
+                            <li key={name}>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  updateExerciseNameOrEquipment(exIndex, { name });
+                                  setSuggestIndex(null);
+                                }}
+                                className="block w-full text-left px-3 py-2 text-sm hover:bg-bone/60"
+                              >
+                                {name}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      );
+                    })()}
+                </div>
+              )}
               {exercises.length > 1 && (
                 <button
                   type="button"
@@ -293,86 +356,123 @@ export function PtLogForm({
               )}
             </div>
 
-            <div className="space-y-2">
-              {ex.groups.map((g, groupIndex) => {
-                const pastGroups = pastExerciseGroups[pastExerciseGroupKey(ex.name.trim(), ex.equipment)];
-                const pastGroup = pastGroups?.[groupIndex];
-                const weightPlaceholder =
-                  pastGroup?.weight != null
-                    ? `(${PT_LOG_EQUIPMENT_LABELS[ex.equipment] ?? ex.equipment}) ${pastGroup.weight}kg`
-                    : "무게(kg)";
+            {ex.equipment === "circuit" && ex.circuit ? (
+              (() => {
+                const config =
+                  PT_LOG_CIRCUIT_FIELD_CONFIG[ex.circuit.type] ?? PT_LOG_CIRCUIT_FIELD_CONFIG.amrap;
                 return (
-                <div key={groupIndex} className="space-y-1.5">
-                  <div className="flex items-center gap-1.5">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={ex.circuit.minutes}
+                        onChange={(e) => updateCircuit(exIndex, { minutes: e.target.value })}
+                        placeholder={config.minutesLabel}
+                        className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                      />
+                      {config.showRounds && (
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={ex.circuit.rounds}
+                          onChange={(e) => updateCircuit(exIndex, { rounds: e.target.value })}
+                          placeholder={config.roundsLabel}
+                          className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                        />
+                      )}
+                    </div>
                     <input
-                      type="number"
-                      inputMode="decimal"
-                      value={g.weight}
-                      onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
-                      placeholder={weightPlaceholder}
-                      className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                      value={ex.circuit.workout}
+                      onChange={(e) => updateCircuit(exIndex, { workout: e.target.value })}
+                      placeholder="주어진 운동 (예: 스쿼트 10개, 버피 10개)"
+                      className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                     />
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={g.reps}
-                      onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
-                      placeholder={pastGroup?.reps != null ? String(pastGroup.reps) : "횟수"}
-                      className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
-                    />
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={g.sets}
-                      onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
-                      placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
-                      className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
-                    />
-                    <input
-                      type="checkbox"
-                      checked={g.trackPerformance}
-                      onChange={(e) =>
-                        updateGroup(exIndex, groupIndex, { trackPerformance: e.target.checked })
-                      }
-                      title="이 세트를 운동 수행능력(e1RM) 그래프에 반영"
-                      className="shrink-0"
-                    />
-                    {ex.groups.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeGroup(exIndex, groupIndex)}
-                        className="shrink-0 text-ink/40 hover:text-coral text-sm"
-                        aria-label="세트 그룹 삭제"
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="space-y-2">
+                {ex.groups.map((g, groupIndex) => {
+                  const pastGroups = pastExerciseGroups[pastExerciseGroupKey(ex.name.trim(), ex.equipment)];
+                  const pastGroup = pastGroups?.[groupIndex];
+                  const weightPlaceholder =
+                    pastGroup?.weight != null
+                      ? `(${PT_LOG_EQUIPMENT_LABELS[ex.equipment] ?? ex.equipment}) ${pastGroup.weight}kg`
+                      : "무게(kg)";
+                  return (
+                  <div key={groupIndex} className="space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={g.weight}
+                        onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
+                        placeholder={weightPlaceholder}
+                        className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={g.reps}
+                        onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
+                        placeholder={pastGroup?.reps != null ? String(pastGroup.reps) : "횟수"}
+                        className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={g.sets}
+                        onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
+                        placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
+                        className="min-w-0 flex-[2] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                      />
+                      <input
+                        type="checkbox"
+                        checked={g.trackPerformance}
+                        onChange={(e) =>
+                          updateGroup(exIndex, groupIndex, { trackPerformance: e.target.checked })
+                        }
+                        title="이 세트를 운동 수행능력(e1RM) 그래프에 반영"
+                        className="shrink-0"
+                      />
+                      {ex.groups.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeGroup(exIndex, groupIndex)}
+                          className="shrink-0 text-ink/40 hover:text-coral text-sm"
+                          aria-label="세트 그룹 삭제"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                    {g.trackPerformance && (
+                      <select
+                        value={g.rpe}
+                        onChange={(e) => updateGroup(exIndex, groupIndex, { rpe: e.target.value })}
+                        className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-coral"
                       >
-                        ×
-                      </button>
+                        <option value="">RPE 선택 — 운동 수행능력 그래프에 반영돼요</option>
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
+                          <option key={v} value={v}>
+                            RPE {v}
+                          </option>
+                        ))}
+                      </select>
                     )}
                   </div>
-                  {g.trackPerformance && (
-                    <select
-                      value={g.rpe}
-                      onChange={(e) => updateGroup(exIndex, groupIndex, { rpe: e.target.value })}
-                      className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-coral"
-                    >
-                      <option value="">RPE 선택 — 운동 수행능력 그래프에 반영돼요</option>
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
-                        <option key={v} value={v}>
-                          RPE {v}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => addGroup(exIndex)}
-                className="text-xs text-coral hover:underline"
-              >
-                + 세트 그룹 추가 (같은 운동, 다른 무게)
-              </button>
-            </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => addGroup(exIndex)}
+                  className="text-xs text-coral hover:underline"
+                >
+                  + 세트 그룹 추가 (같은 운동, 다른 무게)
+                </button>
+              </div>
+            )}
 
             <input
               value={ex.note}
