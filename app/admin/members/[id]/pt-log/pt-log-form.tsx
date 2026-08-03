@@ -10,7 +10,7 @@ import {
   PT_LOG_CIRCUIT_TYPE_LABELS,
   PT_LOG_CIRCUIT_FIELD_CONFIG,
 } from "@/lib/constants";
-import { pastExerciseGroupKey } from "./past-exercise-names";
+import { pastExerciseGroupKey, type PastCircuitEntry } from "./past-exercise-names";
 import type { PtLogSetGroup } from "@/lib/db";
 
 interface SetGroupInput {
@@ -46,6 +46,18 @@ function emptyCircuit(): CircuitInput {
   return { type: PT_LOG_CIRCUIT_TYPE_OPTIONS[0].value, minutes: "", rounds: "", workout: "" };
 }
 
+/** "과거 운동이력" 다이얼의 선택지 한 줄 미리보기. */
+function circuitEntryPreview(
+  circuit: PastCircuitEntry["circuit"],
+  config: { showRounds: boolean },
+): string {
+  const parts: string[] = [];
+  if (circuit.minutes != null) parts.push(`${circuit.minutes}분`);
+  if (config.showRounds && circuit.rounds != null) parts.push(`${circuit.rounds}라운드`);
+  if (circuit.workout) parts.push(circuit.workout.replace(/\s*\n\s*/g, " "));
+  return parts.join(" · ") || "(내용 없음)";
+}
+
 function emptyExercise(): ExerciseInput {
   return {
     name: "",
@@ -69,6 +81,7 @@ export function PtLogForm({
   initialData,
   pastExercises = [],
   pastExerciseGroups = {},
+  pastCircuitEntries = {},
 }: {
   memberId: number;
   memberName: string;
@@ -79,6 +92,9 @@ export function PtLogForm({
       세트 입력란에 회색 placeholder("지난번엔 이랬다")로만 보여주고 값으로 채우진
       않는다. 도구가 다르면(바벨 스쿼트 vs 덤벨 스쿼트) 다른 운동으로 취급한다. */
   pastExerciseGroups?: Record<string, PtLogSetGroup[]>;
+  /** 형식(AMRAP 등)별 과거 서킷 트레이닝 기록. "과거 운동이력" 다이얼에서 골라
+      그대로 불러오는 용도. */
+  pastCircuitEntries?: Record<string, PastCircuitEntry[]>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -284,7 +300,7 @@ export function PtLogForm({
               <select
                 value={ex.equipment}
                 onChange={(e) => updateExerciseNameOrEquipment(exIndex, { equipment: e.target.value })}
-                className="w-24 shrink-0 rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none focus:border-coral"
+                className="w-32 shrink-0 rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none focus:border-coral"
               >
                 {PT_LOG_EQUIPMENT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -300,7 +316,7 @@ export function PtLogForm({
                 >
                   {PT_LOG_CIRCUIT_TYPE_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
-                      {o.label}
+                      {o.label}({o.description})
                     </option>
                   ))}
                 </select>
@@ -358,15 +374,40 @@ export function PtLogForm({
 
             {ex.equipment === "circuit" && ex.circuit ? (
               (() => {
-                const config =
-                  PT_LOG_CIRCUIT_FIELD_CONFIG[ex.circuit.type] ?? PT_LOG_CIRCUIT_FIELD_CONFIG.amrap;
+                const circuit = ex.circuit;
+                const config = PT_LOG_CIRCUIT_FIELD_CONFIG[circuit.type] ?? PT_LOG_CIRCUIT_FIELD_CONFIG.amrap;
+                const pastEntries = pastCircuitEntries[circuit.type] ?? [];
                 return (
                   <div className="space-y-2">
+                    {pastEntries.length > 0 && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const entry = pastEntries[Number(e.target.value)];
+                          if (!entry) return;
+                          updateCircuit(exIndex, {
+                            minutes: entry.circuit.minutes == null ? "" : String(entry.circuit.minutes),
+                            rounds: entry.circuit.rounds == null ? "" : String(entry.circuit.rounds),
+                            workout: entry.circuit.workout,
+                          });
+                        }}
+                        className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink/50 outline-none focus:border-coral"
+                      >
+                        <option value="" disabled>
+                          과거 {PT_LOG_CIRCUIT_TYPE_LABELS[circuit.type] ?? ""} 운동이력 불러오기
+                        </option>
+                        {pastEntries.map((entry, i) => (
+                          <option key={i} value={i}>
+                            {entry.logDate} · {circuitEntryPreview(entry.circuit, config)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <div className="flex items-center gap-1.5">
                       <input
                         type="number"
                         inputMode="numeric"
-                        value={ex.circuit.minutes}
+                        value={circuit.minutes}
                         onChange={(e) => updateCircuit(exIndex, { minutes: e.target.value })}
                         placeholder={config.minutesLabel}
                         className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
@@ -375,18 +416,19 @@ export function PtLogForm({
                         <input
                           type="number"
                           inputMode="numeric"
-                          value={ex.circuit.rounds}
+                          value={circuit.rounds}
                           onChange={(e) => updateCircuit(exIndex, { rounds: e.target.value })}
                           placeholder={config.roundsLabel}
                           className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                         />
                       )}
                     </div>
-                    <input
-                      value={ex.circuit.workout}
+                    <textarea
+                      value={circuit.workout}
                       onChange={(e) => updateCircuit(exIndex, { workout: e.target.value })}
+                      rows={3}
                       placeholder="주어진 운동 (예: 스쿼트 10개, 버피 10개)"
-                      className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                      className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
                     />
                   </div>
                 );

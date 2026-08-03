@@ -4,7 +4,7 @@ import { getMemberById } from "@/lib/schedule";
 import { getPtLogById, listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember } from "@/lib/assessments";
 import { PtLogForm } from "../../pt-log-form";
-import { pastExerciseGroups, pastExerciseNames } from "../../past-exercise-names";
+import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../../past-exercise-names";
 
 export default async function EditPtLogPage({
   params,
@@ -41,6 +41,7 @@ export default async function EditPtLogPage({
         ptLogId={logIdNum}
         pastExercises={pastExerciseNames(ptLogs, assessments)}
         pastExerciseGroups={pastExerciseGroups(ptLogs.filter((l) => l.id !== logIdNum))}
+        pastCircuitEntries={pastCircuitEntries(ptLogs.filter((l) => l.id !== logIdNum))}
         initialData={{
           logDate: ptLog.log_date,
           memo: ptLog.memo,
