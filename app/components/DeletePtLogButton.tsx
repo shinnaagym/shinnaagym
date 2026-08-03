@@ -6,9 +6,14 @@ import { useRouter } from "next/navigation";
 export function DeletePtLogButton({
   ptLogId,
   className,
+  endpoint,
+  confirmMessage,
 }: {
   ptLogId: number;
   className?: string;
+  /** 기본은 PT 일지 삭제 API. 개인 운동 등 다른 기록을 지울 때는 넘긴다. */
+  endpoint?: string;
+  confirmMessage?: string;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -16,10 +21,10 @@ export function DeletePtLogButton({
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm("이 PT 일지를 삭제할까요? 되돌릴 수 없어요.")) return;
+    if (!window.confirm(confirmMessage ?? "이 PT 일지를 삭제할까요? 되돌릴 수 없어요.")) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/admin/pt-logs/${ptLogId}`, { method: "DELETE" });
+      const res = await fetch(endpoint ?? `/api/admin/pt-logs/${ptLogId}`, { method: "DELETE" });
       if (!res.ok) {
         window.alert("삭제에 실패했어요.");
         setDeleting(false);

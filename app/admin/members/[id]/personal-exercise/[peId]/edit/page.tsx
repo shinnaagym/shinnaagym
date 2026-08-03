@@ -1,35 +1,37 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
-import { getPtLogById, listPtLogsByMember } from "@/lib/pt-logs";
-import { listAssessmentsByMember } from "@/lib/assessments";
-import { PtLogForm } from "../../pt-log-form";
-import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../../past-exercise-names";
+import { getPersonalExerciseById, listPersonalExercisesByMember } from "@/lib/personal-exercises";
+import { PtLogForm } from "../../../pt-log/pt-log-form";
+import {
+  pastCircuitEntries,
+  pastExerciseGroups,
+  pastExerciseNames,
+} from "../../../pt-log/past-exercise-names";
 
-export default async function EditPtLogPage({
+export default async function EditPersonalExercisePage({
   params,
 }: {
-  params: Promise<{ id: string; logId: string }>;
+  params: Promise<{ id: string; peId: string }>;
 }) {
   if (!(await isAdminAuthed())) {
     redirect("/admin");
   }
-  const { id, logId } = await params;
+  const { id, peId } = await params;
   const idNum = Number(id);
-  const logIdNum = Number(logId);
-  if (!Number.isInteger(idNum) || !Number.isInteger(logIdNum)) {
+  const peIdNum = Number(peId);
+  if (!Number.isInteger(idNum) || !Number.isInteger(peIdNum)) {
     notFound();
   }
-  const [member, ptLog, ptLogs, assessments] = await Promise.all([
+  const [member, personalExercise, personalExercises] = await Promise.all([
     getMemberById(idNum),
-    getPtLogById(logIdNum),
-    listPtLogsByMember(idNum),
-    listAssessmentsByMember(idNum),
+    getPersonalExerciseById(peIdNum),
+    listPersonalExercisesByMember(idNum),
   ]);
   if (!member) {
     notFound();
   }
-  if (!ptLog || ptLog.member_id !== idNum) {
+  if (!personalExercise || personalExercise.member_id !== idNum) {
     notFound();
   }
 
@@ -38,14 +40,15 @@ export default async function EditPtLogPage({
       <PtLogForm
         memberId={idNum}
         memberName={member.name}
-        ptLogId={logIdNum}
-        pastExercises={pastExerciseNames(ptLogs, assessments)}
-        pastExerciseGroups={pastExerciseGroups(ptLogs.filter((l) => l.id !== logIdNum))}
-        pastCircuitEntries={pastCircuitEntries(ptLogs.filter((l) => l.id !== logIdNum))}
+        ptLogId={peIdNum}
+        kind="personal_exercise"
+        pastExercises={pastExerciseNames(personalExercises, [])}
+        pastExerciseGroups={pastExerciseGroups(personalExercises.filter((p) => p.id !== peIdNum))}
+        pastCircuitEntries={pastCircuitEntries(personalExercises.filter((p) => p.id !== peIdNum))}
         initialData={{
-          logDate: ptLog.log_date,
-          memo: ptLog.memo,
-          exercises: ptLog.exercises.map((e) => ({
+          logDate: personalExercise.log_date,
+          memo: personalExercise.memo,
+          exercises: personalExercise.exercises.map((e) => ({
             name: e.name,
             equipment: e.equipment,
             groups:

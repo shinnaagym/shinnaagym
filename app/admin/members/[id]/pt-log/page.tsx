@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
+import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { AssessmentPainChart } from "../assessment/pain-chart";
@@ -25,9 +26,10 @@ export default async function PtLogHistoryPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const [member, ptLogs, assessments, intake] = await Promise.all([
+  const [member, ptLogs, personalExercises, assessments, intake] = await Promise.all([
     getMemberById(idNum),
     listPtLogsByMember(idNum),
+    listPersonalExercisesByMember(idNum),
     listAssessmentsByMember(idNum),
     getIntakeQuestionnaireByMember(idNum),
   ]);
@@ -77,6 +79,26 @@ export default async function PtLogHistoryPage({
 
       <div className="mb-4">
         <PtLogList ptLogs={ptLogs} />
+      </div>
+
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-display text-lg">🏃 개인 운동</h2>
+        </div>
+        <Link
+          href={`/admin/members/${idNum}/personal-exercise/new`}
+          className="block text-center rounded-full border border-coral text-coral px-4 py-2.5 text-sm font-medium hover:bg-coral/5 transition mb-4"
+        >
+          + 새 개인 운동 작성
+        </Link>
+        <PtLogList
+          ptLogs={personalExercises}
+          emptyLabel="아직 기록된 개인 운동이 없어요."
+          showDone
+          editHrefBase={`/admin/members/${idNum}/personal-exercise`}
+          deleteEndpointBase="/api/admin/personal-exercises"
+          deleteConfirmMessage="이 개인 운동 기록을 삭제할까요? 되돌릴 수 없어요."
+        />
       </div>
 
       <Link

@@ -14,14 +14,21 @@ function toNumberOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** 무게·횟수 칸은 숫자뿐 아니라 "밴드 3단계"·"30초"처럼 자유 텍스트도 받는다. */
+function toTextOrNull(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s === "" ? null : s;
+}
+
 function parseSetGroups(raw: unknown): PtLogSetGroup[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((g): PtLogSetGroup => {
       const obj = (g ?? {}) as Record<string, unknown>;
       return {
-        weight: toNumberOrNull(obj.weight),
-        reps: toNumberOrNull(obj.reps),
+        weight: toTextOrNull(obj.weight),
+        reps: toTextOrNull(obj.reps),
         sets: toNumberOrNull(obj.sets),
       };
     })
@@ -58,12 +65,16 @@ export function parseExercises(raw: unknown): PtLogExercise[] {
       const rawName = typeof obj.name === "string" ? obj.name.trim() : "";
       const name = rawName || (circuit ? PT_LOG_CIRCUIT_TYPE_LABELS[circuit.type] ?? circuit.type : "");
       const note = typeof obj.note === "string" ? obj.note.trim() : "";
+      // "개인 운동"에서만 보내는 완료 체크. PT 일지 폼은 이 값을 보내지 않으므로
+      // 항상 undefined로 남는다.
+      const done = typeof obj.done === "boolean" ? obj.done : undefined;
       return {
         name,
         equipment,
         groups: circuit ? [] : parseSetGroups(obj.groups),
         note,
         ...(circuit ? { circuit } : {}),
+        ...(done !== undefined ? { done } : {}),
       };
     })
     .filter((e) => e.name.length > 0);

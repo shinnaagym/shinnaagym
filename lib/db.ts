@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -429,6 +429,19 @@ function runFullMigration(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
         CREATE INDEX IF NOT EXISTS idx_pt_logs_member_id ON pt_logs(member_id);
+
+        -- 회원이 스스로 기록하는 "개인 운동" — PT 일지와 형식은 같지만(exercises
+        -- JSONB에 done 필드로 완료 여부까지 담음) 코치뿐 아니라 회원 본인도
+        -- /my/[token] 화면에서 직접 추가·수정·삭제할 수 있다.
+        CREATE TABLE IF NOT EXISTS personal_exercises (
+          id SERIAL PRIMARY KEY,
+          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          log_date TEXT NOT NULL,
+          memo TEXT NOT NULL DEFAULT '',
+          exercises JSONB NOT NULL DEFAULT '[]'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_personal_exercises_member_id ON personal_exercises(member_id);
 
         -- 코치별 근무시간(평일/토요일 각각 시작~종료 시각). 코치가 이 표에 행이
         -- 없으면 제한 없음(스튜디오 영업시간 전체가 근무시간)으로 취급해,
@@ -827,8 +840,10 @@ export interface PainMovementEntry {
 }
 
 export interface PtLogSetGroup {
-  weight: number | null;
-  reps: number | null;
+  /** 숫자(kg)뿐 아니라 "밴드 3단계"처럼 변형 동작을 자유 텍스트로도 적을 수 있다. */
+  weight: string | null;
+  /** 숫자(회)뿐 아니라 "30초"처럼 유지 시간을 자유 텍스트로도 적을 수 있다. */
+  reps: string | null;
   sets: number | null;
 }
 
@@ -848,6 +863,8 @@ export interface PtLogExercise {
   note: string;
   /** equipment가 "circuit"(서킷 트레이닝)일 때만 쓰는 AMRAP/TIMECAP/For Time/EMOM 기록. */
   circuit?: PtLogCircuit | null;
+  /** "개인 운동"(personal_exercises)에서만 쓰는 완료 체크. PT 일지에서는 항상 undefined. */
+  done?: boolean;
 }
 
 export interface PtLogRow {
@@ -857,6 +874,17 @@ export interface PtLogRow {
   memo: string;
   pain_scale: number | null;
   performance_scale: number | null;
+  exercises: PtLogExercise[];
+  created_at: string;
+}
+
+/** 회원이 스스로 기록하는 "개인 운동". PT 일지와 exercises 구조가 동일하고,
+    개인 운동은 항상 exercises[].done(완료 체크)을 함께 쓴다. */
+export interface PersonalExerciseRow {
+  id: number;
+  member_id: number;
+  log_date: string;
+  memo: string;
   exercises: PtLogExercise[];
   created_at: string;
 }

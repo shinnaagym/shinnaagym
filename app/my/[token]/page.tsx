@@ -12,6 +12,7 @@ import {
 import { getLatestContractByMember } from "@/lib/contracts";
 import { listAssessmentsByMember } from "@/lib/assessments";
 import { listPtLogsByMember } from "@/lib/pt-logs";
+import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { listNotices } from "@/lib/notices";
 import { koreaTodayKey } from "@/lib/date";
@@ -62,20 +63,31 @@ export default async function MyReservationPage({
     notFound();
   }
 
-  const [progress, sessions, availability, coaches, contract, assessments, ptLogs, intake, notices] =
-    await Promise.all([
-      computeMemberProgress(member.id),
-      listMemberSessions(member.id),
-      member.coach_id
-        ? getCoachAvailability(member.coach_id, koreaTodayKey(), 14)
-        : Promise.resolve([]),
-      listCoaches(),
-      getLatestContractByMember(member.id),
-      listAssessmentsByMember(member.id),
-      listPtLogsByMember(member.id),
-      getIntakeQuestionnaireByMember(member.id),
-      listNotices(),
-    ]);
+  const [
+    progress,
+    sessions,
+    availability,
+    coaches,
+    contract,
+    assessments,
+    ptLogs,
+    personalExercises,
+    intake,
+    notices,
+  ] = await Promise.all([
+    computeMemberProgress(member.id),
+    listMemberSessions(member.id),
+    member.coach_id
+      ? getCoachAvailability(member.coach_id, koreaTodayKey(), 14)
+      : Promise.resolve([]),
+    listCoaches(),
+    getLatestContractByMember(member.id),
+    listAssessmentsByMember(member.id),
+    listPtLogsByMember(member.id),
+    listPersonalExercisesByMember(member.id),
+    getIntakeQuestionnaireByMember(member.id),
+    listNotices(),
+  ]);
 
   // 제목이 비어있지 않은(=실제로 내용을 입력한) 항목만 회원 화면에 노출한다.
   const activeNotices = notices.filter((n) => n.category === "notice" && n.title.trim());
@@ -178,6 +190,23 @@ export default async function MyReservationPage({
         )}
 
         {ptLogs.length > 0 && <PtLogDisclosureCard ptLogs={ptLogs} />}
+
+        <Link
+          href={`/my/${token}/personal-exercise`}
+          className="block rounded-2xl border border-line bg-white/60 px-6 py-5 mb-4 hover:border-coral/40 transition"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-display text-lg mb-1">🏃 개인 운동</p>
+              <p className="text-sm text-ink/60">
+                {personalExercises.length > 0
+                  ? `${personalExercises.length}건 · 내용 확인하기`
+                  : "직접 기록해보세요"}
+              </p>
+            </div>
+            <span className="text-ink/30">→</span>
+          </div>
+        </Link>
 
         {intake && (
           <Link
