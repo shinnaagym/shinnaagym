@@ -1960,6 +1960,7 @@ function EditSessionModal({
                         {s.session_date} {s.session_hour}:00
                       </span>
                       <span className="flex items-center gap-2">
+                        {progressLabel(s) && <span className="text-ink/40">{progressLabel(s)}</span>}
                         {STATUS_LABEL[s.status]}
                         <button
                           type="button"

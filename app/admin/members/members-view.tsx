@@ -1453,7 +1453,7 @@ function CreateMemberModal({
             placeholder="예: 화·목 오전 10시"
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral mb-2"
           />
-          <AvailabilityGridPicker onChange={setAvailableTimes} />
+          <AvailabilityGridPicker onChange={setAvailableTimes} lockable />
         </Field>
         <div>
           <p className="text-sm font-medium mb-2">고정 시간대</p>
@@ -1530,16 +1530,16 @@ function CreateMemberModal({
             />
           </Field>
         </div>
-        <Field label="결제 수단">
-          <PaymentMethodToggle value={paymentMethod} onChange={setPaymentMethod} />
-        </Field>
         <Field label="옵션">
           <input
             value={optionNote}
             onChange={(e) => setOptionNote(e.target.value)}
-            placeholder="선택 입력"
+            placeholder="할인 내용"
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
           />
+        </Field>
+        <Field label="결제 수단">
+          <PaymentMethodToggle value={paymentMethod} onChange={setPaymentMethod} />
         </Field>
         <Field label="운동 목적 / 특이사항">
           <textarea
@@ -2401,7 +2401,7 @@ function MemberDetailModal({
               <input
                 value={addOptionNote}
                 onChange={(e) => setAddOptionNote(e.target.value)}
-                placeholder="할인 내역"
+                placeholder="할인 내용"
                 className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
               />
             </Field>
