@@ -287,7 +287,23 @@ export function ExercisePerformanceChart({
     return names;
   }, [dayGroups]);
 
-  if (dayGroups.length === 0 || exerciseNames.length === 0) return null;
+  if (dayGroups.length === 0 || exerciseNames.length === 0) {
+    return (
+      <div className="rounded-2xl border border-line/60 bg-white shadow-sm px-5 py-4 mb-4">
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <p className="font-display text-base">운동 수행능력 그래프 (e1RM)</p>
+          <DisclosureToggle
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            label={expanded ? "운동 수행능력 그래프 접기" : "운동 수행능력 그래프 펼치기"}
+          />
+        </div>
+        {expanded && (
+          <p className="text-sm text-ink/40 text-center py-6">아직 기록된 운동 수행능력이 없어요.</p>
+        )}
+      </div>
+    );
+  }
 
   const dateLabels = dayGroups.map((g) => shortDateLabel(g.dateKey));
   const fullDates = dayGroups.map((g) => g.dateKey);
