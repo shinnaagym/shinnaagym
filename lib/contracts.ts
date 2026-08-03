@@ -79,6 +79,15 @@ export async function createContract(input: CreateContractInput): Promise<Contra
   return contract;
 }
 
+/** 회원의 계약서 전체(암호화된 그대로) — 회원 삭제 시 실행취소용 스냅샷 등에 쓴다. */
+export async function listContractsByMember(memberId: number): Promise<ContractRow[]> {
+  const result = await query<ContractRow>(
+    `SELECT * FROM contracts WHERE member_id = $1 ORDER BY created_at ASC`,
+    [memberId],
+  );
+  return result.rows;
+}
+
 /** 회원의 가장 최근 계약서 한 건(복호화된 주민등록번호 앞자리 포함). */
 export async function getLatestContractByMember(
   memberId: number,

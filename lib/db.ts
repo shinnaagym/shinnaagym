@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -527,6 +527,17 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS companion_address TEXT NOT NULL DEFAULT '';
             ALTER TABLE contracts ADD COLUMN IF NOT EXISTS companion_privacy_consent BOOLEAN NOT NULL DEFAULT false;
 
+            -- 회원을 삭제해도 PT 예약 내역(class_sessions)·결제 내역(packages)은 정산·
+            -- 매출 기록으로 남겨야 해서, member_id를 지우는 대신 NULL로 남기도록 바꾼다
+            -- (예약자를 알 수 없는 사전예약(reservations)에 이미 쓰던 것과 같은 방식).
+            ALTER TABLE packages ALTER COLUMN member_id DROP NOT NULL;
+            ALTER TABLE packages DROP CONSTRAINT IF EXISTS packages_member_id_fkey;
+            ALTER TABLE packages ADD CONSTRAINT packages_member_id_fkey
+              FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
+            ALTER TABLE class_sessions DROP CONSTRAINT IF EXISTS class_sessions_member_id_fkey;
+            ALTER TABLE class_sessions ADD CONSTRAINT class_sessions_member_id_fkey
+              FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL;
+
             -- "수업 완료" 상태 개념을 없애고 취소되지 않은 수업은 모두 "예약"으로 단순화했다
             -- (SCHEMA_VERSION 2). 기존에 자동/수동으로 'completed'가 된 기록을 'reserved'로
             -- 되돌려, 더 이상 쓰지 않는 상태값이 화면에 남아있지 않게 한다.
@@ -684,7 +695,8 @@ export type PaymentMethod = "card" | "transfer";
 
 export interface PackageRow {
   id: number;
-  member_id: number;
+  /** 소속 회원이 삭제되면 정산 기록 보존을 위해 이 값만 null이 되고 행은 남는다. */
+  member_id: number | null;
   total_sessions: number;
   price: number;
   purchased_at: string;
