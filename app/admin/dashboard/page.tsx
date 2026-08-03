@@ -8,6 +8,7 @@ import {
   getMonthlyTrend,
   listNewRegistrations,
   listPackagePurchases,
+  listRefundsForMonth,
 } from "@/lib/schedule";
 import { getVisitChannelCountsForMonth } from "@/lib/intake";
 import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
@@ -72,7 +73,7 @@ export default async function AdminDashboardPage({
   const { month } = await searchParams;
   const monthKey = month && isValidMonthKey(month) ? month : koreaCurrentMonthKey();
 
-  const [overview, coachReports, trend, retentionTrend, newRegs, purchases, visitChannelCounts] =
+  const [overview, coachReports, trend, retentionTrend, newRegs, purchases, refunds, visitChannelCounts] =
     await Promise.all([
       getDashboardOverview(monthKey),
       getCoachMonthlyReports(monthKey),
@@ -80,6 +81,7 @@ export default async function AdminDashboardPage({
       getMonthlyRetentionStats(monthKey, TREND_MONTHS),
       listNewRegistrations(monthKey),
       listPackagePurchases(monthKey),
+      listRefundsForMonth(monthKey),
       getVisitChannelCountsForMonth(monthKey),
     ]);
 
@@ -418,6 +420,32 @@ export default async function AdminDashboardPage({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* PT 환불 내역 */}
+          <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mt-4">
+            <p className="text-sm font-medium mb-3">PT 환불 내역</p>
+            {refunds.length === 0 ? (
+              <p className="text-sm text-ink/40">이번 달 환불 내역이 없어요.</p>
+            ) : (
+              <div className="max-h-72 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <tbody>
+                    {refunds.map((r) => (
+                      <tr key={r.id} className="border-b border-line/30 last:border-0">
+                        <td className="py-2 pr-2 text-ink/40 whitespace-nowrap">
+                          {formatDate(r.refundedAt)}
+                        </td>
+                        <td className="py-2 pr-2 whitespace-nowrap">{r.memberName}</td>
+                        <td className="py-2 whitespace-nowrap text-coral font-medium">
+                          −{formatWon(r.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
       <p className="text-xs text-ink/40 mt-4 leading-relaxed">

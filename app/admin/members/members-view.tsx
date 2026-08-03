@@ -858,6 +858,7 @@ export function MembersView({
 
       <FixedSlotSchedule
         fixedSlots={fixedSlots}
+        members={members}
         coaches={coaches}
         coachFilter={coachFilter}
         coachName={
@@ -867,6 +868,7 @@ export function MembersView({
               ? "미지정"
               : coaches.find((c) => c.id === coachFilter)?.name ?? null
         }
+        onChanged={refresh}
       />
 
       {showCreate && (
@@ -908,14 +910,18 @@ export function MembersView({
 
 function FixedSlotSchedule({
   fixedSlots,
+  members,
   coaches,
   coachFilter,
   coachName,
+  onChanged,
 }: {
   fixedSlots: FixedSlotWithMember[];
+  members: MemberWithProgress[];
   coaches: CoachRow[];
   coachFilter: number | "all" | "unassigned";
   coachName: string | null;
+  onChanged: () => void;
 }) {
   // 코치별 색상은 전체 코치 목록 기준 순서로 고정해, 스케줄표와도 같은 코치가
   // 항상 같은 색을 쓰도록 한다(스케줄표의 코치 색상 팔레트와 동일한 로직).
@@ -945,6 +951,77 @@ function FixedSlotSchedule({
     }
     return map;
   }, [scopedSlots]);
+
+  // 클릭해서 회원을 배정/제거할 때는 현재 보기 필터(coachFilter)와 무관하게
+  // 그 시간대의 실제 전체 배정 현황을 알아야 하므로, 필터링 전 fixedSlots
+  // 기준으로 따로 모은다.
+  const allByCell = useMemo(() => {
+    const map = new Map<string, Array<{ id: number; memberId: number; name: string }>>();
+    for (const slot of fixedSlots) {
+      const key = `${slot.weekday}-${slot.hour}`;
+      const entries = map.get(key) ?? [];
+      entries.push({ id: slot.id, memberId: slot.member_id, name: slot.member_name });
+      map.set(key, entries);
+    }
+    return map;
+  }, [fixedSlots]);
+
+  const [pickerCell, setPickerCell] = useState<{ weekday: number; hour: number } | null>(null);
+  const [pickerMemberId, setPickerMemberId] = useState<number | "">("");
+  const [pickerSaving, setPickerSaving] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+
+  function openPicker(weekday: number, hour: number) {
+    setPickerCell({ weekday, hour });
+    setPickerMemberId("");
+    setPickerError(null);
+  }
+
+  async function addPickerSlot() {
+    if (!pickerCell || pickerMemberId === "") return;
+    setPickerSaving(true);
+    setPickerError(null);
+    try {
+      const res = await fetch("/api/admin/fixed-slots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: pickerMemberId,
+          weekday: pickerCell.weekday,
+          hour: pickerCell.hour,
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPickerError(d.error ?? "추가에 실패했습니다.");
+        return;
+      }
+      const created = d.created ?? 0;
+      const skippedDates: string[] = d.skippedDates ?? [];
+      if (created > 0 || skippedDates.length > 0) {
+        let message = created > 0 ? `스케줄표에 ${created}건 자동 예약됐어요.` : "";
+        if (skippedDates.length > 0) {
+          message +=
+            (message ? "\n" : "") +
+            `${skippedDates.length}건은 이미 다른 예약이 있어 건너뛰었어요: ${skippedDates.join(", ")}`;
+        }
+        alert(message);
+      }
+      onChanged();
+    } finally {
+      setPickerSaving(false);
+    }
+  }
+
+  async function removePickerSlot(id: number) {
+    setPickerSaving(true);
+    try {
+      await fetch(`/api/admin/fixed-slots/${id}`, { method: "DELETE" });
+      onChanged();
+    } finally {
+      setPickerSaving(false);
+    }
+  }
 
   return (
     <div className="mt-10">
@@ -995,7 +1072,11 @@ function FixedSlotSchedule({
                   // 겹침으로 보지 않는다. 한 코치가 겹치게 배정된 경우에만 표시한다.
                   const over = coachFilter !== "all" && entries.length > FIXED_SLOT_CAPACITY;
                   return (
-                    <td key={weekday} className="px-3 py-2.5 align-top">
+                    <td
+                      key={weekday}
+                      onClick={() => openPicker(weekday, hour)}
+                      className="px-3 py-2.5 align-top cursor-pointer hover:bg-bone/50 transition"
+                    >
                       {entries.length > 0 && (
                         <div
                           className={[
@@ -1032,6 +1113,71 @@ function FixedSlotSchedule({
           </tbody>
         </table>
       </div>
+
+      {pickerCell &&
+        (() => {
+          const key = `${pickerCell.weekday}-${pickerCell.hour}`;
+          const current = allByCell.get(key) ?? [];
+          const availableMembers = members
+            .filter((m) => m.status === "active")
+            .filter((m) => !current.some((entry) => entry.memberId === m.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          return (
+            <ModalShell
+              title={`${FIXED_SLOT_WEEKDAY_LABELS[pickerCell.weekday]}요일 ${pickerCell.hour}시`}
+              onClose={() => setPickerCell(null)}
+            >
+              <div className="space-y-3">
+                {current.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {current.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center justify-between rounded-lg border border-line/60 px-3 py-2 text-sm"
+                      >
+                        <span>{entry.name}</span>
+                        <button
+                          type="button"
+                          disabled={pickerSaving}
+                          onClick={() => removePickerSlot(entry.id)}
+                          className="text-xs text-coral hover:opacity-70 disabled:opacity-50"
+                        >
+                          제거
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-ink/40">아직 배정된 회원이 없어요.</p>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={pickerMemberId}
+                    onChange={(e) => setPickerMemberId(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="flex-1 min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+                  >
+                    <option value="">회원 선택</option>
+                    {availableMembers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={pickerSaving || pickerMemberId === ""}
+                    onClick={addPickerSlot}
+                    className="shrink-0 rounded-full bg-coral text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+                  >
+                    추가
+                  </button>
+                </div>
+                {pickerError && <p className="text-sm text-coral">{pickerError}</p>}
+              </div>
+            </ModalShell>
+          );
+        })()}
     </div>
   );
 }
