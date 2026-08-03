@@ -17,7 +17,7 @@ export function DisclosureToggle({
       onClick={onToggle}
       aria-expanded={expanded}
       aria-label={label}
-      className="shrink-0 text-lg leading-none text-ink/40 hover:text-coral transition-transform"
+      className="shrink-0 text-lg leading-none text-gold hover:text-gold-deep transition-transform"
       style={{ transform: expanded ? "rotate(180deg)" : undefined }}
     >
       ▽

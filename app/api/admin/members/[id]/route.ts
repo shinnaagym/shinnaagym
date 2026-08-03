@@ -10,6 +10,7 @@ import {
   listMemberSessions,
   listPastSessionIdsForMember,
   updateMember,
+  updatePackage,
 } from "@/lib/schedule";
 import { getLatestContractByMember, listContractsByMember } from "@/lib/contracts";
 import { listAssessmentsByMember } from "@/lib/assessments";
@@ -176,7 +177,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   if (!(await isAdminAuthed())) {
@@ -191,6 +192,14 @@ export async function DELETE(
   if (!member) {
     return NextResponse.json({ error: "회원을 찾을 수 없습니다." }, { status: 404 });
   }
+
+  // 환불 처리를 겸한 삭제면(회원 상세의 "환불" 버튼), 가장 최근 패키지 결제금액에서
+  // 환불액만큼 뺀 금액으로 정산 기록을 남긴다.
+  const body = (await req.json().catch(() => null)) as { refundAmount?: unknown } | null;
+  const refundAmount =
+    typeof body?.refundAmount === "number" && Number.isFinite(body.refundAmount) && body.refundAmount > 0
+      ? Math.round(body.refundAmount)
+      : 0;
 
   // 회원을 지워도 PT 예약 내역·결제 내역은 정산·매출 기록으로 남긴다(member_id만
   // NULL이 됨 — packages/class_sessions FK가 SET NULL로 되어있다). 계약서·평가지·
@@ -207,6 +216,14 @@ export async function DELETE(
       listPackages(idNum),
       listPastSessionIdsForMember(idNum, today),
     ]);
+
+  const latestPackage = packages[packages.length - 1];
+  if (refundAmount > 0 && latestPackage) {
+    await updatePackage(latestPackage.id, {
+      price: Math.max(0, latestPackage.price - refundAmount),
+    });
+  }
+
   const deletedUpcomingSessions = await deleteUpcomingSessionsForMember(idNum, today);
   await deleteMember(idNum);
 
@@ -219,14 +236,24 @@ export async function DELETE(
     ...fixedSlots.map((f): UndoOp => ({ op: "insert", table: "fixed_slots", data: f })),
     ...deletedUpcomingSessions.map((s): UndoOp => ({ op: "insert", table: "class_sessions", data: s })),
     ...pastSessionIds.map((sid): UndoOp => ({ op: "update", table: "class_sessions", id: sid, data: { member_id: idNum } })),
-    ...packages.map((p): UndoOp => ({ op: "update", table: "packages", id: p.id, data: { member_id: idNum } })),
+    // 원래 결제금액(price)도 함께 담아, 환불로 깎은 금액까지 실행취소로 되돌릴 수 있게 한다.
+    ...packages.map((p): UndoOp => ({
+      op: "update",
+      table: "packages",
+      id: p.id,
+      data: { member_id: idNum, price: p.price },
+    })),
   ];
-  await recordUndo(`${member.name} 회원 완전 삭제`, ops);
+  await recordUndo(
+    refundAmount > 0 ? `${member.name} 회원 환불 후 삭제 (${refundAmount.toLocaleString()}원)` : `${member.name} 회원 완전 삭제`,
+    ops,
+  );
 
   return NextResponse.json({
     ok: true,
     keptPastSessions: pastSessionIds.length,
     keptPackages: packages.length,
     deletedUpcomingSessions: deletedUpcomingSessions.length,
+    refundAmount,
   });
 }

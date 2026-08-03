@@ -22,7 +22,6 @@ function monthLabel(monthKey: string): string {
 }
 
 export function exerciseSummary(e: PtLogExercise): string {
-  const equipmentLabel = PT_LOG_EQUIPMENT_LABELS[e.equipment] ?? e.equipment;
   const groups =
     e.groups
       .map((g) => {
@@ -34,7 +33,11 @@ export function exerciseSummary(e: PtLogExercise): string {
       })
       .filter((s) => s.length > 0)
       .join(", ") || "-";
-  return `(${equipmentLabel})${e.name} — ${groups}`;
+  // "기타"는 도구를 특정하지 않는 선택지라, 운동 이름 앞에 "(기타)"를 붙이지 않고
+  // 이름만 그대로 보여준다.
+  const namePart =
+    e.equipment === "other" ? e.name : `(${PT_LOG_EQUIPMENT_LABELS[e.equipment] ?? e.equipment})${e.name}`;
+  return `${namePart} — ${groups}`;
 }
 
 export function PtLogList({ ptLogs, editable = true }: { ptLogs: PtLogRow[]; editable?: boolean }) {

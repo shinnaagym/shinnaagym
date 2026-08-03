@@ -271,6 +271,32 @@ function formatWon(n: number): string {
   return `₩${n.toLocaleString("ko-KR")}`;
 }
 
+// 계약서 제3조 환불 조항: "레슨비 + 위약금(10%) + 수수료(5%)"를 제하고 환불.
+// 경과일수/계약기간은 반영하지 않는다(계약기간을 유도리껏 연장해주는 경우가 많아
+// 경과일수가 실제 사용량을 반영하지 못하므로) — 대신 회원 전체 진행률(완료 세션 /
+// 전체 세션)을 레슨비 사용 비율로 삼는다. 재등록 등으로 패키지가 여러 건이어도
+// 가장 최근 패키지 결제금액을 기준으로 계산한다.
+function computeRefund(
+  pkg: PackageRow,
+  progress: { totalSessions: number; doneCount: number },
+): {
+  usedRatio: number;
+  lessonFee: number;
+  penalty: number;
+  fee: number;
+  refundAmount: number;
+} {
+  const usedRatio =
+    progress.totalSessions > 0
+      ? Math.min(1, Math.max(0, progress.doneCount / progress.totalSessions))
+      : 0;
+  const lessonFee = Math.round(pkg.price * usedRatio);
+  const penalty = Math.round(pkg.price * 0.1);
+  const fee = Math.round(pkg.price * 0.05);
+  const refundAmount = Math.min(pkg.price, Math.max(0, pkg.price - lessonFee - penalty - fee));
+  return { usedRatio, lessonFee, penalty, fee, refundAmount };
+}
+
 function TypeBadge({ isFirst }: { isFirst: boolean }) {
   return (
     <span
@@ -1790,6 +1816,9 @@ function MemberDetailModal({
   const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void } | null>(
     null,
   );
+  // 환불 검토 패널 — 계산된 금액 내역을 보여주고 "완료"를 눌러야 실제로 환불+삭제가
+  // 일어난다(즉시 삭제되지 않도록).
+  const [refundState, setRefundState] = useState<ReturnType<typeof computeRefund> | null>(null);
 
   async function addSlot() {
     if (!data?.member.coach_id) {
@@ -1968,6 +1997,34 @@ function MemberDetailModal({
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setError(d.error ?? "삭제에 실패했습니다.");
+        return;
+      }
+      onChanged();
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleRefundClick() {
+    if (!latestPackage) return;
+    setRefundState(computeRefund(latestPackage, data.progress));
+  }
+
+  async function doRefundAndDelete() {
+    if (!refundState) return;
+    const { refundAmount } = refundState;
+    setRefundState(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refundAmount }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? "환불 처리에 실패했습니다.");
         return;
       }
       onChanged();
@@ -2405,6 +2462,13 @@ function MemberDetailModal({
 
         <div className="flex gap-2">
           <button
+            onClick={handleRefundClick}
+            disabled={saving || !latestPackage}
+            className="rounded-full border border-gold px-4 py-2 text-sm text-gold-deep hover:bg-gold/10 transition disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            환불
+          </button>
+          <button
             onClick={handleDeleteMember}
             disabled={saving}
             className="rounded-full border border-line px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent"
@@ -2474,6 +2538,62 @@ function MemberDetailModal({
               className="flex-1 rounded-full bg-coral text-white py-2 text-sm font-medium hover:opacity-90 transition"
             >
               삭제
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    {refundState && latestPackage && (
+      <div
+        className="fixed inset-0 z-30 flex items-center justify-center bg-ink/50 px-4"
+        onClick={() => setRefundState(null)}
+      >
+        <div
+          className="w-full max-w-sm rounded-2xl bg-white shadow-xl p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="font-display text-lg mb-3">환불 금액</p>
+          <div className="rounded-xl bg-bone/50 px-4 py-3 text-sm space-y-1.5">
+            <div className="flex justify-between">
+              <span className="text-ink/60">결제금액</span>
+              <span>{formatWon(latestPackage.price)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink/60">
+                레슨비 차감 (사용 {Math.round(refundState.usedRatio * 100)}%)
+              </span>
+              <span>−{formatWon(refundState.lessonFee)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink/60">위약금 (10%)</span>
+              <span>−{formatWon(refundState.penalty)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-ink/60">수수료 (5%)</span>
+              <span>−{formatWon(refundState.fee)}</span>
+            </div>
+            <div className="flex justify-between font-medium pt-1.5 border-t border-line/60">
+              <span>최종 환불액</span>
+              <span className="text-gold-deep">{formatWon(refundState.refundAmount)}</span>
+            </div>
+          </div>
+          <p className="text-xs text-ink/40 mt-3 whitespace-pre-line">
+            완료를 누르면 회원 정보가 삭제돼요(되돌릴 수 없어요). PT 예약 내역과 결제 내역은
+            정산 기록으로 남지만, 결제 내역은 환불액을 뺀 금액으로 다시 계산돼요.
+          </p>
+          <div className="flex gap-2 mt-5">
+            <button
+              onClick={() => setRefundState(null)}
+              className="flex-1 rounded-full border border-line py-2 text-sm hover:bg-bone transition"
+            >
+              취소
+            </button>
+            <button
+              onClick={doRefundAndDelete}
+              disabled={saving}
+              className="flex-1 rounded-full bg-gold text-white py-2 text-sm font-medium hover:bg-gold-deep transition disabled:opacity-50"
+            >
+              완료
             </button>
           </div>
         </div>
