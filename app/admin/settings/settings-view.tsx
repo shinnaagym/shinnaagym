@@ -36,19 +36,22 @@ export type DutyRoster = Record<number, { coachId: number; coachName: string }>;
 
 // lib/schedule.ts는 서버 전용 DB 클라이언트(pg)를 물고 있어 클라이언트 컴포넌트에서
 // import하면 번들이 깨지므로, 타입만 이 파일에 그대로 복제해 둔다(DutyRoster와 동일한 이유).
+// weekdayStarts/weekdayEnds는 5개 배열(0=월 ~ 4=금) — 요일별로 다른 근무시간을 쓸 수 있다.
 export interface CoachWorkingHours {
-  weekdayStart: number;
-  weekdayEnd: number;
+  weekdayStarts: number[];
+  weekdayEnds: number[];
   saturdayStart: number;
   saturdayEnd: number;
 }
 
 const DEFAULT_WORKING_HOURS: CoachWorkingHours = {
-  weekdayStart: 9,
-  weekdayEnd: 22,
+  weekdayStarts: [9, 9, 9, 9, 9],
+  weekdayEnds: [22, 22, 22, 22, 22],
   saturdayStart: 9,
   saturdayEnd: 15,
 };
+
+const WEEKDAY_SHORT_LABELS = ["월", "화", "수", "목", "금"];
 
 function HourSelect({
   value,
@@ -88,55 +91,94 @@ function CoachWorkingHoursRow({
 }) {
   const [draft, setDraft] = useState<CoachWorkingHours>(saved ?? DEFAULT_WORKING_HOURS);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved ?? DEFAULT_WORKING_HOURS);
+  const [bulkStart, setBulkStart] = useState(9);
+  const [bulkEnd, setBulkEnd] = useState(22);
+
+  function applyBulkToAllWeekdays() {
+    setDraft((d) => ({
+      ...d,
+      weekdayStarts: WEEKDAY_SHORT_LABELS.map(() => bulkStart),
+      weekdayEnds: WEEKDAY_SHORT_LABELS.map(() => bulkEnd),
+    }));
+  }
+
+  function setWeekdayStart(i: number, h: number) {
+    setDraft((d) => {
+      const next = [...d.weekdayStarts];
+      next[i] = h;
+      return { ...d, weekdayStarts: next };
+    });
+  }
+
+  function setWeekdayEnd(i: number, h: number) {
+    setDraft((d) => {
+      const next = [...d.weekdayEnds];
+      next[i] = h;
+      return { ...d, weekdayEnds: next };
+    });
+  }
 
   return (
-    <div className="py-2.5 flex items-center gap-3 flex-wrap">
-      <span className="text-sm w-16 shrink-0">{coachName}</span>
-      <span className="flex items-center gap-1 text-[11px] text-ink/40">
-        평일
-        <HourSelect
-          value={draft.weekdayStart}
-          onChange={(h) => setDraft((d) => ({ ...d, weekdayStart: h }))}
-        />
-        ~
-        <HourSelect
-          value={draft.weekdayEnd}
-          onChange={(h) => setDraft((d) => ({ ...d, weekdayEnd: h }))}
-        />
-      </span>
-      <span className="flex items-center gap-1 text-[11px] text-ink/40">
-        토요일
-        <HourSelect
-          value={draft.saturdayStart}
-          onChange={(h) => setDraft((d) => ({ ...d, saturdayStart: h }))}
-        />
-        ~
-        <HourSelect
-          value={draft.saturdayEnd}
-          onChange={(h) => setDraft((d) => ({ ...d, saturdayEnd: h }))}
-        />
-      </span>
-      {dirty && (
-        <button
-          type="button"
-          onClick={() => onSave(draft)}
-          className="rounded-full bg-ink text-white px-3 py-1 text-xs hover:bg-coral transition"
-        >
-          저장
-        </button>
-      )}
-      {saved && !dirty && (
-        <button
-          type="button"
-          onClick={() => {
-            setDraft(DEFAULT_WORKING_HOURS);
-            onClear();
-          }}
-          className="text-[11px] text-ink/40 hover:text-coral"
-        >
-          제한 없음으로 초기화
-        </button>
-      )}
+    <div className="py-2.5 flex flex-col gap-2">
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-sm w-16 shrink-0">{coachName}</span>
+        <span className="flex items-center gap-1 text-[11px] text-ink/40">
+          평일 일괄 적용
+          <HourSelect value={bulkStart} onChange={setBulkStart} />
+          ~
+          <HourSelect value={bulkEnd} onChange={setBulkEnd} />
+          <button
+            type="button"
+            onClick={applyBulkToAllWeekdays}
+            className="rounded-full border border-line px-2 py-0.5 text-[11px] hover:bg-bone transition"
+          >
+            평일 전체 적용
+          </button>
+        </span>
+        <span className="flex items-center gap-1 text-[11px] text-ink/40">
+          토요일
+          <HourSelect
+            value={draft.saturdayStart}
+            onChange={(h) => setDraft((d) => ({ ...d, saturdayStart: h }))}
+          />
+          ~
+          <HourSelect
+            value={draft.saturdayEnd}
+            onChange={(h) => setDraft((d) => ({ ...d, saturdayEnd: h }))}
+          />
+        </span>
+        {dirty && (
+          <button
+            type="button"
+            onClick={() => onSave(draft)}
+            className="rounded-full bg-ink text-white px-3 py-1 text-xs hover:bg-coral transition"
+          >
+            저장
+          </button>
+        )}
+        {saved && !dirty && (
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(DEFAULT_WORKING_HOURS);
+              onClear();
+            }}
+            className="text-[11px] text-ink/40 hover:text-coral"
+          >
+            제한 없음으로 초기화
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-3 flex-wrap pl-[4.75rem]">
+        {WEEKDAY_SHORT_LABELS.map((label, i) => (
+          <span key={label} className="flex items-center gap-1 text-[11px] text-ink/40">
+            {label}
+            <HourSelect value={draft.weekdayStarts[i]} onChange={(h) => setWeekdayStart(i, h)} />
+            ~
+            <HourSelect value={draft.weekdayEnds[i]} onChange={(h) => setWeekdayEnd(i, h)} />
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -197,7 +239,8 @@ export function SettingsView({
   }
 
   async function saveCoachWorkingHours(coachId: number, hours: CoachWorkingHours) {
-    if (hours.weekdayStart >= hours.weekdayEnd || hours.saturdayStart >= hours.saturdayEnd) {
+    const invalidWeekday = hours.weekdayStarts.some((h, i) => h >= hours.weekdayEnds[i]);
+    if (invalidWeekday || hours.saturdayStart >= hours.saturdayEnd) {
       setError("종료 시각은 시작 시각보다 늦어야 해요.");
       return;
     }
@@ -475,12 +518,15 @@ export function SettingsView({
                     </option>
                   ))}
                 </select>
-                <input
-                  type="date"
-                  defaultValue={c.hired_at}
-                  onChange={(e) => updateCoachEmployment(c.id, { hired_at: e.target.value })}
-                  className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-coral"
-                />
+                <span className="flex items-center gap-1 text-[11px] text-ink/40">
+                  입사일
+                  <input
+                    type="date"
+                    defaultValue={c.hired_at}
+                    onChange={(e) => updateCoachEmployment(c.id, { hired_at: e.target.value })}
+                    className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-coral"
+                  />
+                </span>
               </div>
             </div>
           ))}

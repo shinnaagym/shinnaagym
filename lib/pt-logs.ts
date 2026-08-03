@@ -60,3 +60,8 @@ export async function updatePtLog(id: number, input: UpdatePtLogInput): Promise<
 export async function deletePtLog(id: number): Promise<void> {
   await query(`DELETE FROM pt_logs WHERE id = $1`, [id]);
 }
+
+/** 회원 삭제(소프트 삭제) 시 이 회원의 PT 일지를 모두 지운다. */
+export async function deletePtLogsByMember(memberId: number): Promise<void> {
+  await query(`DELETE FROM pt_logs WHERE member_id = $1`, [memberId]);
+}

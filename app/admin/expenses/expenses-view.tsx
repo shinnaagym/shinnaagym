@@ -20,6 +20,13 @@ function formatWon(n: number): string {
   return `₩${n.toLocaleString("ko-KR")}`;
 }
 
+const AMOUNT_QUICK_ADD = [
+  { label: "+1천", value: 1000 },
+  { label: "+1만", value: 10000 },
+  { label: "+10만", value: 100000 },
+  { label: "+100만", value: 1000000 },
+];
+
 export function ExpensesView({
   monthKey,
   expenses,
@@ -136,28 +143,42 @@ export function ExpensesView({
 
         <div className="rounded-2xl border border-coral/30 bg-coral/5 px-5 py-4 mb-6">
           <h2 className="font-display text-base mb-3">+ 지출 추가</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-[2fr_1.2fr_72px_1fr] gap-2">
             <input
               value={item}
               onChange={(e) => setItem(e.target.value)}
               placeholder="지출 내역"
               className="col-span-2 sm:col-span-1 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
             />
-            <input
-              type="number"
-              inputMode="numeric"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="금액"
-              className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
-            />
+            <div>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="금액"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+              <div className="flex gap-1 mt-1">
+                {AMOUNT_QUICK_ADD.map((q) => (
+                  <button
+                    key={q.value}
+                    type="button"
+                    onClick={() => setAmount(String((Number(amount) || 0) + q.value))}
+                    className="flex-1 rounded-md border border-line bg-white px-1 py-1 text-[11px] text-ink/60 hover:bg-bone transition"
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="number"
               inputMode="numeric"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="수량"
-              className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+              className="w-full min-w-0 rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none focus:border-coral"
             />
             <input
               value={note}

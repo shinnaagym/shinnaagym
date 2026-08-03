@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import {
   computeMemberProgress,
+  deleteFixedSlotsByMember,
   deleteMember,
   deleteUpcomingSessionsForMember,
   getMemberById,
@@ -12,11 +13,15 @@ import {
   updateMember,
   updatePackage,
 } from "@/lib/schedule";
-import { getLatestContractByMember, listContractsByMember } from "@/lib/contracts";
-import { listAssessmentsByMember } from "@/lib/assessments";
-import { listPtLogsByMember } from "@/lib/pt-logs";
-import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
-import { getIntakeQuestionnaireByMember } from "@/lib/intake";
+import {
+  deleteContractsByMember,
+  getLatestContractByMember,
+  listContractsByMember,
+} from "@/lib/contracts";
+import { deleteAssessmentsByMember, listAssessmentsByMember } from "@/lib/assessments";
+import { deletePtLogsByMember, listPtLogsByMember } from "@/lib/pt-logs";
+import { deletePersonalExercisesByMember, listPersonalExercisesByMember } from "@/lib/personal-exercises";
+import { deleteIntakeQuestionnaire, getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { koreaTodayKey } from "@/lib/date";
 import { recordUndo, type UndoOp } from "@/lib/undo";
 import type {
@@ -211,10 +216,13 @@ export async function DELETE(
       ? Math.round(body.refundAmount)
       : 0;
 
-  // 회원을 지워도 PT 예약 내역·결제 내역은 정산·매출 기록으로 남긴다(member_id만
-  // NULL이 됨 — packages/class_sessions FK가 SET NULL로 되어있다). 계약서·평가지·
-  // PT 일지 메모·초진 문진표 같은 개인정보/기록은 함께 지운다. 앞으로 예정된
-  // 예약은 회원이 없어졌으니 지워서 그 시간대를 다른 회원이 다시 쓸 수 있게 한다.
+  // 회원을 지워도 PT 예약 내역·결제 내역·신규/재등록 월별 통계는 그대로 남겨야
+  // 하므로, members 행 자체는 지우지 않고 소프트 삭제(deleted_at)로 처리하고
+  // followup_status를 "이탈"로 넘긴다(deleteMember 내부에서 처리). 회원 행이
+  // 남아있으니 packages/class_sessions의 member_id도 계속 유효하게 남는다.
+  // 계약서·평가지·PT 일지·초진 문진표·고정 시간대 같은 개인정보/기록은 회원 행이
+  // 살아있어 CASCADE가 더 이상 발동하지 않으므로 여기서 직접 지운다. 앞으로
+  // 예정된 예약은 회원이 이탈했으니 지워서 그 시간대를 다른 회원이 쓸 수 있게 한다.
   const today = koreaTodayKey();
   const [contracts, assessments, ptLogs, personalExercises, intake, fixedSlots, packages, pastSessionIds] =
     await Promise.all([
@@ -236,10 +244,28 @@ export async function DELETE(
   }
 
   const deletedUpcomingSessions = await deleteUpcomingSessionsForMember(idNum, today);
+  await Promise.all([
+    deleteContractsByMember(idNum),
+    deleteAssessmentsByMember(idNum),
+    deletePtLogsByMember(idNum),
+    deletePersonalExercisesByMember(idNum),
+    deleteIntakeQuestionnaire(idNum),
+    deleteFixedSlotsByMember(idNum),
+  ]);
   await deleteMember(idNum);
 
   const ops: UndoOp[] = [
-    { op: "insert", table: "members", data: member },
+    {
+      op: "update",
+      table: "members",
+      id: idNum,
+      data: {
+        deleted_at: null,
+        status: member.status,
+        followup_status: member.followup_status,
+        followup_updated_at: member.followup_updated_at,
+      },
+    },
     ...contracts.map((c): UndoOp => ({ op: "insert", table: "contracts", data: c })),
     ...assessments.map((a): UndoOp => ({ op: "insert", table: "assessments", data: assessmentRowForSql(a) })),
     ...ptLogs.map((p): UndoOp => ({ op: "insert", table: "pt_logs", data: ptLogRowForSql(p) })),
@@ -251,14 +277,11 @@ export async function DELETE(
     ...(intake ? [{ op: "insert", table: "intake_questionnaires", data: intakeRowForSql(intake) } as UndoOp] : []),
     ...fixedSlots.map((f): UndoOp => ({ op: "insert", table: "fixed_slots", data: f })),
     ...deletedUpcomingSessions.map((s): UndoOp => ({ op: "insert", table: "class_sessions", data: s })),
-    ...pastSessionIds.map((sid): UndoOp => ({ op: "update", table: "class_sessions", id: sid, data: { member_id: idNum } })),
-    // 원래 결제금액(price)도 함께 담아, 환불로 깎은 금액까지 실행취소로 되돌릴 수 있게 한다.
-    ...packages.map((p): UndoOp => ({
-      op: "update",
-      table: "packages",
-      id: p.id,
-      data: { member_id: idNum, price: p.price },
-    })),
+    // 환불로 깎은 결제금액(price)을 실행취소로 되돌릴 수 있게 한다(member_id는
+    // 회원 행이 그대로 남아있어 바뀌지 않으므로 되돌릴 필요가 없다).
+    ...(refundAmount > 0 && latestPackage
+      ? [{ op: "update", table: "packages", id: latestPackage.id, data: { price: latestPackage.price } } as UndoOp]
+      : []),
   ];
   await recordUndo(
     refundAmount > 0 ? `${member.name} 회원 환불 후 삭제 (${refundAmount.toLocaleString()}원)` : `${member.name} 회원 완전 삭제`,

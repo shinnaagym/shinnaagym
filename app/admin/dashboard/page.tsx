@@ -361,9 +361,9 @@ export default async function AdminDashboardPage({
             )}
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-4">
+          <div className="grid lg:grid-cols-3 gap-4">
             {/* 이번 달 신규 PT 등록 */}
-            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 min-w-0">
               <p className="text-sm font-medium mb-3">이번 달 신규 PT 등록</p>
               {newRegs.length === 0 ? (
                 <p className="text-sm text-ink/40">이번 달 신규 등록이 없어요.</p>
@@ -383,12 +383,12 @@ export default async function AdminDashboardPage({
             </div>
 
             {/* PT 결제 내역 */}
-            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5">
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 min-w-0">
               <p className="text-sm font-medium mb-3">PT 결제 내역</p>
               {purchases.length === 0 ? (
                 <p className="text-sm text-ink/40">이번 달 결제 내역이 없어요.</p>
               ) : (
-                <div className="max-h-72 overflow-y-auto">
+                <div className="max-h-72 overflow-y-auto overflow-x-auto">
                   <table className="w-full text-xs">
                     <tbody>
                       {purchases.map((p) => (
@@ -420,32 +420,32 @@ export default async function AdminDashboardPage({
                 </div>
               )}
             </div>
-          </div>
 
-          {/* PT 환불 내역 */}
-          <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mt-4">
-            <p className="text-sm font-medium mb-3">PT 환불 내역</p>
-            {refunds.length === 0 ? (
-              <p className="text-sm text-ink/40">이번 달 환불 내역이 없어요.</p>
-            ) : (
-              <div className="max-h-72 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <tbody>
-                    {refunds.map((r) => (
-                      <tr key={r.id} className="border-b border-line/30 last:border-0">
-                        <td className="py-2 pr-2 text-ink/40 whitespace-nowrap">
-                          {formatDate(r.refundedAt)}
-                        </td>
-                        <td className="py-2 pr-2 whitespace-nowrap">{r.memberName}</td>
-                        <td className="py-2 whitespace-nowrap text-coral font-medium">
-                          −{formatWon(r.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {/* PT 환불 내역 */}
+            <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 min-w-0">
+              <p className="text-sm font-medium mb-3">PT 환불 내역</p>
+              {refunds.length === 0 ? (
+                <p className="text-sm text-ink/40">이번 달 환불 내역이 없어요.</p>
+              ) : (
+                <div className="max-h-72 overflow-y-auto overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {refunds.map((r) => (
+                        <tr key={r.id} className="border-b border-line/30 last:border-0">
+                          <td className="py-2 pr-2 text-ink/40 whitespace-nowrap">
+                            {formatDate(r.refundedAt)}
+                          </td>
+                          <td className="py-2 pr-2 whitespace-nowrap">{r.memberName}</td>
+                          <td className="py-2 whitespace-nowrap text-coral font-medium">
+                            −{formatWon(r.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
 
       <p className="text-xs text-ink/40 mt-4 leading-relaxed">

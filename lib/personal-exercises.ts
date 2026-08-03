@@ -61,3 +61,8 @@ export async function updatePersonalExercise(
 export async function deletePersonalExercise(id: number): Promise<void> {
   await query(`DELETE FROM personal_exercises WHERE id = $1`, [id]);
 }
+
+/** 회원 삭제(소프트 삭제) 시 이 회원의 개인 운동 기록을 모두 지운다. */
+export async function deletePersonalExercisesByMember(memberId: number): Promise<void> {
+  await query(`DELETE FROM personal_exercises WHERE member_id = $1`, [memberId]);
+}

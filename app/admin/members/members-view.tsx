@@ -1120,6 +1120,11 @@ function FixedSlotSchedule({
           const current = allByCell.get(key) ?? [];
           const availableMembers = members
             .filter((m) => m.status === "active")
+            .filter((m) => {
+              if (coachFilter === "unassigned") return m.coach_id === null;
+              if (coachFilter === "all") return true;
+              return m.coach_id === coachFilter;
+            })
             .filter((m) => !current.some((entry) => entry.memberId === m.id))
             .sort((a, b) => a.name.localeCompare(b.name));
           return (
@@ -2149,7 +2154,16 @@ function MemberDetailModal({
       }
 
       onChanged();
-      onClose();
+
+      // 패키지는 있는데 계약서가 아직 없으면 저장 직후 바로 계약서 작성을 이어서
+      // 받는다. 계약서가 이미 작성돼 있으면 다시 띄우지 않고 그대로 창을 닫는다.
+      const refreshed = await fetch(`/api/admin/members/${memberId}`).then((r) => r.json());
+      setData(refreshed);
+      if (!refreshed.contract && refreshed.packages.length > 0) {
+        setShowWriteContract(true);
+      } else {
+        onClose();
+      }
     } finally {
       setSaving(false);
     }

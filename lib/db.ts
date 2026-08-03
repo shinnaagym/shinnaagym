@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 18;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -569,6 +569,27 @@ function runFullMigration(): Promise<void> {
             CREATE INDEX IF NOT EXISTS idx_assessments_member_id ON assessments(member_id);
             CREATE INDEX IF NOT EXISTS idx_contracts_member_id ON contracts(member_id);
             CREATE INDEX IF NOT EXISTS idx_undo_log_pending ON undo_log(created_at DESC) WHERE undone = false;
+
+            -- 회원을 삭제해도 이전 신규/재등록 월별 통계·이탈 처리 이력이 사라지지
+            -- 않도록, members 행 자체는 지우지 않고 deleted_at만 남기는 소프트
+            -- 삭제로 바꾼다(packages/class_sessions가 가리키는 member_id도 계속
+            -- 유효하게 유지된다). 목록·조회 쪽에서는 deleted_at IS NULL로 걸러
+            -- 화면에서는 기존과 똑같이 사라진 것처럼 보이게 한다.
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+            CREATE INDEX IF NOT EXISTS idx_members_deleted_at ON members(deleted_at) WHERE deleted_at IS NOT NULL;
+
+            -- 근무시간 설정을 "평일 전체 공통"에서 월~금 요일별 개별 설정으로 바꾼다.
+            -- 배열 인덱스 0~4 = 월~금(앱 전체에서 쓰는 0=월 관례와 동일). 기존
+            -- weekday_start/weekday_end 값은 5개 요일에 그대로 복제해 넣어 마이그레이션
+            -- 전 설정을 잃지 않게 한다. 옛 컬럼은 더 이상 쓰지 않지만 남겨둔다.
+            ALTER TABLE coach_working_hours ADD COLUMN IF NOT EXISTS weekday_starts SMALLINT[];
+            ALTER TABLE coach_working_hours ADD COLUMN IF NOT EXISTS weekday_ends SMALLINT[];
+            UPDATE coach_working_hours SET weekday_starts = ARRAY[weekday_start, weekday_start, weekday_start, weekday_start, weekday_start]
+              WHERE weekday_starts IS NULL;
+            UPDATE coach_working_hours SET weekday_ends = ARRAY[weekday_end, weekday_end, weekday_end, weekday_end, weekday_end]
+              WHERE weekday_ends IS NULL;
+            ALTER TABLE coach_working_hours ALTER COLUMN weekday_starts SET NOT NULL;
+            ALTER TABLE coach_working_hours ALTER COLUMN weekday_ends SET NOT NULL;
             `,
           ),
           getPool().query(
@@ -654,11 +675,12 @@ export interface DutyRosterRow {
   coach_id: number;
 }
 
-/** 코치별 근무시간. 행이 없는 코치는 제한 없음(스튜디오 영업시간 전체가 근무시간). */
+/** 코치별 근무시간. 행이 없는 코치는 제한 없음(스튜디오 영업시간 전체가 근무시간).
+    weekday_starts/weekday_ends는 5개 배열(0=월 ~ 4=금). */
 export interface CoachWorkingHoursRow {
   coach_id: number;
-  weekday_start: number;
-  weekday_end: number;
+  weekday_starts: number[];
+  weekday_ends: number[];
   saturday_start: number;
   saturday_end: number;
 }
@@ -700,6 +722,7 @@ export interface MemberRow {
   status: MemberStatus;
   token: string;
   created_at: string;
+  deleted_at: string | null;
 }
 
 export type PtType = "1:1" | "2:1";

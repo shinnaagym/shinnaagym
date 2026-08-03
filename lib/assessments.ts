@@ -150,6 +150,11 @@ export async function deleteAssessment(id: number): Promise<void> {
   await query(`DELETE FROM assessments WHERE id = $1`, [id]);
 }
 
+/** 회원 삭제(소프트 삭제) 시 이 회원의 평가지를 모두 지운다. */
+export async function deleteAssessmentsByMember(memberId: number): Promise<void> {
+  await query(`DELETE FROM assessments WHERE member_id = $1`, [memberId]);
+}
+
 /**
  * 회원별 평가 작성 건수 + 가장 최근 작성 시각 — 상단 탭 목록의 작성 여부/건수
  * 표시와, 최근 작성 순 정렬(최신 작성자가 맨 위) 둘 다에 쓰인다.

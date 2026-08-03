@@ -267,14 +267,19 @@ export function ScheduleGrid({
   }
 
   /** 코치의 근무시간 설정 밖인지를 판단한다. 설정이 없는 코치는 항상 false(제한
-      없음). 공휴일은 토요일과 같은 단축 운영이라 토요일 근무시간을 기준으로 본다. */
+      없음). 공휴일은 토요일과 같은 단축 운영이라 토요일 근무시간을 기준으로 본다.
+      평일은 요일별(월~금, 0~4)로 다른 시간대를 쓸 수 있다. */
   function isOutsideWorkingHours(coachId: number, date: string, hour: number): boolean {
     const wh = coachWorkingHours[coachId];
     if (!wh) return false;
-    const useSaturdayHours = dateKeys.indexOf(date) === 5 || !!holidayMap[date];
-    return useSaturdayHours
-      ? hour < wh.saturdayStart || hour >= wh.saturdayEnd
-      : hour < wh.weekdayStart || hour >= wh.weekdayEnd;
+    const weekdayIndex = dateKeys.indexOf(date);
+    if (weekdayIndex === 5 || !!holidayMap[date]) {
+      return hour < wh.saturdayStart || hour >= wh.saturdayEnd;
+    }
+    const start = wh.weekdayStarts[weekdayIndex];
+    const end = wh.weekdayEnds[weekdayIndex];
+    if (start === undefined || end === undefined) return false;
+    return hour < start || hour >= end;
   }
 
   const visibleCoaches =
