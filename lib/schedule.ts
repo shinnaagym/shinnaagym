@@ -153,9 +153,10 @@ export async function setDutyOverride(
 
 // ---- 코치별 근무시간(평일/토요일) ----
 
+/** weekdayStarts/weekdayEnds는 5개 배열(0=월 ~ 4=금) — 요일별로 다른 근무시간을 쓸 수 있다. */
 export interface CoachWorkingHours {
-  weekdayStart: number;
-  weekdayEnd: number;
+  weekdayStarts: number[];
+  weekdayEnds: number[];
   saturdayStart: number;
   saturdayEnd: number;
 }
@@ -165,8 +166,8 @@ export const getCoachWorkingHours = unstable_cache(
   async (): Promise<Record<number, CoachWorkingHours>> => {
     const result = await query<{
       coach_id: number;
-      weekday_start: number;
-      weekday_end: number;
+      weekday_starts: number[];
+      weekday_ends: number[];
       saturday_start: number;
       saturday_end: number;
     }>(`SELECT * FROM coach_working_hours`);
@@ -174,8 +175,8 @@ export const getCoachWorkingHours = unstable_cache(
       result.rows.map((r) => [
         r.coach_id,
         {
-          weekdayStart: r.weekday_start,
-          weekdayEnd: r.weekday_end,
+          weekdayStarts: r.weekday_starts,
+          weekdayEnds: r.weekday_ends,
           saturdayStart: r.saturday_start,
           saturdayEnd: r.saturday_end,
         },
@@ -194,13 +195,25 @@ export async function setCoachWorkingHours(
   if (hours === null) {
     await query(`DELETE FROM coach_working_hours WHERE coach_id = $1`, [coachId]);
   } else {
+    // weekday_start/weekday_end(옛 단일 값 컬럼)는 더 이상 근무시간 판단에 쓰이지
+    // 않지만 NOT NULL이라 월요일 값으로 채워 둔다.
     await query(
-      `INSERT INTO coach_working_hours (coach_id, weekday_start, weekday_end, saturday_start, saturday_end)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO coach_working_hours
+         (coach_id, weekday_start, weekday_end, weekday_starts, weekday_ends, saturday_start, saturday_end)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (coach_id) DO UPDATE SET
          weekday_start = EXCLUDED.weekday_start, weekday_end = EXCLUDED.weekday_end,
+         weekday_starts = EXCLUDED.weekday_starts, weekday_ends = EXCLUDED.weekday_ends,
          saturday_start = EXCLUDED.saturday_start, saturday_end = EXCLUDED.saturday_end`,
-      [coachId, hours.weekdayStart, hours.weekdayEnd, hours.saturdayStart, hours.saturdayEnd],
+      [
+        coachId,
+        hours.weekdayStarts[0],
+        hours.weekdayEnds[0],
+        hours.weekdayStarts,
+        hours.weekdayEnds,
+        hours.saturdayStart,
+        hours.saturdayEnd,
+      ],
     );
   }
   revalidateTag("coach-working-hours", { expire: 0 });
@@ -352,9 +365,17 @@ export async function updateMember(
   await query(`UPDATE members SET ${fields.join(", ")} WHERE id = $1`, [id, ...values]);
 }
 
-/** 패키지가 하나도 없는(=결제 이력 없는) 회원만 완전 삭제를 허용한다. */
+/** 회원을 소프트 삭제한다 — 행 자체는 남기고 deleted_at만 채운다. 이렇게 해야
+    packages/class_sessions가 가리키는 member_id가 계속 유효해서 신규·재등록
+    월별 통계가 삭제 후에도 그대로 남고, followup_status를 "이탈"로 넘겨 재등록
+    관리 화면의 이탈 집계에도 곧바로 반영된다. */
 export async function deleteMember(id: number): Promise<void> {
-  await query(`DELETE FROM members WHERE id = $1`, [id]);
+  await query(
+    `UPDATE members
+     SET deleted_at = now(), status = 'inactive', followup_status = '이탈', followup_updated_at = now()
+     WHERE id = $1`,
+    [id],
+  );
 }
 
 /** 오늘(포함) 이후로 예정된 이 회원의 예약을 전부 지우고, 지운 행을 그대로 반환한다
@@ -385,7 +406,9 @@ export async function listPastSessionIdsForMember(
 }
 
 export async function listMembers(): Promise<MemberRow[]> {
-  const result = await query<MemberRow>(`SELECT * FROM members ORDER BY name ASC`);
+  const result = await query<MemberRow>(
+    `SELECT * FROM members WHERE deleted_at IS NULL ORDER BY name ASC`,
+  );
   return result.rows;
 }
 
@@ -427,6 +450,7 @@ export async function listMembersWithProgress(
        FROM packages
        ORDER BY member_id, purchased_at DESC
      ) lp ON lp.member_id = m.id
+     WHERE m.deleted_at IS NULL
      ORDER BY m.name ASC`,
     [nextWeekStart ?? "9999-12-31", nextWeekEnd ?? "9999-12-31"],
   );
@@ -475,6 +499,11 @@ export async function addFixedSlot(
 
 export async function removeFixedSlot(id: number): Promise<void> {
   await query(`DELETE FROM fixed_slots WHERE id = $1`, [id]);
+}
+
+/** 회원 삭제(소프트 삭제) 시 이 회원의 고정 시간대 배정을 모두 지운다. */
+export async function deleteFixedSlotsByMember(memberId: number): Promise<void> {
+  await query(`DELETE FROM fixed_slots WHERE member_id = $1`, [memberId]);
 }
 
 /** 회원의 가장 최근 결제 패키지의 PT 유형(없으면 1:1). */
@@ -599,9 +628,10 @@ export async function getMemberById(id: number): Promise<MemberRow | null> {
 }
 
 export async function getMemberByToken(token: string): Promise<MemberRow | null> {
-  const result = await query<MemberRow>(`SELECT * FROM members WHERE token = $1`, [
-    token,
-  ]);
+  const result = await query<MemberRow>(
+    `SELECT * FROM members WHERE token = $1 AND deleted_at IS NULL`,
+    [token],
+  );
   return result.rows[0] ?? null;
 }
 
@@ -898,7 +928,7 @@ async function pickDefaultCoachId(): Promise<number | null> {
 export async function getMemberByPhone(phone: string): Promise<MemberRow | null> {
   if (!phone.trim()) return null;
   const result = await query<MemberRow>(
-    `SELECT * FROM members WHERE phone = $1 AND phone <> '' LIMIT 1`,
+    `SELECT * FROM members WHERE phone = $1 AND phone <> '' AND deleted_at IS NULL LIMIT 1`,
     [phone.trim()],
   );
   return result.rows[0] ?? null;
@@ -1030,7 +1060,7 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
          LEFT JOIN (
            SELECT member_id, COUNT(*) as package_count FROM packages GROUP BY member_id
          ) pkg ON pkg.member_id = m.id
-         WHERE m.coach_id IS NOT NULL
+         WHERE m.coach_id IS NOT NULL AND m.deleted_at IS NULL
          GROUP BY m.coach_id`,
       ),
       query<{ coach_id: number; consultation_count: string; success_count: string }>(

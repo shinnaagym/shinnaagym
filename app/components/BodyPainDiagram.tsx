@@ -41,8 +41,8 @@ const REGION_META: Record<
 > = {
   front: { label: "전면", src: "/body-diagram/front.png", width: 350, height: 704 },
   back: { label: "후면", src: "/body-diagram/back.png", width: 355, height: 704 },
-  left: { label: "좌측면", src: "/body-diagram/side.png", width: 170, height: 704 },
-  right: { label: "우측면", src: "/body-diagram/side-flipped.png", width: 170, height: 704 },
+  left: { label: "좌측면", src: "/body-diagram/side-flipped.png", width: 170, height: 704 },
+  right: { label: "우측면", src: "/body-diagram/side.png", width: 170, height: 704 },
   feet: { label: "발", src: "/body-diagram/feet.png", width: 366, height: 310 },
   hands: { label: "손", src: "/body-diagram/hands.png", width: 365, height: 292 },
 };

@@ -31,19 +31,29 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ hours });
   }
 
-  const weekdayStart = toHour(body?.weekdayStart);
-  const weekdayEnd = toHour(body?.weekdayEnd);
+  const weekdayStartsRaw = Array.isArray(body?.weekdayStarts) ? body.weekdayStarts : null;
+  const weekdayEndsRaw = Array.isArray(body?.weekdayEnds) ? body.weekdayEnds : null;
   const saturdayStart = toHour(body?.saturdayStart);
   const saturdayEnd = toHour(body?.saturdayEnd);
   if (
-    weekdayStart === null ||
-    weekdayEnd === null ||
+    !weekdayStartsRaw ||
+    !weekdayEndsRaw ||
+    weekdayStartsRaw.length !== 5 ||
+    weekdayEndsRaw.length !== 5 ||
     saturdayStart === null ||
     saturdayEnd === null
   ) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  if (weekdayStart >= weekdayEnd || saturdayStart >= saturdayEnd) {
+  const weekdayStarts = weekdayStartsRaw.map(toHour);
+  const weekdayEnds = weekdayEndsRaw.map(toHour);
+  if (weekdayStarts.some((h) => h === null) || weekdayEnds.some((h) => h === null)) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+  if (
+    weekdayStarts.some((h, i) => (h as number) >= (weekdayEnds[i] as number)) ||
+    saturdayStart >= saturdayEnd
+  ) {
     return NextResponse.json(
       { error: "종료 시각은 시작 시각보다 늦어야 해요." },
       { status: 400 },
@@ -51,8 +61,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   await setCoachWorkingHours(coachId, {
-    weekdayStart,
-    weekdayEnd,
+    weekdayStarts: weekdayStarts as number[],
+    weekdayEnds: weekdayEnds as number[],
     saturdayStart,
     saturdayEnd,
   });

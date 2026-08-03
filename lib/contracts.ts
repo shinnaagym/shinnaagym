@@ -88,6 +88,11 @@ export async function listContractsByMember(memberId: number): Promise<ContractR
   return result.rows;
 }
 
+/** 회원 삭제(소프트 삭제) 시 이 회원의 계약서를 모두 지운다. */
+export async function deleteContractsByMember(memberId: number): Promise<void> {
+  await query(`DELETE FROM contracts WHERE member_id = $1`, [memberId]);
+}
+
 /** 회원의 가장 최근 계약서 한 건(복호화된 주민등록번호 앞자리 포함). */
 export async function getLatestContractByMember(
   memberId: number,

@@ -7,6 +7,8 @@ export const EXERCISE_PURPOSE_OPTIONS = [
   { key: "learning", label: "운동 배우기" },
   { key: "strength", label: "근력 증가" },
   { key: "growth", label: "키성장" },
+  { key: "functional", label: "기능성 트레이닝" },
+  { key: "prenatal_postnatal", label: "산전산후" },
 ] as const;
 
 // 초진 문진표 · 계약서 작성 · 대시보드 월별 통계가 모두 이 목록 하나를 공유한다 —
