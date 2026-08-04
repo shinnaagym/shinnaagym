@@ -111,7 +111,7 @@ export function ExpensesView({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_260px] items-start">
-      <div>
+      <div className="min-w-0">
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <button
             type="button"
