@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
         coachId?: unknown;
         date?: unknown;
         hour?: unknown;
+        minute?: unknown;
         memo?: unknown;
         entryType?: unknown;
         ptType?: unknown;
@@ -55,6 +56,10 @@ export async function POST(req: NextRequest) {
   const coachId = Number(body?.coachId);
   const date = typeof body?.date === "string" ? body.date : "";
   const hour = Number(body?.hour);
+  const minute =
+    typeof body?.minute === "number" && Number.isInteger(body.minute) && body.minute >= 0 && body.minute <= 59
+      ? body.minute
+      : 0;
   let memo = typeof body?.memo === "string" ? body.memo : "";
 
   if (!Number.isInteger(coachId) || !isValidDateKey(date) || !Number.isInteger(hour)) {
@@ -96,7 +101,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const session = await createSession({ memberId, coachId, date, hour, memo, entryType, ptType });
+    const session = await createSession({ memberId, coachId, date, hour, minute, memo, entryType, ptType });
 
     const member = memberId != null ? await getMemberById(memberId) : null;
     const who = member ? `${member.name} 회원` : entryType === "memo" ? "메모" : "일정";

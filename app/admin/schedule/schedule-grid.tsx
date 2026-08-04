@@ -100,6 +100,12 @@ function entryMainLabel(session: SessionWithMember): string {
   return session.member_name ?? "";
 }
 
+/** 정시가 아닌 분(예: 15시 20분)에 시작하는 일정은 스케줄표 칸에 "(20)"처럼
+    이름 앞에 분을 표시한다. 정시(0분)면 표시하지 않는다. */
+function minutePrefix(session: SessionWithMember): string {
+  return session.session_minute ? `(${session.session_minute})` : "";
+}
+
 /** 세션 pill에 표시할 "진행/총" 회차 문구. 개인 일정·수업 불가는 대상이 없어 null. */
 function progressLabel(session: SessionWithMember): string | null {
   if (isSimpleEntry(session)) return null;
@@ -177,12 +183,14 @@ function SessionCellButton({
       {isSimpleEntry(session) ? (
         <span className="font-medium block break-words leading-tight">
           {entryIcon(session)}
+          {minutePrefix(session)}
           {entryMainLabel(session)}
         </span>
       ) : (
         <>
           <span className="font-medium block break-words leading-tight">
             {entryIcon(session)}
+            {minutePrefix(session)}
             {session.member_name}
             {progressLabel(session) && (
               <span className="ml-1 font-normal opacity-70">{progressLabel(session)}</span>
@@ -1268,6 +1276,7 @@ function CreateSessionModal({
   const [endHour, setEndHour] = useState(hour + 1);
   const [weekdays, setWeekdays] = useState<Set<number>>(new Set());
   const [duration, setDuration] = useState("1");
+  const [minute, setMinute] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -1352,6 +1361,7 @@ function CreateSessionModal({
             coachId: selectedCoachId,
             date: occDate,
             hour: occHour,
+            minute,
             memo,
           };
           if (category === "session") {
@@ -1414,7 +1424,7 @@ function CreateSessionModal({
   }
 
   return (
-    <ModalShell title={`새 일정 — ${date} ${hour}:00`} onClose={onClose}>
+    <ModalShell title={`새 일정 — ${date} ${formatHourMinute(hour, minute)}`} onClose={onClose}>
       <div className="space-y-4">
         <div className="grid grid-cols-4 gap-1 rounded-full bg-bone/70 p-1 text-xs">
           {(Object.keys(CATEGORY_LABELS) as SessionEntryType[]).map((cat) => (
@@ -1430,6 +1440,23 @@ function CreateSessionModal({
             </button>
           ))}
         </div>
+
+        <label className="flex items-center justify-end gap-1 text-xs text-ink/50">
+          {hour}시
+          <input
+            type="number"
+            min={0}
+            max={59}
+            step={5}
+            value={minute}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isInteger(v)) setMinute(Math.min(59, Math.max(0, v)));
+            }}
+            className="w-14 rounded-lg border border-line px-2 py-1 text-sm text-ink outline-none focus:border-coral"
+          />
+          분
+        </label>
 
         {coaches.length > 1 && (
           <div>
