@@ -76,11 +76,11 @@ export function ExercisePerformanceSection({
   return (
     <div className="rounded-2xl border border-line/60 bg-white shadow-sm px-5 py-4 mb-6">
       <div className="flex items-center justify-between gap-2 mb-1">
-        <h2 className="font-display text-base">운동 수행능력 평가</h2>
+        <h2 className="font-display text-base">운동 수행능력 기록</h2>
         <DisclosureToggle
           expanded={expanded}
           onToggle={() => setExpanded((v) => !v)}
-          label={expanded ? "운동 수행능력 평가 접기" : "운동 수행능력 평가 펼치기"}
+          label={expanded ? "운동 수행능력 기록 접기" : "운동 수행능력 기록 펼치기"}
         />
       </div>
       {expanded && (

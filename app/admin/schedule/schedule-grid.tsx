@@ -15,6 +15,7 @@ type SessionWithMember = {
   coach_id: number;
   session_date: string;
   session_hour: number;
+  session_minute: number;
   status: SessionStatus;
   memo: string;
   entry_type: SessionEntryType;
@@ -32,6 +33,11 @@ function weekdayLabelForDateKey(key: string): string {
   const [y, m, d] = key.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   return WEEKDAY_LABELS[(dt.getUTCDay() + 6) % 7];
+}
+
+/** "17:00" 또는(분이 있으면) "17:20"처럼, 세션의 시:분을 표시용으로 포맷한다. */
+function formatHourMinute(hour: number, minute: number): string {
+  return `${hour}:${String(minute).padStart(2, "0")}`;
 }
 
 const CATEGORY_LABELS: Record<SessionEntryType, string> = {
@@ -102,9 +108,10 @@ function progressLabel(session: SessionWithMember): string | null {
   return `${session.ordinal ?? "-"}/${total}`;
 }
 
-/** 재등록 골든벨은 회원 단위 자격(잔여 ≤ 3회)뿐 아니라, 이 세션 pill 자체의
-    회차도 "총 회차 - 이 회차 ≤ 3"이어야 뜬다 — 그래야 예: "3/10"(잔여 7회
-    시점)처럼 한참 이른 회차의 pill에까지 종 아이콘이 잘못 붙는 일이 없다. */
+/** 재등록 골든벨은 활성 회원의 세션에서만, 그 pill 자체의 회차 기준으로
+    "총 회차 - 이 회차 ≤ 3"이면 뜬다. 잔여는 예약분까지 포함한 회차(ordinal)로
+    판단한다 — 완료(출석)만 세면 예약은 해뒀지만 아직 안 지난 미래 회차들이
+    잔여에 잡혀 정작 마지막 몇 회차 pill에서 종이 안 뜨는 문제가 있었다. */
 function isGoldenBellSession(session: SessionWithMember, goldenBellMemberIds: Set<number>): boolean {
   if (session.entry_type !== "session" || session.member_id === null) return false;
   if (!goldenBellMemberIds.has(session.member_id)) return false;
@@ -304,22 +311,16 @@ export function ScheduleGrid({
     return map;
   }, [coaches]);
 
-  /** 잔여 3회 이하인 활성 회원 — 스케줄표 pill에 재등록 골든벨을 표시하기 위함. */
   /** 날짜(YYYY-MM-DD) -> 그날이 생일인 재직 코치 이름들. 연도는 무시하고 월·일만 비교한다. */
   function birthdayCoachNamesFor(dateKey: string): string[] {
     const monthDay = dateKey.slice(5);
     return effectiveCoaches.filter((c) => c.birthday && c.birthday.slice(5) === monthDay).map((c) => c.name);
   }
 
-  const goldenBellMemberIds = useMemo(() => {
-    const set = new Set<number>();
-    for (const m of members) {
-      if (m.status === "active" && m.total_sessions > 0 && m.total_sessions - m.done_count <= 3) {
-        set.add(m.id);
-      }
-    }
-    return set;
-  }, [members]);
+  /** 재등록 골든벨 대상 회원 — 활성 회원이면 후보이고, 실제로 종이 뜰지는
+      각 pill의 회차(ordinal)가 판단한다(isGoldenBellSession). members는 이미
+      활성 회원만 넘어오므로 여기서는 그대로 id만 모은다. */
+  const goldenBellMemberIds = useMemo(() => new Set(members.map((m) => m.id)), [members]);
 
   const sessionMap = useMemo(() => {
     const map = new Map<string, SessionWithMember>();
@@ -1778,6 +1779,7 @@ function EditSessionModal({
   const [memo, setMemo] = useState(session.memo);
   const [coachId, setCoachId] = useState(session.coach_id);
   const [ptType, setPtType] = useState<PtType>(session.pt_type);
+  const [minute, setMinute] = useState(session.session_minute);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMove, setShowMove] = useState(false);
@@ -1847,7 +1849,7 @@ function EditSessionModal({
   if (isSimpleEntry(session)) {
     return (
       <ModalShell
-        title={`${CATEGORY_LABELS[session.entry_type]} — ${session.session_date} ${session.session_hour}:00`}
+        title={`${CATEGORY_LABELS[session.entry_type]} — ${session.session_date} ${formatHourMinute(session.session_hour, session.session_minute)}`}
         onClose={onClose}
       >
         <div className="space-y-4">
@@ -1908,21 +1910,39 @@ function EditSessionModal({
 
   return (
     <ModalShell
-      title={`${session.member_name} — ${session.session_date} ${session.session_hour}:00`}
+      title={`${session.member_name} — ${session.session_date} ${formatHourMinute(session.session_hour, minute)}`}
       onClose={onClose}
     >
       <div className="space-y-4">
-        <p className="text-sm text-ink/60">
-          {session.entry_type === "consultation" && (
-            <span className="mr-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
-              상담
-            </span>
-          )}
-          현재 상태: <span className="font-medium text-ink">{STATUS_LABEL[session.status]}</span>
-          {progressLabel(session) && (
-            <span className="ml-2 text-ink/50">· 회차 {progressLabel(session)}</span>
-          )}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-ink/60">
+            {session.entry_type === "consultation" && (
+              <span className="mr-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                상담
+              </span>
+            )}
+            현재 상태: <span className="font-medium text-ink">{STATUS_LABEL[session.status]}</span>
+            {progressLabel(session) && (
+              <span className="ml-2 text-ink/50">· 회차 {progressLabel(session)}</span>
+            )}
+          </p>
+          <label className="flex items-center gap-1 text-xs text-ink/50 shrink-0">
+            {session.session_hour}시
+            <input
+              type="number"
+              min={0}
+              max={59}
+              step={5}
+              value={minute}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (Number.isInteger(v)) setMinute(Math.min(59, Math.max(0, v)));
+              }}
+              className="w-14 rounded-lg border border-line px-2 py-1 text-sm text-ink outline-none focus:border-coral"
+            />
+            분
+          </label>
+        </div>
 
         {coaches.length > 1 && (
           <div>
@@ -1982,14 +2002,20 @@ function EditSessionModal({
                   return others.map((s) => (
                     <div key={s.id} className="flex items-center justify-between text-[11px] text-ink/60">
                       <span>
-                        {s.session_date}({weekdayLabelForDateKey(s.session_date)}) {s.session_hour}:00
+                        {s.session_date}({weekdayLabelForDateKey(s.session_date)}){" "}
+                        {formatHourMinute(s.session_hour, s.session_minute)}
                       </span>
                       <span className="flex items-center gap-2">
                         {progressLabel(s) && <span className="text-ink/40">{progressLabel(s)}</span>}
                         {STATUS_LABEL[s.status]}
                         <button
                           type="button"
-                          onClick={() => handleDeleteOther(s.id, `${s.session_date} ${s.session_hour}:00`)}
+                          onClick={() =>
+                            handleDeleteOther(
+                              s.id,
+                              `${s.session_date} ${formatHourMinute(s.session_hour, s.session_minute)}`,
+                            )
+                          }
                           className="text-ink/40 hover:text-coral"
                         >
                           삭제
@@ -2093,7 +2119,9 @@ function EditSessionModal({
             disabled={submitting}
             onClick={() =>
               patch(
-                session.entry_type === "session" ? { memo, coachId, ptType } : { memo, coachId },
+                session.entry_type === "session"
+                  ? { memo, coachId, ptType, minute }
+                  : { memo, coachId, minute },
               )
             }
             className="rounded-full border border-line py-2 text-xs sm:text-sm hover:bg-bone transition disabled:opacity-50"

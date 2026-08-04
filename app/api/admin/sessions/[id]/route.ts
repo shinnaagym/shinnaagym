@@ -29,6 +29,7 @@ export async function PATCH(
         ptType?: unknown;
         date?: unknown;
         hour?: unknown;
+        minute?: unknown;
       }
     | null;
 
@@ -49,6 +50,10 @@ export async function PATCH(
     typeof body?.date === "string" && isValidDateKey(body.date) ? body.date : undefined;
   const sessionHour =
     typeof body?.hour === "number" && Number.isInteger(body.hour) ? body.hour : undefined;
+  const sessionMinute =
+    typeof body?.minute === "number" && Number.isInteger(body.minute) && body.minute >= 0 && body.minute <= 59
+      ? body.minute
+      : undefined;
 
   const before = (
     await query<ClassSessionRow>(`SELECT * FROM class_sessions WHERE id = $1`, [idNum])
@@ -61,7 +66,15 @@ export async function PATCH(
   }
 
   try {
-    await updateSession(idNum, { status, memo, coachId, ptType, sessionDate, sessionHour });
+    await updateSession(idNum, {
+      status,
+      memo,
+      coachId,
+      ptType,
+      sessionDate,
+      sessionHour,
+      sessionMinute,
+    });
 
     const prevValues: Record<string, unknown> = {};
     if (status !== undefined) prevValues.status = before.status;
@@ -70,6 +83,7 @@ export async function PATCH(
     if (ptType !== undefined) prevValues.pt_type = before.pt_type;
     if (sessionDate !== undefined) prevValues.session_date = before.session_date;
     if (sessionHour !== undefined) prevValues.session_hour = before.session_hour;
+    if (sessionMinute !== undefined) prevValues.session_minute = before.session_minute;
     await recordUndo(`${before.session_date} ${before.session_hour}시 일정 수정`, [
       { op: "update", table: "class_sessions", id: idNum, data: prevValues },
     ]);
