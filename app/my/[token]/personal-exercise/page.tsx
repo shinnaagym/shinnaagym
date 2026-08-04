@@ -21,7 +21,7 @@ export default async function MyPersonalExercisePage({
     <main className="flex-1">
       <div className="mx-auto max-w-2xl px-6 py-12 sm:py-16">
         <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">Personal Exercise</p>
-        <h1 className="font-display text-3xl mb-6">{member.name}님의 개인 운동</h1>
+        <h1 className="font-serif-display text-3xl mb-6">{member.name}님의 개인 운동</h1>
 
         <Link
           href={`/my/${token}/personal-exercise/new`}

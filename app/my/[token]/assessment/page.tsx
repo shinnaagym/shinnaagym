@@ -32,7 +32,7 @@ export default async function MyAssessmentHistoryPage({
     <main className="flex-1">
       <div className="mx-auto max-w-2xl px-6 py-12 sm:py-16">
         <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">Assessment</p>
-        <h1 className="font-display text-3xl mb-6">{member.name}님의 체형 평가 이력</h1>
+        <h1 className="font-serif-display text-3xl mb-6">{member.name}님의 체형 평가 이력</h1>
 
         <Link
           href={`/my/${token}/intake`}

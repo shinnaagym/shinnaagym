@@ -132,6 +132,10 @@ export default async function AdminDashboardPage({
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
+      <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Dashboard</p>
+      <h1 className="font-display text-2xl mb-1">대시보드</h1>
+      <p className="text-sm text-ink/50 mb-6">이번 달 운영 현황을 한눈에 확인하세요.</p>
+
       {/* 월 네비게이션 */}
           <div className="flex items-center justify-between mb-2 flex-wrap gap-3">
             <p className="font-display text-lg">{formatMonthLabel(monthKey)}</p>

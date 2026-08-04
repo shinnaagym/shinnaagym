@@ -27,7 +27,7 @@ export default async function MyPtLogHistoryPage({
     <main className="flex-1">
       <div className="mx-auto max-w-2xl px-6 py-12 sm:py-16">
         <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">PT Log</p>
-        <h1 className="font-display text-3xl mb-6">{member.name}님의 PT 일지</h1>
+        <h1 className="font-serif-display text-3xl mb-6">{member.name}님의 PT 일지</h1>
 
         <div className="mb-8">
           <PtLogList ptLogs={ptLogs} editable={false} />
