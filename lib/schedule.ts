@@ -422,6 +422,11 @@ export async function listMembers(): Promise<MemberRow[]> {
 export interface MemberWithProgress extends MemberRow {
   total_sessions: number;
   done_count: number;
+  /** 예약(미래분 포함) + 완료 — 취소만 제외한 전체 회차. "잔여"(done_count 기준)와
+      달리 재등록 골든벨처럼 "더 예약할 수 있는 자리가 얼마나 남았는지"를 판단할
+      때 쓴다 — done_count만 쓰면 예약은 꽉 찼지만 아직 지나지 않은 회원이
+      빠지는 문제가 있다. */
+  scheduled_count: number;
   package_count: number;
   has_next_week_session: boolean;
   latest_pt_type: PtType;
@@ -436,6 +441,7 @@ export async function listMembersWithProgress(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
        COALESCE(s.done, 0)::int as done_count,
+       COALESCE(sc.scheduled, 0)::int as scheduled_count,
        COALESCE(p.pkg_count, 0)::int as package_count,
        (nw.member_id IS NOT NULL) as has_next_week_session,
        COALESCE(lp.pt_type, '1:1') as latest_pt_type
@@ -451,6 +457,12 @@ export async function listMembersWithProgress(
        WHERE entry_type = 'session' AND status <> 'cancelled' AND session_date <= $3
        GROUP BY member_id
      ) s ON s.member_id = m.id
+     LEFT JOIN (
+       -- scheduled_count는 날짜 제한 없이 예약(미래분)까지 센다.
+       SELECT member_id, COUNT(*) as scheduled FROM class_sessions
+       WHERE entry_type = 'session' AND status <> 'cancelled'
+       GROUP BY member_id
+     ) sc ON sc.member_id = m.id
      LEFT JOIN (
        SELECT DISTINCT member_id FROM class_sessions
        WHERE entry_type = 'session' AND status <> 'cancelled'

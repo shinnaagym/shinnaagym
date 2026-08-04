@@ -36,9 +36,12 @@ export default async function AdminRetentionPage() {
 
   const coachNameMap = Object.fromEntries(coaches.map((c) => [c.id, c.name]));
 
+  // 대상 여부는 예약(미래분 포함)까지 합친 scheduled_count로 판단한다 — done_count
+  // (출석만)로 걸러내면 예약은 꽉 찼지만 아직 지나지 않은 회원이 재등록을 놓칠
+  // 만큼 임박했는데도 목록에서 빠지는 문제가 있다(스케줄표 골든벨과 동일한 기준).
   const goldenMembers = members
-    .filter((m) => m.status === "active" && m.total_sessions > 0 && m.total_sessions - m.done_count <= 3)
-    .sort((a, b) => a.total_sessions - a.done_count - (b.total_sessions - b.done_count));
+    .filter((m) => m.status === "active" && m.total_sessions > 0 && m.total_sessions - m.scheduled_count <= 3)
+    .sort((a, b) => a.total_sessions - a.scheduled_count - (b.total_sessions - b.scheduled_count));
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
