@@ -229,16 +229,16 @@ export function AssessmentDocument({
       {ASSESSMENT_REGIONS.map((region) => (
         <section key={region.key} className="mb-8">
           <h2 className="font-display text-lg mb-3">{region.label}</h2>
-          <div className="rounded-2xl border border-line overflow-hidden">
-            <table className="w-full text-xs sm:text-sm">
+          <div className="rounded-2xl border border-line overflow-x-auto">
+            <table className="w-full text-xs sm:text-sm min-w-[640px]">
               <thead>
                 <tr className="bg-bone/60 text-left text-ink/50">
-                  <th className="px-3 py-2 font-medium">동작</th>
-                  <th className="px-3 py-2 font-medium">가동범위(수동)</th>
-                  <th className="px-3 py-2 font-medium">가동범위(능동)</th>
-                  <th className="px-3 py-2 font-medium">근력</th>
-                  <th className="px-3 py-2 font-medium">통증척도</th>
-                  <th className="px-3 py-2 font-medium">보상패턴 및 특이사항</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">동작</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">가동범위(수동)</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">가동범위(능동)</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">근력</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">통증척도</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">보상패턴 및 특이사항</th>
                 </tr>
               </thead>
               <tbody>

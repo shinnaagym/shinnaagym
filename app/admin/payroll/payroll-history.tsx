@@ -190,16 +190,16 @@ export function PayrollHistory({ coaches }: { coaches: CoachRow[] }) {
           </div>
 
           <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-left text-ink/50 text-xs border-b border-line/60">
-                  <th className="px-4 py-2.5 font-medium">정산월</th>
-                  <th className="px-4 py-2.5 font-medium">이름</th>
-                  <th className="px-4 py-2.5 font-medium">고용형태</th>
-                  <th className="px-4 py-2.5 font-medium">근속</th>
-                  <th className="px-4 py-2.5 font-medium text-right">총지급액</th>
-                  <th className="px-4 py-2.5 font-medium text-right">실지급액</th>
-                  <th className="px-4 py-2.5 font-medium">저장일시</th>
+                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">정산월</th>
+                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">이름</th>
+                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">고용형태</th>
+                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">근속</th>
+                  <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">총지급액</th>
+                  <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">실지급액</th>
+                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">저장일시</th>
                   <th className="px-4 py-2.5 font-medium"></th>
                 </tr>
               </thead>
