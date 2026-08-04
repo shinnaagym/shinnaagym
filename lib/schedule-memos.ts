@@ -17,6 +17,14 @@ export async function createScheduleMemo(content: string): Promise<ScheduleMemoR
   return rows[0];
 }
 
+export async function updateScheduleMemo(id: number, content: string): Promise<ScheduleMemoRow | null> {
+  const { rows } = await query<ScheduleMemoRow>(
+    `UPDATE schedule_memos SET content = $2 WHERE id = $1 RETURNING *`,
+    [id, content],
+  );
+  return rows[0] ?? null;
+}
+
 export async function deleteScheduleMemo(id: number): Promise<boolean> {
   const { rowCount } = await query(`DELETE FROM schedule_memos WHERE id = $1`, [id]);
   return (rowCount ?? 0) > 0;
