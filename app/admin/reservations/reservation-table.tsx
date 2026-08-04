@@ -19,7 +19,7 @@ function SortHeader({
   onClick: () => void;
 }) {
   return (
-    <th className="px-4 py-3 font-medium">
+    <th className="px-4 py-3 font-medium whitespace-nowrap">
       <button type="button" onClick={onClick} className="flex items-center gap-1 hover:text-coral">
         {label}
         <span className={active ? "text-coral" : "text-ink/30"}>{dir === "asc" ? "▲" : "▼"}</span>
@@ -85,7 +85,7 @@ export function ReservationTable({
         <p className="text-ink/50">아직 예약이 없어요.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[760px]">
             <thead>
               <tr className="bg-bone text-left">
                 <SortHeader
@@ -94,12 +94,12 @@ export function ReservationTable({
                   dir={sortKey === "reservation_date" ? sortDir : "asc"}
                   onClick={() => toggleSort("reservation_date")}
                 />
-                <th className="px-4 py-3 font-medium">시간</th>
-                <th className="px-4 py-3 font-medium">성함</th>
-                <th className="px-4 py-3 font-medium">나이</th>
-                <th className="px-4 py-3 font-medium">연락처</th>
-                <th className="px-4 py-3 font-medium">운동 목적</th>
-                <th className="px-4 py-3 font-medium">설명</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">시간</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">성함</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">나이</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">연락처</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">운동 목적</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap">설명</th>
                 <SortHeader
                   label="신청 시각"
                   active={sortKey === "created_at"}

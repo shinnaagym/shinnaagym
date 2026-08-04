@@ -204,14 +204,14 @@ export function ExpensesView({
           </div>
         ) : (
           <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="text-left text-ink/50 text-xs border-b border-line/60">
-                  <th className="px-4 py-2.5 font-medium">지출 내역</th>
-                  <th className="px-4 py-2.5 font-medium text-right">금액</th>
-                  <th className="px-4 py-2.5 font-medium text-right">수량</th>
-                  <th className="px-4 py-2.5 font-medium text-right">소계</th>
-                  <th className="px-4 py-2.5 font-medium">내용</th>
+                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">지출 내역</th>
+                  <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">금액</th>
+                  <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">수량</th>
+                  <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">소계</th>
+                  <th className="px-4 py-2.5 font-medium whitespace-nowrap">내용</th>
                   <th className="px-4 py-2.5 font-medium"></th>
                 </tr>
               </thead>
