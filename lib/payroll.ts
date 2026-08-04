@@ -1,6 +1,7 @@
 import { query } from "./db";
 import type { EmploymentType, PayrollRecordRow } from "./db";
 import type { PayrollResult, ReferralEntry } from "./payroll/calculate";
+import { koreaTodayKey } from "./date";
 
 export type { ReferralEntry, ReferralPaymentMethod } from "./payroll/calculate";
 
@@ -9,7 +10,9 @@ export interface CoachMonthSessionCounts {
   sessionCount2on1: number;
 }
 
-/** 코치 한 명의 특정 정산월(1:1/2:1) 진행 수업 횟수. 노쇼도 포함(취소만 제외). */
+/** 코치 한 명의 특정 정산월(1:1/2:1) 진행 수업 횟수. 노쇼도 포함(취소만 제외).
+    아직 지나지 않은(오늘 이후) 예약은 진행한 수업이 아니므로 제외한다 —
+    이번 달 정산을 월 중간에 계산해도 미래 예약분까지 급여에 잡히지 않게 한다. */
 export async function getCoachSessionCountsForMonth(
   coachId: number,
   yearMonth: string,
@@ -21,8 +24,9 @@ export async function getCoachSessionCountsForMonth(
        AND entry_type = 'session'
        AND status <> 'cancelled'
        AND LEFT(session_date, 7) = $2
+       AND session_date <= $3
      GROUP BY pt_type`,
-    [coachId, yearMonth],
+    [coachId, yearMonth, koreaTodayKey()],
   );
   let sessionCount1on1 = 0;
   let sessionCount2on1 = 0;
