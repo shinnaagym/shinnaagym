@@ -431,6 +431,7 @@ export async function listMembersWithProgress(
   nextWeekStart?: string,
   nextWeekEnd?: string,
 ): Promise<MemberWithProgress[]> {
+  const todayKey = koreaTodayKey();
   const result = await query<MemberWithProgress>(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
@@ -444,8 +445,11 @@ export async function listMembersWithProgress(
        FROM packages GROUP BY member_id
      ) p ON p.member_id = m.id
      LEFT JOIN (
+       -- 진행 횟수는 실제로 이미 지난 수업만 센다 — 미래에 예약만 해둔 수업은
+       -- 예약 시점에 바로 진행률에 반영되면 안 되므로 오늘(KST) 이전 날짜만 포함한다.
        SELECT member_id, COUNT(*) as done FROM class_sessions
-       WHERE entry_type = 'session' AND status <> 'cancelled' GROUP BY member_id
+       WHERE entry_type = 'session' AND status <> 'cancelled' AND session_date <= $3
+       GROUP BY member_id
      ) s ON s.member_id = m.id
      LEFT JOIN (
        SELECT DISTINCT member_id FROM class_sessions
@@ -459,7 +463,7 @@ export async function listMembersWithProgress(
      ) lp ON lp.member_id = m.id
      WHERE m.deleted_at IS NULL
      ORDER BY m.name ASC`,
-    [nextWeekStart ?? "9999-12-31", nextWeekEnd ?? "9999-12-31"],
+    [nextWeekStart ?? "9999-12-31", nextWeekEnd ?? "9999-12-31", todayKey],
   );
   return result.rows;
 }
@@ -717,7 +721,7 @@ export async function deletePackage(id: number): Promise<void> {
 
 export interface MemberProgress {
   totalSessions: number;
-  doneCount: number; // 취소 제외 전체 수업 수(예약 포함)
+  doneCount: number; // 취소 제외, 오늘(KST) 이전까지 실제로 지난 수업 수(미래 예약 제외)
   remaining: number;
 }
 
@@ -729,8 +733,9 @@ export async function computeMemberProgress(memberId: number): Promise<MemberPro
     ),
     query<{ count: string }>(
       `SELECT COUNT(*) as count FROM class_sessions
-       WHERE member_id = $1 AND entry_type = 'session' AND status <> 'cancelled'`,
-      [memberId],
+       WHERE member_id = $1 AND entry_type = 'session' AND status <> 'cancelled'
+         AND session_date <= $2`,
+      [memberId, koreaTodayKey()],
     ),
   ]);
   const totalSessions = Number(packagesResult.rows[0]?.sum ?? 0);
