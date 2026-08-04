@@ -27,6 +27,13 @@ type SessionWithMember = {
 
 const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 
+/** "YYYY-MM-DD" 문자열의 요일 한 글자(월~일)를 반환한다. */
+function weekdayLabelForDateKey(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return WEEKDAY_LABELS[(dt.getUTCDay() + 6) % 7];
+}
+
 const CATEGORY_LABELS: Record<SessionEntryType, string> = {
   session: "PT 수업",
   consultation: "상담",
@@ -1975,7 +1982,7 @@ function EditSessionModal({
                   return others.map((s) => (
                     <div key={s.id} className="flex items-center justify-between text-[11px] text-ink/60">
                       <span>
-                        {s.session_date} {s.session_hour}:00
+                        {s.session_date}({weekdayLabelForDateKey(s.session_date)}) {s.session_hour}:00
                       </span>
                       <span className="flex items-center gap-2">
                         {progressLabel(s) && <span className="text-ink/40">{progressLabel(s)}</span>}
