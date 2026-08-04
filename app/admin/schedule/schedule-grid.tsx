@@ -2077,6 +2077,13 @@ function EditSessionModal({
         >
           <button
             disabled={submitting}
+            onClick={handleDelete}
+            className="rounded-full border border-red-200 text-red-500 py-2 text-xs sm:text-sm hover:bg-red-50 transition disabled:opacity-50"
+          >
+            기록 삭제
+          </button>
+          <button
+            disabled={submitting}
             onClick={() =>
               patch(
                 session.entry_type === "session" ? { memo, coachId, ptType } : { memo, coachId },
@@ -2085,13 +2092,6 @@ function EditSessionModal({
             className="rounded-full border border-line py-2 text-xs sm:text-sm hover:bg-bone transition disabled:opacity-50"
           >
             메모·담당 저장
-          </button>
-          <button
-            disabled={submitting}
-            onClick={handleDelete}
-            className="rounded-full border border-red-200 text-red-500 py-2 text-xs sm:text-sm hover:bg-red-50 transition disabled:opacity-50"
-          >
-            기록 삭제
           </button>
           {session.entry_type === "consultation" && session.member_id !== null && (
             <button
