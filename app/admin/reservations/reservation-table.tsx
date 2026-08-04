@@ -76,10 +76,7 @@ export function ReservationTable({
 
   return (
     <div>
-      <div className="mb-8">
-        <p className="font-display text-2xl">사전예약 현황</p>
-        <p className="text-sm text-ink/60 mt-1">총 {reservations.length}건</p>
-      </div>
+      <p className="text-sm text-ink/60 mb-4">총 {reservations.length}건</p>
 
       {reservations.length === 0 ? (
         <p className="text-ink/50">아직 예약이 없어요.</p>

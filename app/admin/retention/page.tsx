@@ -42,7 +42,9 @@ export default async function AdminRetentionPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      <h1 className="font-display text-2xl mb-6">재등록 관리</h1>
+      <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Retention</p>
+      <h1 className="font-display text-2xl mb-1">재등록 관리</h1>
+      <p className="text-sm text-ink/50 mb-6">잔여 횟수가 얼마 안 남은 회원을 확인하고 재등록을 챙기세요.</p>
 
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-6">
         <div className="flex items-baseline gap-2 mb-4">

@@ -42,6 +42,9 @@ export default async function AdminSettingsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
+      <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Settings</p>
+      <h1 className="font-display text-2xl mb-1">설정</h1>
+      <p className="text-sm text-ink/50 mb-6">코치·근무시간·당직자 같은 운영 기본값을 관리하세요.</p>
       <SettingsView
         initialCoaches={coaches}
         initialHolidays={holidays}

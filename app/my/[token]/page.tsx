@@ -115,7 +115,7 @@ export default async function MyReservationPage({
         </div>
 
         <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">My Reservation</p>
-        <h1 className="font-display text-3xl mb-8">{member.name}님의 예약</h1>
+        <h1 className="font-serif-display text-3xl mb-8">{member.name}님의 예약</h1>
 
         {(activeNotices.length > 0 || activeEvents.length > 0) && (
           <div className="space-y-4 mb-10">
