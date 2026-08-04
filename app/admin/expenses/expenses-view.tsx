@@ -143,14 +143,14 @@ export function ExpensesView({
 
         <div className="rounded-2xl border border-coral/30 bg-coral/5 px-5 py-4 mb-6">
           <h2 className="font-display text-base mb-3">+ 지출 추가</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-[2fr_1.2fr_72px_1fr] gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[2fr_1.2fr_72px_1fr]">
             <input
               value={item}
               onChange={(e) => setItem(e.target.value)}
               placeholder="지출 내역"
-              className="col-span-2 sm:col-span-1 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+              className="w-full min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
             />
-            <div>
+            <div className="min-w-0">
               <input
                 type="number"
                 inputMode="numeric"
@@ -172,20 +172,25 @@ export function ExpensesView({
                 ))}
               </div>
             </div>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              placeholder="수량"
-              className="w-full min-w-0 rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none focus:border-coral"
-            />
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="내용 (선택)"
-              className="rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
-            />
+            {/* 모바일에서는 수량(좁게)·내용(남는 폭)을 한 줄에 나란히 배치하고,
+                sm 이상에서는 sm:contents로 감싸는 div를 없애 원래 4열 그리드의
+                독립 칸으로 되돌린다. */}
+            <div className="flex gap-2 sm:contents">
+              <input
+                type="number"
+                inputMode="numeric"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="수량"
+                className="w-20 shrink-0 sm:w-full rounded-lg border border-line bg-white px-2 py-2 text-sm outline-none focus:border-coral"
+              />
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="내용 (선택)"
+                className="flex-1 min-w-0 sm:w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+            </div>
           </div>
           <button
             type="button"
