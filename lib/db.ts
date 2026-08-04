@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 19;
+const SCHEMA_VERSION = 20;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -596,6 +596,11 @@ function runFullMigration(): Promise<void> {
             -- 신규 등록(패키지 결제)이 이뤄지면 is_lead를 false로 승격해 그동안 쌓인
             -- 문진표·평가지 기록이 그대로 이어붙은 채 목록에 나타난다.
             ALTER TABLE members ADD COLUMN IF NOT EXISTS is_lead BOOLEAN NOT NULL DEFAULT false;
+
+            -- 스케줄은 시(hour) 단위 칸으로 나뉘어 있지만, 실제 수업이 정시가 아니라
+            -- 그 시간대 안의 몇 분에 시작하는 경우가 있어 표시·기록용으로 분을 둔다.
+            -- 칸 자체는 여전히 시 단위라 같은 시간대에 분만 다른 세션을 여러 개 만들 수는 없다.
+            ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS session_minute SMALLINT NOT NULL DEFAULT 0;
             `,
           ),
           getPool().query(
@@ -986,6 +991,7 @@ export interface ClassSessionRow {
   coach_id: number;
   session_date: string;
   session_hour: number;
+  session_minute: number;
   status: SessionStatus;
   memo: string;
   entry_type: SessionEntryType;

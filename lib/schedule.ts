@@ -852,18 +852,20 @@ export async function createSession(input: {
   coachId: number;
   date: string;
   hour: number;
+  minute?: number;
   memo?: string;
   entryType?: "session" | "consultation" | "memo" | "blocked";
   ptType?: PtType;
 }): Promise<ClassSessionRow> {
   const result = await query<ClassSessionRow>(
-    `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, memo, entry_type, pt_type)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    `INSERT INTO class_sessions (member_id, coach_id, session_date, session_hour, session_minute, memo, entry_type, pt_type)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
     [
       input.memberId,
       input.coachId,
       input.date,
       input.hour,
+      input.minute ?? 0,
       input.memo ?? "",
       input.entryType ?? "session",
       input.ptType ?? "1:1",
@@ -881,6 +883,7 @@ export async function updateSession(
     ptType?: PtType;
     sessionDate?: string;
     sessionHour?: number;
+    sessionMinute?: number;
   },
 ): Promise<void> {
   const fields: string[] = [];
@@ -910,6 +913,10 @@ export async function updateSession(
   if (input.sessionHour !== undefined) {
     fields.push(`session_hour = $${++i}`);
     values.push(input.sessionHour);
+  }
+  if (input.sessionMinute !== undefined) {
+    fields.push(`session_minute = $${++i}`);
+    values.push(input.sessionMinute);
   }
   if (fields.length === 0) return;
 
