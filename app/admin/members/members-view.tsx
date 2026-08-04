@@ -50,7 +50,11 @@ function SortHeader({
   center?: boolean;
 }) {
   return (
-    <th className={["px-5 py-3 font-medium", center ? "text-center" : ""].filter(Boolean).join(" ")}>
+    <th
+      className={["px-5 py-3 font-medium whitespace-nowrap", center ? "text-center" : ""]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <button
         type="button"
         onClick={onClick}
@@ -459,6 +463,10 @@ export function MembersView({
   const [statusFilter, setStatusFilter] = useState<MemberStatus | "all">("active");
   const [showCreate, setShowCreate] = useState(false);
   const [detailId, setDetailId] = useState<number | null>(initialOpenId ?? null);
+  // ?open=id&contract=1 딥링크는 처음 열렸을 때 한 번만 계약서 화면을 자동으로
+  // 보여줘야 한다. URL은 setDetailId로 바뀌지 않아 그대로 남아있으므로, 모달을
+  // 닫은 뒤 같은 회원을 다시 열면 계약서 창이 계속 재발생하던 문제를 막는다.
+  const [initialContractConsumed, setInitialContractConsumed] = useState(false);
   const [sortKey, setSortKey] = useState<MemberSortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
@@ -733,8 +741,8 @@ export function MembersView({
                     dir={sortKey === "name" ? sortDir : "asc"}
                     onClick={() => toggleSort("name")}
                   />
-                  <th className="px-5 py-3 font-medium">담당</th>
-                  <th className="px-5 py-3 font-medium">진행</th>
+                  <th className="px-5 py-3 font-medium whitespace-nowrap">담당</th>
+                  <th className="px-5 py-3 font-medium whitespace-nowrap">진행</th>
                   <SortHeader
                     label="잔여"
                     active={sortKey === "remaining"}
@@ -747,7 +755,7 @@ export function MembersView({
                     dir={sortKey === "type" ? sortDir : "asc"}
                     onClick={() => toggleSort("type")}
                   />
-                  <th className="px-5 py-3 font-medium">상태</th>
+                  <th className="px-5 py-3 font-medium whitespace-nowrap">상태</th>
                   <SortHeader
                     label="다음주"
                     active={sortKey === "nextWeek"}
@@ -791,7 +799,7 @@ export function MembersView({
                           </Link>
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-ink/70">{coachName}</td>
+                      <td className="px-5 py-3 text-ink/70 whitespace-nowrap">{coachName}</td>
                       <td className="px-5 py-3 w-48">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 rounded-full bg-line/60 overflow-hidden">
@@ -808,10 +816,10 @@ export function MembersView({
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           {expired ? (
-                            <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium">
+                            <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium whitespace-nowrap">
                               만료
                             </span>
                           ) : (
@@ -823,13 +831,13 @@ export function MembersView({
                           {goldenBell && <GoldenBellBadge />}
                         </div>
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 whitespace-nowrap">
                         {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 whitespace-nowrap">
                         <span
                           className={[
-                            "rounded-full px-2.5 py-0.5 text-xs",
+                            "rounded-full px-2.5 py-0.5 text-xs whitespace-nowrap",
                             m.status === "active"
                               ? "bg-sage/20 text-sage"
                               : "bg-line/40 text-ink/50",
@@ -898,13 +906,21 @@ export function MembersView({
               coaches={coaches}
               activeCoaches={activeCoaches}
               fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
-              onClose={() => setDetailId(null)}
+              onClose={() => {
+                setDetailId(null);
+                setInitialContractConsumed(true);
+              }}
               onChanged={refresh}
               // 계약서 화면으로 바로 열기(초기 URL의 ?contract=1)는 그 딥링크가
-              // 가리킨 회원(initialOpenId)에만 적용한다. 그 상태로 목록에서 다른
-              // 회원 행을 눌러도 페이지 prop은 그대로라, 매칭 없이 넘기면 이후에
-              // 클릭하는 회원마다 계속 계약서 화면부터 열리는 문제가 있었다.
-              initialShowContractView={detailId === initialOpenId ? initialShowContractView : false}
+              // 가리킨 회원(initialOpenId)에만, 그것도 딱 한 번만 적용한다. 그
+              // 상태로 목록에서 다른 회원 행을 눌러도 페이지 prop은 그대로라,
+              // 매칭만 확인하면 같은 회원을 다시 열 때마다(모달을 닫았다 다시
+              // 열어도) 계약서 화면부터 계속 재발생하는 문제가 있었다.
+              initialShowContractView={
+                detailId === initialOpenId && !initialContractConsumed
+                  ? initialShowContractView
+                  : false
+              }
             />
           );
         })()}
