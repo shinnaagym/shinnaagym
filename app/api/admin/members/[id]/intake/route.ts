@@ -7,7 +7,9 @@ import {
   upsertIntakeQuestionnaire,
 } from "@/lib/intake";
 import { parseIntakeInput } from "@/lib/intake-validation";
-import { recordUndo } from "@/lib/undo";
+import { createAssessment } from "@/lib/assessments";
+import { koreaTodayKey } from "@/lib/date";
+import { recordUndo, type UndoOp } from "@/lib/undo";
 import type { IntakeQuestionnaireRow } from "@/lib/db";
 
 // pain_movements/pain_characteristics는 JSONB 배열 컬럼이라, pg가 JS 배열을
@@ -59,16 +61,32 @@ export async function PUT(
   const before = await getIntakeQuestionnaireByMember(idNum);
   const intake = await upsertIntakeQuestionnaire({ memberId: idNum, ...parsed });
 
+  const undoOps: UndoOp[] = [];
   if (before) {
     const { id: _id, member_id: _memberId, ...prevRest } = intakeRowForSql(before);
-    await recordUndo(`${member.name} 초진 문진표 수정`, [
-      { op: "update", table: "intake_questionnaires", id: idNum, idColumn: "member_id", data: prevRest },
-    ]);
+    undoOps.push({ op: "update", table: "intake_questionnaires", id: idNum, idColumn: "member_id", data: prevRest });
   } else {
-    await recordUndo(`${member.name} 초진 문진표 작성`, [
-      { op: "delete", table: "intake_questionnaires", id: idNum, idColumn: "member_id" },
-    ]);
+    undoOps.push({ op: "delete", table: "intake_questionnaires", id: idNum, idColumn: "member_id" });
   }
+
+  // 통증의 강도(NRS)에서 "현재" 값을 적어둔 동작은, 평가지의 통증 척도
+  // 그래프에도 그대로 반영되도록 통증 유발 동작 기록(assessments)을 함께
+  // 남긴다 — PT 일지의 "통증 유발 동작 기록" 섹션과 같은 방식.
+  const currentPainEntries = parsed.painMovements
+    .filter((m) => m.movement.trim() && m.nrsCurrent != null)
+    .map((m) => ({ note: m.movement.trim(), painScale: m.nrsCurrent }));
+
+  if (currentPainEntries.length > 0) {
+    const assessment = await createAssessment({
+      memberId: idNum,
+      evaluatedAt: koreaTodayKey(),
+      movements: {},
+      painTriggers: currentPainEntries,
+    });
+    undoOps.push({ op: "delete", table: "assessments", id: assessment.id });
+  }
+
+  await recordUndo(`${member.name} 초진 문진표 ${before ? "수정" : "작성"}`, undoOps);
 
   return NextResponse.json({ intake });
 }
