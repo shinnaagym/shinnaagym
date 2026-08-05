@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 21;
+const SCHEMA_VERSION = 22;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -618,6 +618,19 @@ function runFullMigration(): Promise<void> {
             -- 그 시간대 안의 몇 분에 시작하는 경우가 있어 표시·기록용으로 분을 둔다.
             -- 칸 자체는 여전히 시 단위라 같은 시간대에 분만 다른 세션을 여러 개 만들 수는 없다.
             ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS session_minute SMALLINT NOT NULL DEFAULT 0;
+
+            -- 대시보드·재등록 관리 통계 쿼리들이 원래 to_char(컬럼, 'YYYY-MM') = $1로
+            -- 월을 걸렀는데, timestamptz에 대한 to_char/timezone 변환 함수는
+            -- STABLE이라(세션 TimeZone에 따라 결과가 달라질 수 있어서) 표현식
+            -- 인덱스에 쓸 수 없다(IMMUTABLE만 허용) — 아래 컬럼들도 실제로
+            -- CREATE INDEX 시도 시 "functions in index expression must be
+            -- marked IMMUTABLE" 에러가 난다. 그래서 인덱스 대신 해당 쿼리들을
+            -- 원본 timestamptz 컬럼에 대한 범위 비교(>= / <)로 바꾸고(별도 커밋),
+            -- 그 범위 비교가 인덱스를 탈 수 있도록 아래 일반 인덱스만 추가한다.
+            CREATE INDEX IF NOT EXISTS idx_packages_member_purchased ON packages(member_id, purchased_at);
+            CREATE INDEX IF NOT EXISTS idx_members_followup_updated_at ON members(followup_updated_at)
+              WHERE followup_updated_at IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_intake_questionnaires_created_at ON intake_questionnaires(created_at);
             `,
           ),
           getPool().query(

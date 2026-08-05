@@ -1,4 +1,5 @@
 import { query } from "./db";
+import { monthKeyRange } from "./date";
 import type { IntakeQuestionnaireRow, PainMovementEntry } from "./db";
 
 export interface UpsertIntakeQuestionnaireInput {
@@ -94,6 +95,7 @@ export async function listIntakeMemberTimestamps(): Promise<Map<number, string>>
 export async function getVisitChannelCountsForMonth(
   yearMonth: string,
 ): Promise<Record<string, number>> {
+  const [monthStart, monthEnd] = monthKeyRange(yearMonth);
   const result = await query<{ channel_key: string; count: string }>(
     `SELECT
        CASE
@@ -102,9 +104,9 @@ export async function getVisitChannelCountsForMonth(
        END AS channel_key,
        COUNT(*) as count
      FROM intake_questionnaires
-     WHERE to_char(created_at, 'YYYY-MM') = $1
+     WHERE created_at >= $1 AND created_at < $2
      GROUP BY channel_key`,
-    [yearMonth],
+    [monthStart, monthEnd],
   );
   const counts: Record<string, number> = {};
   for (const row of result.rows) {

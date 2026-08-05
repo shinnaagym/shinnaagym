@@ -14,7 +14,14 @@ import type {
   PtType,
   SessionStatus,
 } from "./db";
-import { addDaysToKey, addMonthsToKey, koreaCurrentHour, koreaTodayKey } from "./date";
+import {
+  addDaysToKey,
+  addMonthsToKey,
+  koreaCurrentHour,
+  koreaTodayKey,
+  monthKeyRange,
+  monthKeysRange,
+} from "./date";
 import { scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
@@ -1051,6 +1058,7 @@ export interface CoachMonthlyReport {
 /** yearMonth: "YYYY-MM" */
 export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMonthlyReport[]> {
   const monthStart = `${yearMonth}-01`;
+  const [revenueMonthStart, revenueMonthEnd] = monthKeyRange(yearMonth);
 
   const [coachesResult, revenueResult, sessionsResult, memberStatsResult, consultationResult] =
     await Promise.all([
@@ -1059,9 +1067,9 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
         `SELECT m.coach_id as coach_id, SUM(p.price) as revenue
          FROM packages p
          JOIN members m ON m.id = p.member_id
-         WHERE to_char(p.purchased_at, 'YYYY-MM') = $1 AND m.coach_id IS NOT NULL
+         WHERE p.purchased_at >= $1 AND p.purchased_at < $2 AND m.coach_id IS NOT NULL
          GROUP BY m.coach_id`,
-        [yearMonth],
+        [revenueMonthStart, revenueMonthEnd],
       ),
       query<{
         coach_id: number;
@@ -1168,14 +1176,15 @@ export interface DashboardOverview {
 
 /** yearMonth: "YYYY-MM" */
 export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
+  const [monthStart, monthEnd] = monthKeyRange(yearMonth);
   const [activeMembers, revenue, sessionStats, newMembers, reRegistered, consultations] =
     await Promise.all([
       query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
       query<{ payment_method: PaymentMethod; revenue: string }>(
         `SELECT payment_method, COALESCE(SUM(price), 0) as revenue FROM packages
-         WHERE to_char(purchased_at, 'YYYY-MM') = $1
+         WHERE purchased_at >= $1 AND purchased_at < $2
          GROUP BY payment_method`,
-        [yearMonth],
+        [monthStart, monthEnd],
       ),
       query<{ total: string; no_show: string }>(
         `SELECT
@@ -1193,11 +1202,11 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
       ),
       query<{ count: string }>(
         `SELECT COUNT(DISTINCT p.member_id) as count FROM packages p
-         WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+         WHERE p.purchased_at >= $1 AND p.purchased_at < $2
            AND p.purchased_at <> (
              SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
            )`,
-        [yearMonth],
+        [monthStart, monthEnd],
       ),
       query<{ count: string }>(
         `SELECT COUNT(*) as count FROM class_sessions
@@ -1241,14 +1250,15 @@ export async function getMonthlyTrend(
   for (let i = months - 1; i >= 0; i--) {
     monthKeys.push(addMonthsToKey(endYearMonth, -i));
   }
+  const [rangeStart, rangeEnd] = monthKeysRange(monthKeys);
 
   const [revenueResult, sessionResult, consultationResult] = await Promise.all([
     query<{ month: string; revenue: string }>(
       `SELECT to_char(purchased_at, 'YYYY-MM') as month, SUM(price) as revenue
        FROM packages
-       WHERE to_char(purchased_at, 'YYYY-MM') = ANY($1)
+       WHERE purchased_at >= $1 AND purchased_at < $2
        GROUP BY month`,
-      [monthKeys],
+      [rangeStart, rangeEnd],
     ),
     // "수업수"는 스케줄표 KPI와 동일한 정의: 취소되지 않은 수업(완료·노쇼·예정 포함) 건수.
     query<{ month: string; count: string }>(
@@ -1306,6 +1316,7 @@ export async function getMonthlyRetentionStats(
   for (let i = months - 1; i >= 0; i--) {
     monthKeys.push(addMonthsToKey(endYearMonth, -i));
   }
+  const [rangeStart, rangeEnd] = monthKeysRange(monthKeys);
 
   const [newResult, reRegisteredResult, churnedResult] = await Promise.all([
     query<{ month: string; count: string }>(
@@ -1318,19 +1329,19 @@ export async function getMonthlyRetentionStats(
     query<{ month: string; count: string }>(
       `SELECT to_char(p.purchased_at, 'YYYY-MM') as month, COUNT(DISTINCT p.member_id) as count
        FROM packages p
-       WHERE to_char(p.purchased_at, 'YYYY-MM') = ANY($1)
+       WHERE p.purchased_at >= $1 AND p.purchased_at < $2
          AND p.purchased_at <> (
            SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
          )
        GROUP BY month`,
-      [monthKeys],
+      [rangeStart, rangeEnd],
     ),
     query<{ month: string; count: string }>(
       `SELECT to_char(followup_updated_at, 'YYYY-MM') as month, COUNT(*) as count
        FROM members
-       WHERE followup_status = '이탈' AND to_char(followup_updated_at, 'YYYY-MM') = ANY($1)
+       WHERE followup_status = '이탈' AND followup_updated_at >= $1 AND followup_updated_at < $2
        GROUP BY month`,
-      [monthKeys],
+      [rangeStart, rangeEnd],
     ),
   ]);
 
@@ -1372,6 +1383,8 @@ export async function getCoachRetentionReports(
   for (let i = months - 1; i >= 0; i--) {
     monthKeys.push(addMonthsToKey(endYearMonth, -i));
   }
+  const [monthStart, monthEnd] = monthKeyRange(endYearMonth);
+  const [rangeStart, rangeEnd] = monthKeysRange(monthKeys);
 
   const [coachesResult, monthReRegisteredResult, periodReRegisteredResult, periodChurnedResult] =
     await Promise.all([
@@ -1380,33 +1393,33 @@ export async function getCoachRetentionReports(
         `SELECT m.coach_id as coach_id, COUNT(*) as count
          FROM packages p
          JOIN members m ON m.id = p.member_id
-         WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+         WHERE p.purchased_at >= $1 AND p.purchased_at < $2
            AND m.coach_id IS NOT NULL
            AND p.purchased_at <> (
              SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
            )
          GROUP BY m.coach_id`,
-        [endYearMonth],
+        [monthStart, monthEnd],
       ),
       query<{ coach_id: number; count: string }>(
         `SELECT m.coach_id as coach_id, COUNT(*) as count
          FROM packages p
          JOIN members m ON m.id = p.member_id
-         WHERE to_char(p.purchased_at, 'YYYY-MM') = ANY($1)
+         WHERE p.purchased_at >= $1 AND p.purchased_at < $2
            AND m.coach_id IS NOT NULL
            AND p.purchased_at <> (
              SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
            )
          GROUP BY m.coach_id`,
-        [monthKeys],
+        [rangeStart, rangeEnd],
       ),
       query<{ coach_id: number; count: string }>(
         `SELECT coach_id, COUNT(*) as count
          FROM members
-         WHERE followup_status = '이탈' AND to_char(followup_updated_at, 'YYYY-MM') = ANY($1)
+         WHERE followup_status = '이탈' AND followup_updated_at >= $1 AND followup_updated_at < $2
            AND coach_id IS NOT NULL
          GROUP BY coach_id`,
-        [monthKeys],
+        [rangeStart, rangeEnd],
       ),
     ]);
 
@@ -1480,6 +1493,7 @@ export interface PackagePurchaseEntry {
 
 /** 이번 달 패키지 결제 내역 (신규/재등록 여부 포함). */
 export async function listPackagePurchases(yearMonth: string): Promise<PackagePurchaseEntry[]> {
+  const [monthStart, monthEnd] = monthKeyRange(yearMonth);
   const result = await query<{
     id: number;
     purchased_at: string;
@@ -1497,9 +1511,9 @@ export async function listPackagePurchases(yearMonth: string): Promise<PackagePu
      FROM packages p
      JOIN members m ON m.id = p.member_id
      LEFT JOIN coaches c ON c.id = m.coach_id
-     WHERE to_char(p.purchased_at, 'YYYY-MM') = $1
+     WHERE p.purchased_at >= $1 AND p.purchased_at < $2
      ORDER BY p.purchased_at DESC`,
-    [yearMonth],
+    [monthStart, monthEnd],
   );
   return result.rows.map((r) => ({
     id: r.id,
@@ -1524,12 +1538,13 @@ export interface RefundEntry {
 // 설명으로만 남는다. 여기서 그 문구를 파싱해 이번 달 환불 내역으로 보여준다.
 // 실행취소(undone = true)된 건은 환불이 되돌려진 것이므로 제외한다.
 export async function listRefundsForMonth(yearMonth: string): Promise<RefundEntry[]> {
+  const [monthStart, monthEnd] = monthKeyRange(yearMonth);
   const result = await query<{ id: number; description: string; created_at: string }>(
     `SELECT id, description, created_at FROM undo_log
      WHERE undone = false AND description LIKE '%회원 환불 후 삭제%'
-       AND to_char(created_at, 'YYYY-MM') = $1
+       AND created_at >= $1 AND created_at < $2
      ORDER BY created_at DESC`,
-    [yearMonth],
+    [monthStart, monthEnd],
   );
   const entries: RefundEntry[] = [];
   for (const r of result.rows) {
