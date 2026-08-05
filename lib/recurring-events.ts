@@ -129,15 +129,26 @@ export async function ensureRecurringEventSessions(): Promise<void> {
   if (coaches.length === 0) return;
   const holidaySet = new Set(holidaysResult.rows.map((h) => h.holiday_date));
 
+  const coachIds = coaches.map((c) => c.id);
+  const hoursOf = (event: RecurringEventRow) =>
+    Array.from({ length: event.end_hour - event.start_hour }, (_, i) => event.start_hour + i);
+
+  // 승자(이번에 스케줄표에 남을 일정)의 INSERT는 진 일정의 DELETE가 전부
+  // 끝난 뒤에만 실행해야 한다 — 먼저 넣으면 그 순간 자리가 안 비어있어
+  // ON CONFLICT DO NOTHING에 막혀 승자 자신도 못 들어가는 문제가 있었다.
+  // 이 선후관계만 지키면, 서로 다른 일정끼리는(달이 다르든 같은 달의 다른
+  // 날짜든) 독립적이라 굳이 하나씩 순차로 왕복할 필요가 없다 — 진 일정
+  // DELETE를 한 번에 병렬로 보내고, 그 다음 승자 INSERT를 한 번에 병렬로
+  // 보낸다(달×일정 개수만큼 순차 왕복하던 것을 최대 2번의 왕복으로 줄임).
+  const losers: { event: RecurringEventRow; occurrenceDate: string }[] = [];
+  const winners: { event: RecurringEventRow; occurrenceDate: string }[] = [];
+
   for (const monthKey of monthKeys) {
     const month = Number(monthKey.slice(5, 7));
 
     // 매달 반복(monthly)과 분기 반복(quarterly)이 같은 달에 겹치면(3·6·9·12월)
     // 분기 일정을 우선한다. 이 달에 적용되는 일정들의 발생일을 먼저 전부
-    // 계산해 날짜별 "승자"를 정하고 — 승자가 없는(=이미 진 monthly) 일정은
-    // 자기 이름으로 남아있을 수 있는 예전 행을 지우기부터 한 다음에 승자를
-    // 넣는다. 승자를 먼저 넣어버리면 그 순간엔 아직 자리가 안 비어있어
-    // ON CONFLICT DO NOTHING에 막혀 승자 자신도 못 들어가는 문제가 있었다.
+    // 계산해 날짜별 "승자"를 정한다.
     const applicable = events.filter((e) => CYCLE_MONTHS[e.cycle].includes(month));
     const occurrenceDateByEventId = new Map<number, string>();
     const winnerByDate = new Map<string, RecurringEventRow>();
@@ -150,37 +161,36 @@ export async function ensureRecurringEventSessions(): Promise<void> {
       }
     }
 
-    // 코치 수 × 시간대 수만큼 하나씩 개별 쿼리를 날리면(예: 코치 5명 × 2시간 ×
-    // 일정 2개 × 2개월 = 수십 번의 순차 왕복) 스케줄표를 열 때마다 이 함수
-    // 하나가 로딩을 눈에 띄게 늦춘다. unnest로 코치×시간 조합을 한 번의
-    // 쿼리에 다 실어 보낸다 — 일정당 최대 쿼리 1개(진 일정은 정리용 DELETE
-    // 1개까지)로 끝난다.
-    const coachIds = coaches.map((c) => c.id);
-    const hoursOf = (event: RecurringEventRow) =>
-      Array.from({ length: event.end_hour - event.start_hour }, (_, i) => event.start_hour + i);
-
     for (const event of applicable) {
       const occurrenceDate = occurrenceDateByEventId.get(event.id)!;
-      const isWinner = winnerByDate.get(occurrenceDate)?.id === event.id;
-      if (isWinner) continue;
-      await query(
+      if (winnerByDate.get(occurrenceDate)?.id === event.id) {
+        winners.push({ event, occurrenceDate });
+      } else {
+        losers.push({ event, occurrenceDate });
+      }
+    }
+  }
+
+  await Promise.all(
+    losers.map(({ event, occurrenceDate }) =>
+      query(
         `DELETE FROM class_sessions
          WHERE coach_id = ANY($1::int[]) AND session_date = $2 AND session_hour = ANY($3::int[])
            AND entry_type = 'memo' AND memo = $4`,
         [coachIds, occurrenceDate, hoursOf(event), event.name],
-      );
-    }
+      ),
+    ),
+  );
 
-    for (const event of applicable) {
-      const occurrenceDate = occurrenceDateByEventId.get(event.id)!;
-      if (winnerByDate.get(occurrenceDate)?.id !== event.id) continue;
-      await query(
+  await Promise.all(
+    winners.map(({ event, occurrenceDate }) =>
+      query(
         `INSERT INTO class_sessions (coach_id, session_date, session_hour, memo, entry_type)
          SELECT c, $2::text, h, $4::text, 'memo'
          FROM unnest($1::int[]) AS c, unnest($3::int[]) AS h
          ON CONFLICT (coach_id, session_date, session_hour) DO NOTHING`,
         [coachIds, occurrenceDate, hoursOf(event), event.name],
-      );
-    }
-  }
+      ),
+    ),
+  );
 }
