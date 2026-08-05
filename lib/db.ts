@@ -6,9 +6,16 @@ import { Pool, types, type QueryResultRow } from "pg";
 // 실제 런타임 값이 일치하도록 한다.
 types.setTypeParser(1700, (value: string) => (value === null ? null : parseFloat(value)));
 
-// Vercel Storage(Neon) 연동은 스토리지 이름이 접두사로 붙은 환경변수
-// (예: `내프로젝트명_POSTGRES_URL`)를 만들기도 해서, 표준 이름이 없으면
-// "*_POSTGRES_URL" / "*_DATABASE_URL" 패턴의 변수도 찾아본다.
+// ⚠️ 실제로 운영 데이터가 들어있는 DB는 접두사 없는 표준 이름 변수
+// (POSTGRES_URL 등)를 쓰는 Supabase 연동이다(2026-08 확인). Vercel
+// 프로젝트에 스토리지 이름이 접두사로 붙은 변수(예: `내프로젝트명_POSTGRES_URL`)를
+// 만드는 다른 Postgres 연동(예: 쓰지 않는 Neon 연동)이 함께 붙어있을 수
+// 있는데, 그건 이 앱이 실제로 쓰는 DB가 아니다 — 스키마도, 회원 데이터도
+// 전부 표준 이름 변수 쪽에 있다. 아래에서 표준 이름을 접두사 붙은 이름보다
+// 먼저 찾는 순서를 절대 바꾸면 안 된다 — 바꾸면 배포 즉시 비어있는(또는
+// 쓰지 않는) DB로 조용히 연결이 바뀌어, 회원 데이터가 전부 사라진 것처럼
+// 보이는 사고로 이어진다. 접두사 붙은 변수 검색은 어디까지나 "이 프로젝트에
+// 표준 이름 연동이 하나도 없을 때"를 위한 폴백이다.
 function resolveConnectionString(): string | undefined {
   const direct =
     process.env.POSTGRES_URL ||
