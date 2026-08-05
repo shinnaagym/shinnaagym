@@ -449,7 +449,7 @@ export async function listMembersWithProgress(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
        COALESCE(s.done, 0)::int as done_count,
-       COALESCE(sc.scheduled, 0)::int as scheduled_count,
+       COALESCE(s.scheduled, 0)::int as scheduled_count,
        COALESCE(p.pkg_count, 0)::int as package_count,
        (nw.member_id IS NOT NULL) as has_next_week_session,
        COALESCE(lp.pt_type, '1:1') as latest_pt_type
@@ -459,18 +459,18 @@ export async function listMembersWithProgress(
        FROM packages GROUP BY member_id
      ) p ON p.member_id = m.id
      LEFT JOIN (
-       -- 진행 횟수는 실제로 이미 지난 수업만 센다 — 미래에 예약만 해둔 수업은
-       -- 예약 시점에 바로 진행률에 반영되면 안 되므로 오늘(KST) 이전 날짜만 포함한다.
-       SELECT member_id, COUNT(*) as done FROM class_sessions
-       WHERE entry_type = 'session' AND status <> 'cancelled' AND session_date <= $3
-       GROUP BY member_id
-     ) s ON s.member_id = m.id
-     LEFT JOIN (
-       -- scheduled_count는 날짜 제한 없이 예약(미래분)까지 센다.
-       SELECT member_id, COUNT(*) as scheduled FROM class_sessions
+       -- done_count(진행 횟수)와 scheduled_count(예약 미래분 포함)는 둘 다
+       -- "취소되지 않은 session" 전체를 회원별로 세는 같은 집계라, 이전엔
+       -- class_sessions를 두 번(WHERE만 다르게) 훑었다 — FILTER로 한 번의
+       -- 스캔에서 같이 뽑는다. done_count는 오늘(KST) 이전에 실제로 지난
+       -- 수업만 센다(미래 예약은 예약 시점에 진행률로 잡히면 안 되므로).
+       SELECT member_id,
+         COUNT(*) FILTER (WHERE session_date <= $3) as done,
+         COUNT(*) as scheduled
+       FROM class_sessions
        WHERE entry_type = 'session' AND status <> 'cancelled'
        GROUP BY member_id
-     ) sc ON sc.member_id = m.id
+     ) s ON s.member_id = m.id
      LEFT JOIN (
        SELECT DISTINCT member_id FROM class_sessions
        WHERE entry_type = 'session' AND status <> 'cancelled'
