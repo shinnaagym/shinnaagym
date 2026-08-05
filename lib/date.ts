@@ -63,6 +63,21 @@ export function addMonthsToKey(key: string, months: number): string {
   return `${newYear}-${pad(newMonth)}`;
 }
 
+/** "YYYY-MM" 하나를 [해당 월 1일, 다음 달 1일) 범위로 바꾼다 — timestamptz 컬럼을
+    `to_char(컬럼, 'YYYY-MM') = $1`로 거르던 쿼리를 `컬럼 >= $1 AND 컬럼 < $2`
+    범위 비교로 바꿀 때 쓴다(to_char/timezone 변환 함수는 STABLE이라 인덱스를
+    못 타지만, 원본 컬럼에 대한 범위 비교는 일반 인덱스를 그대로 쓸 수 있다). */
+export function monthKeyRange(yearMonth: string): [string, string] {
+  return [`${yearMonth}-01`, `${addMonthsToKey(yearMonth, 1)}-01`];
+}
+
+/** 여러 "YYYY-MM"이 연속된 달일 때(예: 최근 N개월 추이), 전체를 아우르는
+    [첫 달 1일, 마지막 달 다음 달 1일) 범위로 바꾼다. */
+export function monthKeysRange(yearMonths: string[]): [string, string] {
+  const sorted = [...yearMonths].sort();
+  return [`${sorted[0]}-01`, `${addMonthsToKey(sorted[sorted.length - 1], 1)}-01`];
+}
+
 /** Current hour of day (0-23) in KST. */
 export function koreaCurrentHour(): number {
   const now = new Date();
