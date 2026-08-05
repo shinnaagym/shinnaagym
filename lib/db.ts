@@ -103,7 +103,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 20;
+const SCHEMA_VERSION = 21;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -324,6 +324,16 @@ function runFullMigration(): Promise<void> {
           content TEXT NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
+
+        -- 회원별 "목표" 메모장. 관리자(PT 일지 화면)에서만 작성·수정·삭제할 수
+        -- 있고, 회원 페이지에는 읽기 전용으로 노출된다.
+        CREATE TABLE IF NOT EXISTS goal_memos (
+          id SERIAL PRIMARY KEY,
+          member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+          content TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_goal_memos_member_id ON goal_memos(member_id);
 
         -- 매달/분기마다 반복되는 정기 일정(스터디, 독서 모임 등). cycle이
         -- 'monthly'면 매달, 'quarterly'면 3·6·9·12월에 day_of_month일 발생하고,
@@ -1044,6 +1054,14 @@ export interface ScheduleMemoRow {
 
 /** 설정 페이지 메모장 — 스케줄표 메모(ScheduleMemoRow)와 별개의 목록이지만 행 모양은 같다. */
 export type SettingsMemoRow = ScheduleMemoRow;
+
+/** 회원별 "목표" 메모장 — 관리자만 작성·수정·삭제할 수 있고, 회원 페이지에는 읽기 전용으로 보인다. */
+export interface GoalMemoRow {
+  id: number;
+  member_id: number;
+  content: string;
+  created_at: string;
+}
 
 export type RecurringEventCycle = "monthly" | "quarterly";
 

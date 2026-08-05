@@ -10,18 +10,20 @@ function formatDateTime(iso: string): string {
   ).padStart(2, "0")}`;
 }
 
-/** 특정 화면 전용의 공용 메모장 — 여러 메모를 누적해서 쓸 수 있다. addUrl/idToDeleteUrl로
-    어느 메모 목록(스케줄표/설정 등)을 다룰지 지정한다. */
+/** 특정 화면 전용의 공용 메모장 — 여러 메모를 누적해서 쓸 수 있다. addUrl/itemUrlBase로
+    어느 메모 목록(스케줄표/설정/회원별 목표 등)을 다룰지 지정한다. itemUrlBase는 개별
+    메모의 PATCH·DELETE 요청 URL의 앞부분("/api/admin/schedule-memos"처럼)이다 —
+    서버 컴포넌트에서도 이 컴포넌트를 쓸 수 있도록 함수 대신 문자열로 받는다. */
 export function MemoPad({
   title,
   initialMemos,
   addUrl,
-  idToDeleteUrl,
+  itemUrlBase,
 }: {
   title: string;
   initialMemos: ScheduleMemoRow[];
   addUrl: string;
-  idToDeleteUrl: (id: number) => string;
+  itemUrlBase: string;
 }) {
   const [memos, setMemos] = useState(initialMemos);
   const [content, setContent] = useState("");
@@ -59,7 +61,7 @@ export function MemoPad({
 
   async function removeMemo(id: number) {
     setMemos((prev) => prev.filter((m) => m.id !== id));
-    await fetch(idToDeleteUrl(id), { method: "DELETE" });
+    await fetch(`${itemUrlBase}/${id}`, { method: "DELETE" });
   }
 
   function startEdit(memo: ScheduleMemoRow) {
@@ -82,7 +84,7 @@ export function MemoPad({
     setEditSubmitting(true);
     setEditError(null);
     try {
-      const res = await fetch(idToDeleteUrl(id), {
+      const res = await fetch(`${itemUrlBase}/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: trimmed }),

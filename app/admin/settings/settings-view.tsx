@@ -445,7 +445,7 @@ export function SettingsView({
         title="메모장"
         initialMemos={initialSettingsMemos}
         addUrl="/api/admin/settings-memos"
-        idToDeleteUrl={(id) => `/api/admin/settings-memos/${id}`}
+        itemUrlBase="/api/admin/settings-memos"
       />
 
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">

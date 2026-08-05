@@ -6,12 +6,14 @@ import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
+import { listGoalMemosByMember } from "@/lib/goal-memos";
 import { AssessmentPainChart } from "../assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { ImprovementDirectionNote } from "../assessment/improvement-direction-note";
 import { PainTriggerSection } from "./pain-trigger-section";
 import { ExercisePerformanceSection } from "./exercise-performance-section";
 import { PtLogList } from "./pt-log-list";
+import { MemoPad } from "../../../memo-pad";
 
 export default async function PtLogHistoryPage({
   params,
@@ -26,12 +28,13 @@ export default async function PtLogHistoryPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const [member, ptLogs, personalExercises, assessments, intake] = await Promise.all([
+  const [member, ptLogs, personalExercises, assessments, intake, goalMemos] = await Promise.all([
     getMemberById(idNum),
     listPtLogsByMember(idNum),
     listPersonalExercisesByMember(idNum),
     listAssessmentsByMember(idNum),
     getIntakeQuestionnaireByMember(idNum),
+    listGoalMemosByMember(idNum),
   ]);
   if (!member) {
     notFound();
@@ -113,6 +116,15 @@ export default async function PtLogHistoryPage({
         </div>
         <span className="text-ink/30">→</span>
       </Link>
+
+      <div className="mb-6">
+        <MemoPad
+          title="목표"
+          initialMemos={goalMemos}
+          addUrl={`/api/admin/members/${idNum}/goal-memos`}
+          itemUrlBase="/api/admin/goal-memos"
+        />
+      </div>
 
       <ImprovementDirectionNote memberId={idNum} initialValue={member.improvement_direction} />
 
