@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { cache } from "react";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { query, UNIQUE_VIOLATION } from "./db";
 import type {
@@ -692,6 +693,29 @@ export async function listPackages(memberId: number): Promise<PackageRow[]> {
   return result.rows;
 }
 
+/**
+ * 회원별 최초 결제 시각 — "신규 등록"(패키지를 처음 구매한 시점) 판정에 쓰인다.
+ * MIN(purchased_at) GROUP BY member_id는 대상 월과 무관하게 매번 packages
+ * 테이블 전체를 훑어야 하는 집계라 인덱스로 줄일 수 없는데, 대시보드 한 번
+ * 렌더링에서 이 계산이 필요한 함수(getDashboardOverview/listNewRegistrations/
+ * getMonthlyRetentionStats)가 동시에 3곳이라 캐시 없이는 같은 전체 스캔을
+ * 3번 반복하게 된다. React의 cache()로 "이번 렌더 한 번" 범위에서만 결과를
+ * 공유한다 — unstable_cache(next/cache)는 여러 요청에 걸쳐 결과를 영속화하는
+ * 용도라 이런 요청 내부 중복 제거에는 과하고, 실제로 로컬에서 콜드 캐시 상태의
+ * 동시 호출이 드물게 빈 값을 돌려주는 경합을 확인해 피했다.
+ */
+export const getFirstPurchaseDatesByMember = cache(
+  async (): Promise<Map<number, Date>> => {
+    // 오래된 데이터 중 회원이 이미 없어진(member_id가 NULL인) 패키지가 섞여
+    // 있을 수 있다 — 그런 패키지는 누구의 "첫 결제"도 될 수 없으므로 제외한다.
+    const result = await query<{ member_id: number; first_at: Date }>(
+      `SELECT member_id, MIN(purchased_at) as first_at FROM packages
+       WHERE member_id IS NOT NULL GROUP BY member_id`,
+    );
+    return new Map(result.rows.map((r) => [r.member_id, r.first_at]));
+  },
+);
+
 export async function updatePackage(
   id: number,
   input: {
@@ -1062,7 +1086,7 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
 
   const [coachesResult, revenueResult, sessionsResult, memberStatsResult, consultationResult] =
     await Promise.all([
-      query<CoachRow>(`SELECT * FROM coaches ORDER BY id ASC`),
+      query<{ id: number; name: string }>(`SELECT id, name FROM coaches ORDER BY id ASC`),
       query<{ coach_id: number; revenue: string }>(
         `SELECT m.coach_id as coach_id, SUM(p.price) as revenue
          FROM packages p
@@ -1177,7 +1201,7 @@ export interface DashboardOverview {
 /** yearMonth: "YYYY-MM" */
 export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
   const [monthStart, monthEnd] = monthKeyRange(yearMonth);
-  const [activeMembers, revenue, sessionStats, newMembers, reRegistered, consultations] =
+  const [activeMembers, revenue, sessionStats, firstPurchaseByMember, reRegistered, consultations] =
     await Promise.all([
       query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
       query<{ payment_method: PaymentMethod; revenue: string }>(
@@ -1194,12 +1218,7 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
          WHERE entry_type = 'session' AND LEFT(session_date, 7) = $1`,
         [yearMonth],
       ),
-      query<{ count: string }>(
-        `SELECT COUNT(*) as count FROM (
-           SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id
-         ) f WHERE to_char(f.first_at, 'YYYY-MM') = $1`,
-        [yearMonth],
-      ),
+      getFirstPurchaseDatesByMember(),
       query<{ count: string }>(
         `SELECT COUNT(DISTINCT p.member_id) as count FROM packages p
          WHERE p.purchased_at >= $1 AND p.purchased_at < $2
@@ -1221,6 +1240,10 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
   const revenueByMethod = new Map(
     revenue.rows.map((r) => [r.payment_method, Number(r.revenue ?? 0)]),
   );
+  let monthlyNewMemberCount = 0;
+  for (const firstAt of firstPurchaseByMember.values()) {
+    if (firstAt.toISOString().slice(0, 7) === yearMonth) monthlyNewMemberCount++;
+  }
 
   return {
     activeMemberCount: Number(activeMembers.rows[0]?.count ?? 0),
@@ -1228,7 +1251,7 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
     monthlyRevenueTransfer: revenueByMethod.get("transfer") ?? 0,
     monthlyNoShowCount: noShow,
     noShowRate: denom > 0 ? noShow / denom : null,
-    monthlyNewMemberCount: Number(newMembers.rows[0]?.count ?? 0),
+    monthlyNewMemberCount,
     monthlyReRegisteredMemberCount: Number(reRegistered.rows[0]?.count ?? 0),
     monthlyConsultationCount: Number(consultations.rows[0]?.count ?? 0),
   };
@@ -1318,14 +1341,8 @@ export async function getMonthlyRetentionStats(
   }
   const [rangeStart, rangeEnd] = monthKeysRange(monthKeys);
 
-  const [newResult, reRegisteredResult, churnedResult] = await Promise.all([
-    query<{ month: string; count: string }>(
-      `SELECT to_char(f.first_at, 'YYYY-MM') as month, COUNT(*) as count
-       FROM (SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id) f
-       WHERE to_char(f.first_at, 'YYYY-MM') = ANY($1)
-       GROUP BY month`,
-      [monthKeys],
-    ),
+  const [firstPurchaseByMember, reRegisteredResult, churnedResult] = await Promise.all([
+    getFirstPurchaseDatesByMember(),
     query<{ month: string; count: string }>(
       `SELECT to_char(p.purchased_at, 'YYYY-MM') as month, COUNT(DISTINCT p.member_id) as count
        FROM packages p
@@ -1345,7 +1362,11 @@ export async function getMonthlyRetentionStats(
     ),
   ]);
 
-  const newMap = new Map(newResult.rows.map((r) => [r.month, Number(r.count ?? 0)]));
+  const newMap = new Map<string, number>();
+  for (const firstAt of firstPurchaseByMember.values()) {
+    const month = firstAt.toISOString().slice(0, 7);
+    if (monthKeys.includes(month)) newMap.set(month, (newMap.get(month) ?? 0) + 1);
+  }
   const reRegisteredMap = new Map(
     reRegisteredResult.rows.map((r) => [r.month, Number(r.count ?? 0)]),
   );
@@ -1388,7 +1409,7 @@ export async function getCoachRetentionReports(
 
   const [coachesResult, monthReRegisteredResult, periodReRegisteredResult, periodChurnedResult] =
     await Promise.all([
-      query<CoachRow>(`SELECT * FROM coaches ORDER BY id ASC`),
+      query<{ id: number; name: string }>(`SELECT id, name FROM coaches ORDER BY id ASC`),
       query<{ coach_id: number; count: string }>(
         `SELECT m.coach_id as coach_id, COUNT(*) as count
          FROM packages p
@@ -1457,28 +1478,31 @@ export interface NewRegistration {
 
 /** 이번 달에 첫 패키지를 구매한(=신규 등록) 회원 목록. */
 export async function listNewRegistrations(yearMonth: string): Promise<NewRegistration[]> {
-  const result = await query<{
-    member_id: number;
-    member_name: string;
-    coach_name: string | null;
-    first_at: string;
-  }>(
-    `SELECT f.member_id, m.name as member_name, c.name as coach_name, f.first_at
-     FROM (
-       SELECT member_id, MIN(purchased_at) as first_at FROM packages GROUP BY member_id
-     ) f
-     JOIN members m ON m.id = f.member_id
+  const firstPurchaseByMember = await getFirstPurchaseDatesByMember();
+  const matches = [...firstPurchaseByMember.entries()]
+    .filter(([, firstAt]) => firstAt.toISOString().slice(0, 7) === yearMonth)
+    .sort((a, b) => a[1].getTime() - b[1].getTime());
+  if (matches.length === 0) return [];
+
+  const memberIds = matches.map(([memberId]) => memberId);
+  const result = await query<{ id: number; name: string; coach_name: string | null }>(
+    `SELECT m.id, m.name, c.name as coach_name
+     FROM members m
      LEFT JOIN coaches c ON c.id = m.coach_id
-     WHERE to_char(f.first_at, 'YYYY-MM') = $1
-     ORDER BY f.first_at ASC`,
-    [yearMonth],
+     WHERE m.id = ANY($1)`,
+    [memberIds],
   );
-  return result.rows.map((r) => ({
-    memberId: r.member_id,
-    memberName: r.member_name,
-    coachName: r.coach_name ?? "미배정",
-    firstPurchasedAt: r.first_at,
-  }));
+  const memberInfoMap = new Map(result.rows.map((r) => [r.id, r]));
+
+  return matches.map(([memberId, firstAt]) => {
+    const info = memberInfoMap.get(memberId);
+    return {
+      memberId,
+      memberName: info?.name ?? "",
+      coachName: info?.coach_name ?? "미배정",
+      firstPurchasedAt: firstAt.toISOString(),
+    };
+  });
 }
 
 export interface PackagePurchaseEntry {
