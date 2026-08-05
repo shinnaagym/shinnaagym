@@ -22,6 +22,7 @@ import { deleteAssessmentsByMember, listAssessmentsByMember } from "@/lib/assess
 import { deletePtLogsByMember, listPtLogsByMember } from "@/lib/pt-logs";
 import { deletePersonalExercisesByMember, listPersonalExercisesByMember } from "@/lib/personal-exercises";
 import { deleteIntakeQuestionnaire, getIntakeQuestionnaireByMember } from "@/lib/intake";
+import { deleteGoalMemosByMember, listGoalMemosByMember } from "@/lib/goal-memos";
 import { koreaTodayKey } from "@/lib/date";
 import { recordUndo, type UndoOp } from "@/lib/undo";
 import type {
@@ -224,7 +225,7 @@ export async function DELETE(
   // 살아있어 CASCADE가 더 이상 발동하지 않으므로 여기서 직접 지운다. 앞으로
   // 예정된 예약은 회원이 이탈했으니 지워서 그 시간대를 다른 회원이 쓸 수 있게 한다.
   const today = koreaTodayKey();
-  const [contracts, assessments, ptLogs, personalExercises, intake, fixedSlots, packages, pastSessionIds] =
+  const [contracts, assessments, ptLogs, personalExercises, intake, fixedSlots, packages, pastSessionIds, goalMemos] =
     await Promise.all([
       listContractsByMember(idNum),
       listAssessmentsByMember(idNum),
@@ -234,6 +235,7 @@ export async function DELETE(
       listFixedSlotsByMember(idNum),
       listPackages(idNum),
       listPastSessionIdsForMember(idNum, today),
+      listGoalMemosByMember(idNum),
     ]);
 
   const latestPackage = packages[packages.length - 1];
@@ -251,6 +253,7 @@ export async function DELETE(
     deletePersonalExercisesByMember(idNum),
     deleteIntakeQuestionnaire(idNum),
     deleteFixedSlotsByMember(idNum),
+    deleteGoalMemosByMember(idNum),
   ]);
   await deleteMember(idNum);
 
@@ -276,6 +279,7 @@ export async function DELETE(
     })),
     ...(intake ? [{ op: "insert", table: "intake_questionnaires", data: intakeRowForSql(intake) } as UndoOp] : []),
     ...fixedSlots.map((f): UndoOp => ({ op: "insert", table: "fixed_slots", data: f })),
+    ...goalMemos.map((g): UndoOp => ({ op: "insert", table: "goal_memos", data: g })),
     ...deletedUpcomingSessions.map((s): UndoOp => ({ op: "insert", table: "class_sessions", data: s })),
     // 환불로 깎은 결제금액(price)을 실행취소로 되돌릴 수 있게 한다(member_id는
     // 회원 행이 그대로 남아있어 바뀌지 않으므로 되돌릴 필요가 없다).

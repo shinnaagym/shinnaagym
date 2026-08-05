@@ -771,7 +771,7 @@ export function ScheduleGrid({
         title="메모장"
         initialMemos={initialMemos}
         addUrl="/api/admin/schedule-memos"
-        idToDeleteUrl={(id) => `/api/admin/schedule-memos/${id}`}
+        itemUrlBase="/api/admin/schedule-memos"
       />
 
       {/* 코치를 한 명만 선택하면 그 코치의 이번 주 전체를 한 번에 보여준다. */}

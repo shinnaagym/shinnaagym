@@ -14,6 +14,7 @@ import { listAssessmentsByMember } from "@/lib/assessments";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
+import { listGoalMemosByMember } from "@/lib/goal-memos";
 import { listNotices } from "@/lib/notices";
 import { koreaTodayKey } from "@/lib/date";
 import { AssessmentPainChart } from "@/app/admin/members/[id]/assessment/pain-chart";
@@ -74,6 +75,7 @@ export default async function MyReservationPage({
     personalExercises,
     intake,
     notices,
+    goalMemos,
   ] = await Promise.all([
     computeMemberProgress(member.id),
     listMemberSessions(member.id),
@@ -87,6 +89,7 @@ export default async function MyReservationPage({
     listPersonalExercisesByMember(member.id),
     getIntakeQuestionnaireByMember(member.id),
     listNotices(),
+    listGoalMemosByMember(member.id),
   ]);
 
   // 제목이 비어있지 않은(=실제로 내용을 입력한) 항목만 회원 화면에 노출한다.
@@ -221,6 +224,25 @@ export default async function MyReservationPage({
               <span className="text-ink/30">→</span>
             </div>
           </Link>
+        )}
+
+        {goalMemos.length > 0 && (
+          <section className="rounded-2xl border border-line bg-white/60 px-6 py-5 mb-4">
+            <p className="font-display text-lg mb-3">🎯 목표</p>
+            <ul className="space-y-3">
+              {goalMemos.map((memo) => (
+                <li key={memo.id}>
+                  <p className="text-sm whitespace-pre-wrap break-words">{memo.content}</p>
+                  <p className="text-xs text-ink/40 mt-0.5">
+                    {new Date(memo.created_at).toLocaleDateString("ko-KR", {
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {assessments.length > 0 && (
