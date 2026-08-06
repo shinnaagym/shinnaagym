@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 22;
+const SCHEMA_VERSION = 23;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -385,6 +385,19 @@ function runFullMigration(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           revoked_at TIMESTAMPTZ
+        );
+
+        -- 관리자/급여 로그인 브루트포스 방어용 — IP(+scope)별 최근 실패 횟수와
+        -- 잠금 만료 시각을 기록한다. scope를 나누는 이유는 관리자 공용
+        -- 비밀번호 브루트포스와 급여 2차 비밀번호 브루트포스가 서로 다른
+        -- 시도이기 때문이다(한쪽 실패가 다른 쪽 잠금에 영향을 주면 안 됨).
+        CREATE TABLE IF NOT EXISTS login_attempts (
+          ip TEXT NOT NULL,
+          scope TEXT NOT NULL,
+          failed_count INTEGER NOT NULL DEFAULT 0,
+          first_failed_at TIMESTAMPTZ,
+          locked_until TIMESTAMPTZ,
+          PRIMARY KEY (ip, scope)
         );
 
         -- 요일별 당직자(고정 담당 코치) 설정. 요일은 앱 전체에서 쓰는 관례대로
