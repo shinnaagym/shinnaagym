@@ -3,6 +3,7 @@ import { checkAdminPassword, getOrCreateDeviceId, setAdminSessionCookie } from "
 import { BUILD_ID } from "@/lib/build-info";
 import { labelFromUserAgent, upsertDeviceOnLogin } from "@/lib/devices";
 import { checkLoginLock, clearLoginAttempts, getClientIp, recordFailedLogin } from "@/lib/login-rate-limit";
+import { verifyRecaptcha } from "@/lib/recaptcha";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -21,6 +22,11 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+
+  const recaptchaToken = (body as Record<string, unknown> | null)?.recaptchaToken;
+  if (!(await verifyRecaptcha(recaptchaToken, ip))) {
+    return NextResponse.json({ error: "로봇이 아님을 확인해주세요." }, { status: 400 });
   }
 
   const password = (body as Record<string, unknown> | null)?.password;

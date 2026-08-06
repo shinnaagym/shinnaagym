@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { isAdminAuthed } from "@/lib/auth";
+import { getRecaptchaSiteKey } from "@/lib/recaptcha";
 import { LoginForm } from "./login-form";
 
 export default async function AdminLoginPage() {
@@ -17,7 +18,7 @@ export default async function AdminLoginPage() {
           <p className="font-display text-xl">신나아짐 관리자</p>
         </div>
         <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-6 py-7">
-          <LoginForm />
+          <LoginForm recaptchaSiteKey={getRecaptchaSiteKey()} />
         </div>
       </div>
     </main>
