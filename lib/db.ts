@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 23;
+const SCHEMA_VERSION = 24;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -644,6 +644,12 @@ function runFullMigration(): Promise<void> {
             CREATE INDEX IF NOT EXISTS idx_members_followup_updated_at ON members(followup_updated_at)
               WHERE followup_updated_at IS NOT NULL;
             CREATE INDEX IF NOT EXISTS idx_intake_questionnaires_created_at ON intake_questionnaires(created_at);
+
+            -- 2:1 PT(둘이 함께 수업받는 회원 두 명)를 서로 짝지어둔다. 각자 별도
+            -- 회원 행·PT 일지를 갖되, 한쪽에 새 PT 일지를 작성하면 같은 내용을
+            -- 짝에게도 복사해 각자 페이지에서 확인·수정할 수 있게 한다. 짝 관계는
+            -- 항상 서로를 가리키도록 애플리케이션 코드(setDuoPartner)가 유지한다.
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS duo_partner_id INTEGER REFERENCES members(id) ON DELETE SET NULL;
             `,
           ),
           getPool().query(
@@ -778,6 +784,8 @@ export interface MemberRow {
   created_at: string;
   deleted_at: string | null;
   is_lead: boolean;
+  /** 2:1 PT를 함께 받는 짝 회원의 id. 항상 서로를 가리키도록 유지된다(setDuoPartner). */
+  duo_partner_id: number | null;
 }
 
 export type PtType = "1:1" | "2:1";

@@ -10,6 +10,7 @@ import {
   listPackages,
   listMemberSessions,
   listPastSessionIdsForMember,
+  setDuoPartner,
   updateMember,
   updatePackage,
 } from "@/lib/schedule";
@@ -120,6 +121,7 @@ export async function PATCH(
         followupMemo?: unknown;
         improvementDirection?: unknown;
         status?: unknown;
+        duoPartnerId?: unknown;
       }
     | null;
   if (!body) {
@@ -149,10 +151,25 @@ export async function PATCH(
     body.status === "active" || body.status === "inactive"
       ? (body.status as MemberStatus)
       : undefined;
+  const duoPartnerId =
+    body.duoPartnerId === null
+      ? null
+      : typeof body.duoPartnerId === "number" && Number.isInteger(body.duoPartnerId)
+        ? body.duoPartnerId
+        : undefined;
 
   const before = await getMemberById(idNum);
   if (!before) {
     return NextResponse.json({ error: "회원을 찾을 수 없습니다." }, { status: 404 });
+  }
+  if (duoPartnerId !== undefined && duoPartnerId === idNum) {
+    return NextResponse.json({ error: "자기 자신을 짝으로 지정할 수 없습니다." }, { status: 400 });
+  }
+  if (duoPartnerId != null) {
+    const partner = await getMemberById(duoPartnerId);
+    if (!partner || partner.deleted_at) {
+      return NextResponse.json({ error: "짝으로 지정할 회원을 찾을 수 없습니다." }, { status: 400 });
+    }
   }
 
   await updateMember(idNum, {
@@ -167,6 +184,40 @@ export async function PATCH(
     improvementDirection,
     status,
   });
+
+  // duo_partner_id는 항상 서로를 가리키는 대칭 관계라 단순 UPDATE 한 줄로 못
+  // 바꾼다(setDuoPartner가 양쪽을 함께 갱신) — 실행취소도 영향받는 모든 회원
+  // 행(본인·이전 짝·새 짝·새 짝의 이전 짝)의 이전 값을 각각 되돌리게 남긴다.
+  if (duoPartnerId !== undefined) {
+    const oldPartnerId = before.duo_partner_id;
+    const targetOldPartnerId =
+      duoPartnerId != null ? ((await getMemberById(duoPartnerId))?.duo_partner_id ?? null) : null;
+    await setDuoPartner(idNum, duoPartnerId);
+
+    const duoOps: UndoOp[] = [
+      { op: "update", table: "members", id: idNum, data: { duo_partner_id: oldPartnerId } },
+    ];
+    if (oldPartnerId != null) {
+      duoOps.push({ op: "update", table: "members", id: oldPartnerId, data: { duo_partner_id: idNum } });
+    }
+    if (duoPartnerId != null) {
+      duoOps.push({
+        op: "update",
+        table: "members",
+        id: duoPartnerId,
+        data: { duo_partner_id: targetOldPartnerId },
+      });
+      if (targetOldPartnerId != null && targetOldPartnerId !== idNum) {
+        duoOps.push({
+          op: "update",
+          table: "members",
+          id: targetOldPartnerId,
+          data: { duo_partner_id: duoPartnerId },
+        });
+      }
+    }
+    await recordUndo(`${before.name} 2:1 짝 회원 변경`, duoOps);
+  }
 
   const prevValues: Record<string, unknown> = {};
   if (name !== undefined) prevValues.name = before.name;
@@ -245,6 +296,13 @@ export async function DELETE(
     });
   }
 
+  // 삭제되는 회원이 2:1 짝이 있었다면, 남은 짝의 페이지에 사라진 회원이 계속
+  // "짝"으로 남지 않도록 관계를 끊어둔다(소프트 삭제는 UPDATE라 ON DELETE
+  // SET NULL 외래키가 발동하지 않는다).
+  if (member.duo_partner_id != null) {
+    await setDuoPartner(idNum, null);
+  }
+
   const deletedUpcomingSessions = await deleteUpcomingSessionsForMember(idNum, today);
   await Promise.all([
     deleteContractsByMember(idNum),
@@ -267,8 +325,19 @@ export async function DELETE(
         status: member.status,
         followup_status: member.followup_status,
         followup_updated_at: member.followup_updated_at,
+        duo_partner_id: member.duo_partner_id,
       },
     },
+    ...(member.duo_partner_id != null
+      ? [
+          {
+            op: "update",
+            table: "members",
+            id: member.duo_partner_id,
+            data: { duo_partner_id: idNum },
+          } as UndoOp,
+        ]
+      : []),
     ...contracts.map((c): UndoOp => ({ op: "insert", table: "contracts", data: c })),
     ...assessments.map((a): UndoOp => ({ op: "insert", table: "assessments", data: assessmentRowForSql(a) })),
     ...ptLogs.map((p): UndoOp => ({ op: "insert", table: "pt_logs", data: ptLogRowForSql(p) })),

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import {
   computeMemberProgress,
   getCoachAvailability,
+  getMemberById,
   getMemberByToken,
   listCoaches,
   listMemberSessions,
@@ -91,6 +92,14 @@ export default async function MyReservationPage({
     listNotices(),
     listGoalMemosByMember(member.id),
   ]);
+
+  // 2:1 PT 짝이 있으면, 이 예약 페이지 하나에서 두 회원의 그래프·PT 일지를
+  // 함께 볼 수 있게 짝 회원의 기록도 불러온다(둘 다 같은 운동을 하므로 각자
+  // 페이지가 달라 보이지 않도록 하기 위함).
+  const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
+  const [duoPartnerAssessments, duoPartnerPtLogs] = duoPartner
+    ? await Promise.all([listAssessmentsByMember(duoPartner.id), listPtLogsByMember(duoPartner.id)])
+    : [[], []];
 
   // 제목이 비어있지 않은(=실제로 내용을 입력한) 항목만 회원 화면에 노출한다.
   const activeNotices = notices.filter((n) => n.category === "notice" && n.title.trim());
@@ -185,14 +194,39 @@ export default async function MyReservationPage({
           </p>
         </div>
 
+        {duoPartner && (
+          <p className="text-sm text-coral mb-4">🤝 {duoPartner.name}님과 2:1 PT를 함께 받고 있어요.</p>
+        )}
+
         {assessments.length > 0 && (
           <>
+            {duoPartner && <p className="text-sm font-medium text-ink/60 mb-2">{member.name}님</p>}
             <AssessmentPainChart assessments={assessments} />
             <ExercisePerformanceChart assessments={assessments} />
           </>
         )}
 
-        {ptLogs.length > 0 && <PtLogDisclosureCard ptLogs={ptLogs} />}
+        {ptLogs.length > 0 && (
+          <PtLogDisclosureCard
+            ptLogs={ptLogs}
+            title={duoPartner ? `🏋️ ${member.name}님의 PT 일지` : undefined}
+          />
+        )}
+
+        {duoPartner && duoPartnerAssessments.length > 0 && (
+          <>
+            <p className="text-sm font-medium text-ink/60 mb-2">{duoPartner.name}님</p>
+            <AssessmentPainChart assessments={duoPartnerAssessments} />
+            <ExercisePerformanceChart assessments={duoPartnerAssessments} />
+          </>
+        )}
+
+        {duoPartner && duoPartnerPtLogs.length > 0 && (
+          <PtLogDisclosureCard
+            ptLogs={duoPartnerPtLogs}
+            title={`🏋️ ${duoPartner.name}님의 PT 일지`}
+          />
+        )}
 
         <Link
           href={`/my/${token}/personal-exercise`}

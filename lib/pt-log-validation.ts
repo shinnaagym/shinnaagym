@@ -3,7 +3,7 @@ import {
   PT_LOG_CIRCUIT_TYPE_OPTIONS,
   PT_LOG_CIRCUIT_TYPE_LABELS,
 } from "./constants";
-import type { PtLogCircuit, PtLogExercise, PtLogSetGroup } from "./db";
+import type { ExercisePerformanceEntry, PtLogCircuit, PtLogExercise, PtLogSetGroup } from "./db";
 
 const VALID_EQUIPMENT = new Set<string>(PT_LOG_EQUIPMENT_OPTIONS.map((o) => o.value));
 const VALID_CIRCUIT_TYPES = new Set<string>(PT_LOG_CIRCUIT_TYPE_OPTIONS.map((o) => o.value));
@@ -86,4 +86,22 @@ export function parseScale(raw: unknown): number | null {
   const n = Number(raw);
   if (!Number.isFinite(n)) return null;
   return Math.min(10, Math.max(0, Math.round(n)));
+}
+
+/** PT 일지 작성 폼의 "그래프 기록" 체크박스로 넘어오는 운동 수행능력(e1RM) 항목.
+    운동 이름이 없는 항목은 그래프에 남길 의미가 없어 걸러낸다. */
+export function parsePerformanceEntries(raw: unknown): ExercisePerformanceEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((e): ExercisePerformanceEntry => {
+      const obj = (e ?? {}) as Record<string, unknown>;
+      return {
+        exercise: typeof obj.exercise === "string" ? obj.exercise.trim() : "",
+        note: typeof obj.note === "string" ? obj.note.trim() : "",
+        weight: toNumberOrNull(obj.weight),
+        reps: toNumberOrNull(obj.reps),
+        rpe: toNumberOrNull(obj.rpe),
+      };
+    })
+    .filter((e) => e.exercise.length > 0);
 }

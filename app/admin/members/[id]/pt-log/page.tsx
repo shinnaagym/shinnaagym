@@ -40,6 +40,13 @@ export default async function PtLogHistoryPage({
     notFound();
   }
 
+  // 2:1 PT 짝이 있으면, 같은 페이지에서 두 회원의 PT 일지·그래프를 나란히 볼 수
+  // 있게 짝 회원의 기록도 함께 불러온다(회원용 예약 페이지와 동일한 구성).
+  const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
+  const [duoPartnerPtLogs, duoPartnerAssessments] = duoPartner
+    ? await Promise.all([listPtLogsByMember(duoPartner.id), listAssessmentsByMember(duoPartner.id)])
+    : [[], []];
+
   const pastPainTriggerNotes = Array.from(
     new Set(
       assessments
@@ -63,6 +70,14 @@ export default async function PtLogHistoryPage({
         <div>
           <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">PT Log</p>
           <h1 className="font-display text-2xl">{member.name}님의 PT 일지</h1>
+          {duoPartner && (
+            <Link
+              href={`/admin/members/${duoPartner.id}/pt-log`}
+              className="inline-block text-xs text-coral hover:underline mt-1"
+            >
+              🤝 {duoPartner.name}님과 2:1 PT
+            </Link>
+          )}
         </div>
       </div>
 
@@ -83,6 +98,13 @@ export default async function PtLogHistoryPage({
       <div className="mb-4">
         <PtLogList ptLogs={ptLogs} />
       </div>
+
+      {duoPartner && (
+        <div className="mb-6">
+          <h2 className="font-display text-lg mb-3">🤝 {duoPartner.name}님의 PT 일지</h2>
+          <PtLogList ptLogs={duoPartnerPtLogs} />
+        </div>
+      )}
 
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
@@ -132,11 +154,20 @@ export default async function PtLogHistoryPage({
           쓴다 — PT 일지에서 기록해도, 평가 기록 화면에서 기록해도 같은
           그래프에 반영된다. 그래프 자체 "+ 기록추가" 대신, 평가 기록 작성
           폼과 같은 입력 섹션을 그래프 바로 아래에 항상 띄워둔다. */}
+      {duoPartner && <h2 className="font-display text-lg mb-3">📈 {member.name}님</h2>}
       <AssessmentPainChart assessments={assessments} />
       <PainTriggerSection memberId={idNum} pastNotes={pastPainTriggerNotes} />
 
       <ExercisePerformanceChart assessments={assessments} />
       <ExercisePerformanceSection memberId={idNum} pastExercises={pastExercises} />
+
+      {duoPartner && (
+        <>
+          <h2 className="font-display text-lg mb-3">📈 {duoPartner.name}님</h2>
+          <AssessmentPainChart assessments={duoPartnerAssessments} />
+          <ExercisePerformanceChart assessments={duoPartnerAssessments} />
+        </>
+      )}
     </div>
   );
 }

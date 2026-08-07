@@ -297,6 +297,7 @@ type MemberDetail = {
   available_times: string;
   token: string;
   status: MemberStatus;
+  duo_partner_id: number | null;
 };
 
 function formatWon(n: number): string {
@@ -903,6 +904,7 @@ export function MembersView({
             <MemberDetailModal
               memberId={detailId}
               initialMember={detailMember}
+              members={members}
               coaches={coaches}
               activeCoaches={activeCoaches}
               fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
@@ -1987,6 +1989,7 @@ function ContractViewModal({
 function MemberDetailModal({
   memberId,
   initialMember,
+  members,
   coaches,
   activeCoaches,
   fixedSlots,
@@ -1996,6 +1999,7 @@ function MemberDetailModal({
 }: {
   memberId: number;
   initialMember: MemberWithProgress;
+  members: MemberWithProgress[];
   coaches: CoachRow[];
   activeCoaches: CoachRow[];
   fixedSlots: FixedSlotWithMember[];
@@ -2098,6 +2102,9 @@ function MemberDetailModal({
   const [referrer, setReferrer] = useState(initialMember.referrer);
   const [availableTimes, setAvailableTimes] = useState(initialMember.available_times);
   const [notes, setNotes] = useState(initialMember.notes);
+  const [duoPartnerId, setDuoPartnerId] = useState<number | "">(
+    initialMember.duo_partner_id ?? "",
+  );
 
   const [editingPkgId, setEditingPkgId] = useState<number | null>(null);
   const [editTotal, setEditTotal] = useState("");
@@ -2144,6 +2151,7 @@ function MemberDetailModal({
           referrer,
           availableTimes,
           notes,
+          duoPartnerId: duoPartnerId === "" ? null : duoPartnerId,
         }),
       });
       if (!res.ok) {
@@ -2454,6 +2462,27 @@ function MemberDetailModal({
               </select>
             </Field>
           </div>
+          <Field label="2:1 짝 회원">
+            <select
+              value={duoPartnerId}
+              onChange={(e) => setDuoPartnerId(e.target.value ? Number(e.target.value) : "")}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+            >
+              <option value="">없음 (1:1)</option>
+              {members
+                .filter((m) => m.id !== memberId)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                    {m.duo_partner_id != null && m.duo_partner_id !== memberId ? " (다른 회원과 짝)" : ""}
+                  </option>
+                ))}
+            </select>
+            <p className="text-xs text-ink/40 mt-1">
+              2:1 PT를 함께 받는 회원을 지정하면, 한쪽의 새 PT 일지 작성 내용이 짝 회원에게도
+              복사돼요.
+            </p>
+          </Field>
           <Field label="소개해주신 분">
             <input
               value={referrer}

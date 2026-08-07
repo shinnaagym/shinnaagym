@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
 import {
@@ -95,11 +96,17 @@ export function PtLogForm({
   pastCircuitEntries = {},
   kind = "pt_log",
   authToken,
+  duoPartner = null,
 }: {
   memberId: number;
   memberName: string;
   ptLogId?: number;
   initialData?: PtLogFormInitialData;
+  /** 2:1 PT로 짝지어진 회원. 새 PT 일지 작성 화면에서만 상단에 두 이름을 탭처럼
+      보여주고, 클릭하면 그 회원의 새 PT 일지 작성 화면으로 이동한다(실제 운동
+      기록 동기화는 저장 시 서버가 처리하므로, 이 탭은 어느 회원 화면에서
+      작성을 시작할지 고르는 용도일 뿐이다). */
+  duoPartner?: { id: number; name: string } | null;
   pastExercises?: string[];
   /** (운동 이름, 도구) -> 가장 최근에 그 조합으로 했을 때의 세트 그룹. 무게·횟수·
       세트 입력란에 회색 placeholder("지난번엔 이랬다")로만 보여주고 값으로 채우진
@@ -279,6 +286,10 @@ export function PtLogForm({
           ? `/api/admin/pt-logs/${ptLogId}`
           : `/api/admin/members/${memberId}/pt-logs`;
       }
+      // 새 PT 일지 작성 시엔 운동 수행능력(그래프 기록 체크)까지 같은 요청에
+      // 실어 보낸다 — 서버가 이 요청 하나 안에서만 2:1 짝 회원에게도 복사하므로,
+      // 별도 요청으로 쪼개면 짝 동기화가 빠진다. 수정(edit)은 짝에게 동기화하지
+      // 않으므로 예전처럼 별도 요청으로 평가 기록에만 남긴다.
       const res = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -286,6 +297,7 @@ export function PtLogForm({
           logDate,
           memo,
           exercises: cleanedExercises,
+          ...(!isEditing && performanceEntries.length > 0 ? { performanceEntries } : {}),
         }),
       });
       if (!res.ok) {
@@ -293,7 +305,7 @@ export function PtLogForm({
         setError(data?.error ?? "저장에 실패했어요.");
         return;
       }
-      if (performanceEntries.length > 0) {
+      if (isEditing && performanceEntries.length > 0) {
         await fetch(`/api/admin/members/${memberId}/assessments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -314,6 +326,20 @@ export function PtLogForm({
 
   return (
     <div>
+      {duoPartner && !isEditing && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="rounded-full bg-ink text-white px-4 py-1.5 text-sm font-medium">
+            {memberName}
+          </span>
+          <Link
+            href={`/admin/members/${duoPartner.id}/pt-log/new`}
+            className="rounded-full border border-line px-4 py-1.5 text-sm text-ink/60 hover:border-coral hover:text-coral transition"
+          >
+            {duoPartner.name}
+          </Link>
+          <span className="text-xs text-ink/40">2:1 PT · 저장하면 짝에게도 복사돼요</span>
+        </div>
+      )}
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">
         {kind === "personal_exercise" ? "Personal Exercise" : "PT Log"}
       </p>
