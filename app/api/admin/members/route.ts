@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
-import { addPackage, createMember, getMemberById, getMemberByPhone, listMembers, updateMember } from "@/lib/schedule";
+import {
+  addPackage,
+  createMember,
+  getMemberById,
+  getMemberByPhone,
+  listMembers,
+  setDuoPartner,
+  updateMember,
+} from "@/lib/schedule";
 import { createContract } from "@/lib/contracts";
 import { recordUndo, type UndoOp } from "@/lib/undo";
 import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
@@ -112,6 +120,12 @@ export async function POST(req: NextRequest) {
   const companionAddress =
     typeof body?.companionAddress === "string" ? body.companionAddress.trim() : "";
   const companionPrivacyConsent = body?.companionPrivacyConsent === true;
+  if (ptType === "2:1" && !companionName) {
+    return NextResponse.json(
+      { error: "2:1 PT는 함께 등록하는 분 이름을 입력해주세요." },
+      { status: 400 },
+    );
+  }
 
   // 같은 연락처로 상담 단계(초진 문진표/평가지 등)에서 이미 만들어진 회원 레코드가
   // 있으면 새로 만들지 않고 그 회원에 패키지·계약서를 연결한다 — 상담 시 작성한
@@ -150,6 +164,26 @@ export async function POST(req: NextRequest) {
   } else {
     member = await createMember({ name, phone, coachId, notes, referrer, availableTimes });
   }
+
+  // 2:1 PT는 계약서에만 기록되던 "함께 등록하는 분"도 별도 회원 행으로 만들어
+  // duo_partner_id로 서로 짝지어둔다 — 이렇게 등록 시점에 짝을 정해야만, 이후
+  // 한쪽에 새 PT 일지를 작성하면 같은 내용이 짝의 PT 일지에도 복사된다. 이미
+  // 짝이 있는 회원(예: 재등록)은 건드리지 않는다.
+  let companionMemberId: number | null = null;
+  if (ptType === "2:1" && companionName && member.duo_partner_id == null) {
+    const companionMember = await createMember({
+      name: companionName,
+      phone: companionPhone,
+      coachId,
+      notes: "",
+      referrer: "",
+      availableTimes: "",
+    });
+    companionMemberId = companionMember.id;
+    await setDuoPartner(member.id, companionMember.id);
+    member = (await getMemberById(member.id))!;
+  }
+
   // 등록 폼의 "옵션" 입력은 결제·패키지 이력 목록에 바로 보이도록 패키지 메모에도 남긴다.
   const packageNote = optionNote ? `최초 등록 · ${optionNote}` : "최초 등록";
   const pkg = await addPackage(member.id, totalSessions, price, packageNote, ptType, paymentMethod);
@@ -177,17 +211,29 @@ export async function POST(req: NextRequest) {
     companionPrivacyConsent,
   });
 
+  // companionMemberId는 새로 만든 별도 회원 행이라, 실행취소 시 삭제하면
+  // members의 ON DELETE SET NULL 외래키가 원래 짝 쪽 duo_partner_id도 함께
+  // 정리해준다(soft delete가 아닌 실제 DELETE라 이번엔 발동한다).
+  const companionUndoOps: UndoOp[] =
+    companionMemberId != null
+      ? [{ op: "delete", table: "members", id: companionMemberId }]
+      : [];
+
   if (existingMember) {
     // 계약서 → 패키지 순으로 먼저 지우고, 마지막에 회원 필드를 원래 값으로 되돌린다.
     await recordUndo(`${name} 회원 재등록`, [
       { op: "delete", table: "contracts", id: contract.id },
       { op: "delete", table: "packages", id: pkg.id },
+      ...companionUndoOps,
       ...undoOps,
     ]);
   } else {
     // members는 packages/contracts에 ON DELETE CASCADE로 걸려있어 회원 행만
     // 지우면 방금 만든 패키지·계약서도 함께 정리된다.
-    await recordUndo(`${name} 신규 회원 등록`, [{ op: "delete", table: "members", id: member.id }]);
+    await recordUndo(`${name} 신규 회원 등록`, [
+      { op: "delete", table: "members", id: member.id },
+      ...companionUndoOps,
+    ]);
   }
 
   return NextResponse.json({ member }, { status: 201 });
