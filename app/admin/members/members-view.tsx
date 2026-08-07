@@ -648,6 +648,10 @@ export function MembersView({
               const expired = m.total_sessions > 0 && remaining <= 0;
               const low = !expired && remaining > 0 && remaining <= 3;
               const goldenBell = m.status === "active" && m.total_sessions > 0 && remaining <= 3;
+              const duoPartnerName =
+                m.duo_partner_id != null
+                  ? (members.find((p) => p.id === m.duo_partner_id)?.name ?? null)
+                  : null;
               return (
                 <div
                   key={m.id}
@@ -660,6 +664,9 @@ export function MembersView({
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="font-medium flex items-center gap-1.5 flex-wrap">
                       {m.name}
+                      {duoPartnerName && (
+                        <span className="text-ink/40 font-normal">· {duoPartnerName}</span>
+                      )}
                       {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
                       {goldenBell && <GoldenBellBadge />}
                       {m.referrer && <ReferrerBadge referrer={m.referrer} />}
@@ -777,6 +784,10 @@ export function MembersView({
                   const expired = m.total_sessions > 0 && remaining <= 0;
                   const low = !expired && remaining > 0 && remaining <= 3;
                   const goldenBell = m.status === "active" && m.total_sessions > 0 && remaining <= 3;
+                  const duoPartnerName =
+                    m.duo_partner_id != null
+                      ? (members.find((p) => p.id === m.duo_partner_id)?.name ?? null)
+                      : null;
                   return (
                     <tr
                       key={m.id}
@@ -786,6 +797,9 @@ export function MembersView({
                       <td className="px-5 py-3 font-medium">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {m.name}
+                          {duoPartnerName && (
+                            <span className="text-ink/40 font-normal">· {duoPartnerName}</span>
+                          )}
                           {m.referrer && <ReferrerBadge referrer={m.referrer} />}
                           {/* 회원 수만큼 반복 렌더링되는 링크라 prefetch를 꺼서
                               목록을 열 때마다 전원 분량의 PT일지 페이지가
@@ -904,7 +918,6 @@ export function MembersView({
             <MemberDetailModal
               memberId={detailId}
               initialMember={detailMember}
-              members={members}
               coaches={coaches}
               activeCoaches={activeCoaches}
               fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
@@ -1445,6 +1458,10 @@ function CreateMemberModal({
       setError("등록 횟수를 입력해주세요.");
       return;
     }
+    if (ptType === "2:1" && !companionName.trim()) {
+      setError("2:1 PT는 함께 등록하는 분 이름을 입력해주세요.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -1551,10 +1568,10 @@ function CreateMemberModal({
         {ptType === "2:1" && (
           <div className="rounded-xl border border-line/60 bg-bone/30 px-4 py-3 space-y-3">
             <p className="text-xs text-ink/50">
-              2:1 수업이라 함께 등록하는 분의 인적사항도 계약서에 함께 기록돼요. (별도
-              회원으로 등록되지는 않아요.)
+              2:1 수업이라 함께 등록하는 분도 별도 회원으로 함께 등록되고, 서로 짝지어져요.
+              앞으로 한쪽의 PT 일지에 운동을 기록하면 짝의 PT 일지에도 그대로 복사돼요.
             </p>
-            <Field label="함께 등록하는 분 이름">
+            <Field label="함께 등록하는 분 이름 *">
               <input
                 value={companionName}
                 onChange={(e) => setCompanionName(e.target.value)}
@@ -1989,7 +2006,6 @@ function ContractViewModal({
 function MemberDetailModal({
   memberId,
   initialMember,
-  members,
   coaches,
   activeCoaches,
   fixedSlots,
@@ -1999,7 +2015,6 @@ function MemberDetailModal({
 }: {
   memberId: number;
   initialMember: MemberWithProgress;
-  members: MemberWithProgress[];
   coaches: CoachRow[];
   activeCoaches: CoachRow[];
   fixedSlots: FixedSlotWithMember[];
@@ -2102,9 +2117,6 @@ function MemberDetailModal({
   const [referrer, setReferrer] = useState(initialMember.referrer);
   const [availableTimes, setAvailableTimes] = useState(initialMember.available_times);
   const [notes, setNotes] = useState(initialMember.notes);
-  const [duoPartnerId, setDuoPartnerId] = useState<number | "">(
-    initialMember.duo_partner_id ?? "",
-  );
 
   const [editingPkgId, setEditingPkgId] = useState<number | null>(null);
   const [editTotal, setEditTotal] = useState("");
@@ -2151,7 +2163,6 @@ function MemberDetailModal({
           referrer,
           availableTimes,
           notes,
-          duoPartnerId: duoPartnerId === "" ? null : duoPartnerId,
         }),
       });
       if (!res.ok) {
@@ -2462,27 +2473,6 @@ function MemberDetailModal({
               </select>
             </Field>
           </div>
-          <Field label="2:1 짝 회원">
-            <select
-              value={duoPartnerId}
-              onChange={(e) => setDuoPartnerId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
-            >
-              <option value="">없음 (1:1)</option>
-              {members
-                .filter((m) => m.id !== memberId)
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                    {m.duo_partner_id != null && m.duo_partner_id !== memberId ? " (다른 회원과 짝)" : ""}
-                  </option>
-                ))}
-            </select>
-            <p className="text-xs text-ink/40 mt-1">
-              2:1 PT를 함께 받는 회원을 지정하면, 한쪽의 새 PT 일지 작성 내용이 짝 회원에게도
-              복사돼요.
-            </p>
-          </Field>
           <Field label="소개해주신 분">
             <input
               value={referrer}
