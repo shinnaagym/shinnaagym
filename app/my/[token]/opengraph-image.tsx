@@ -42,7 +42,7 @@ export default async function Image({ params }: { params: Promise<{ token: strin
           gap: 32,
         }}
       >
-        <img src={logoSrc} width={168} height={211} style={{ objectFit: "contain" }} alt="" />
+        <img src={logoSrc} width={320} height={136} style={{ objectFit: "contain" }} alt="" />
         <div style={{ display: "flex", color: "#f3ecdd", fontSize: 88, fontFamily: "Pretendard" }}>
           신나아짐
         </div>

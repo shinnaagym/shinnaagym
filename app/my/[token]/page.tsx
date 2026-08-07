@@ -113,7 +113,7 @@ export default async function MyReservationPage({
     <main className="flex-1">
       <div className="mx-auto max-w-2xl px-6 py-12 sm:py-16">
         <div className="flex items-center gap-2 mb-10">
-          <Image src="/logo.png" alt="신나아짐" width={271} height={341} className="h-8 w-auto" />
+          <Image src="/logo.png" alt="신나아짐" width={1585} height={674} className="h-8 w-auto" />
           <span className="font-display text-lg">신나아짐</span>
         </div>
 
