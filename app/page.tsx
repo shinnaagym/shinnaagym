@@ -79,8 +79,8 @@ export default function Home() {
             <Image
               src="/logo.png"
               alt="신나아짐 로고"
-              width={271}
-              height={341}
+              width={1585}
+              height={674}
               priority
               className="h-12 w-auto sm:h-16"
             />

@@ -265,7 +265,7 @@ export function AdminNav() {
     <header className="no-print sticky top-0 z-10 border-b border-line bg-white/90 backdrop-blur">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 sm:min-h-16 flex flex-wrap items-center justify-between gap-y-3 gap-x-4 sm:flex-nowrap">
         <Link href="/admin/dashboard" className="flex items-center gap-2 shrink-0">
-          <Image src="/logo.png" alt="신나아짐" width={271} height={341} className="h-7 w-auto" />
+          <Image src="/logo.png" alt="신나아짐" width={1585} height={674} className="h-7 w-auto" />
           <span className="font-display text-base text-ink hidden sm:inline">신나아짐</span>
           <span className="text-xs text-ink/40 hidden sm:inline">관리자</span>
         </Link>
