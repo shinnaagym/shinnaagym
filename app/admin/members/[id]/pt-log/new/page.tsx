@@ -27,6 +27,7 @@ export default async function NewPtLogPage({
   if (!member) {
     notFound();
   }
+  const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -36,6 +37,7 @@ export default async function NewPtLogPage({
         pastExercises={pastExerciseNames(ptLogs, assessments)}
         pastExerciseGroups={pastExerciseGroups(ptLogs)}
         pastCircuitEntries={pastCircuitEntries(ptLogs)}
+        duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
       />
     </div>
   );

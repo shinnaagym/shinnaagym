@@ -380,6 +380,34 @@ export async function updateMember(
   await query(`UPDATE members SET ${fields.join(", ")} WHERE id = $1`, [id, ...values]);
 }
 
+/** 2:1 PT 짝 관계를 맺거나 끊는다. duo_partner_id는 항상 서로를 가리켜야 하므로,
+    이 함수를 거치지 않고 한쪽만 직접 UPDATE하면 안 된다. partnerId가 null이면
+    현재 짝과의 관계만 끊고, 값이 있으면 memberId·partnerId 각각 기존에 다른
+    회원과 짝이었더라도 그 관계를 먼저 끊은 뒤 서로를 새로 짝짓는다. */
+export async function setDuoPartner(memberId: number, partnerId: number | null): Promise<void> {
+  const current = await getMemberById(memberId);
+  if (!current) return;
+  const prevPartnerId = current.duo_partner_id;
+  if (prevPartnerId === partnerId) return;
+
+  if (prevPartnerId != null) {
+    await query(
+      `UPDATE members SET duo_partner_id = NULL WHERE id = $1 AND duo_partner_id = $2`,
+      [prevPartnerId, memberId],
+    );
+  }
+  if (partnerId != null) {
+    // 새 짝이 이미 다른 회원과 짝이었다면 그 관계도 끊어(한 회원이 동시에 두
+    // 명과 짝일 수 없으므로) 대칭이 깨지지 않게 한다.
+    await query(
+      `UPDATE members SET duo_partner_id = NULL WHERE id = (SELECT duo_partner_id FROM members WHERE id = $1) AND duo_partner_id = $1`,
+      [partnerId],
+    );
+    await query(`UPDATE members SET duo_partner_id = $2 WHERE id = $1`, [partnerId, memberId]);
+  }
+  await query(`UPDATE members SET duo_partner_id = $2 WHERE id = $1`, [memberId, partnerId]);
+}
+
 /** 회원을 소프트 삭제한다 — 행 자체는 남기고 deleted_at만 채운다. 이렇게 해야
     packages/class_sessions가 가리키는 member_id가 계속 유효해서 신규·재등록
     월별 통계가 삭제 후에도 그대로 남고, followup_status를 "이탈"로 넘겨 재등록

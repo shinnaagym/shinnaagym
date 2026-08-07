@@ -7,14 +7,20 @@ import type { PtLogRow } from "@/lib/db";
 
 /** 예전엔 이 카드를 누르면 별도 페이지(/my/[token]/pt-log)로 이동했는데, 카드
     안에서 바로 펼쳐 보이도록 바꿨다. */
-export function PtLogDisclosureCard({ ptLogs }: { ptLogs: PtLogRow[] }) {
+export function PtLogDisclosureCard({
+  ptLogs,
+  title = "🏋️ PT 일지",
+}: {
+  ptLogs: PtLogRow[];
+  title?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="rounded-2xl border border-line bg-white px-6 py-5 mb-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="font-display text-lg mb-1">🏋️ PT 일지</p>
+          <p className="font-display text-lg mb-1">{title}</p>
           <p className="text-sm text-ink/60">{ptLogs.length}건 · 내용 확인하기</p>
         </div>
         <DisclosureToggle
