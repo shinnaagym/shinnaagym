@@ -77,10 +77,10 @@ export default function Home() {
         <div className="relative mx-auto max-w-5xl px-6 pt-8 sm:pt-10">
           <a href="#" className="hero-fade-1 inline-flex items-center gap-3">
             <Image
-              src="/logo.png"
+              src="/logo-on-dark.png"
               alt="신나아짐 로고"
               width={1585}
-              height={674}
+              height={799}
               priority
               className="h-12 w-auto sm:h-16"
             />

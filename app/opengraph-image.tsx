@@ -8,7 +8,7 @@ export const contentType = "image/png";
 
 export default async function Image() {
   const [logoData, fontData] = await Promise.all([
-    readFile(join(process.cwd(), "public/logo.png")),
+    readFile(join(process.cwd(), "public/logo-on-dark.png")),
     readFile(
       join(process.cwd(), "node_modules/pretendard/dist/public/static/Pretendard-Bold.otf"),
     ),
@@ -29,7 +29,7 @@ export default async function Image() {
           gap: 32,
         }}
       >
-        <img src={logoSrc} width={320} height={136} style={{ objectFit: "contain" }} alt="" />
+        <img src={logoSrc} width={320} height={161} style={{ objectFit: "contain" }} alt="" />
         <div style={{ display: "flex", color: "#f3ecdd", fontSize: 88, fontFamily: "Pretendard" }}>
           신나아짐
         </div>
