@@ -69,15 +69,9 @@ export default async function PtLogHistoryPage({
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <div>
           <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">PT Log</p>
-          <h1 className="font-display text-2xl">{member.name}님의 PT 일지</h1>
-          {duoPartner && (
-            <Link
-              href={`/admin/members/${duoPartner.id}/pt-log`}
-              className="inline-block text-xs text-coral hover:underline mt-1"
-            >
-              🤝 {duoPartner.name}님과 2:1 PT
-            </Link>
-          )}
+          <h1 className="font-display text-2xl">
+            {duoPartner ? `${member.name}/${duoPartner.name}` : member.name}님의 PT 일지
+          </h1>
         </div>
       </div>
 

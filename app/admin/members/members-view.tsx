@@ -486,6 +486,10 @@ export function MembersView({
       // 않는다. 스케줄표의 "결제" 버튼으로 ?open=id 딥링크될 때는 members 원본
       // 배열에서 바로 찾으므로 이 필터의 영향을 받지 않는다.
       if (m.is_lead) return false;
+      // 2:1 짝은 회원 정보가 서로 다른 행이라도 목록에는 한 행으로만 보여준다
+      // (이름 칸에 "이름A · 이름B"로 함께 표시). id가 더 작은(먼저 등록된) 쪽
+      // 행만 남기고, 나중에 함께 등록된 짝의 행은 숨긴다.
+      if (m.duo_partner_id != null && m.duo_partner_id < m.id) return false;
       if (search && !m.name.includes(search)) return false;
       if (coachFilter === "unassigned") {
         if (m.coach_id !== null) return false;
