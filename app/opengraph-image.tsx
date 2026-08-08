@@ -29,7 +29,7 @@ export default async function Image() {
           gap: 32,
         }}
       >
-        <img src={logoSrc} width={320} height={161} style={{ objectFit: "contain" }} alt="" />
+        <img src={logoSrc} width={320} height={98} style={{ objectFit: "contain" }} alt="" />
         <div style={{ display: "flex", color: "#f3ecdd", fontSize: 88, fontFamily: "Pretendard" }}>
           신나아짐
         </div>

@@ -80,7 +80,7 @@ export default function Home() {
               src="/logo-on-dark.png"
               alt="신나아짐 로고"
               width={1585}
-              height={799}
+              height={488}
               priority
               className="h-12 w-auto sm:h-16"
             />
@@ -266,7 +266,7 @@ export default function Home() {
               <p className="text-ink/70 mb-10 leading-relaxed">
                 {STUDIO_ADDRESS}
                 <br />
-                문의 · <span className="text-gold-deep font-medium">010-6859-6114</span>
+                문의 · <span className="text-gold-deep font-medium">010-2496-8088</span>
               </p>
             </Reveal>
             <Reveal delayMs={100}>
@@ -307,7 +307,7 @@ export default function Home() {
           <p>전 직원 물리치료사 면허 보유 · 프리미엄 PT 스튜디오</p>
           <p>{STUDIO_ADDRESS}</p>
           <p>
-            문의 · <span className="text-gold-deep font-medium">010-6859-6114</span>
+            문의 · <span className="text-gold-deep font-medium">010-2496-8088</span>
           </p>
           <p>정확한 오픈일은 사전예약해주신 분들께 가장 먼저 안내드릴게요.</p>
         </div>

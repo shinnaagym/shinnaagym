@@ -904,8 +904,8 @@ export function IntakeForm({
       )}
 
       <div className="rounded-2xl bg-ink text-bone px-6 py-5 text-sm space-y-1 mb-6 mt-3">
-        <p>신나아짐 본점 T. 010-6859-6114</p>
-        <p className="text-bone/70">개인정보 보호책임자 · 신종수 (T. 010-6859-6114)</p>
+        <p>신나아짐 본점 T. 010-2496-8088</p>
+        <p className="text-bone/70">개인정보 보호책임자 · 신종수 (T. 010-2496-8088)</p>
       </div>
 
       {error && <p className="text-sm text-coral mb-3 no-print">{error}</p>}

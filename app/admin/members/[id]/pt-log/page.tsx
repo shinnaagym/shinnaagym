@@ -43,9 +43,13 @@ export default async function PtLogHistoryPage({
   // 2:1 PT 짝이 있으면, 같은 페이지에서 두 회원의 PT 일지·그래프를 나란히 볼 수
   // 있게 짝 회원의 기록도 함께 불러온다(회원용 예약 페이지와 동일한 구성).
   const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
-  const [duoPartnerPtLogs, duoPartnerAssessments] = duoPartner
-    ? await Promise.all([listPtLogsByMember(duoPartner.id), listAssessmentsByMember(duoPartner.id)])
-    : [[], []];
+  const [duoPartnerPtLogs, duoPartnerAssessments, duoPartnerPersonalExercises] = duoPartner
+    ? await Promise.all([
+        listPtLogsByMember(duoPartner.id),
+        listAssessmentsByMember(duoPartner.id),
+        listPersonalExercisesByMember(duoPartner.id),
+      ])
+    : [[], [], []];
 
   const pastPainTriggerNotes = Array.from(
     new Set(
@@ -134,6 +138,20 @@ export default async function PtLogHistoryPage({
           deleteEndpointBase="/api/admin/personal-exercises"
           deleteConfirmMessage="이 개인 운동 기록을 삭제할까요? 되돌릴 수 없어요."
         />
+
+        {duoPartner && (
+          <div className="mt-6">
+            <h3 className="font-display text-base mb-3">🤝 {duoPartner.name}님의 개인 운동</h3>
+            <PtLogList
+              ptLogs={duoPartnerPersonalExercises}
+              emptyLabel="아직 기록된 개인 운동이 없어요."
+              showDone
+              editHrefBase={`/admin/members/${duoPartner.id}/personal-exercise`}
+              deleteEndpointBase="/api/admin/personal-exercises"
+              deleteConfirmMessage="이 개인 운동 기록을 삭제할까요? 되돌릴 수 없어요."
+            />
+          </div>
+        )}
       </div>
 
       <Link
