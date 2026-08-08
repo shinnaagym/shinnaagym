@@ -486,6 +486,10 @@ export function MembersView({
       // 않는다. 스케줄표의 "결제" 버튼으로 ?open=id 딥링크될 때는 members 원본
       // 배열에서 바로 찾으므로 이 필터의 영향을 받지 않는다.
       if (m.is_lead) return false;
+      // 2:1 짝은 회원 정보가 서로 다른 행이라도 목록에는 한 행으로만 보여준다
+      // (이름 칸에 "이름A · 이름B"로 함께 표시). id가 더 작은(먼저 등록된) 쪽
+      // 행만 남기고, 나중에 함께 등록된 짝의 행은 숨긴다.
+      if (m.duo_partner_id != null && m.duo_partner_id < m.id) return false;
       if (search && !m.name.includes(search)) return false;
       if (coachFilter === "unassigned") {
         if (m.coach_id !== null) return false;
@@ -918,7 +922,6 @@ export function MembersView({
             <MemberDetailModal
               memberId={detailId}
               initialMember={detailMember}
-              members={members}
               coaches={coaches}
               activeCoaches={activeCoaches}
               fixedSlots={fixedSlots.filter((f) => f.member_id === detailId)}
@@ -2007,7 +2010,6 @@ function ContractViewModal({
 function MemberDetailModal({
   memberId,
   initialMember,
-  members,
   coaches,
   activeCoaches,
   fixedSlots,
@@ -2017,7 +2019,6 @@ function MemberDetailModal({
 }: {
   memberId: number;
   initialMember: MemberWithProgress;
-  members: MemberWithProgress[];
   coaches: CoachRow[];
   activeCoaches: CoachRow[];
   fixedSlots: FixedSlotWithMember[];
@@ -2120,9 +2121,6 @@ function MemberDetailModal({
   const [referrer, setReferrer] = useState(initialMember.referrer);
   const [availableTimes, setAvailableTimes] = useState(initialMember.available_times);
   const [notes, setNotes] = useState(initialMember.notes);
-  const [duoPartnerId, setDuoPartnerId] = useState<number | "">(
-    initialMember.duo_partner_id ?? "",
-  );
 
   const [editingPkgId, setEditingPkgId] = useState<number | null>(null);
   const [editTotal, setEditTotal] = useState("");
@@ -2169,7 +2167,6 @@ function MemberDetailModal({
           referrer,
           availableTimes,
           notes,
-          duoPartnerId: duoPartnerId === "" ? null : duoPartnerId,
         }),
       });
       if (!res.ok) {
@@ -2480,27 +2477,6 @@ function MemberDetailModal({
               </select>
             </Field>
           </div>
-          <Field label="2:1 짝 회원">
-            <select
-              value={duoPartnerId}
-              onChange={(e) => setDuoPartnerId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
-            >
-              <option value="">없음 (1:1)</option>
-              {members
-                .filter((m) => m.id !== memberId)
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                    {m.duo_partner_id != null && m.duo_partner_id !== memberId ? " (다른 회원과 짝)" : ""}
-                  </option>
-                ))}
-            </select>
-            <p className="text-xs text-ink/40 mt-1">
-              2:1 PT를 함께 받는 회원을 지정하면, 한쪽의 새 PT 일지 작성 내용이 짝 회원에게도
-              복사돼요.
-            </p>
-          </Field>
           <Field label="소개해주신 분">
             <input
               value={referrer}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
 import {
@@ -127,6 +126,12 @@ export function PtLogForm({
   const router = useRouter();
   const isEditing = ptLogId != null;
   const kindLabel = kind === "personal_exercise" ? "개인 운동" : "PT 일지";
+  // 2:1 짝 탭 — 어느 회원 앞으로 저장할지만 바꾸는 상태다. 탭을 눌러도 지금까지
+  // 적은 운동 기록(exercises/memo)은 그대로 유지된다(어차피 저장하면 서버가
+  // 짝에게도 똑같이 복사하므로, 탭 전환 자체가 페이지 이동일 필요가 없다).
+  const [activeMemberId, setActiveMemberId] = useState(memberId);
+  const activeMemberName =
+    activeMemberId === memberId ? memberName : (duoPartner?.name ?? memberName);
   const [logDate, setLogDate] = useState(() => initialData?.logDate ?? koreaTodayKey());
   const [memo, setMemo] = useState(() => initialData?.memo ?? "");
   const [exercises, setExercises] = useState<ExerciseInput[]>(
@@ -280,11 +285,11 @@ export function PtLogForm({
       } else if (kind === "personal_exercise") {
         url = isEditing
           ? `/api/admin/personal-exercises/${ptLogId}`
-          : `/api/admin/members/${memberId}/personal-exercises`;
+          : `/api/admin/members/${activeMemberId}/personal-exercises`;
       } else {
         url = isEditing
           ? `/api/admin/pt-logs/${ptLogId}`
-          : `/api/admin/members/${memberId}/pt-logs`;
+          : `/api/admin/members/${activeMemberId}/pt-logs`;
       }
       // 새 PT 일지 작성 시엔 운동 수행능력(그래프 기록 체크)까지 같은 요청에
       // 실어 보낸다 — 서버가 이 요청 하나 안에서만 2:1 짝 회원에게도 복사하므로,
@@ -306,7 +311,7 @@ export function PtLogForm({
         return;
       }
       if (isEditing && performanceEntries.length > 0) {
-        await fetch(`/api/admin/members/${memberId}/assessments`, {
+        await fetch(`/api/admin/members/${activeMemberId}/assessments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ evaluatedAt: logDate, exercisePerformance: performanceEntries }),
@@ -314,7 +319,7 @@ export function PtLogForm({
       }
       const redirectHref = authToken
         ? `/my/${authToken}/personal-exercise`
-        : `/admin/members/${memberId}/pt-log`;
+        : `/admin/members/${activeMemberId}/pt-log`;
       router.push(redirectHref);
       router.refresh();
     } catch {
@@ -328,23 +333,38 @@ export function PtLogForm({
     <div>
       {duoPartner && !isEditing && (
         <div className="flex items-center gap-2 mb-4">
-          <span className="rounded-full bg-ink text-white px-4 py-1.5 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => setActiveMemberId(memberId)}
+            className={[
+              "rounded-full px-4 py-1.5 text-sm font-medium transition",
+              activeMemberId === memberId
+                ? "bg-ink text-white"
+                : "border border-line text-ink/60 hover:border-coral hover:text-coral",
+            ].join(" ")}
+          >
             {memberName}
-          </span>
-          <Link
-            href={`/admin/members/${duoPartner.id}/pt-log/new`}
-            className="rounded-full border border-line px-4 py-1.5 text-sm text-ink/60 hover:border-coral hover:text-coral transition"
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMemberId(duoPartner.id)}
+            className={[
+              "rounded-full px-4 py-1.5 text-sm font-medium transition",
+              activeMemberId === duoPartner.id
+                ? "bg-ink text-white"
+                : "border border-line text-ink/60 hover:border-coral hover:text-coral",
+            ].join(" ")}
           >
             {duoPartner.name}
-          </Link>
-          <span className="text-xs text-ink/40">2:1 PT · 저장하면 짝에게도 복사돼요</span>
+          </button>
+          <span className="text-xs text-ink/40">2:1 PT · 저장하면 짝에게도 똑같이 복사돼요</span>
         </div>
       )}
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">
         {kind === "personal_exercise" ? "Personal Exercise" : "PT Log"}
       </p>
       <h1 className="font-display text-2xl mb-6">
-        {memberName}님의 {isEditing ? `${kindLabel} 수정` : `새 ${kindLabel}`}
+        {activeMemberName}님의 {isEditing ? `${kindLabel} 수정` : `새 ${kindLabel}`}
       </h1>
 
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-4 space-y-4">
