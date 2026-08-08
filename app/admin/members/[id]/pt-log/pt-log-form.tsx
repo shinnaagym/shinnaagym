@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
 import {
@@ -85,6 +85,72 @@ export interface PtLogFormInitialData {
   exercises: ExerciseInput[];
 }
 
+/** 화면에 입력된 운동 목록을 저장용 형태로 정리하고, 체크해둔 세트를 운동
+    수행능력(e1RM) 그래프용 평가 기록으로 뽑아낸다. 2:1 짝 탭이 있으면 각
+    탭(회원)의 초안마다 따로 호출해서 서로 다른 결과를 얻는다. */
+function buildSubmitPayload(exercises: ExerciseInput[], kind: "pt_log" | "personal_exercise") {
+  const cleanedExercises = exercises
+    .map((e) => {
+      const done = kind === "personal_exercise" ? e.done : undefined;
+      // 서킷 트레이닝은 이름을 직접 입력하지 않으므로 형식 이름(AMRAP 등)을
+      // 이름으로 쓰고, 무게·횟수·세트 대신 circuit 기록을 담는다.
+      if (e.equipment === "circuit" && e.circuit) {
+        return {
+          name: PT_LOG_CIRCUIT_TYPE_LABELS[e.circuit.type] ?? e.circuit.type,
+          equipment: e.equipment,
+          groups: [],
+          note: e.note.trim(),
+          done,
+          circuit: {
+            type: e.circuit.type,
+            minutes: e.circuit.minutes === "" ? null : Number(e.circuit.minutes),
+            rounds: e.circuit.rounds === "" ? null : Number(e.circuit.rounds),
+            workout: e.circuit.workout.trim(),
+          },
+        };
+      }
+      return {
+        name: e.name.trim(),
+        equipment: e.equipment,
+        groups: e.groups
+          .filter((g) => g.weight !== "" || g.reps !== "" || g.sets !== "")
+          .map((g) => ({
+            weight: g.weight === "" ? null : g.weight.trim(),
+            reps: g.reps === "" ? null : g.reps.trim(),
+            sets: g.sets === "" ? null : Number(g.sets),
+          })),
+        note: e.note.trim(),
+        done,
+      };
+    })
+    .filter((e) => e.name.trim().length > 0);
+
+  // 체크해둔 세트는 운동 수행능력(e1RM) 그래프용 평가 기록으로도 함께 남긴다.
+  // 개인 운동에는 이 트래킹 UI 자체가 없다(코치가 감독하는 공식 기록만 반영).
+  const performanceEntries =
+    kind === "pt_log"
+      ? exercises.flatMap((e) =>
+          e.groups
+            .filter(
+              (g) =>
+                g.trackPerformance &&
+                g.rpe !== "" &&
+                (g.weight === "" || isNumericText(g.weight)) &&
+                (g.reps === "" || isNumericText(g.reps)),
+            )
+            .map((g) => ({
+              exercise: e.name.trim(),
+              note: "",
+              weight: g.weight === "" ? null : Number(g.weight),
+              reps: g.reps === "" ? null : Number(g.reps),
+              rpe: Number(g.rpe),
+            })),
+        )
+      : [];
+
+  return { cleanedExercises, performanceEntries };
+}
+
 export function PtLogForm({
   memberId,
   memberName,
@@ -102,9 +168,9 @@ export function PtLogForm({
   ptLogId?: number;
   initialData?: PtLogFormInitialData;
   /** 2:1 PT로 짝지어진 회원. 새 PT 일지 작성 화면에서만 상단에 두 이름을 탭처럼
-      보여주고, 클릭하면 그 회원의 새 PT 일지 작성 화면으로 이동한다(실제 운동
-      기록 동기화는 저장 시 서버가 처리하므로, 이 탭은 어느 회원 화면에서
-      작성을 시작할지 고르는 용도일 뿐이다). */
+      보여준다. 짝 탭으로 처음 전환하는 순간 지금까지 적은 메모·운동 기록이
+      그대로 복사되고, 그 이후로는 각 탭이 독립된 기록이라 어느 한쪽을 고쳐도
+      다른 쪽에는 반영되지 않는다(handleSubmit의 draftsRef 참고). */
   duoPartner?: { id: number; name: string } | null;
   pastExercises?: string[];
   /** (운동 이름, 도구) -> 가장 최근에 그 조합으로 했을 때의 세트 그룹. 무게·횟수·
@@ -126,9 +192,6 @@ export function PtLogForm({
   const router = useRouter();
   const isEditing = ptLogId != null;
   const kindLabel = kind === "personal_exercise" ? "개인 운동" : "PT 일지";
-  // 2:1 짝 탭 — 어느 회원 앞으로 저장할지만 바꾸는 상태다. 탭을 눌러도 지금까지
-  // 적은 운동 기록(exercises/memo)은 그대로 유지된다(어차피 저장하면 서버가
-  // 짝에게도 똑같이 복사하므로, 탭 전환 자체가 페이지 이동일 필요가 없다).
   const [activeMemberId, setActiveMemberId] = useState(memberId);
   const activeMemberName =
     activeMemberId === memberId ? memberName : (duoPartner?.name ?? memberName);
@@ -141,6 +204,24 @@ export function PtLogForm({
   const [submitting, setSubmitting] = useState(false);
   // 이름 입력 중 자동완성 목록을 띄울 운동의 인덱스. 한 번에 한 칸만 연다.
   const [suggestIndex, setSuggestIndex] = useState<number | null>(null);
+
+  // 2:1 짝 탭별로 독립된 초안을 보관한다. 어떤 회원의 탭에도 아직 없으면(=처음
+  // 그 탭으로 전환하는 순간) 지금 화면에 있는 값을 그대로 복사해 넣고, 그
+  // 다음부터는 각 탭이 완전히 독립된 상태로 움직인다 — 한쪽 탭에서 고친 내용이
+  // 다른 쪽 탭에는 절대 반영되지 않는다.
+  const draftsRef = useRef<Record<number, { memo: string; exercises: ExerciseInput[] }>>({});
+
+  function switchActiveMember(targetId: number) {
+    if (targetId === activeMemberId) return;
+    draftsRef.current[activeMemberId] = { memo, exercises };
+    if (!draftsRef.current[targetId]) {
+      draftsRef.current[targetId] = { memo, exercises };
+    }
+    const target = draftsRef.current[targetId];
+    setMemo(target.memo);
+    setExercises(target.exercises);
+    setActiveMemberId(targetId);
+  }
 
   function updateExercise(index: number, patch: Partial<ExerciseInput>) {
     setExercises((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
@@ -212,64 +293,19 @@ export function PtLogForm({
   }
 
   async function handleSubmit() {
-    const cleanedExercises = exercises
-      .map((e) => {
-        const done = kind === "personal_exercise" ? e.done : undefined;
-        // 서킷 트레이닝은 이름을 직접 입력하지 않으므로 형식 이름(AMRAP 등)을
-        // 이름으로 쓰고, 무게·횟수·세트 대신 circuit 기록을 담는다.
-        if (e.equipment === "circuit" && e.circuit) {
-          return {
-            name: PT_LOG_CIRCUIT_TYPE_LABELS[e.circuit.type] ?? e.circuit.type,
-            equipment: e.equipment,
-            groups: [],
-            note: e.note.trim(),
-            done,
-            circuit: {
-              type: e.circuit.type,
-              minutes: e.circuit.minutes === "" ? null : Number(e.circuit.minutes),
-              rounds: e.circuit.rounds === "" ? null : Number(e.circuit.rounds),
-              workout: e.circuit.workout.trim(),
-            },
-          };
-        }
-        return {
-          name: e.name.trim(),
-          equipment: e.equipment,
-          groups: e.groups
-            .filter((g) => g.weight !== "" || g.reps !== "" || g.sets !== "")
-            .map((g) => ({
-              weight: g.weight === "" ? null : g.weight.trim(),
-              reps: g.reps === "" ? null : g.reps.trim(),
-              sets: g.sets === "" ? null : Number(g.sets),
-            })),
-          note: e.note.trim(),
-          done,
-        };
-      })
-      .filter((e) => e.name.trim().length > 0);
+    // 지금 화면(activeMemberId 탭)에 있는 값을 그 탭의 초안으로 먼저 저장해둔다
+    // — 짝 탭으로 한 번도 전환하지 않고 바로 저장을 눌러도 draftsRef[memberId]가
+    // 채워지도록 하기 위함.
+    draftsRef.current[activeMemberId] = { memo, exercises };
 
-    // 체크해둔 세트는 운동 수행능력(e1RM) 그래프용 평가 기록으로도 함께 남긴다.
-    // 개인 운동에는 이 트래킹 UI 자체가 없다(코치가 감독하는 공식 기록만 반영).
-    const performanceEntries =
-      kind === "pt_log"
-        ? exercises.flatMap((e) =>
-            e.groups
-              .filter(
-                (g) =>
-                  g.trackPerformance &&
-                  g.rpe !== "" &&
-                  (g.weight === "" || isNumericText(g.weight)) &&
-                  (g.reps === "" || isNumericText(g.reps)),
-              )
-              .map((g) => ({
-                exercise: e.name.trim(),
-                note: "",
-                weight: g.weight === "" ? null : Number(g.weight),
-                reps: g.reps === "" ? null : Number(g.reps),
-                rpe: Number(g.rpe),
-              })),
-          )
-        : [];
+    const primaryDraft = draftsRef.current[memberId] ?? { memo, exercises };
+    // 짝 탭을 실제로 열어봤을 때만(=독립적으로 고쳤을 수 있을 때만) 그 초안을
+    // 함께 보낸다. 열어본 적이 없으면 서버가 예전처럼 primary 내용을 그대로
+    // 복사한다.
+    const partnerDraft = duoPartner && !isEditing ? draftsRef.current[duoPartner.id] : undefined;
+
+    const primaryPayload = buildSubmitPayload(primaryDraft.exercises, kind);
+    const partnerPayload = partnerDraft ? buildSubmitPayload(partnerDraft.exercises, kind) : null;
 
     setSubmitting(true);
     setError(null);
@@ -285,11 +321,9 @@ export function PtLogForm({
       } else if (kind === "personal_exercise") {
         url = isEditing
           ? `/api/admin/personal-exercises/${ptLogId}`
-          : `/api/admin/members/${activeMemberId}/personal-exercises`;
+          : `/api/admin/members/${memberId}/personal-exercises`;
       } else {
-        url = isEditing
-          ? `/api/admin/pt-logs/${ptLogId}`
-          : `/api/admin/members/${activeMemberId}/pt-logs`;
+        url = isEditing ? `/api/admin/pt-logs/${ptLogId}` : `/api/admin/members/${memberId}/pt-logs`;
       }
       // 새 PT 일지 작성 시엔 운동 수행능력(그래프 기록 체크)까지 같은 요청에
       // 실어 보낸다 — 서버가 이 요청 하나 안에서만 2:1 짝 회원에게도 복사하므로,
@@ -300,9 +334,20 @@ export function PtLogForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           logDate,
-          memo,
-          exercises: cleanedExercises,
-          ...(!isEditing && performanceEntries.length > 0 ? { performanceEntries } : {}),
+          memo: primaryDraft.memo,
+          exercises: primaryPayload.cleanedExercises,
+          ...(!isEditing && primaryPayload.performanceEntries.length > 0
+            ? { performanceEntries: primaryPayload.performanceEntries }
+            : {}),
+          ...(!isEditing && partnerDraft && partnerPayload
+            ? {
+                partnerOverride: {
+                  memo: partnerDraft.memo,
+                  exercises: partnerPayload.cleanedExercises,
+                  performanceEntries: partnerPayload.performanceEntries,
+                },
+              }
+            : {}),
         }),
       });
       if (!res.ok) {
@@ -310,11 +355,14 @@ export function PtLogForm({
         setError(data?.error ?? "저장에 실패했어요.");
         return;
       }
-      if (isEditing && performanceEntries.length > 0) {
-        await fetch(`/api/admin/members/${activeMemberId}/assessments`, {
+      if (isEditing && primaryPayload.performanceEntries.length > 0) {
+        await fetch(`/api/admin/members/${memberId}/assessments`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ evaluatedAt: logDate, exercisePerformance: performanceEntries }),
+          body: JSON.stringify({
+            evaluatedAt: logDate,
+            exercisePerformance: primaryPayload.performanceEntries,
+          }),
         });
       }
       const redirectHref = authToken
@@ -335,7 +383,7 @@ export function PtLogForm({
         <div className="flex items-center gap-2 mb-4">
           <button
             type="button"
-            onClick={() => setActiveMemberId(memberId)}
+            onClick={() => switchActiveMember(memberId)}
             className={[
               "rounded-full px-4 py-1.5 text-sm font-medium transition",
               activeMemberId === memberId
@@ -347,7 +395,7 @@ export function PtLogForm({
           </button>
           <button
             type="button"
-            onClick={() => setActiveMemberId(duoPartner.id)}
+            onClick={() => switchActiveMember(duoPartner.id)}
             className={[
               "rounded-full px-4 py-1.5 text-sm font-medium transition",
               activeMemberId === duoPartner.id
@@ -357,7 +405,9 @@ export function PtLogForm({
           >
             {duoPartner.name}
           </button>
-          <span className="text-xs text-ink/40">2:1 PT · 저장하면 짝에게도 똑같이 복사돼요</span>
+          <span className="text-xs text-ink/40">
+            2:1 PT · 탭 전환 시 지금 기록이 복사되고, 이후 각자 독립적으로 수정돼요
+          </span>
         </div>
       )}
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">

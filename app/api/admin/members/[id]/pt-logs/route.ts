@@ -52,6 +52,16 @@ export async function POST(
   // PT 일지 작성 폼이 예전엔 이걸 별도 요청으로 평가 기록에 남겼는데, 2:1 짝
   // 동기화를 여기 한 곳에서만 처리하려고 같은 요청에 실어 받는다.
   const performanceEntries = parsePerformanceEntries(body?.performanceEntries);
+  // 2:1 짝 탭을 열어 독립적으로 고쳐뒀다면, 폼이 짝의 초안을 여기 실어 보낸다
+  // — 있으면 짝의 PT 일지는 이 값으로 만들고, 없으면 아래에서 예전처럼 원본을
+  // 그대로 복사한다.
+  const partnerOverride = (body?.partnerOverride ?? null) as Record<string, unknown> | null;
+  const partnerMemo =
+    partnerOverride && typeof partnerOverride.memo === "string" ? partnerOverride.memo.trim() : null;
+  const partnerExercises = partnerOverride ? parseExercises(partnerOverride.exercises) : null;
+  const partnerPerformanceEntries = partnerOverride
+    ? parsePerformanceEntries(partnerOverride.performanceEntries)
+    : null;
 
   const ptLog = await createPtLog({
     memberId: idNum,
@@ -94,10 +104,10 @@ export async function POST(
     const partnerPtLog = await createPtLog({
       memberId: member.duo_partner_id,
       logDate,
-      memo,
+      memo: partnerMemo ?? memo,
       painScale,
       performanceScale: null,
-      exercises,
+      exercises: partnerExercises ?? exercises,
     });
     ops.push({ op: "delete", table: "pt_logs", id: partnerPtLog.id });
 
@@ -111,12 +121,13 @@ export async function POST(
       });
       ops.push({ op: "delete", table: "assessments", id: partnerAssessment.id });
     }
-    if (performanceEntries.length > 0) {
+    const partnerPerfEntries = partnerPerformanceEntries ?? performanceEntries;
+    if (partnerPerfEntries.length > 0) {
       const partnerAssessment = await createAssessment({
         memberId: member.duo_partner_id,
         evaluatedAt: logDate,
         movements: {},
-        exercisePerformance: performanceEntries,
+        exercisePerformance: partnerPerfEntries,
       });
       ops.push({ op: "delete", table: "assessments", id: partnerAssessment.id });
     }
