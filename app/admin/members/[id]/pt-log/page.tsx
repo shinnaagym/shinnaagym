@@ -63,6 +63,22 @@ export default async function PtLogHistoryPage({
         .filter((exercise) => exercise.length > 0),
     ),
   );
+  const duoPartnerPastPainTriggerNotes = Array.from(
+    new Set(
+      duoPartnerAssessments
+        .flatMap((a) => getPainTriggerEntries(a))
+        .map((e) => e.note)
+        .filter((note) => note.length > 0),
+    ),
+  );
+  const duoPartnerPastExercises = Array.from(
+    new Set(
+      duoPartnerAssessments
+        .flatMap((a) => a.exercise_performance)
+        .map((e) => e.exercise)
+        .filter((exercise) => exercise.length > 0),
+    ),
+  );
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -159,7 +175,10 @@ export default async function PtLogHistoryPage({
         <>
           <h2 className="font-display text-lg mb-3">📈 {duoPartner.name}님</h2>
           <AssessmentPainChart assessments={duoPartnerAssessments} />
+          <PainTriggerSection memberId={duoPartner.id} pastNotes={duoPartnerPastPainTriggerNotes} />
+
           <ExercisePerformanceChart assessments={duoPartnerAssessments} />
+          <ExercisePerformanceSection memberId={duoPartner.id} pastExercises={duoPartnerPastExercises} />
         </>
       )}
     </div>
