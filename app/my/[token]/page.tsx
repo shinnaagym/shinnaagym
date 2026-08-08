@@ -47,7 +47,8 @@ export async function generateMetadata({
   const member = await getMemberByToken(token);
   if (!member) return {};
 
-  const title = `${member.name}님의 예약 사이트`;
+  const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
+  const title = `${duoPartner ? `${member.name}/${duoPartner.name}` : member.name}님의 예약 사이트`;
   return {
     title,
     openGraph: { title },

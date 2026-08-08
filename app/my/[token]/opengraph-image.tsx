@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getMemberByToken } from "@/lib/schedule";
+import { getMemberById, getMemberByToken } from "@/lib/schedule";
 
 export const alt = "신나아짐 — 회원 예약 사이트";
 export const size = { width: 1200, height: 630 };
@@ -23,7 +23,11 @@ export default async function Image({ params }: { params: Promise<{ token: strin
   let subtitle = "PRE-OPEN RESERVATION";
   try {
     const member = await getMemberByToken(token);
-    if (member) subtitle = `${member.name}님의 예약 사이트`;
+    if (member) {
+      const duoPartner =
+        member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
+      subtitle = `${duoPartner ? `${member.name}/${duoPartner.name}` : member.name}님의 예약 사이트`;
+    }
   } catch {
     // 기본 문구 유지
   }
