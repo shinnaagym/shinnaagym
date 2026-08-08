@@ -23,7 +23,7 @@ import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceCh
 import { PtLogDisclosureCard } from "./pt-log-disclosure-card";
 
 // 담당 코치의 개인 연락처가 등록되지 않은 경우를 위한 기본(스튜디오) 문의 번호.
-const DEFAULT_STUDIO_PHONE = "010-6859-6114";
+const DEFAULT_STUDIO_PHONE = "010-2496-8088";
 
 const STATUS_LABEL: Record<string, string> = {
   reserved: "예약",
@@ -122,12 +122,14 @@ export default async function MyReservationPage({
     <main className="flex-1">
       <div className="mx-auto max-w-2xl px-6 py-12 sm:py-16">
         <div className="flex items-center gap-2 mb-10">
-          <Image src="/logo.png" alt="신나아짐" width={1585} height={674} className="h-8 w-auto" />
+          <Image src="/logo.png" alt="신나아짐" width={1585} height={488} className="h-8 w-auto" />
           <span className="font-display text-lg">신나아짐</span>
         </div>
 
         <p className="text-sm tracking-[0.2em] text-coral uppercase mb-2">My Reservation</p>
-        <h1 className="font-serif-display text-3xl mb-8">{member.name}님의 예약</h1>
+        <h1 className="font-serif-display text-3xl mb-8">
+          {duoPartner ? `${member.name}/${duoPartner.name}` : member.name}님의 예약
+        </h1>
 
         {(activeNotices.length > 0 || activeEvents.length > 0) && (
           <div className="space-y-4 mb-10">
@@ -193,10 +195,6 @@ export default async function MyReservationPage({
             </span>
           </p>
         </div>
-
-        {duoPartner && (
-          <p className="text-sm text-coral mb-4">🤝 {duoPartner.name}님과 2:1 PT를 함께 받고 있어요.</p>
-        )}
 
         {assessments.length > 0 && (
           <>
