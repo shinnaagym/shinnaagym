@@ -278,6 +278,17 @@ export function PtLogForm({
     setExercises((prev) => prev.filter((_, i) => i !== index));
   }
 
+  /** 운동 카드의 순서를 한 칸 위(-1) 또는 아래(+1)로 옮긴다. */
+  function moveExercise(index: number, direction: -1 | 1) {
+    setExercises((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   function addGroup(exIndex: number) {
     setExercises((prev) =>
       prev.map((e, i) => (i === exIndex ? { ...e, groups: [...e.groups, emptyGroup()] } : e)),
@@ -449,6 +460,26 @@ export function PtLogForm({
         {exercises.map((ex, exIndex) => (
           <div key={exIndex} className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4">
             <div className="flex items-center mb-3 gap-2">
+              <div className="flex flex-col shrink-0">
+                <button
+                  type="button"
+                  onClick={() => moveExercise(exIndex, -1)}
+                  disabled={exIndex === 0}
+                  className="leading-none px-1 text-ink/40 hover:text-coral disabled:opacity-20 disabled:hover:text-ink/40"
+                  aria-label="운동 순서 위로 이동"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveExercise(exIndex, 1)}
+                  disabled={exIndex === exercises.length - 1}
+                  className="leading-none px-1 text-ink/40 hover:text-coral disabled:opacity-20 disabled:hover:text-ink/40"
+                  aria-label="운동 순서 아래로 이동"
+                >
+                  ▼
+                </button>
+              </div>
               <select
                 value={ex.equipment}
                 onChange={(e) => updateExerciseNameOrEquipment(exIndex, { equipment: e.target.value })}
