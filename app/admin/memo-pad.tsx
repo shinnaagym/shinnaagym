@@ -60,6 +60,7 @@ export function MemoPad({
   }
 
   async function removeMemo(id: number) {
+    if (!window.confirm("이 메모를 삭제할까요? 되돌릴 수 없어요.")) return;
     setMemos((prev) => prev.filter((m) => m.id !== id));
     await fetch(`${itemUrlBase}/${id}`, { method: "DELETE" });
   }
@@ -106,15 +107,13 @@ export function MemoPad({
   return (
     <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4">
       <p className="font-display text-base mb-3">{title}</p>
-      <div className="flex gap-2 mb-3">
-        <input
+      <div className="flex items-end gap-2 mb-3">
+        <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") addMemo();
-          }}
           placeholder="메모를 남겨주세요"
-          className="flex-1 min-w-0 rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral"
+          rows={1}
+          className="flex-1 min-w-0 rounded-lg border border-line px-3.5 py-2 text-sm outline-none focus:border-coral resize-y"
         />
         <button
           type="button"
@@ -134,15 +133,15 @@ export function MemoPad({
           {memos.map((memo) =>
             editingId === memo.id ? (
               <div key={memo.id} className="py-2.5">
-                <input
+                <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") saveEdit(memo.id);
                     if (e.key === "Escape") cancelEdit();
                   }}
                   autoFocus
-                  className="w-full rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-coral"
+                  rows={2}
+                  className="w-full rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-coral resize-y"
                 />
                 {editError && <p className="text-xs text-coral mt-1">{editError}</p>}
                 <div className="flex items-center gap-3 mt-1.5">
