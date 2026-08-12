@@ -11,6 +11,7 @@ interface RecaptchaWidget {
       sitekey: string;
       callback: (token: string) => void;
       "expired-callback": () => void;
+      size?: "normal" | "compact";
     },
   ): number;
   reset(widgetId?: number): void;
@@ -52,6 +53,7 @@ export function LoginForm({ recaptchaSiteKey }: { recaptchaSiteKey: string }) {
       sitekey: recaptchaSiteKey,
       callback: (token) => setRecaptchaToken(token),
       "expired-callback": () => setRecaptchaToken(null),
+      size: "compact",
     });
   }, [recaptchaSiteKey]);
 
@@ -115,7 +117,7 @@ export function LoginForm({ recaptchaSiteKey }: { recaptchaSiteKey: string }) {
             className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-coral focus:ring-1 focus:ring-coral"
           />
         </div>
-        <div ref={recaptchaContainerRef} />
+        <div ref={recaptchaContainerRef} className="flex justify-center" />
         {error && (
           <p className="text-sm text-coral font-medium" role="alert">
             {error}
