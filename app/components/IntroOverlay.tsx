@@ -37,7 +37,7 @@ export function IntroOverlay() {
     >
       <video
         ref={videoRef}
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full bg-[#1C1E22] object-contain"
         src="/videos/intro-logo.mp4"
         autoPlay
         muted
