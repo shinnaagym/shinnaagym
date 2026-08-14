@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { getPtLogById, listPtLogsByMember } from "@/lib/pt-logs";
-import { listAssessmentsByMember } from "@/lib/assessments";
+import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { PtLogForm } from "../../pt-log-form";
 import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../../past-exercise-names";
 
@@ -32,6 +32,14 @@ export default async function EditPtLogPage({
   if (!ptLog || ptLog.member_id !== idNum) {
     notFound();
   }
+  const pastPainTriggerNotes = Array.from(
+    new Set(
+      assessments
+        .flatMap((a) => getPainTriggerEntries(a))
+        .map((e) => e.note)
+        .filter((note) => note.length > 0),
+    ),
+  );
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -42,6 +50,7 @@ export default async function EditPtLogPage({
         pastExercises={pastExerciseNames(ptLogs, assessments)}
         pastExerciseGroups={pastExerciseGroups(ptLogs.filter((l) => l.id !== logIdNum))}
         pastCircuitEntries={pastCircuitEntries(ptLogs.filter((l) => l.id !== logIdNum))}
+        painTriggerPastNotes={{ [idNum]: pastPainTriggerNotes }}
         initialData={{
           logDate: ptLog.log_date,
           memo: ptLog.memo,

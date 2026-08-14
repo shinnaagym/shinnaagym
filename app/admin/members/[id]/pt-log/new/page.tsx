@@ -2,9 +2,20 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
-import { listAssessmentsByMember } from "@/lib/assessments";
+import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { PtLogForm } from "../pt-log-form";
 import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../past-exercise-names";
+
+function pastPainTriggerNotes(assessments: Awaited<ReturnType<typeof listAssessmentsByMember>>): string[] {
+  return Array.from(
+    new Set(
+      assessments
+        .flatMap((a) => getPainTriggerEntries(a))
+        .map((e) => e.note)
+        .filter((note) => note.length > 0),
+    ),
+  );
+}
 
 export default async function NewPtLogPage({
   params,
@@ -28,6 +39,7 @@ export default async function NewPtLogPage({
     notFound();
   }
   const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
+  const duoPartnerAssessments = duoPartner ? await listAssessmentsByMember(duoPartner.id) : [];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -38,6 +50,10 @@ export default async function NewPtLogPage({
         pastExerciseGroups={pastExerciseGroups(ptLogs)}
         pastCircuitEntries={pastCircuitEntries(ptLogs)}
         duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
+        painTriggerPastNotes={{
+          [idNum]: pastPainTriggerNotes(assessments),
+          ...(duoPartner ? { [duoPartner.id]: pastPainTriggerNotes(duoPartnerAssessments) } : {}),
+        }}
       />
     </div>
   );
