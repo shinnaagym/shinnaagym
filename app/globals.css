@@ -56,28 +56,6 @@ body {
   }
 }
 
-@keyframes draw-pulse {
-  from {
-    stroke-dashoffset: 620;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-.pulse-path {
-  stroke-dasharray: 620;
-  stroke-dashoffset: 620;
-  animation: draw-pulse 2.4s ease-out 0.2s forwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pulse-path {
-    animation: none;
-    stroke-dashoffset: 0;
-  }
-}
-
 .reveal {
   opacity: 0;
   transform: translateY(24px);
@@ -151,5 +129,67 @@ body {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+}
+
+/* 사전예약 랜딩페이지(app/page.tsx) 전용 — 인트로 영상 오버레이·히어로 배경
+   영상 위에서만 쓰는 모션이라 이름을 shinna- 접두어로 분리해둔다. */
+@keyframes shinna-intro-line {
+  from {
+    opacity: 0;
+    transform: translateY(60px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.shinna-intro-word {
+  animation: shinna-intro-line 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.7s both;
+}
+
+.shinna-intro-hint {
+  animation: fade-up-in 0.8s ease-out 1s both;
+}
+
+@keyframes shinna-video-pan {
+  0%,
+  100% {
+    transform: scale(1.08);
+  }
+  50% {
+    transform: scale(1.16) translate(-2%, -1%);
+  }
+}
+
+.shinna-video-pan {
+  animation: shinna-video-pan 14s ease-in-out infinite;
+}
+
+@keyframes shinna-float-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-4%, 5%) scale(1.08);
+  }
+}
+
+.shinna-float-a {
+  animation: shinna-float-a 18s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shinna-intro-word,
+  .shinna-intro-hint {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .shinna-video-pan,
+  .shinna-float-a {
+    animation: none;
   }
 }
