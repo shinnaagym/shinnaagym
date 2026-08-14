@@ -11,6 +11,7 @@ import {
   PT_LOG_CIRCUIT_FIELD_CONFIG,
 } from "@/lib/constants";
 import { pastExerciseGroupKey, type PastCircuitEntry } from "./past-exercise-names";
+import { PainTriggerSection } from "./pain-trigger-section";
 import type { PtLogSetGroup } from "@/lib/db";
 
 interface SetGroupInput {
@@ -162,6 +163,7 @@ export function PtLogForm({
   kind = "pt_log",
   authToken,
   duoPartner = null,
+  painTriggerPastNotes = {},
 }: {
   memberId: number;
   memberName: string;
@@ -188,6 +190,9 @@ export function PtLogForm({
       본인 개인 운동만 만들고 고칠 수 있는 /api/my/[token]/personal-exercises로
       요청을 보낸다. 관리자 화면에서 개인 운동을 대신 기록할 때는 넘기지 않는다. */
   authToken?: string;
+  /** 회원 id -> 그 회원이 과거에 남긴 통증 유발 동작 메모 목록. "통증 유발 동작
+      기록" 섹션의 자동완성용. kind가 "pt_log"일 때만 그 섹션을 보여준다. */
+  painTriggerPastNotes?: Record<number, string[]>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -451,10 +456,18 @@ export function PtLogForm({
         </div>
         {kind === "pt_log" && (
           <p className="text-xs text-ink/40">
-            통증 척도·운동수행 능력은 PT 일지 목록의 그래프 아래 섹션에서 바로 남길 수 있어요.
+            운동수행 능력은 PT 일지 목록의 그래프 아래 섹션에서 바로 남길 수 있어요.
           </p>
         )}
       </div>
+
+      {kind === "pt_log" && (
+        <PainTriggerSection
+          key={activeMemberId}
+          memberId={activeMemberId}
+          pastNotes={painTriggerPastNotes[activeMemberId] ?? []}
+        />
+      )}
 
       <div className="space-y-3 mb-4">
         {exercises.map((ex, exIndex) => (
