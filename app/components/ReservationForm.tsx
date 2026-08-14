@@ -178,7 +178,7 @@ export function ReservationForm() {
   const hours = businessHours();
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[1.1fr_1fr]">
+    <div className="grid gap-10 md:grid-cols-[1.1fr_1fr]">
       <div>
         <div className="flex items-center justify-between mb-4">
           <button
