@@ -9,6 +9,8 @@ export const PURPOSE_OPTIONS = [
   { value: "diet", label: "다이어트" },
   { value: "strength", label: "근력 증진" },
   { value: "growth", label: "키성장" },
+  { value: "prenatal_postnatal", label: "산전산후" },
+  { value: "other", label: "기타" },
 ] as const;
 
 export type PurposeValue = (typeof PURPOSE_OPTIONS)[number]["value"];

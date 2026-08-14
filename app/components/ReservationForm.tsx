@@ -184,7 +184,7 @@ export function ReservationForm() {
           <button
             type="button"
             onClick={goPrevMonth}
-            className="px-3 py-1 rounded-full border border-line transition-all duration-200 hover:bg-bone hover:scale-105 active:scale-95"
+            className="px-3 py-1 rounded-full border border-[#1F2A24]/[0.15] transition-all duration-200 hover:bg-[#EFE6D3] hover:scale-105 active:scale-95"
             aria-label="이전 달"
           >
             ‹
@@ -193,13 +193,13 @@ export function ReservationForm() {
           <button
             type="button"
             onClick={goNextMonth}
-            className="px-3 py-1 rounded-full border border-line transition-all duration-200 hover:bg-bone hover:scale-105 active:scale-95"
+            className="px-3 py-1 rounded-full border border-[#1F2A24]/[0.15] transition-all duration-200 hover:bg-[#EFE6D3] hover:scale-105 active:scale-95"
             aria-label="다음 달"
           >
             ›
           </button>
         </div>
-        <div className="grid grid-cols-7 text-center text-sm text-ink/60 mb-2">
+        <div className="grid grid-cols-7 text-center text-sm text-[#1F2A24]/60 mb-2">
           {WEEKDAYS.map((w) => (
             <div key={w}>{w}</div>
           ))}
@@ -219,11 +219,11 @@ export function ReservationForm() {
                 className={[
                   "aspect-square rounded-xl text-sm transition-all duration-200 flex items-center justify-center",
                   isSelected
-                    ? "bg-ink text-bone font-semibold"
+                    ? "bg-[#1F2A24] text-[#EFE6D3] font-semibold border border-[#D9C08F]"
                     : selectable
-                      ? "hover:bg-sage/25 hover:scale-105 active:scale-95 border border-line"
-                      : "text-ink/25 border border-transparent cursor-not-allowed",
-                  isToday && !isSelected ? "ring-1 ring-gold" : "",
+                      ? "hover:bg-[#D9C08F]/20 hover:scale-105 active:scale-95 border border-[#1F2A24]/[0.15]"
+                      : "text-[#1F2A24]/25 border border-transparent cursor-not-allowed",
+                  isToday && !isSelected ? "ring-1 ring-[#D9C08F]" : "",
                 ].join(" ")}
               >
                 {cell.day}
@@ -231,14 +231,14 @@ export function ReservationForm() {
             );
           })}
         </div>
-        <p className="text-xs text-ink/50 mt-3">
+        <p className="text-sm text-[#1F2A24]/50 mt-3">
           오늘부터 {BOOKING_WINDOW_DAYS}일 이내로 예약하실 수 있어요.
         </p>
 
         {selectedDate && (
-          <div className="mt-6">
-            <p className="text-sm text-ink/70 mb-2">{selectedDate} 예약 가능 시간</p>
-            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+          <div className="mt-12">
+            <p className="text-[23px] font-medium mb-3">{selectedDate} 시간 선택</p>
+            <div className="flex flex-wrap gap-3.5">
               {hours.map((h) => {
                 const isPast = selectedDate === todayKey && h <= currentHour;
                 const isTaken = taken.has(`${selectedDate}-${h}`) || isPast;
@@ -250,12 +250,12 @@ export function ReservationForm() {
                     disabled={isTaken}
                     onClick={() => setSelectedHour(h)}
                     className={[
-                      "py-2 rounded-lg text-sm border transition-all duration-200",
+                      "px-3.5 py-2 rounded-full text-[13px] border transition-all duration-200",
                       isTaken
-                        ? "border-line text-ink/30 line-through cursor-not-allowed"
+                        ? "border-[#1F2A24]/[0.15] text-[#1F2A24]/30 line-through cursor-not-allowed"
                         : isSelected
-                          ? "bg-gold-deep text-bone border-gold-deep shadow-md shadow-gold-deep/25"
-                          : "border-line hover:border-gold hover:scale-105 active:scale-95",
+                          ? "bg-[#1F2A24] text-[#EFE6D3] border-[#1F2A24] shadow-md shadow-black/10"
+                          : "border-[#1F2A24]/[0.15] text-[#1F2A24] hover:border-[#D9C08F] hover:scale-105 active:scale-95",
                     ].join(" ")}
                   >
                     {h}:00
@@ -267,111 +267,114 @@ export function ReservationForm() {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium mb-1.5">성함</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={30}
-            required
-            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-gold focus:ring-1 focus:ring-gold"
-            placeholder="홍길동"
-          />
+      {success ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl bg-[#1F2A24] px-7 py-10 text-center text-[#EFE6D3]">
+          <p className="font-serif-display text-[22px]">예약 신청이 접수됐어요</p>
+          <p className="text-sm leading-relaxed text-[#EFE6D3]/70">
+            {success.date} {success.hour}:00에 예약해드릴게요.
+            <br />
+            남겨주신 연락처로 확인 안내드릴게요.
+          </p>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1.5">나이</label>
-          <input
-            type="number"
-            min={1}
-            max={120}
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
-            required
-            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-gold focus:ring-1 focus:ring-gold"
-            placeholder="30"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1.5">연락처</label>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            required
-            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-gold focus:ring-1 focus:ring-gold"
-            placeholder="010-1234-5678"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">운동 목적 (중복 선택 가능)</label>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {PURPOSE_OPTIONS.map((opt) => {
-              const checked = purposes.includes(opt.value);
-              return (
-                <button
-                  type="button"
-                  key={opt.value}
-                  onClick={() => togglePurpose(opt.value)}
-                  aria-pressed={checked}
-                  className={[
-                    "px-3.5 py-2 rounded-full text-sm border transition-all duration-200",
-                    checked
-                      ? "bg-sage/30 border-sage text-ink"
-                      : "border-line text-ink/70 hover:border-sage hover:scale-105",
-                    "active:scale-95",
-                  ].join(" ")}
-                >
-                  {checked ? "✓ " : ""}
-                  {opt.label}
-                </button>
-              );
-            })}
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-1.5">성함</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={30}
+              required
+              className="w-full box-border rounded-[10px] border border-[#1F2A24]/[0.15] bg-white/60 px-3.5 py-2.5 text-[15px] outline-none focus:border-[#D9C08F] focus:ring-1 focus:ring-[#D9C08F]"
+              placeholder="홍길동"
+            />
           </div>
-          <textarea
-            value={purposeNote}
-            onChange={(e) => setPurposeNote(e.target.value)}
-            maxLength={200}
-            rows={2}
-            className="w-full rounded-lg border border-line bg-white/60 px-3.5 py-2.5 outline-none focus:border-gold focus:ring-1 focus:ring-gold resize-none"
-            placeholder="추가로 알려주고 싶은 내용을 한 줄 정도 적어주세요. (예: 허리 디스크 재활 중이에요)"
-          />
-        </div>
 
-        <div className="rounded-lg border border-line bg-white/50 px-3.5 py-2.5 text-sm">
-          선택한 시간:{" "}
-          {selectedDate && selectedHour !== null ? (
-            <span className="font-semibold text-ink">
-              {selectedDate} {selectedHour}:00 - {selectedHour + 1}:00
-            </span>
-          ) : (
-            <span className="text-ink/50">왼쪽 달력에서 날짜와 시간을 선택해주세요.</span>
+          <div>
+            <label className="block text-sm font-medium mb-1.5">나이</label>
+            <input
+              type="number"
+              min={1}
+              max={120}
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              required
+              className="w-full box-border rounded-[10px] border border-[#1F2A24]/[0.15] bg-white/60 px-3.5 py-2.5 text-[15px] outline-none focus:border-[#D9C08F] focus:ring-1 focus:ring-[#D9C08F]"
+              placeholder="30"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5">연락처</label>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              className="w-full box-border rounded-[10px] border border-[#1F2A24]/[0.15] bg-white/60 px-3.5 py-2.5 text-[15px] outline-none focus:border-[#D9C08F] focus:ring-1 focus:ring-[#D9C08F]"
+              placeholder="010-1234-5678"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">운동 목적 (중복 선택 가능)</label>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {PURPOSE_OPTIONS.map((opt) => {
+                const checked = purposes.includes(opt.value);
+                return (
+                  <button
+                    type="button"
+                    key={opt.value}
+                    onClick={() => togglePurpose(opt.value)}
+                    aria-pressed={checked}
+                    className={[
+                      "px-3.5 py-2 rounded-full text-[13px] border transition-all duration-200",
+                      checked
+                        ? "bg-[#8A6D3B] border-[#8A6D3B] text-[#F6F1E7]"
+                        : "border-[#1F2A24]/[0.15] text-[#1F2A24]/70 hover:border-[#8A6D3B] hover:scale-105",
+                      "active:scale-95",
+                    ].join(" ")}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <textarea
+              value={purposeNote}
+              onChange={(e) => setPurposeNote(e.target.value)}
+              maxLength={200}
+              rows={2}
+              className="w-full rounded-[10px] border border-[#1F2A24]/[0.15] bg-white/60 px-3.5 py-2.5 text-sm outline-none focus:border-[#D9C08F] focus:ring-1 focus:ring-[#D9C08F] resize-none"
+              placeholder="추가로 알려주고 싶은 내용을 한 줄 정도 적어주세요. (예: 허리 디스크 재활 중이에요)"
+            />
+          </div>
+
+          <div className="rounded-[10px] border border-[#1F2A24]/[0.15] bg-white/[0.5] px-3.5 py-2.5 text-sm">
+            선택한 시간:{" "}
+            {selectedDate && selectedHour !== null ? (
+              <span className="text-[#1F2A24]">
+                {selectedDate} {selectedHour}:00 - {selectedHour + 1}:00
+              </span>
+            ) : (
+              <span className="text-[#1F2A24]/50">왼쪽 달력에서 날짜와 시간을 선택해주세요.</span>
+            )}
+          </div>
+
+          {error && (
+            <p className="text-sm text-coral font-medium" role="alert">
+              {error}
+            </p>
           )}
-        </div>
 
-        {error && (
-          <p className="text-sm text-coral font-medium" role="alert">
-            {error}
-          </p>
-        )}
-
-        {success && (
-          <p className="text-sm text-sage font-medium" role="status">
-            예약이 완료됐어요! {success.date} {success.hour}:00에 뵙겠습니다. 확인 연락
-            드릴게요.
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-full bg-ink text-bone py-3.5 font-medium tracking-wide transition-all duration-200 hover:bg-gold hover:-translate-y-0.5 hover:shadow-lg hover:shadow-gold/25 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
-        >
-          {submitting ? "예약 처리 중..." : "사전예약 신청하기"}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-full bg-[#1F2A24] text-[#EFE6D3] py-3.5 text-[15px] font-medium transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+          >
+            {submitting ? "예약 처리 중..." : "사전예약 신청하기"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

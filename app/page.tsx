@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { PulseLine } from "@/app/components/PulseLine";
+import { IntroOverlay } from "@/app/components/IntroOverlay";
+import { HeroBackgroundVideo } from "@/app/components/HeroBackgroundVideo";
 import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
 
@@ -23,16 +24,26 @@ const TRAINER_CAREER = [
 const TRAINER_EDUCATION = [
   "근골격계 재활 전문가(MRS) 교육 이수",
   "근신경계 기능적 재교육(NFR) 교육 이수",
+  "러닝 피지오 교육 이수",
   "운동분석 기반 근골격계 관리 솔루션(KEMA) 교육 이수",
+  "도수치료 및 카이로프랙틱(MTA) 교육 이수",
   "스포츠 재활 운동 교육(Sport Physio) 이수",
   "근골격계 및 스포츠 재활(Personal Physio) 교육 이수",
-  "도수치료 및 카이로프랙틱(MTA) 교육 이수",
   "만성통증 중재 교육(Hello Pain) 이수",
-  "러닝 피지오 교육 이수",
   "근골격계 운동치료(EMP) 교육 이수",
 ];
 
 const STUDIO_ADDRESS = "충청북도 청주시 흥덕구 서현로32 210,211호";
+const FULL_STUDIO_ADDRESS = "충청북도 청주시 흥덕구 서현로32 가경자이프라자 2층 신나아짐";
+
+// 히어로의 굵은 4줄 특징 — 1·2번만 강조색(골드)을 준다. 실제 내원 순서와
+// 무관하게 병렬 나열이라 별도 정렬 로직 없이 순서 그대로 렌더링한다.
+const HERO_FEATURES = [
+  { text: "전 직원 물리치료사 출신", emphasis: true },
+  { text: "자체 개발 앱으로 맞춤형 PT", emphasis: true },
+  { text: "100% 프라이빗 회원 전용 공간", emphasis: false },
+  { text: "아픈 몸 재활부터 완벽한 운동 자립까지!", emphasis: false },
+];
 
 // 실제 내원 순서 그대로 — 순서 자체가 정보라 번호를 붙일 근거가 있다.
 const PROCESS_STEPS = [
@@ -44,12 +55,12 @@ const PROCESS_STEPS = [
   {
     n: "02",
     title: "평가",
-    body: "자세, 가동범위, 통증 부위를 물리치료사가 직접 확인합니다.",
+    body: "자세, 가동범위, 통증 부위를 물리치료사가 자체 개발 앱을 통해 직접 확인합니다.",
   },
   {
     n: "03",
     title: "운동 지도",
-    body: "검사 결과를 바탕으로 지금 이 몸에 필요한 운동만 설계합니다.",
+    body: "평가 결과를 바탕으로 지금 회원님 몸에 필요한 운동만 설계합니다.",
   },
   {
     n: "04",
@@ -69,90 +80,100 @@ export default function Home() {
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap"
       />
-      <header className="relative overflow-hidden bg-ink text-bone">
-        <div
-          aria-hidden="true"
-          className="energy-glow pointer-events-none absolute -top-32 right-[-10%] h-96 w-96 rounded-full bg-gold/30 blur-3xl"
-        />
-        <div className="relative mx-auto max-w-5xl px-6 pt-8 sm:pt-10">
-          <a href="#" className="hero-fade-1 inline-flex items-center gap-3">
+
+      <IntroOverlay />
+
+      <header className="relative overflow-hidden bg-[#1F2A24] px-6 pt-14 pb-22 text-[#EFE6D3]">
+        <div aria-hidden="true" className="absolute inset-0 z-0 overflow-hidden">
+          <HeroBackgroundVideo />
+          <div
+            className="shinna-float-a absolute -right-[12%] -top-[10%] aspect-square w-[min(60vw,620px)] rounded-full blur-[4px]"
+            style={{
+              background:
+                "radial-gradient(circle at 35% 35%, rgba(217,192,143,0.33), rgba(217,192,143,0) 70%)",
+            }}
+          />
+          <div className="absolute inset-0 bg-[#1F2A24]/40" />
+        </div>
+
+        <div className="relative z-[1] mx-auto max-w-[780px]">
+          <a href="#" className="hero-fade-1 mb-10 inline-flex items-center gap-2.5 sm:mb-14">
             <Image
               src="/logo-on-dark.png"
-              alt="신나아짐 로고"
+              alt="EXCITING"
               width={1585}
               height={488}
               priority
-              className="h-12 w-auto sm:h-16"
+              className="h-[39px] w-auto opacity-90"
             />
-            <span className="font-serif-display text-2xl sm:text-3xl tracking-wide text-bone">
-              신나아짐
-            </span>
+            <span className="font-serif-display text-2xl font-bold sm:text-[30px]">신나아짐</span>
           </a>
-        </div>
-        <div className="relative mx-auto max-w-5xl px-6 pt-12 pb-16 sm:pt-16 sm:pb-24">
-          <p className="hero-fade-1 text-sm tracking-[0.2em] text-gold-light uppercase mb-6">
-            Pre-Open Reservation
+
+          <p className="hero-fade-1 mb-5 text-sm tracking-[0.2em] text-[#FFB119] uppercase sm:text-base">
+            IMPROVE YOUR BODY, EXCITING YOUR LIFE
           </p>
-          <h1 className="hero-fade-2 font-serif-display text-[1.9rem] sm:text-7xl leading-[1.3] sm:leading-[1.15] tracking-tight mb-8">
+          <p className="hero-fade-2 text-xl leading-[1.75] sm:text-[30px]">
+            물리치료사가 지도하는 프리미엄 PT
+          </p>
+          <h1 className="hero-fade-2 font-serif-display mt-3 mb-8 text-[32px] leading-[1.35] font-bold sm:text-[44px]">
             내 몸이 나아지고,
             <br />
             운동이 신나는 공간.
             <br />
             신나아짐에서 시작됩니다.
           </h1>
-          <div className="hero-fade-2 mb-6 flex flex-col items-start gap-3">
-            <div className="inline-flex items-baseline gap-2 rounded-2xl bg-black border border-gold/40 px-6 py-3 shadow-lg shadow-black/30">
-              <span className="font-serif-display text-3xl sm:text-4xl font-bold text-gold-light tracking-tight">
-                평생 20% 할인
-              </span>
-            </div>
-            <span className="inline-block rounded-full border border-gold/50 px-3 py-1 text-xs tracking-[0.15em] text-gold-light uppercase">
-              오픈 기념 특별 · 오픈 후 한 달간
+
+          <div className="hero-fade-3 mb-6">
+            <span className="font-serif-display inline-block rounded-xl border border-[#D9C08F]/[0.33] bg-[#14201B] px-[22px] py-3 text-[22px] font-bold text-[#D9C08F] sm:text-[28px]">
+              평생 20% 할인
             </span>
-            <p className="text-xs text-gold-light/80 tracking-wide">
+          </div>
+          <div className="hero-fade-3 mb-8 space-y-1">
+            <p className="text-xl text-[#D9C08F] sm:text-[29px]">
               오픈 후 한 달간 진행되는 이벤트예요
             </p>
-            <p className="text-sm text-sage">
-              선착순 15% 할인 + 그 이후 등록 시 추가 5%
+            <p className="text-base text-[#EFE6D3]/70 sm:text-lg">
+              선착순 15% 할인 + 상담 후 바로 등록 시 추가 5%
             </p>
           </div>
-          <p className="hero-fade-3 max-w-xl text-bone/80 leading-relaxed mb-3">
-            물리치료사가 설계하는 프리미엄 PT, 신나아짐이 곧 문을 엽니다.
-            오픈에 앞서 가장 먼저 예약하고 첫 회원이 되어주세요.
+
+          <ol className="hero-fade-3 mb-8 list-none space-y-1.5 leading-[1.9]">
+            {HERO_FEATURES.map((item) => (
+              <li
+                key={item.text}
+                className={[
+                  "text-lg sm:text-[25px]",
+                  item.emphasis ? "font-bold text-[#D9C08F]" : "text-[#EFE6D3]/[0.85]",
+                ].join(" ")}
+              >
+                {item.text}
+              </li>
+            ))}
+          </ol>
+
+          <p className="hero-fade-3 mb-10 max-w-xl text-base leading-[1.75] text-[#EFE6D3]/70">
+            개인마다 다른 체형과 불균형. 획일화된 머신이 아닌 맨몸과 프리웨이트로 진짜 내
+            몸을 통제하는 능력을 키워드립니다.
           </p>
-          <div className="hero-fade-3 max-w-xl text-sm text-sage leading-relaxed mb-12 space-y-1.5">
-            <p>1. 전 직원 물리치료사 출신</p>
-            <p>2. 100% 프라이빗 회원 전용 공간</p>
-            <p>3. 1:1 맞춤 기능성 트레이닝</p>
-            <p>4. 아픈 몸 재활부터 완벽한 운동 자립까지!</p>
-            <p className="pt-1.5">
-              개인마다 다른 체형과 불균형. 획일화된 머신이 아닌 맨몸과 프리웨이트로
-              진짜 내 몸을 통제하는 능력을 키워드립니다.
-            </p>
-          </div>
-          <div className="hero-fade-4">
-            <PulseLine className="w-full max-w-xl h-16 text-gold" />
-            <a
-              href="#reserve"
-              className="group inline-flex items-center gap-2 mt-12 rounded-full bg-gold-deep text-bone px-8 py-3.5 font-medium tracking-wide shadow-lg shadow-gold-deep/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-gold-deep/30"
-            >
-              지금 사전예약하기
-              <span className="transition-transform duration-300 group-hover:translate-x-1">
-                →
-              </span>
-            </a>
-          </div>
+
+          <a
+            href="#reserve"
+            className="hero-fade-4 group inline-flex items-center gap-2 rounded-full bg-[#8A6D3B] px-6 py-3.5 text-lg font-semibold text-[#F6F1E7] shadow-lg shadow-black/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl sm:text-xl"
+          >
+            지금 사전예약하기
+            <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+          </a>
         </div>
       </header>
 
-      <main className="flex-1">
-        <section id="trainer" className="mx-auto max-w-5xl px-6 py-20">
+      <main className="flex-1 bg-[#F6F1E7] text-[#1F2A24]">
+        <section id="trainer" className="mx-auto max-w-[980px] px-6 py-20">
           <Reveal>
-            <h2 className="font-serif-display text-3xl mb-14">대표 소개</h2>
+            <h2 className="font-serif-display mb-14 text-[32px] sm:text-[45px]">대표 소개</h2>
           </Reveal>
-          <div className="grid gap-10 sm:grid-cols-[280px_1fr] items-start">
+          <div className="grid items-start gap-10 sm:grid-cols-[280px_1fr]">
             <Reveal>
-              <div className="relative w-full max-w-[280px] mx-auto sm:max-w-none aspect-[4/5] rounded-2xl overflow-hidden shadow-lg">
+              <div className="relative mx-auto aspect-[4/5] w-full max-w-[280px] overflow-hidden rounded-2xl shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)] sm:mx-0 sm:max-w-none">
                 <Image
                   src="/trainer-shinjongsu.jpg"
                   alt={`신나아짐 대표 ${TRAINER_NAME}`}
@@ -163,24 +184,24 @@ export default function Home() {
               </div>
             </Reveal>
             <Reveal delayMs={100}>
-              <p className="font-serif-display text-2xl mb-1">{TRAINER_NAME}</p>
-              <p className="text-xs tracking-[0.15em] text-gold-deep uppercase mb-5">
+              <p className="font-serif-display text-2xl">{TRAINER_NAME}</p>
+              <p className="mb-5 text-xs tracking-[0.15em] text-[#8A6D3B] uppercase">
                 Physical Therapist
               </p>
-              <p className="text-ink/70 leading-relaxed mb-8">{TRAINER_BIO}</p>
+              <p className="mb-8 leading-[1.75] text-[#1F2A24]/70">{TRAINER_BIO}</p>
 
-              <div className="grid gap-8 sm:grid-cols-2 mb-8">
+              <div className="mb-8 grid gap-8 sm:grid-cols-2">
                 <div>
-                  <p className="font-medium text-sm mb-2.5">자격</p>
-                  <ul className="space-y-1.5 text-sm text-ink/70">
+                  <p className="mb-2.5 text-sm font-medium">자격</p>
+                  <ul className="space-y-1.5 text-base leading-[1.8] text-[#1F2A24]/70">
                     {TRAINER_QUALIFICATIONS.map((item) => (
                       <li key={item}>{item}</li>
                     ))}
                   </ul>
                 </div>
                 <div>
-                  <p className="font-medium text-sm mb-2.5">경력</p>
-                  <ul className="space-y-1.5 text-sm text-ink/70">
+                  <p className="mb-2.5 text-sm font-medium">경력</p>
+                  <ul className="space-y-1.5 text-base leading-[1.8] text-[#1F2A24]/70">
                     {TRAINER_CAREER.map((item) => (
                       <li key={item}>{item}</li>
                     ))}
@@ -189,12 +210,12 @@ export default function Home() {
               </div>
 
               <div>
-                <p className="font-medium text-sm mb-2.5">이수 교육</p>
+                <p className="mb-2.5 text-sm font-medium">이수 교육</p>
                 <div className="flex flex-wrap gap-2">
                   {TRAINER_EDUCATION.map((item) => (
                     <span
                       key={item}
-                      className="rounded-full bg-bone px-3 py-1.5 text-xs text-ink/70"
+                      className="rounded-full bg-[#EFE6D3] px-3 py-1.5 text-[15px] text-[#1F2A24]/70"
                     >
                       {item}
                     </span>
@@ -205,47 +226,42 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="bg-ink text-bone py-20 sm:py-24">
-          <div className="mx-auto max-w-5xl px-6">
+        <section className="bg-[#1F2A24] px-6 py-22 text-[#EFE6D3]">
+          <div className="mx-auto max-w-[980px]">
             <Reveal>
-              <p className="text-sm tracking-[0.2em] text-gold-light uppercase mb-3">
+              <p className="mb-3 text-[13px] tracking-[0.2em] text-[#D9C08F] uppercase">
                 How It Works
               </p>
-              <h2 className="font-serif-display text-3xl mb-14">처음 오시는 날의 순서</h2>
+              <h2 className="font-serif-display mb-14 text-[26px] sm:text-[30px]">
+                처음 오시는 날의 순서
+              </h2>
             </Reveal>
-            <div className="relative">
-              <div
-                aria-hidden="true"
-                className="hidden sm:block absolute left-0 right-0 top-1 h-10 text-gold/40"
-              >
-                <PulseLine className="w-full h-full" />
-              </div>
-              <div className="grid gap-10 sm:grid-cols-4">
-                {PROCESS_STEPS.map((step, i) => (
-                  <Reveal key={step.n} delayMs={i * 100}>
-                    <div className="relative">
-                      <span className="relative z-10 inline-block bg-ink pr-4 font-serif-display text-5xl text-gold">
-                        {step.n}
-                      </span>
-                      <h3 className="font-serif-display text-lg mt-4 mb-2">{step.title}</h3>
-                      <p className="text-sm text-bone/70 leading-relaxed">{step.body}</p>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
+            <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+              {PROCESS_STEPS.map((step, i) => (
+                <Reveal key={step.n} delayMs={i * 120}>
+                  <div>
+                    <span className="font-serif-display text-[34px] text-[#D9C08F] sm:text-[44px]">
+                      {step.n}
+                    </span>
+                    <h3 className="font-serif-display mt-3.5 mb-2 text-xl sm:text-[25px]">
+                      {step.title}
+                    </h3>
+                    <p className="text-base leading-[1.7] text-[#EFE6D3]/70">{step.body}</p>
+                  </div>
+                </Reveal>
+              ))}
             </div>
           </div>
         </section>
 
         <section id="reserve">
-          <div className="mx-auto max-w-5xl px-6 py-20">
+          <div className="mx-auto max-w-[980px] px-6 py-20">
             <Reveal>
-              <PulseLine className="w-24 h-8 text-gold/70 mb-6" />
-              <p className="text-sm tracking-[0.2em] text-gold-deep uppercase mb-3">
+              <p className="mb-3 text-[13px] tracking-[0.2em] text-[#8A6D3B] uppercase">
                 Reservation
               </p>
-              <h2 className="font-serif-display text-3xl mb-3">사전예약 안내</h2>
-              <p className="text-ink/70 mb-12 leading-relaxed">
+              <h2 className="font-serif-display mb-3 text-[26px] sm:text-[30px]">예약 안내</h2>
+              <p className="mb-12 max-w-[640px] leading-[1.75] text-[#1F2A24]/70">
                 아래 달력에서 원하시는 날짜와 시간을 선택해주세요. 예약은 오전 9시부터
                 오후 10시까지 1시간 단위로 가능하며, 한 시간에 한 분만 예약하실 수
                 있어요. 예약이 확정되면 남겨주신 연락처로 안내드릴게요.
@@ -255,42 +271,39 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="location" className="border-t border-line">
-          <div className="mx-auto max-w-5xl px-6 py-20">
+        <section id="location" className="border-t border-[#1F2A24]/[0.125]">
+          <div className="mx-auto max-w-[980px] px-6 py-20">
             <Reveal>
-              <PulseLine className="w-24 h-8 text-gold/70 mb-6" />
-              <p className="text-sm tracking-[0.2em] text-gold-deep uppercase mb-3">
-                Location
-              </p>
-              <h2 className="font-serif-display text-3xl mb-3">오시는 길</h2>
-              <p className="text-ink/70 mb-10 leading-relaxed">
-                {STUDIO_ADDRESS}
+              <p className="mb-3 text-lg tracking-[0.2em] text-[#8A6D3B] uppercase">Location</p>
+              <h2 className="font-serif-display mb-3 text-[26px] sm:text-[30px]">오시는 길</h2>
+              <p className="mb-10 text-lg leading-[1.75] text-[#1F2A24]/70">
+                {FULL_STUDIO_ADDRESS}
                 <br />
-                문의 · <span className="text-gold-deep font-medium">010-2496-8088</span>
+                문의 · <span className="font-medium text-[#8A6D3B]">010-2496-8088</span>
               </p>
             </Reveal>
             <Reveal delayMs={100}>
-              <div className="grid gap-6 sm:grid-cols-[1fr_1.3fr] items-stretch">
-                <div className="rounded-2xl bg-bone/50 border border-line p-6 flex flex-col justify-between">
+              <div className="grid items-stretch gap-6 sm:grid-cols-[1fr_1.3fr]">
+                <div className="flex flex-col justify-between rounded-2xl border border-[#1F2A24]/[0.125] bg-[#EFE6D3]/50 p-6">
                   <div>
-                    <p className="font-serif-display text-lg mb-2">신나아짐 PT</p>
-                    <p className="text-sm text-ink/70 leading-relaxed">{STUDIO_ADDRESS}</p>
+                    <p className="font-serif-display mb-2 text-lg">신나아짐 PT</p>
+                    <p className="text-sm leading-relaxed text-[#1F2A24]/70">{STUDIO_ADDRESS}</p>
                   </div>
                   <a
-                    href={`https://map.naver.com/p/search/${encodeURIComponent(STUDIO_ADDRESS)}`}
+                    href={`https://map.naver.com/p/search/${encodeURIComponent(FULL_STUDIO_ADDRESS)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-6 inline-flex items-center gap-1.5 text-sm text-gold-deep font-medium hover:underline"
+                    className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-[#8A6D3B] hover:underline"
                   >
                     네이버 지도에서 길찾기
                     <span aria-hidden="true">→</span>
                   </a>
                 </div>
-                <div className="rounded-2xl overflow-hidden border border-line h-64 sm:h-auto">
+                <div className="h-64 overflow-hidden rounded-2xl border border-[#1F2A24]/[0.125] sm:h-auto">
                   <iframe
                     title="신나아짐 위치 지도"
-                    src={`https://maps.google.com/maps?q=${encodeURIComponent(STUDIO_ADDRESS)}&z=16&output=embed`}
-                    className="w-full h-full grayscale-[15%]"
+                    src={`https://maps.google.com/maps?q=${encodeURIComponent(FULL_STUDIO_ADDRESS)}&z=16&output=embed`}
+                    className="h-full w-full grayscale-[15%]"
                     loading="lazy"
                     referrerPolicy="no-referrer-when-downgrade"
                   />
@@ -301,13 +314,13 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-line">
-        <div className="mx-auto max-w-5xl px-6 py-12 text-sm text-ink/60 flex flex-col gap-2">
-          <p className="font-serif-display text-base text-ink">신나아짐</p>
+      <footer className="border-t border-[#1F2A24]/[0.125] bg-[#F6F1E7]">
+        <div className="mx-auto flex max-w-[980px] flex-col gap-2 px-6 py-12 text-sm text-[#1F2A24]/70">
+          <p className="font-serif-display text-base text-[#1F2A24]">신나아짐</p>
           <p>전 직원 물리치료사 면허 보유 · 프리미엄 PT 스튜디오</p>
-          <p>{STUDIO_ADDRESS}</p>
+          <p>{FULL_STUDIO_ADDRESS}</p>
           <p>
-            문의 · <span className="text-gold-deep font-medium">010-2496-8088</span>
+            문의 · <span className="font-medium text-[#8A6D3B]">010-2496-8088</span>
           </p>
           <p>정확한 오픈일은 사전예약해주신 분들께 가장 먼저 안내드릴게요.</p>
         </div>
