@@ -10,25 +10,54 @@ export function IntroOverlay() {
   const [done, setDone] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
+  // 자동재생이 막힌 브라우저(iOS Safari, 카카오톡 인앱브라우저 등)를 위해 등록해둔
+  // 재시도 리스너들 — 인트로가 끝나면(finish) 한 번에 정리한다.
+  const cleanupRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const video = videoRef.current;
-    if (video) {
-      video.muted = true;
-      video.defaultMuted = true;
-      video.volume = 0;
+    if (!video) return;
+    video.muted = true;
+    video.defaultMuted = true;
+    video.volume = 0;
+
+    const tryPlay = () => {
       video.play().catch(() => {
-        // 자동재생이 막혀도 4.6초 뒤 타이머로 어차피 넘어간다.
+        // 이번 시도도 막히면 아래 등록해둔 다른 재시도 시점(로드 완료·터치·탭 복귀)에서
+        // 다시 시도한다. 그래도 안 되면 4.6초 타이머로 어차피 넘어간다.
       });
-    }
-    const timer = window.setTimeout(() => setDone(true), 4600);
-    return () => window.clearTimeout(timer);
+    };
+
+    const removers: Array<() => void> = [];
+    const on = (target: EventTarget, type: string, handler: EventListener) => {
+      target.addEventListener(type, handler);
+      removers.push(() => target.removeEventListener(type, handler));
+    };
+
+    video.load();
+    tryPlay();
+    // 로드가 늦게 끝나는 환경(느린 네트워크)에서도 재생을 다시 시도.
+    on(video, "loadeddata", tryPlay);
+    on(video, "canplay", tryPlay);
+    // 자동재생 정책 때문에 막힌 경우, 사용자의 첫 터치/클릭이나 탭이 다시
+    // 보이는 시점(백그라운드 탭에서 돌아옴)에 재생을 재시도한다.
+    on(window, "touchstart", tryPlay);
+    on(window, "pointerdown", tryPlay);
+    on(document, "visibilitychange", tryPlay);
+
+    cleanupRef.current = () => removers.forEach((remove) => remove());
+    return () => cleanupRef.current();
   }, []);
+
+  function finish() {
+    cleanupRef.current();
+    setDone(true);
+  }
 
   return (
     <div
-      onClick={() => setDone(true)}
+      onClick={finish}
       aria-hidden={done}
       className={[
         "fixed inset-0 z-[9999] cursor-pointer overflow-hidden bg-[#1C1E22] transition-[opacity,visibility] duration-700 ease-out",
@@ -42,8 +71,10 @@ export function IntroOverlay() {
         autoPlay
         muted
         playsInline
+        {...{ "webkit-playsinline": "true", "x5-playsinline": "true" }}
+        disablePictureInPicture
         preload="auto"
-        onEnded={() => setDone(true)}
+        onEnded={finish}
       />
       <p
         className="shinna-intro-word absolute left-1/2 top-[68%] -translate-x-1/2 whitespace-nowrap text-center text-white"

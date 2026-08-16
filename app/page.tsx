@@ -1,6 +1,5 @@
 import Image from "next/image";
 import { IntroOverlay } from "@/app/components/IntroOverlay";
-import { HeroBackgroundVideo } from "@/app/components/HeroBackgroundVideo";
 import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
 
@@ -85,7 +84,15 @@ export default function Home() {
 
       <header className="relative overflow-hidden bg-[#1F2A24] px-6 pt-14 pb-22 text-[#EFE6D3]">
         <div aria-hidden="true" className="absolute inset-0 z-0 overflow-hidden">
-          <HeroBackgroundVideo />
+          <Image
+            src="/images/center-interior.jpg"
+            alt=""
+            fill
+            priority
+            quality={90}
+            sizes="100vw"
+            className="shinna-video-pan object-cover"
+          />
           <div
             className="shinna-float-a absolute -right-[12%] -top-[10%] aspect-square w-[min(60vw,620px)] rounded-full blur-[4px]"
             style={{
@@ -93,7 +100,16 @@ export default function Home() {
                 "radial-gradient(circle at 35% 35%, rgba(217,192,143,0.33), rgba(217,192,143,0) 70%)",
             }}
           />
-          <div className="absolute inset-0 bg-[#1F2A24]/40" />
+          <div className="absolute inset-0 bg-[#1F2A24]/45" />
+          {/* 텍스트가 있는 왼쪽은 진하게, 오른쪽은 사진이 드러나도록 대각선으로
+              한 번 더 어둡게 — 사진 배경 위에서도 글자 대비를 확보한다. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(100deg, #14201BF2 0%, #14201BD9 38%, #14201B59 68%, #14201B26 100%)",
+            }}
+          />
         </div>
 
         <div className="relative z-[1] mx-auto max-w-[780px]">
@@ -132,7 +148,7 @@ export default function Home() {
             <p className="text-xl text-[#D9C08F] sm:text-[29px]">
               오픈 후 한 달간 진행되는 이벤트예요
             </p>
-            <p className="text-base text-[#EFE6D3]/70 sm:text-lg">
+            <p className="text-base text-[#EFE6D3] sm:text-lg">
               선착순 15% 할인 + 상담 후 바로 등록 시 추가 5%
             </p>
           </div>
@@ -143,7 +159,7 @@ export default function Home() {
                 key={item.text}
                 className={[
                   "text-lg sm:text-[25px]",
-                  item.emphasis ? "font-bold text-[#D9C08F]" : "text-[#EFE6D3]/[0.85]",
+                  item.emphasis ? "font-bold text-[#D9C08F]" : "text-white",
                 ].join(" ")}
               >
                 {item.text}
@@ -151,7 +167,7 @@ export default function Home() {
             ))}
           </ol>
 
-          <p className="hero-fade-3 mb-10 max-w-xl text-base leading-[1.75] text-[#EFE6D3]/70">
+          <p className="hero-fade-3 mb-10 max-w-xl text-base leading-[1.75] text-[#EFE6D3]/[0.9]">
             개인마다 다른 체형과 불균형. 획일화된 머신이 아닌 맨몸과 프리웨이트로 진짜 내
             몸을 통제하는 능력을 키워드립니다.
           </p>
@@ -178,6 +194,7 @@ export default function Home() {
                   src="/trainer-shinjongsu.jpg"
                   alt={`신나아짐 대표 ${TRAINER_NAME}`}
                   fill
+                  quality={100}
                   sizes="(min-width: 640px) 280px, 280px"
                   className="object-cover object-[center_18%] grayscale-[15%] sepia-[8%] contrast-[1.05]"
                 />
