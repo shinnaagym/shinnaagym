@@ -4,11 +4,9 @@ import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
 
 const TRAINER_NAME = "신종수";
-const TRAINER_BIO =
-  "보건복지부 면허를 보유한 운동 전문 물리치료사이자 생활체육지도자(보디빌딩 2급)로서, " +
-  "병원에서의 재활 경험과 헬스장 현장에서의 실전 트레이닝 노하우를 결합했습니다. " +
-  "회원님이 궁극적으로 저 없이도 스스로 안전하고 운동에 재미를 붙여드려 평생의 습관을 " +
-  "만들어 드리는 것이 저의 확고한 목표입니다.";
+const TRAINER_BIO_LINE_1 = "병원에서의 재활 경험과 헬스장 현장의 트레이닝 노하우를 가진 물리치료사 입니다.";
+const TRAINER_BIO_LINE_2 =
+  "제 목표는 단 하나, 회원님이 스스로 운동의 재미를 느끼고 평생의 습관을 만들도록 돕는 것입니다.";
 
 const TRAINER_QUALIFICATIONS = ["보건복지부 물리치료사 면허", "생활체육지도자 보디빌딩 2급"];
 
@@ -54,7 +52,7 @@ const PROCESS_STEPS = [
   {
     n: "02",
     title: "평가",
-    body: "자세, 가동범위, 통증 부위를 물리치료사가 자체 개발 앱을 통해 직접 확인합니다.",
+    body: "자세, 가동범위, 근력, 기능을 물리치료사가 자체 개발 앱을 통해 직접 평가합니다.",
   },
   {
     n: "03",
@@ -64,7 +62,7 @@ const PROCESS_STEPS = [
   {
     n: "04",
     title: "기록",
-    body: "매 세션의 변화를 기록하고, 운동 지도를 계속 조율해 나갑니다.",
+    body: "매 세션의 PT일지를 기록하고, 운동 난이도를 점진적으로 조율해 나갑니다.",
   },
 ];
 
@@ -205,7 +203,11 @@ export default function Home() {
               <p className="mb-5 text-xs tracking-[0.15em] text-[#8A6D3B] uppercase">
                 Physical Therapist
               </p>
-              <p className="mb-8 leading-[1.75] text-[#1F2A24]/70">{TRAINER_BIO}</p>
+              <p className="mb-8 leading-[1.75] text-[#1F2A24]/70">
+                {TRAINER_BIO_LINE_1}
+                <br />
+                {TRAINER_BIO_LINE_2}
+              </p>
 
               <div className="mb-8 grid gap-8 sm:grid-cols-2">
                 <div>
@@ -279,9 +281,13 @@ export default function Home() {
               </p>
               <h2 className="font-serif-display mb-3 text-[26px] sm:text-[30px]">예약 안내</h2>
               <p className="mb-12 max-w-[640px] leading-[1.75] text-[#1F2A24]/70">
-                아래 달력에서 원하시는 날짜와 시간을 선택해주세요. 예약은 오전 9시부터
-                오후 10시까지 1시간 단위로 가능하며, 한 시간에 한 분만 예약하실 수
-                있어요. 예약이 확정되면 남겨주신 연락처로 안내드릴게요.
+                아래 달력에서 원하시는 날짜와 시간을 선택해주세요.
+                <br />
+                예약은 오전 9시부터 오후 10시까지 1시간 단위로 가능하며,
+                <br />
+                한 시간에 한 분만 예약하실 수 있어요.
+                <br />
+                예약이 확정되면 남겨주신 연락처로 안내드릴게요.
               </p>
             </Reveal>
             <ReservationForm />
