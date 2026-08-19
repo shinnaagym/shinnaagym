@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { PURPOSE_OPTIONS, businessHours, BOOKING_WINDOW_DAYS } from "@/lib/constants";
+import { PURPOSE_OPTIONS, businessHours, BOOKING_START_DATE, BOOKING_WINDOW_DAYS } from "@/lib/constants";
 import { addDaysToKey, koreaCurrentHour, koreaTodayKey } from "@/lib/date";
 
 type TakenSlot = { date: string; hour: number };
@@ -33,8 +33,12 @@ function buildMonthCells(year: number, month: number) {
 export function ReservationForm() {
   const todayKey = koreaTodayKey();
   const currentHour = koreaCurrentHour();
-  const maxKey = addDaysToKey(todayKey, BOOKING_WINDOW_DAYS);
-  const [todayY, todayM] = todayKey.split("-").map(Number);
+  // 오픈일(BOOKING_START_DATE) 전에는 예약을 받지 않는다 — 오픈일이 지나면
+  // 자연스럽게 오늘부터로 넘어간다.
+  const minKey = todayKey > BOOKING_START_DATE ? todayKey : BOOKING_START_DATE;
+  const maxKey = addDaysToKey(BOOKING_START_DATE, BOOKING_WINDOW_DAYS);
+  const [todayY, todayM] = minKey.split("-").map(Number);
+  const [, bookingStartMonth, bookingStartDay] = BOOKING_START_DATE.split("-").map(Number);
 
   const [viewYear, setViewYear] = useState(todayY);
   const [viewMonth, setViewMonth] = useState(todayM);
@@ -96,7 +100,7 @@ export function ReservationForm() {
   }
 
   function isSelectable(key: string) {
-    return key >= todayKey && key <= maxKey;
+    return key >= minKey && key <= maxKey;
   }
 
   function selectDate(key: string) {
@@ -232,7 +236,8 @@ export function ReservationForm() {
           })}
         </div>
         <p className="text-sm text-[#1F2A24]/50 mt-3">
-          오늘부터 {BOOKING_WINDOW_DAYS}일 이내로 예약하실 수 있어요.
+          {bookingStartMonth}월 {bookingStartDay}일부터 {BOOKING_WINDOW_DAYS}일 이내로 예약하실 수
+          있어요.
         </p>
 
         {selectedDate && (
