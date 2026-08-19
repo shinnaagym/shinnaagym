@@ -1,4 +1,4 @@
-import { BOOKING_WINDOW_DAYS } from "./constants";
+import { BOOKING_START_DATE, BOOKING_WINDOW_DAYS } from "./constants";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -85,10 +85,11 @@ export function koreaCurrentHour(): number {
   return kst.getUTCHours();
 }
 
-/** Whether `key` falls within [today, today + BOOKING_WINDOW_DAYS] in KST. */
+/** Whether `key` falls within [max(today, BOOKING_START_DATE), BOOKING_START_DATE + BOOKING_WINDOW_DAYS] in KST. */
 export function isWithinBookingWindow(key: string): boolean {
   if (!isValidDateKey(key)) return false;
   const today = koreaTodayKey();
-  const maxDate = addDaysToKey(today, BOOKING_WINDOW_DAYS);
-  return key >= today && key <= maxDate;
+  const minDate = today > BOOKING_START_DATE ? today : BOOKING_START_DATE;
+  const maxDate = addDaysToKey(BOOKING_START_DATE, BOOKING_WINDOW_DAYS);
+  return key >= minDate && key <= maxDate;
 }

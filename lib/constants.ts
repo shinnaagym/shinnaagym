@@ -2,6 +2,8 @@ export const BUSINESS_START_HOUR = 9;
 // exclusive — last bookable slot starts at BUSINESS_END_HOUR - 1
 export const BUSINESS_END_HOUR = 22;
 export const BOOKING_WINDOW_DAYS = 90;
+// 오픈일 전에는 사전예약을 받지 않는다 — 이 날짜 이전은 달력에서 선택할 수 없다.
+export const BOOKING_START_DATE = "2026-09-15";
 
 export const PURPOSE_OPTIONS = [
   { value: "rehab", label: "재활" },
