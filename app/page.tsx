@@ -297,33 +297,54 @@ export default function Home() {
         <div className="border-t border-[#1F2A24]/[0.125]">
           <div className="mx-auto max-w-[980px] px-6 py-12">
             <Reveal>
-              <a
-                href="https://m.blog.naver.com/shinnaagym"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group mx-auto flex w-fit items-center gap-3 rounded-full border border-[#1F2A24]/[0.15] bg-white/60 px-6 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#03C75A]/50 hover:shadow-md"
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-[#03C75A]">
-                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
-                    <path
-                      d="M6 4h9l5 5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"
-                      stroke="#FFFFFF"
-                      strokeWidth="1.6"
-                      strokeLinejoin="round"
-                    />
-                    <path d="M9 12h6M9 16h6" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                </span>
-                <span className="text-[15px] font-medium text-[#1F2A24]">
-                  신나아짐 블로그 보러가기
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="text-[#1F2A24]/40 transition-transform duration-200 group-hover:translate-x-1"
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <a
+                  href="https://m.blog.naver.com/shinnaagym"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-3 rounded-full border border-[#1F2A24]/[0.15] bg-white/60 px-6 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#03C75A]/50 hover:shadow-md"
                 >
-                  →
-                </span>
-              </a>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-[#03C75A]">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                      <path
+                        d="M6 4h9l5 5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"
+                        stroke="#FFFFFF"
+                        strokeWidth="1.6"
+                        strokeLinejoin="round"
+                      />
+                      <path d="M9 12h6M9 16h6" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                  <span className="text-[15px] font-medium text-[#1F2A24]">블로그 보러가기</span>
+                  <span
+                    aria-hidden="true"
+                    className="text-[#1F2A24]/40 transition-transform duration-200 group-hover:translate-x-1"
+                  >
+                    →
+                  </span>
+                </a>
+                <a
+                  href="https://www.instagram.com/shinnaa_gym"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-3 rounded-full border border-[#1F2A24]/[0.15] bg-white/60 px-6 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#DD2A7B]/50 hover:shadow-md"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]">
+                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                      <rect x="3" y="3" width="18" height="18" rx="5" stroke="#FFFFFF" strokeWidth="1.6" />
+                      <circle cx="12" cy="12" r="4" stroke="#FFFFFF" strokeWidth="1.6" />
+                      <circle cx="17.5" cy="6.5" r="1" fill="#FFFFFF" />
+                    </svg>
+                  </span>
+                  <span className="text-[15px] font-medium text-[#1F2A24]">인스타그램 보러가기</span>
+                  <span
+                    aria-hidden="true"
+                    className="text-[#1F2A24]/40 transition-transform duration-200 group-hover:translate-x-1"
+                  >
+                    →
+                  </span>
+                </a>
+              </div>
             </Reveal>
           </div>
         </div>
