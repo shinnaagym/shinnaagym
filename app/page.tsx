@@ -294,6 +294,40 @@ export default function Home() {
           </div>
         </section>
 
+        <div className="border-t border-[#1F2A24]/[0.125]">
+          <div className="mx-auto max-w-[980px] px-6 py-12">
+            <Reveal>
+              <a
+                href="https://m.blog.naver.com/shinnaagym"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group mx-auto flex w-fit items-center gap-3 rounded-full border border-[#1F2A24]/[0.15] bg-white/60 px-6 py-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#03C75A]/50 hover:shadow-md"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] bg-[#03C75A]">
+                  <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden="true">
+                    <path
+                      d="M6 4h9l5 5v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"
+                      stroke="#FFFFFF"
+                      strokeWidth="1.6"
+                      strokeLinejoin="round"
+                    />
+                    <path d="M9 12h6M9 16h6" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span className="text-[15px] font-medium text-[#1F2A24]">
+                  신나아짐 블로그 보러가기
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="text-[#1F2A24]/40 transition-transform duration-200 group-hover:translate-x-1"
+                >
+                  →
+                </span>
+              </a>
+            </Reveal>
+          </div>
+        </div>
+
         <section id="location" className="border-t border-[#1F2A24]/[0.125]">
           <div className="mx-auto max-w-[980px] px-6 py-20">
             <Reveal>
