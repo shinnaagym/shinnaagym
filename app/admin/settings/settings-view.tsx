@@ -132,7 +132,9 @@ function ShiftPresetPicker({
 
 // ---- 토요일 당직 캘린더 ----
 
-const CALENDAR_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+// 스튜디오가 일요일엔 쉬어(당직·휴가 기록이 필요 없음) 캘린더에서 일요일
+// 컬럼 자체를 없앤다 — 월~토 6열.
+const CALENDAR_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토"];
 
 /** "YYYY-MM-DD"의 요일(0=월~6=일)을 반환한다. */
 function calendarWeekdayOf(dateKey: string): number {
@@ -143,7 +145,9 @@ function calendarWeekdayOf(dateKey: string): number {
 function daysInCalendarMonth(monthKey: string): string[] {
   const [y, m] = monthKey.split("-").map(Number);
   const count = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return Array.from({ length: count }, (_, i) => `${monthKey}-${String(i + 1).padStart(2, "0")}`);
+  return Array.from({ length: count }, (_, i) => `${monthKey}-${String(i + 1).padStart(2, "0")}`).filter(
+    (d) => calendarWeekdayOf(d) !== 6,
+  );
 }
 
 function shiftMonthKey(monthKey: string, delta: number): string {
@@ -559,12 +563,12 @@ function DutyCalendar({
           ›
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-ink/40 mb-1">
+      <div className="grid grid-cols-6 gap-1 text-center text-[11px] text-ink/40 mb-1">
         {CALENDAR_WEEKDAY_LABELS.map((label) => (
           <div key={label}>{label}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-6 gap-1">
         {Array.from({ length: leadingBlanks }).map((_, i) => (
           <div key={`blank-${i}`} />
         ))}

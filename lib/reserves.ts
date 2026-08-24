@@ -92,6 +92,23 @@ export async function addReserveWithdrawal(
   return rows[0];
 }
 
+/** 잘못 기록한 적립·차감 내역을 바로잡는다(금액·메모만 고칠 수 있고,
+    저수지 종류·구분은 바꿀 수 없다 — 종류를 바꿔야 한다면 삭제 후 새로
+    기록해야 함을 화면에서 안내한다). 자동 정산(source='monthly_settlement')
+    행도 수정할 수 있지만, "이번 달 정산"을 다시 누르면 그 값은 재계산되어
+    덮어써진다. */
+export async function updateReserveTransaction(
+  id: number,
+  amount: number,
+  memo: string,
+): Promise<ReserveTransactionRow | null> {
+  const { rows } = await query<ReserveTransactionRow>(
+    `UPDATE reserve_transactions SET amount = $2, memo = $3 WHERE id = $1 RETURNING *`,
+    [id, amount, memo],
+  );
+  return rows[0] ?? null;
+}
+
 /** 저수지 적립을 수동으로 추가한다(자동 정산 대상이 아닌 임시 적립 등). */
 export async function addReserveDeposit(
   reserveType: ReserveType,

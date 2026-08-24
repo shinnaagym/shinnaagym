@@ -39,6 +39,10 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawMemo, setWithdrawMemo] = useState("");
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editMemo, setEditMemo] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   async function loadReserves(month: string) {
     setLoading(true);
@@ -119,6 +123,42 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
       setError(e instanceof Error ? e.message : "차감에 실패했어요.");
     } finally {
       setSubmittingWithdraw(false);
+    }
+  }
+
+  function startEdit(t: ReserveTransactionRow) {
+    setEditingId(t.id);
+    setEditAmount(String(t.amount));
+    setEditMemo(t.memo);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  async function saveEdit(id: number) {
+    const amountNum = Number(editAmount);
+    if (!editAmount || !Number.isFinite(amountNum) || amountNum <= 0) {
+      setError("금액을 입력해주세요.");
+      return;
+    }
+    setSavingEdit(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/reserves/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountNum, memo: editMemo.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "수정에 실패했어요.");
+      setBalances(data.balances);
+      setTransactions((prev) => prev.map((t) => (t.id === id ? data.entry : t)));
+      setEditingId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "수정에 실패했어요.");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -246,35 +286,88 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
                   <th className="px-2 py-1.5 font-medium">구분</th>
                   <th className="px-2 py-1.5 font-medium text-right">금액</th>
                   <th className="px-2 py-1.5 font-medium">메모</th>
+                  <th className="px-2 py-1.5 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/40">
-                {transactions.slice(0, 15).map((t) => (
-                  <tr key={t.id}>
-                    <td className="py-1.5 pr-2 whitespace-nowrap text-ink/50">
-                      {formatDateTime(t.created_at)}
-                    </td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">
-                      {RESERVE_TYPE_LABELS[t.reserve_type] ?? t.reserve_type}
-                    </td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">
-                      <span
-                        className={
-                          t.transaction_type === "withdrawal"
-                            ? "rounded-full bg-red-50 text-red-500 px-2 py-0.5"
-                            : "rounded-full bg-sage/10 text-sage px-2 py-0.5"
-                        }
-                      >
-                        {t.transaction_type === "withdrawal" ? "차감" : "적립"}
-                      </span>
-                    </td>
-                    <td className="px-2 py-1.5 text-right whitespace-nowrap font-medium">
-                      {t.transaction_type === "withdrawal" ? "-" : "+"}
-                      {formatWon(t.amount)}
-                    </td>
-                    <td className="px-2 py-1.5 text-ink/60">{t.memo}</td>
-                  </tr>
-                ))}
+                {transactions.slice(0, 15).map((t) => {
+                  const isEditing = editingId === t.id;
+                  return (
+                    <tr key={t.id}>
+                      <td className="py-1.5 pr-2 whitespace-nowrap text-ink/50">
+                        {formatDateTime(t.created_at)}
+                      </td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        {RESERVE_TYPE_LABELS[t.reserve_type] ?? t.reserve_type}
+                      </td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        <span
+                          className={
+                            t.transaction_type === "withdrawal"
+                              ? "rounded-full bg-red-50 text-red-500 px-2 py-0.5"
+                              : "rounded-full bg-sage/10 text-sage px-2 py-0.5"
+                          }
+                        >
+                          {t.transaction_type === "withdrawal" ? "차감" : "적립"}
+                        </span>
+                      </td>
+                      {isEditing ? (
+                        <>
+                          <td className="px-2 py-1.5 text-right">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={editAmount}
+                              onChange={(e) => setEditAmount(e.target.value)}
+                              className="w-24 rounded-md border border-line px-2 py-1 text-xs text-right outline-none focus:border-coral"
+                            />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <input
+                              value={editMemo}
+                              onChange={(e) => setEditMemo(e.target.value)}
+                              className="w-full min-w-[120px] rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-coral"
+                            />
+                          </td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => saveEdit(t.id)}
+                              disabled={savingEdit}
+                              className="text-coral hover:opacity-70 disabled:opacity-50 mr-2"
+                            >
+                              {savingEdit ? "저장 중..." : "저장"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              className="text-ink/40 hover:text-ink"
+                            >
+                              취소
+                            </button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap font-medium">
+                            {t.transaction_type === "withdrawal" ? "-" : "+"}
+                            {formatWon(t.amount)}
+                          </td>
+                          <td className="px-2 py-1.5 text-ink/60">{t.memo}</td>
+                          <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(t)}
+                              className="text-ink/40 hover:text-coral"
+                            >
+                              수정
+                            </button>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
