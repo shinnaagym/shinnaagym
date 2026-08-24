@@ -6,14 +6,66 @@ export const BOOKING_WINDOW_DAYS = 90;
 export const BOOKING_START_DATE = "2026-09-15";
 
 // 취업규칙 제6조(단축근무 및 휴무) 기준 휴가 종류. 당직 캘린더에서 코치별
-// 휴가를 기록할 때 이 중 하나를 고른다(한도는 참고용 안내 문구로만 노출하고,
-// 실제 신청 건수 집계·제한은 하지 않는다).
+// 휴가를 기록할 때 이 중 하나를 고른다. limitPeriod/limitUnit/limitAmount와
+// noticeDays는 서버 검증(lib/schedule.ts checkLeaveRequest)에서 실제로 쓰는
+// 값이고, limitLabel/noticeLabel/payLabel은 화면 표시용 문구다 — 숫자가
+// 바뀌면 반드시 둘 다 같이 고쳐야 한다.
 export const LEAVE_TYPE_OPTIONS = [
-  { value: "shortened", label: "단축근무", limit: "1일 2시간, 월 4회 이내" },
-  { value: "day_off", label: "휴무", limit: "월 2일 이내" },
-  { value: "extended", label: "연속 휴가", limit: "3일 이상, 연 5일 이내" },
-  { value: "sick", label: "병가", limit: "연 3일" },
-  { value: "birthday", label: "생일휴가", limit: "연 1일" },
+  {
+    value: "shortened",
+    label: "단축근무",
+    limitPeriod: "month",
+    limitUnit: "hours",
+    limitAmount: 8,
+    limitLabel: "월 8시간",
+    noticeDays: 3,
+    noticeLabel: "3일 전",
+    payLabel: "유급",
+  },
+  {
+    value: "day_off",
+    label: "휴무",
+    limitPeriod: "month",
+    limitUnit: "days",
+    limitAmount: 2,
+    limitLabel: "월 2일 이내",
+    noticeDays: 14,
+    noticeLabel: "2주 전",
+    payLabel: "유급",
+  },
+  {
+    value: "extended",
+    label: "연속 휴가",
+    limitPeriod: "year",
+    limitUnit: "days",
+    limitAmount: 5,
+    limitLabel: "3일 이상, 연 5일 이내",
+    noticeDays: 30,
+    noticeLabel: "1개월 전",
+    payLabel: "유급",
+  },
+  {
+    value: "sick",
+    label: "병가",
+    limitPeriod: "year",
+    limitUnit: "days",
+    limitAmount: 3,
+    limitLabel: "연 3일",
+    noticeDays: 0,
+    noticeLabel: "당일 가능",
+    payLabel: "유급",
+  },
+  {
+    value: "birthday",
+    label: "생일휴가",
+    limitPeriod: "year",
+    limitUnit: "days",
+    limitAmount: 1,
+    limitLabel: "연 1일",
+    noticeDays: 14,
+    noticeLabel: "2주 전",
+    payLabel: "유급",
+  },
 ] as const;
 
 export type LeaveTypeValue = (typeof LEAVE_TYPE_OPTIONS)[number]["value"];

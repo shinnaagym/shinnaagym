@@ -682,8 +682,8 @@ export function ScheduleGrid({
 
   /** 토요일 당직을 지정/해제한다. coachId가 undefined면 그 날짜의 당직 지정을
       완전히 지우고, null이면 "이 토요일은 당직자 없음"을 명시적으로 저장한다.
-      코치별 당직은 월 1회로 제한돼 있어(setDutyOverride), 서버가 거부하면
-      낙관적으로 바꿔둔 화면 상태를 되돌리고 사유를 안내한다. */
+      서버가 거부하면(토요일이 아닌 날짜 등) 낙관적으로 바꿔둔 화면 상태를
+      되돌리고 사유를 안내한다. */
   async function assignDutyOverride(date: string, coachId: number | null | undefined) {
     const prevState = dutyOverridesState;
     const coach = typeof coachId === "number" ? effectiveCoaches.find((c) => c.id === coachId) : null;
@@ -2377,8 +2377,8 @@ function EditMergedBlockModal({
 }
 
 /** 스케줄표 토요일 헤더의 "당직 OOO" 표시를 눌렀을 때 뜨는, 그 토요일의
-    당직자를 바꾸는 모달. 코치별 당직은 월 1회로 제한된다(설정 페이지의
-    당직 캘린더에서도 같은 규칙으로 배정할 수 있다). */
+    당직자를 바꾸는 모달(설정 페이지의 당직 캘린더에서도 같은 방식으로
+    배정할 수 있다). */
 function DutyEditModal({
   date,
   dateLabel,
@@ -2400,10 +2400,7 @@ function DutyEditModal({
   return (
     <ModalShell title={`${dateLabel} 당직자`} onClose={onClose}>
       <div className="space-y-4">
-        <p className="text-xs text-ink/50">
-          당직 코치는 9~15시로 근무해요. 같은 코치를 한 달에 두 번 이상
-          당직으로 배정할 수는 없어요.
-        </p>
+        <p className="text-xs text-ink/50">당직 코치는 9~15시로 근무해요.</p>
         <div className="space-y-2">
           {coaches.map((c) => (
             <button

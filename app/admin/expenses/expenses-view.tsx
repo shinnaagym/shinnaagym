@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ExpenseRow } from "@/lib/db";
 import { ExpenseMonthPicker } from "./expense-month-picker";
@@ -308,6 +309,14 @@ export function ExpensesView({ monthKey }: { monthKey: string }) {
         </div>
       </div>
       </div>
+
+      <Link
+        href="/admin/payroll"
+        className="mt-6 flex items-center justify-between rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4 text-sm hover:border-coral/50 transition"
+      >
+        <span className="font-medium">급여 계산</span>
+        <span className="text-ink/40">코치별 급여를 계산하고 이력을 확인하세요 →</span>
+      </Link>
     </div>
   );
 }
