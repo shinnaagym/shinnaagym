@@ -948,6 +948,100 @@ export async function listBlockedDaysForMonth(
   return map;
 }
 
+// ---- 코치별 휴가 기록 ----
+
+export interface CoachLeaveEntry {
+  id: number;
+  coachId: number;
+  coachName: string;
+  leaveType: string;
+}
+
+/** "YYYY-MM" 한 달 동안 등록된 코치별 휴가(coach_leaves)를 날짜별로 묶어
+    반환한다(당직 캘린더 표시용). */
+export async function listCoachLeavesForMonth(
+  monthKey: string,
+): Promise<Record<string, CoachLeaveEntry[]>> {
+  const [from, to] = monthKeyRange(monthKey);
+  const result = await query<{ id: number; leave_date: string; coach_id: number; coach_name: string; leave_type: string }>(
+    `SELECT l.id, l.leave_date, l.coach_id, c.name AS coach_name, l.leave_type
+     FROM coach_leaves l JOIN coaches c ON c.id = l.coach_id
+     WHERE l.leave_date >= $1 AND l.leave_date < $2
+     ORDER BY l.leave_date ASC, l.id ASC`,
+    [from, to],
+  );
+  const map: Record<string, CoachLeaveEntry[]> = {};
+  for (const r of result.rows) {
+    (map[r.leave_date] ??= []).push({
+      id: r.id,
+      coachId: r.coach_id,
+      coachName: r.coach_name,
+      leaveType: r.leave_type,
+    });
+  }
+  return map;
+}
+
+export async function addCoachLeave(
+  coachId: number,
+  date: string,
+  leaveType: string,
+): Promise<CoachLeaveEntry> {
+  const result = await query<{ id: number; coach_name: string }>(
+    `INSERT INTO coach_leaves (coach_id, leave_date, leave_type)
+     VALUES ($1, $2, $3)
+     RETURNING id, (SELECT name FROM coaches WHERE id = $1) AS coach_name`,
+    [coachId, date, leaveType],
+  );
+  return { id: result.rows[0].id, coachId, coachName: result.rows[0].coach_name, leaveType };
+}
+
+export async function removeCoachLeave(id: number): Promise<void> {
+  await query(`DELETE FROM coach_leaves WHERE id = $1`, [id]);
+}
+
+// ---- 홍보 콘텐츠 포스팅 기록 ----
+
+export interface PromoPostEntry {
+  id: number;
+  coachId: number;
+  coachName: string;
+}
+
+/** "YYYY-MM" 한 달 동안 등록된 홍보 포스팅(promo_posts)을 날짜별로 묶어
+    반환한다(당직 캘린더 표시용). */
+export async function listPromoPostsForMonth(
+  monthKey: string,
+): Promise<Record<string, PromoPostEntry[]>> {
+  const [from, to] = monthKeyRange(monthKey);
+  const result = await query<{ id: number; post_date: string; coach_id: number; coach_name: string }>(
+    `SELECT p.id, p.post_date, p.coach_id, c.name AS coach_name
+     FROM promo_posts p JOIN coaches c ON c.id = p.coach_id
+     WHERE p.post_date >= $1 AND p.post_date < $2
+     ORDER BY p.post_date ASC, p.id ASC`,
+    [from, to],
+  );
+  const map: Record<string, PromoPostEntry[]> = {};
+  for (const r of result.rows) {
+    (map[r.post_date] ??= []).push({ id: r.id, coachId: r.coach_id, coachName: r.coach_name });
+  }
+  return map;
+}
+
+export async function addPromoPost(coachId: number, date: string): Promise<PromoPostEntry> {
+  const result = await query<{ id: number; coach_name: string }>(
+    `INSERT INTO promo_posts (coach_id, post_date)
+     VALUES ($1, $2)
+     RETURNING id, (SELECT name FROM coaches WHERE id = $1) AS coach_name`,
+    [coachId, date],
+  );
+  return { id: result.rows[0].id, coachId, coachName: result.rows[0].coach_name };
+}
+
+export async function removePromoPost(id: number): Promise<void> {
+  await query(`DELETE FROM promo_posts WHERE id = $1`, [id]);
+}
+
 export async function listMemberSessions(memberId: number): Promise<SessionWithMember[]> {
   const result = await query<SessionWithMember>(
     `SELECT ${SESSION_SELECT_FIELDS}

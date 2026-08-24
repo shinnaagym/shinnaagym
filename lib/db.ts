@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 24;
+const SCHEMA_VERSION = 25;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -409,6 +409,29 @@ function runFullMigration(): Promise<void> {
           override_date TEXT PRIMARY KEY,
           coach_id INTEGER REFERENCES coaches(id) ON DELETE CASCADE
         );
+
+        -- 코치별 휴가 기록(취업규칙 제6조 단축근무/휴무/연속 휴가/병가/생일휴가).
+        -- 설정 페이지의 당직 캘린더에서 날짜를 골라 직접 기록하며, 스케줄표의
+        -- "수업 불가" 표시와는 별개로 관리한다(실제 예약 차단은 하지 않고,
+        -- 당직 배정 시 참고할 수 있도록 달력에 표시만 한다).
+        CREATE TABLE IF NOT EXISTS coach_leaves (
+          id SERIAL PRIMARY KEY,
+          coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE,
+          leave_date TEXT NOT NULL,
+          leave_type TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_coach_leaves_date ON coach_leaves(leave_date);
+
+        -- 정직원의 블로그·인스타그램 홍보 콘텐츠 발행(격주 1회) 기록. 당직
+        -- 캘린더에 휴가와 함께 표시해 한눈에 확인할 수 있게 한다.
+        CREATE TABLE IF NOT EXISTS promo_posts (
+          id SERIAL PRIMARY KEY,
+          coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE,
+          post_date TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_promo_posts_date ON promo_posts(post_date);
 
         -- 급여 계산 결과 이력. coach_id는 나중에 코치가 삭제/개명되어도 당시 급여
         -- 명세를 그대로 보존할 수 있게 nullable로 두고, employee_name에 계산 당시
@@ -736,6 +759,21 @@ export interface CoachWorkingHoursRow {
 export interface DutyOverrideRow {
   override_date: string;
   coach_id: number | null;
+}
+
+export interface CoachLeaveRow {
+  id: number;
+  coach_id: number;
+  leave_date: string;
+  leave_type: string;
+  created_at: string;
+}
+
+export interface PromoPostRow {
+  id: number;
+  coach_id: number;
+  post_date: string;
+  created_at: string;
 }
 
 export interface AdminDeviceRow {
