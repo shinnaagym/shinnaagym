@@ -5,15 +5,18 @@ export const BOOKING_WINDOW_DAYS = 90;
 // 오픈일 전에는 사전예약을 받지 않는다 — 이 날짜 이전은 달력에서 선택할 수 없다.
 export const BOOKING_START_DATE = "2026-09-15";
 
-// 취업규칙 제6조(단축근무 및 휴무) 기준 휴가 종류. 당직 캘린더에서 코치별
-// 휴가를 기록할 때 이 중 하나를 고른다. limitPeriod/limitUnit/limitAmount와
-// noticeDays는 서버 검증(lib/schedule.ts checkLeaveRequest)에서 실제로 쓰는
-// 값이고, limitLabel/noticeLabel/payLabel은 화면 표시용 문구다 — 숫자가
-// 바뀌면 반드시 둘 다 같이 고쳐야 한다.
+// 취업규칙 제6조(단축근무 및 휴무)·제11조(경조사 지원) 기준 휴가 종류. 당직
+// 캘린더에서 코치별 휴가를 기록할 때 이 중 하나를 고른다. limitPeriod/
+// limitUnit/limitAmount와 noticeDays는 서버 검증(lib/schedule.ts
+// checkLeaveRequest)에서 실제로 쓰는 값이고, limitLabel/noticeLabel/
+// payLabel/amountLabel/ruleLabel은 화면 표시용 문구다 — 숫자가 바뀌면
+// 반드시 둘 다 같이 고쳐야 한다. amountLabel은 경조사 지원금처럼 일수 외에
+// 별도로 지급되는 금액이 있는 유형에만 채운다(없으면 null).
 export const LEAVE_TYPE_OPTIONS = [
   {
     value: "shortened",
     label: "단축근무",
+    ruleLabel: "취업규칙 제6조",
     limitPeriod: "month",
     limitUnit: "hours",
     limitAmount: 8,
@@ -21,10 +24,12 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 3,
     noticeLabel: "3일 전",
     payLabel: "유급",
+    amountLabel: null,
   },
   {
     value: "day_off",
     label: "휴무",
+    ruleLabel: "취업규칙 제6조",
     limitPeriod: "month",
     limitUnit: "days",
     limitAmount: 2,
@@ -32,10 +37,12 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 14,
     noticeLabel: "2주 전",
     payLabel: "유급",
+    amountLabel: null,
   },
   {
     value: "extended",
     label: "연속 휴가",
+    ruleLabel: "취업규칙 제6조",
     limitPeriod: "year",
     limitUnit: "days",
     limitAmount: 5,
@@ -43,10 +50,12 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 30,
     noticeLabel: "1개월 전",
     payLabel: "유급",
+    amountLabel: null,
   },
   {
     value: "sick",
     label: "병가",
+    ruleLabel: "취업규칙 제6조",
     limitPeriod: "year",
     limitUnit: "days",
     limitAmount: 3,
@@ -54,17 +63,62 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 0,
     noticeLabel: "당일 가능",
     payLabel: "유급",
+    amountLabel: null,
   },
   {
     value: "birthday",
     label: "생일휴가",
+    ruleLabel: "취업규칙 제6조",
     limitPeriod: "year",
     limitUnit: "days",
     limitAmount: 1,
     limitLabel: "연 1일",
-    noticeDays: 14,
-    noticeLabel: "2주 전",
+    // 신청시기 대신 "생일이 포함된 주(월~일) 안에서만" 사용 가능한지를
+    // lib/schedule.ts checkLeaveRequest에서 별도로 검증한다(noticeDays는
+    // 이 유형에는 쓰이지 않음).
+    noticeDays: 0,
+    noticeLabel: "생일이 포함된 주(월~일)만",
     payLabel: "유급",
+    amountLabel: null,
+  },
+  {
+    value: "marriage",
+    label: "본인 결혼",
+    ruleLabel: "취업규칙 제11조(경조사 지원)",
+    limitPeriod: "year",
+    limitUnit: "days",
+    limitAmount: 5,
+    limitLabel: "5일",
+    noticeDays: 0,
+    noticeLabel: "당일 가능",
+    payLabel: "유급",
+    amountLabel: "200,000원 및 화환",
+  },
+  {
+    value: "bereavement",
+    label: "직계가족 사망",
+    ruleLabel: "취업규칙 제11조(경조사 지원)",
+    limitPeriod: "year",
+    limitUnit: "days",
+    limitAmount: 3,
+    limitLabel: "3일",
+    noticeDays: 0,
+    noticeLabel: "당일 가능",
+    payLabel: "유급",
+    amountLabel: "200,000원 및 조화",
+  },
+  {
+    value: "childbirth",
+    label: "본인/배우자 출산",
+    ruleLabel: "취업규칙 제11조(경조사 지원)",
+    limitPeriod: "year",
+    limitUnit: "days",
+    limitAmount: 3,
+    limitLabel: "3일",
+    noticeDays: 0,
+    noticeLabel: "당일 가능",
+    payLabel: "유급",
+    amountLabel: "100,000원",
   },
 ] as const;
 
