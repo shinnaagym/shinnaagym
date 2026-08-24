@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   AdminDeviceRow,
   CoachRow,
@@ -10,7 +10,15 @@ import type {
   RecurringEventRow,
   SettingsMemoRow,
 } from "@/lib/db";
-import { LEAVE_TYPE_LABELS, LEAVE_TYPE_OPTIONS, type LeaveTypeValue } from "@/lib/constants";
+import {
+  LEAVE_TYPE_LABELS,
+  LEAVE_TYPE_OPTIONS,
+  SHORTENED_LEAVE_DIRECTION_LABELS,
+  SHORTENED_LEAVE_DIRECTION_OPTIONS,
+  SHORTENED_LEAVE_HOUR_OPTIONS,
+  type LeaveTypeValue,
+  type ShortenedLeaveDirection,
+} from "@/lib/constants";
 import { SyncDiagnostics } from "./sync-diagnostics";
 import { MemoPad } from "../memo-pad";
 
@@ -142,8 +150,21 @@ function shiftMonthKey(monthKey: string, delta: number): string {
 
 type DutyOverrideMap = Record<string, { coachId: number | null; coachName: string | null }>;
 type BlockedDayMap = Record<string, { coachId: number; coachName: string; memo: string }[]>;
-type CoachLeaveMap = Record<string, { id: number; coachId: number; coachName: string; leaveType: string }[]>;
+type CoachLeaveMap = Record<
+  string,
+  { id: number; coachId: number; coachName: string; leaveType: string; direction: string | null; hours: number | null }[]
+>;
 type PromoPostMap = Record<string, { id: number; coachId: number; coachName: string }[]>;
+
+/** 휴가 표시 문구를 만든다. 단축근무는 "단축근무(출근 지연 2시간)"처럼 방향·시간을 덧붙인다. */
+function formatLeaveLabel(entry: { leaveType: string; direction: string | null; hours: number | null }): string {
+  const base = LEAVE_TYPE_LABELS[entry.leaveType] ?? entry.leaveType;
+  if (entry.leaveType === "shortened" && entry.direction && entry.hours) {
+    const dirLabel = SHORTENED_LEAVE_DIRECTION_LABELS[entry.direction] ?? entry.direction;
+    return `${base}(${dirLabel} ${entry.hours}시간)`;
+  }
+  return base;
+}
 
 /** 코치 한 명의 휴가·포스팅 기록을 날짜 하나에 대해 추가/삭제하는 모달.
     "+기록" 버튼을 눌러 연다. */
@@ -163,13 +184,22 @@ function DayDetailModal({
   leaves: CoachLeaveMap[string];
   posts: PromoPostMap[string];
   onClose: () => void;
-  onAddLeave: (coachId: number, leaveType: LeaveTypeValue) => void;
+  onAddLeave: (
+    coachId: number,
+    leaveType: LeaveTypeValue,
+    direction: ShortenedLeaveDirection | null,
+    hours: number | null,
+  ) => void;
   onRemoveLeave: (id: number) => void;
   onAddPost: (coachId: number) => void;
   onRemovePost: (id: number) => void;
 }) {
   const [leaveCoachId, setLeaveCoachId] = useState(coaches[0]?.id ?? 0);
   const [leaveType, setLeaveType] = useState<LeaveTypeValue>(LEAVE_TYPE_OPTIONS[0].value);
+  const [shortenedDirection, setShortenedDirection] = useState<ShortenedLeaveDirection>(
+    SHORTENED_LEAVE_DIRECTION_OPTIONS[0].value,
+  );
+  const [shortenedHours, setShortenedHours] = useState(SHORTENED_LEAVE_HOUR_OPTIONS[0]);
   const [postCoachId, setPostCoachId] = useState(coaches[0]?.id ?? 0);
   const [, m, d] = date.split("-").map(Number);
 
@@ -200,7 +230,7 @@ function DayDetailModal({
                 className="flex items-center justify-between rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900"
               >
                 <span>
-                  {l.coachName} · {LEAVE_TYPE_LABELS[l.leaveType] ?? l.leaveType}
+                  {l.coachName} · {formatLeaveLabel(l)}
                 </span>
                 <button
                   type="button"
@@ -214,35 +244,70 @@ function DayDetailModal({
             {leaves.length === 0 && <p className="text-xs text-ink/30">등록된 휴가가 없어요.</p>}
           </div>
           {coaches.length > 0 && (
-            <div className="flex gap-1.5">
-              <select
-                value={leaveCoachId}
-                onChange={(e) => setLeaveCoachId(Number(e.target.value))}
-                className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
-              >
-                {coaches.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={leaveType}
-                onChange={(e) => setLeaveType(e.target.value as LeaveTypeValue)}
-                className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
-              >
-                {LEAVE_TYPE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+            <div className="space-y-1.5">
+              <div className="flex gap-1.5">
+                <select
+                  value={leaveCoachId}
+                  onChange={(e) => setLeaveCoachId(Number(e.target.value))}
+                  className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                >
+                  {coaches.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={leaveType}
+                  onChange={(e) => setLeaveType(e.target.value as LeaveTypeValue)}
+                  className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                >
+                  {LEAVE_TYPE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {leaveType === "shortened" && (
+                <div className="flex gap-1.5">
+                  <select
+                    value={shortenedDirection}
+                    onChange={(e) => setShortenedDirection(e.target.value as ShortenedLeaveDirection)}
+                    className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                  >
+                    {SHORTENED_LEAVE_DIRECTION_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={shortenedHours}
+                    onChange={(e) => setShortenedHours(Number(e.target.value))}
+                    className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                  >
+                    {SHORTENED_LEAVE_HOUR_OPTIONS.map((h) => (
+                      <option key={h} value={h}>
+                        {h}시간
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <button
                 type="button"
-                onClick={() => onAddLeave(leaveCoachId, leaveType)}
-                className="shrink-0 rounded-lg bg-ink px-3 text-xs text-white transition hover:bg-coral"
+                onClick={() =>
+                  onAddLeave(
+                    leaveCoachId,
+                    leaveType,
+                    leaveType === "shortened" ? shortenedDirection : null,
+                    leaveType === "shortened" ? shortenedHours : null,
+                  )
+                }
+                className="w-full rounded-lg bg-ink px-3 py-1.5 text-xs text-white transition hover:bg-coral"
               >
-                추가
+                휴가 추가
               </button>
             </div>
           )}
@@ -363,11 +428,17 @@ function DutyCalendar({
     }
   }
 
-  async function addLeave(date: string, coachId: number, leaveType: LeaveTypeValue) {
+  async function addLeave(
+    date: string,
+    coachId: number,
+    leaveType: LeaveTypeValue,
+    direction: ShortenedLeaveDirection | null,
+    hours: number | null,
+  ) {
     const res = await fetch("/api/admin/coach-leaves", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coachId, date, leaveType }),
+      body: JSON.stringify({ coachId, date, leaveType, direction, hours }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -404,6 +475,28 @@ function DutyCalendar({
   const days = daysInCalendarMonth(month);
   const leadingBlanks = calendarWeekdayOf(days[0]);
   const [year, monthNum] = month.split("-").map(Number);
+
+  // 코치 x 휴가 유형별 사용 일수, 코치별 포스팅 횟수(현재 보고 있는 달 기준).
+  const leaveStats = useMemo(() => {
+    const counts: Record<number, Record<string, number>> = {};
+    for (const entries of Object.values(leaves)) {
+      for (const l of entries) {
+        const coachCounts = (counts[l.coachId] ??= {});
+        coachCounts[l.leaveType] = (coachCounts[l.leaveType] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [leaves]);
+
+  const postStats = useMemo(() => {
+    const counts: Record<number, number> = {};
+    for (const entries of Object.values(posts)) {
+      for (const p of entries) {
+        counts[p.coachId] = (counts[p.coachId] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [posts]);
 
   return (
     <div>
@@ -480,9 +573,10 @@ function DutyCalendar({
               {leavesToday.map((l) => (
                 <span
                   key={`l${l.id}`}
+                  title={formatLeaveLabel(l)}
                   className="truncate rounded bg-amber-100 px-1 py-0.5 text-[9px] text-amber-800"
                 >
-                  {l.coachName} · {LEAVE_TYPE_LABELS[l.leaveType] ?? l.leaveType}
+                  {l.coachName} · {formatLeaveLabel(l)}
                 </span>
               ))}
               {postsToday.map((p) => (
@@ -505,6 +599,64 @@ function DutyCalendar({
         })}
       </div>
       {calendarError && <p className="text-sm text-coral mt-3">{calendarError}</p>}
+
+      <div className="mt-6 border-t border-line/50 pt-4">
+        <p className="mb-2 text-xs font-medium text-ink/60">
+          {year}년 {monthNum}월 통계
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[480px] text-xs">
+            <thead>
+              <tr className="text-ink/40">
+                <th className="py-1.5 pr-2 text-left font-medium">코치</th>
+                {LEAVE_TYPE_OPTIONS.map((o) => (
+                  <th key={o.value} className="px-2 py-1.5 text-center font-medium">
+                    {o.label}
+                  </th>
+                ))}
+                <th className="py-1.5 pl-2 text-center font-medium">포스팅</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line/40">
+              {coaches.map((c) => (
+                <tr key={c.id}>
+                  <td className="py-1.5 pr-2">{c.name}</td>
+                  {LEAVE_TYPE_OPTIONS.map((o) => {
+                    const count = leaveStats[c.id]?.[o.value] ?? 0;
+                    return (
+                      <td
+                        key={o.value}
+                        className={[
+                          "px-2 py-1.5 text-center",
+                          count > 0 ? "font-medium text-amber-800" : "text-ink/25",
+                        ].join(" ")}
+                      >
+                        {count > 0 ? `${count}일` : "-"}
+                      </td>
+                    );
+                  })}
+                  <td
+                    className={[
+                      "py-1.5 pl-2 text-center",
+                      (postStats[c.id] ?? 0) > 0 ? "font-medium text-sky-800" : "text-ink/25",
+                    ].join(" ")}
+                  >
+                    {(postStats[c.id] ?? 0) > 0 ? `${postStats[c.id]}회` : "-"}
+                  </td>
+                </tr>
+              ))}
+              {coaches.length === 0 && (
+                <tr>
+                  <td colSpan={LEAVE_TYPE_OPTIONS.length + 2} className="py-2 text-center text-ink/30">
+                    재직 중인 코치가 없어요.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {selectedDate && (
         <DayDetailModal
           date={selectedDate}
@@ -512,7 +664,9 @@ function DutyCalendar({
           leaves={leaves[selectedDate] ?? []}
           posts={posts[selectedDate] ?? []}
           onClose={() => setSelectedDate(null)}
-          onAddLeave={(coachId, leaveType) => addLeave(selectedDate, coachId, leaveType)}
+          onAddLeave={(coachId, leaveType, direction, hours) =>
+            addLeave(selectedDate, coachId, leaveType, direction, hours)
+          }
           onRemoveLeave={(id) => removeLeave(selectedDate, id)}
           onAddPost={(coachId) => addPost(selectedDate, coachId)}
           onRemovePost={(id) => removePost(selectedDate, id)}

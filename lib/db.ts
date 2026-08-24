@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 25;
+const SCHEMA_VERSION = 26;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -411,14 +411,17 @@ function runFullMigration(): Promise<void> {
         );
 
         -- 코치별 휴가 기록(취업규칙 제6조 단축근무/휴무/연속 휴가/병가/생일휴가).
-        -- 설정 페이지의 당직 캘린더에서 날짜를 골라 직접 기록하며, 스케줄표의
-        -- "수업 불가" 표시와는 별개로 관리한다(실제 예약 차단은 하지 않고,
-        -- 당직 배정 시 참고할 수 있도록 달력에 표시만 한다).
+        -- 설정 페이지의 당직 캘린더에서 날짜를 골라 직접 기록하며, 스케줄표에
+        -- 반영되어 회색으로 표시되지만 실제 예약을 막지는 않는다. direction/hours는
+        -- leave_type이 'shortened'(단축근무)일 때만 쓰인다 — direction은
+        -- 'late_start'(출근 지연)/'early_leave'(조기 퇴근), hours는 1~2시간.
         CREATE TABLE IF NOT EXISTS coach_leaves (
           id SERIAL PRIMARY KEY,
           coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE,
           leave_date TEXT NOT NULL,
           leave_type TEXT NOT NULL,
+          direction TEXT,
+          hours SMALLINT,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
         CREATE INDEX IF NOT EXISTS idx_coach_leaves_date ON coach_leaves(leave_date);
@@ -666,6 +669,11 @@ function runFullMigration(): Promise<void> {
             -- 짝에게도 복사해 각자 페이지에서 확인·수정할 수 있게 한다. 짝 관계는
             -- 항상 서로를 가리키도록 애플리케이션 코드(setDuoPartner)가 유지한다.
             ALTER TABLE members ADD COLUMN IF NOT EXISTS duo_partner_id INTEGER REFERENCES members(id) ON DELETE SET NULL;
+
+            -- 단축근무(leave_type='shortened')일 때 출근을 늦출지/퇴근을 당길지와
+            -- 몇 시간(1~2)인지를 함께 기록한다.
+            ALTER TABLE coach_leaves ADD COLUMN IF NOT EXISTS direction TEXT;
+            ALTER TABLE coach_leaves ADD COLUMN IF NOT EXISTS hours SMALLINT;
             `,
           ),
           getPool().query(
@@ -766,6 +774,8 @@ export interface CoachLeaveRow {
   coach_id: number;
   leave_date: string;
   leave_type: string;
+  direction: string | null;
+  hours: number | null;
   created_at: string;
 }
 

@@ -3,6 +3,7 @@ import { isAdminAuthed } from "@/lib/auth";
 import { addDaysToKey, koreaCurrentMonthKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import {
   getAllCoachScheduleStats,
+  getCoachLeavesForDates,
   getCoachWorkingHours,
   getDayHoursForRange,
   getDutyOverridesForDates,
@@ -47,6 +48,7 @@ export default async function AdminSchedulePage({
     memos,
     dutyOverrides,
     coachWorkingHours,
+    coachLeaves,
   ] = await Promise.all([
     listCoaches(),
     listMembersWithProgress(),
@@ -57,6 +59,7 @@ export default async function AdminSchedulePage({
     listScheduleMemos(),
     getDutyOverridesForDates(dateKeys),
     getCoachWorkingHours(),
+    getCoachLeavesForDates(dateKeys),
   ]);
 
   const holidayMap = Object.fromEntries(
@@ -84,6 +87,7 @@ export default async function AdminSchedulePage({
         initialMemos={memos}
         dutyOverrides={dutyOverrides}
         coachWorkingHours={coachWorkingHours}
+        coachLeaves={coachLeaves}
       />
     </div>
   );
