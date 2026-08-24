@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { isValidDateKey } from "@/lib/date";
-import { getDutyOverridesForDates, setDutyOverride } from "@/lib/schedule";
+import { DutyAssignmentError, getDutyOverridesForDates, setDutyOverride } from "@/lib/schedule";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminAuthed())) {
@@ -27,19 +27,26 @@ export async function PATCH(req: NextRequest) {
   if (!date) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  if (body?.clear === true) {
-    await setDutyOverride(date, undefined);
-  } else {
-    const coachId =
-      body?.coachId === null
-        ? null
-        : typeof body?.coachId === "number" && Number.isInteger(body.coachId)
-          ? body.coachId
-          : undefined;
-    if (coachId === undefined) {
-      return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  try {
+    if (body?.clear === true) {
+      await setDutyOverride(date, undefined);
+    } else {
+      const coachId =
+        body?.coachId === null
+          ? null
+          : typeof body?.coachId === "number" && Number.isInteger(body.coachId)
+            ? body.coachId
+            : undefined;
+      if (coachId === undefined) {
+        return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+      }
+      await setDutyOverride(date, coachId);
     }
-    await setDutyOverride(date, coachId);
+  } catch (err) {
+    if (err instanceof DutyAssignmentError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
   }
   return NextResponse.json({ ok: true });
 }

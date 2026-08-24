@@ -29,14 +29,11 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   owner: "대표",
 };
 
-// weekday: 앱 전체에서 쓰는 관례대로 0=월요일 ~ 6=일요일.
-const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
-
-export type DutyRoster = Record<number, { coachId: number; coachName: string }>;
-
 // lib/schedule.ts는 서버 전용 DB 클라이언트(pg)를 물고 있어 클라이언트 컴포넌트에서
-// import하면 번들이 깨지므로, 타입만 이 파일에 그대로 복제해 둔다(DutyRoster와 동일한 이유).
-// weekdayStarts/weekdayEnds는 5개 배열(0=월 ~ 4=금) — 요일별로 다른 근무시간을 쓸 수 있다.
+// import하면 번들이 깨지므로, 타입만 이 파일에 그대로 복제해 둔다.
+// weekdayStarts/weekdayEnds는 5개 배열(0=월 ~ 4=금)이지만, 이 화면에서는 오전조/오후조
+// 프리셋으로만 저장해 다섯 값이 항상 같다. 토요일 값(saturdayStart/End)은 더 이상 이
+// 화면에서 편집하지 않는다 — 토요일 근무는 아래 당직 캘린더에서 9~15시 고정으로 배정된다.
 export interface CoachWorkingHours {
   weekdayStarts: number[];
   weekdayEnds: number[];
@@ -44,141 +41,244 @@ export interface CoachWorkingHours {
   saturdayEnd: number;
 }
 
-const DEFAULT_WORKING_HOURS: CoachWorkingHours = {
-  weekdayStarts: [9, 9, 9, 9, 9],
-  weekdayEnds: [22, 22, 22, 22, 22],
-  saturdayStart: 9,
-  saturdayEnd: 15,
-};
+/** 코치별 근무시간 설정은 이제 요일별 커스텀 대신 오전조/오후조 중 하나를 고르는
+    방식이다. 토요일 값은 더 이상 이 화면에서 쓰이지 않지만(당직 캘린더가 대신함)
+    스키마상 NOT NULL이라 9~15시로 채워 둔다. */
+const SHIFT_PRESETS = {
+  morning: {
+    label: "오전조 (9~17시)",
+    hours: { weekdayStarts: [9, 9, 9, 9, 9], weekdayEnds: [17, 17, 17, 17, 17], saturdayStart: 9, saturdayEnd: 15 },
+  },
+  afternoon: {
+    label: "오후조 (14~22시)",
+    hours: { weekdayStarts: [14, 14, 14, 14, 14], weekdayEnds: [22, 22, 22, 22, 22], saturdayStart: 9, saturdayEnd: 15 },
+  },
+} as const satisfies Record<string, { label: string; hours: CoachWorkingHours }>;
 
-const WEEKDAY_SHORT_LABELS = ["월", "화", "수", "목", "금"];
+type ShiftKey = keyof typeof SHIFT_PRESETS;
 
-function HourSelect({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (hour: number) => void;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="rounded-lg border border-line px-2 py-1 text-xs outline-none focus:border-coral"
-    >
-      {HOUR_OPTIONS.map((h) => (
-        <option key={h} value={h}>
-          {h}시
-        </option>
-      ))}
-    </select>
-  );
+function detectShift(hours: CoachWorkingHours | undefined): ShiftKey | null {
+  if (!hours) return null;
+  for (const key of Object.keys(SHIFT_PRESETS) as ShiftKey[]) {
+    const preset = SHIFT_PRESETS[key].hours;
+    if (
+      hours.weekdayStarts.join(",") === preset.weekdayStarts.join(",") &&
+      hours.weekdayEnds.join(",") === preset.weekdayEnds.join(",")
+    ) {
+      return key;
+    }
+  }
+  return null;
 }
 
-/** 코치 한 명의 평일/토요일 근무시간을 편집하는 행. 저장 전까지는 로컬 상태로만
-    수정하다가 "저장"을 눌러야 반영된다 — 4개 값이 서로 맞물려 있어(종료가 시작보다
-    늦어야 함) 값 하나 바뀔 때마다 바로 저장하면 중간에 잘못된 조합이 저장될 수 있다. */
-function CoachWorkingHoursRow({
+/** 코치 한 명의 근무 조(오전/오후)를 고르는 행. 클릭하는 즉시 저장된다. */
+function CoachShiftRow({
   coachName,
   saved,
-  onSave,
+  onSelect,
   onClear,
 }: {
   coachName: string;
   saved: CoachWorkingHours | undefined;
-  onSave: (hours: CoachWorkingHours) => void;
+  onSelect: (hours: CoachWorkingHours) => void;
   onClear: () => void;
 }) {
-  const [draft, setDraft] = useState<CoachWorkingHours>(saved ?? DEFAULT_WORKING_HOURS);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(saved ?? DEFAULT_WORKING_HOURS);
-  const [bulkStart, setBulkStart] = useState(9);
-  const [bulkEnd, setBulkEnd] = useState(22);
-
-  function applyBulkToAllWeekdays() {
-    setDraft((d) => ({
-      ...d,
-      weekdayStarts: WEEKDAY_SHORT_LABELS.map(() => bulkStart),
-      weekdayEnds: WEEKDAY_SHORT_LABELS.map(() => bulkEnd),
-    }));
-  }
-
-  function setWeekdayStart(i: number, h: number) {
-    setDraft((d) => {
-      const next = [...d.weekdayStarts];
-      next[i] = h;
-      return { ...d, weekdayStarts: next };
-    });
-  }
-
-  function setWeekdayEnd(i: number, h: number) {
-    setDraft((d) => {
-      const next = [...d.weekdayEnds];
-      next[i] = h;
-      return { ...d, weekdayEnds: next };
-    });
-  }
-
+  const current = detectShift(saved);
   return (
-    <div className="py-2.5 flex flex-col gap-2">
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm w-16 shrink-0">{coachName}</span>
-        <span className="flex items-center gap-1 text-[11px] text-ink/40">
-          평일 일괄 적용
-          <HourSelect value={bulkStart} onChange={setBulkStart} />
-          ~
-          <HourSelect value={bulkEnd} onChange={setBulkEnd} />
+    <div className="py-2.5 flex items-center gap-3 flex-wrap">
+      <span className="text-sm w-16 shrink-0">{coachName}</span>
+      <div className="flex gap-1.5 flex-wrap">
+        {(Object.keys(SHIFT_PRESETS) as ShiftKey[]).map((key) => (
           <button
+            key={key}
             type="button"
-            onClick={applyBulkToAllWeekdays}
-            className="rounded-full border border-line px-2 py-0.5 text-[11px] hover:bg-bone transition"
+            onClick={() => onSelect(SHIFT_PRESETS[key].hours)}
+            className={[
+              "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
+              current === key
+                ? "bg-ink text-white border-ink"
+                : "border-line text-ink/60 hover:bg-bone",
+            ].join(" ")}
           >
-            평일 전체 적용
+            {SHIFT_PRESETS[key].label}
           </button>
-        </span>
-        <span className="flex items-center gap-1 text-[11px] text-ink/40">
-          토요일
-          <HourSelect
-            value={draft.saturdayStart}
-            onChange={(h) => setDraft((d) => ({ ...d, saturdayStart: h }))}
-          />
-          ~
-          <HourSelect
-            value={draft.saturdayEnd}
-            onChange={(h) => setDraft((d) => ({ ...d, saturdayEnd: h }))}
-          />
-        </span>
-        {dirty && (
-          <button
-            type="button"
-            onClick={() => onSave(draft)}
-            className="rounded-full bg-ink text-white px-3 py-1 text-xs hover:bg-coral transition"
-          >
-            저장
-          </button>
-        )}
-        {saved && !dirty && (
-          <button
-            type="button"
-            onClick={() => {
-              setDraft(DEFAULT_WORKING_HOURS);
-              onClear();
-            }}
-            className="text-[11px] text-ink/40 hover:text-coral"
-          >
-            제한 없음으로 초기화
-          </button>
-        )}
-      </div>
-      <div className="flex items-center gap-3 flex-wrap pl-[4.75rem]">
-        {WEEKDAY_SHORT_LABELS.map((label, i) => (
-          <span key={label} className="flex items-center gap-1 text-[11px] text-ink/40">
-            {label}
-            <HourSelect value={draft.weekdayStarts[i]} onChange={(h) => setWeekdayStart(i, h)} />
-            ~
-            <HourSelect value={draft.weekdayEnds[i]} onChange={(h) => setWeekdayEnd(i, h)} />
-          </span>
         ))}
       </div>
+      {saved && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-[11px] text-ink/40 hover:text-coral"
+        >
+          제한 없음으로 초기화
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---- 토요일 당직 캘린더 ----
+
+const CALENDAR_WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+
+/** "YYYY-MM-DD"의 요일(0=월~6=일)을 반환한다. */
+function calendarWeekdayOf(dateKey: string): number {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
+}
+
+function daysInCalendarMonth(monthKey: string): string[] {
+  const [y, m] = monthKey.split("-").map(Number);
+  const count = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return Array.from({ length: count }, (_, i) => `${monthKey}-${String(i + 1).padStart(2, "0")}`);
+}
+
+function shiftMonthKey(monthKey: string, delta: number): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  const total = y * 12 + (m - 1) + delta;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
+}
+
+type DutyOverrideMap = Record<string, { coachId: number | null; coachName: string | null }>;
+type BlockedDayMap = Record<string, { coachId: number; coachName: string; memo: string }[]>;
+
+/** 토요일마다 당직 코치를 배정하는 월별 캘린더. 코치별 당직은 월 1회로
+    제한되며(서버에서 검증), 같은 달에 등록된 휴가(수업 불가 표시)도 함께
+    보여줘 당직 배정할 때 참고할 수 있게 한다. */
+function DutyCalendar({
+  coaches,
+  initialMonth,
+  initialOverrides,
+  initialBlockedDays,
+}: {
+  coaches: CoachRow[];
+  initialMonth: string;
+  initialOverrides: DutyOverrideMap;
+  initialBlockedDays: BlockedDayMap;
+}) {
+  const [month, setMonth] = useState(initialMonth);
+  const [overrides, setOverrides] = useState<DutyOverrideMap>(initialOverrides);
+  const [blockedDays, setBlockedDays] = useState<BlockedDayMap>(initialBlockedDays);
+  const [loading, setLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+
+  async function goToMonth(nextMonth: string) {
+    setMonth(nextMonth);
+    setLoading(true);
+    setCalendarError(null);
+    try {
+      const res = await fetch(`/api/admin/duty-calendar?month=${nextMonth}`);
+      const data = await res.json();
+      if (res.ok) {
+        setOverrides(data.overrides);
+        setBlockedDays(data.blocked);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function assignSaturday(date: string, coachId: number | null | undefined) {
+    const prevOverrides = overrides;
+    const coach = typeof coachId === "number" ? coaches.find((c) => c.id === coachId) : null;
+    setOverrides((prev) => {
+      const next = { ...prev };
+      if (coachId === undefined) delete next[date];
+      else next[date] = { coachId, coachName: coach?.name ?? null };
+      return next;
+    });
+    setCalendarError(null);
+    const res = await fetch("/api/admin/duty-override", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(coachId === undefined ? { date, clear: true } : { date, coachId }),
+    });
+    if (!res.ok) {
+      setOverrides(prevOverrides);
+      const data = await res.json().catch(() => ({}));
+      setCalendarError(data.error ?? "당직 지정에 실패했습니다.");
+    }
+  }
+
+  const days = daysInCalendarMonth(month);
+  const leadingBlanks = calendarWeekdayOf(days[0]);
+  const [year, monthNum] = month.split("-").map(Number);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <button
+          type="button"
+          onClick={() => goToMonth(shiftMonthKey(month, -1))}
+          className="rounded-full border border-line w-8 h-8 text-sm hover:bg-bone transition"
+        >
+          ‹
+        </button>
+        <p className="text-sm font-medium">
+          {year}년 {monthNum}월{loading && <span className="text-ink/30"> · 불러오는 중</span>}
+        </p>
+        <button
+          type="button"
+          onClick={() => goToMonth(shiftMonthKey(month, 1))}
+          className="rounded-full border border-line w-8 h-8 text-sm hover:bg-bone transition"
+        >
+          ›
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-ink/40 mb-1">
+        {CALENDAR_WEEKDAY_LABELS.map((label) => (
+          <div key={label}>{label}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: leadingBlanks }).map((_, i) => (
+          <div key={`blank-${i}`} />
+        ))}
+        {days.map((d) => {
+          const isSaturday = calendarWeekdayOf(d) === 5;
+          const dayNum = Number(d.split("-")[2]);
+          const duty = overrides[d];
+          const blockedToday = blockedDays[d] ?? [];
+          return (
+            <div
+              key={d}
+              className={[
+                "rounded-lg border p-1.5 min-h-[62px] flex flex-col gap-1",
+                isSaturday ? "border-coral/30 bg-coral/[0.03]" : "border-line/50",
+              ].join(" ")}
+            >
+              <span className="text-[11px] text-ink/50">{dayNum}</span>
+              {isSaturday && (
+                <select
+                  value={duty?.coachId ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    assignSaturday(d, v === "" ? undefined : Number(v));
+                  }}
+                  className="w-full min-w-0 rounded border border-line/70 bg-white px-1 py-0.5 text-[10px] outline-none focus:border-coral"
+                >
+                  <option value="">미배정</option>
+                  {coaches.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {blockedToday.map((b, i) => (
+                <span
+                  key={i}
+                  title={b.memo}
+                  className="truncate rounded bg-slate-200 px-1 py-0.5 text-[9px] text-slate-700"
+                >
+                  {b.coachName} · {b.memo || "휴가"}
+                </span>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      {calendarError && <p className="text-sm text-coral mt-3">{calendarError}</p>}
     </div>
   );
 }
@@ -190,7 +290,9 @@ export function SettingsView({
   buildId,
   initialDevices,
   currentDeviceId,
-  initialDutyRoster,
+  initialDutyMonth,
+  initialDutyOverrides,
+  initialBlockedDays,
   initialRecurringEvents,
   initialSettingsMemos,
   initialCoachWorkingHours,
@@ -201,14 +303,15 @@ export function SettingsView({
   buildId: string;
   initialDevices: AdminDeviceRow[];
   currentDeviceId: string | null;
-  initialDutyRoster: DutyRoster;
+  initialDutyMonth: string;
+  initialDutyOverrides: DutyOverrideMap;
+  initialBlockedDays: BlockedDayMap;
   initialRecurringEvents: RecurringEventRow[];
   initialSettingsMemos: SettingsMemoRow[];
   initialCoachWorkingHours: Record<number, CoachWorkingHours>;
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
-  const [dutyRoster, setDutyRoster] = useState(initialDutyRoster);
   const [coachWorkingHours, setCoachWorkingHours] = useState(initialCoachWorkingHours);
   const [newCoachName, setNewCoachName] = useState("");
   const [newCoachPhone, setNewCoachPhone] = useState("");
@@ -221,22 +324,6 @@ export function SettingsView({
   const [newEventStartHour, setNewEventStartHour] = useState(12);
   const [newEventEndHour, setNewEventEndHour] = useState(14);
   const [error, setError] = useState<string | null>(null);
-
-  async function toggleDuty(weekday: number, coach: CoachRow) {
-    const isAssignedToThisCoach = dutyRoster[weekday]?.coachId === coach.id;
-    const nextCoachId = isAssignedToThisCoach ? null : coach.id;
-    setDutyRoster((prev) => {
-      const next = { ...prev };
-      if (nextCoachId === null) delete next[weekday];
-      else next[weekday] = { coachId: coach.id, coachName: coach.name };
-      return next;
-    });
-    await fetch("/api/admin/duty-roster", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weekday, coachId: nextCoachId }),
-    });
-  }
 
   async function saveCoachWorkingHours(coachId: number, hours: CoachWorkingHours) {
     const invalidWeekday = hours.weekdayStarts.some((h, i) => h >= hours.weekdayEnds[i]);
@@ -554,38 +641,24 @@ export function SettingsView({
       </section>
 
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
-        <h2 className="font-display text-lg mb-1">당직자 설정</h2>
+        <h2 className="font-display text-lg mb-1">근무시간 설정</h2>
         <p className="text-xs text-ink/50 mb-4">
-          요일마다 당직 코치를 지정하면 스케줄표 요일 아래에 표시돼요. 한 요일에는 한 명만
-          지정할 수 있어요(다른 코치를 선택하면 그 요일의 기존 지정은 해제돼요).
+          코치별로 오전조(9~17시) 또는 오후조(14~22시) 중 하나를 지정하면, 스케줄표에서
+          그 시간 외 칸이 회색으로 표시돼요(예약 자체가 막히진 않아요). 지정하지 않은
+          코치는 스튜디오 영업시간 전체가 근무시간으로 취급돼 회색 표시가 나타나지
+          않아요. 토요일 근무는 아래 당직 캘린더에서 별도로 배정합니다.
         </p>
         <div className="divide-y divide-line/50">
           {coaches
             .filter((c) => c.active)
             .map((c) => (
-              <div key={c.id} className="py-2.5 flex items-center gap-3 flex-wrap">
-                <span className="text-sm w-16 shrink-0">{c.name}</span>
-                <div className="flex gap-1 flex-wrap">
-                  {WEEKDAY_LABELS.map((label, weekday) => {
-                    const active = dutyRoster[weekday]?.coachId === c.id;
-                    return (
-                      <button
-                        key={weekday}
-                        type="button"
-                        onClick={() => toggleDuty(weekday, c)}
-                        className={[
-                          "rounded-lg border w-9 h-9 text-xs font-medium transition",
-                          active
-                            ? "bg-ink text-white border-ink"
-                            : "border-line text-ink/60 hover:bg-bone",
-                        ].join(" ")}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <CoachShiftRow
+                key={c.id}
+                coachName={c.name}
+                saved={coachWorkingHours[c.id]}
+                onSelect={(hours) => saveCoachWorkingHours(c.id, hours)}
+                onClear={() => clearCoachWorkingHours(c.id)}
+              />
             ))}
           {coaches.filter((c) => c.active).length === 0 && (
             <p className="text-sm text-ink/40 py-2.5">재직 중인 코치가 없어요.</p>
@@ -594,28 +667,18 @@ export function SettingsView({
       </section>
 
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
-        <h2 className="font-display text-lg mb-1">근무시간 설정</h2>
+        <h2 className="font-display text-lg mb-1">토요일 당직</h2>
         <p className="text-xs text-ink/50 mb-4">
-          코치별로 평일·토요일 근무시간을 정해두면, 스케줄표에서 그 시간 외 칸이 회색으로
-          표시돼요(예약 자체가 막히진 않아요). 설정하지 않은 코치는 스튜디오 영업시간 전체가
-          근무시간으로 취급돼 회색 표시가 나타나지 않아요.
+          토요일마다 당직 코치 한 명을 배정하세요(9~15시 고정 근무). 같은 코치를 한
+          달에 두 번 이상 당직으로 배정할 수는 없어요. 코치별로 등록된 휴가도 함께
+          표시되니 참고해서 배정하세요.
         </p>
-        <div className="divide-y divide-line/50">
-          {coaches
-            .filter((c) => c.active)
-            .map((c) => (
-              <CoachWorkingHoursRow
-                key={c.id}
-                coachName={c.name}
-                saved={coachWorkingHours[c.id]}
-                onSave={(hours) => saveCoachWorkingHours(c.id, hours)}
-                onClear={() => clearCoachWorkingHours(c.id)}
-              />
-            ))}
-          {coaches.filter((c) => c.active).length === 0 && (
-            <p className="text-sm text-ink/40 py-2.5">재직 중인 코치가 없어요.</p>
-          )}
-        </div>
+        <DutyCalendar
+          coaches={coaches.filter((c) => c.active)}
+          initialMonth={initialDutyMonth}
+          initialOverrides={initialDutyOverrides}
+          initialBlockedDays={initialBlockedDays}
+        />
       </section>
 
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">

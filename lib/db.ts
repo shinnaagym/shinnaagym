@@ -400,18 +400,11 @@ function runFullMigration(): Promise<void> {
           PRIMARY KEY (ip, scope)
         );
 
-        -- 요일별 당직자(고정 담당 코치) 설정. 요일은 앱 전체에서 쓰는 관례대로
-        -- 0=월요일 ~ 6=일요일이며, 한 요일에는 코치 한 명만 지정할 수 있다
-        -- (PRIMARY KEY). 코치가 삭제되면 그 요일의 당직 지정도 함께 사라진다.
-        CREATE TABLE IF NOT EXISTS duty_roster (
-          weekday SMALLINT PRIMARY KEY,
-          coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE
-        );
-
-        -- 특정 날짜 하루만 당직자를 요일 기본값과 다르게 바꾸고 싶을 때 쓰는
-        -- 예외 테이블(스케줄표에서 "당직" 표시를 눌러 바꾸면 이 표에 기록된다).
-        -- coach_id가 NULL이면 "이 날짜는 당직자 없음"을 명시적으로 나타내고,
-        -- 행 자체가 없으면 duty_roster의 요일 기본값을 그대로 따른다.
+        -- 토요일 당직(그날 근무하는 코치) 지정. 토요일은 코치별 근무시간 대신
+        -- 당직 코치 한 명만 9~15시로 근무하는 방식이라, 날짜별로 당직자를
+        -- 기록한다. coach_id가 NULL이면 "이 토요일은 당직자 없음(휴무)"을
+        -- 명시적으로 나타낸다. 같은 코치가 한 달에 두 번 이상 당직을 서지
+        -- 않도록 setDutyOverride에서 검증한다(lib/schedule.ts).
         CREATE TABLE IF NOT EXISTS duty_overrides (
           override_date TEXT PRIMARY KEY,
           coach_id INTEGER REFERENCES coaches(id) ON DELETE CASCADE
@@ -727,12 +720,6 @@ export interface CoachRow {
   /** YYYY-MM-DD. 연도는 무시하고 월·일만 스케줄표 생일 표시에 쓴다. 미입력 시 빈 문자열. */
   birthday: string;
   created_at: string;
-}
-
-/** weekday: 앱 전체에서 쓰는 관례대로 0=월요일 ~ 6=일요일. */
-export interface DutyRosterRow {
-  weekday: number;
-  coach_id: number;
 }
 
 /** 코치별 근무시간. 행이 없는 코치는 제한 없음(스튜디오 영업시간 전체가 근무시간).
