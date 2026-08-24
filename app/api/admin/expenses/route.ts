@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminAuthed } from "@/lib/auth";
+import { isAdminAuthed, isLedgerAuthed } from "@/lib/auth";
 import { isValidMonthKey } from "@/lib/date";
 import { createExpense, listExpensesByMonth } from "@/lib/expenses";
 import { recordUndo } from "@/lib/undo";
@@ -7,6 +7,9 @@ import { recordUndo } from "@/lib/undo";
 export async function GET(req: NextRequest) {
   if (!(await isAdminAuthed())) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+  }
+  if (!(await isLedgerAuthed())) {
+    return NextResponse.json({ error: "가계부 비밀번호 확인이 필요합니다." }, { status: 401 });
   }
   const month = req.nextUrl.searchParams.get("month") ?? "";
   if (!isValidMonthKey(month)) {
@@ -19,6 +22,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!(await isAdminAuthed())) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+  }
+  if (!(await isLedgerAuthed())) {
+    return NextResponse.json({ error: "가계부 비밀번호 확인이 필요합니다." }, { status: 401 });
   }
   const body = (await req.json().catch(() => null)) as
     | {

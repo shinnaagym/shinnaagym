@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminAuthed } from "@/lib/auth";
+import { isAdminAuthed, isLedgerAuthed } from "@/lib/auth";
 import { deleteExpense } from "@/lib/expenses";
 import { query, type ExpenseRow } from "@/lib/db";
 import { recordUndo } from "@/lib/undo";
@@ -10,6 +10,9 @@ export async function DELETE(
 ) {
   if (!(await isAdminAuthed())) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+  }
+  if (!(await isLedgerAuthed())) {
+    return NextResponse.json({ error: "가계부 비밀번호 확인이 필요합니다." }, { status: 401 });
   }
   const { id } = await params;
   const idNum = Number(id);

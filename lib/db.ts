@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 26;
+const SCHEMA_VERSION = 27;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -458,6 +458,30 @@ function runFullMigration(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_payroll_records_year_month ON payroll_records(year_month);
         CREATE INDEX IF NOT EXISTS idx_payroll_records_coach_id ON payroll_records(coach_id);
+
+        -- 저수지(세금·예비비) 관리용 적립/차감 통합 히스토리. reserve_type은
+        -- lib/constants.ts의 RESERVE_TYPE_OPTIONS 값(vat/income_tax/severance/
+        -- withholding_tax/social_insurance/refund_defense/depreciation) 중 하나다.
+        -- 한 저수지의 "누적 잔액"은 이 표에 쌓인 deposit 합계에서 withdrawal
+        -- 합계를 뺀 값이고, "당월 적립액"은 year_month가 해당 월인 deposit
+        -- 합계다 — 별도 잔액 컬럼을 두지 않고 항상 이 표에서 계산해, 잔액이
+        -- 실제 입출금 내역과 어긋날 수 없게 한다. source='monthly_settlement'인
+        -- deposit 행은 "이번 달 정산" 버튼을 다시 눌러도 중복되지 않도록(멱등)
+        -- 같은 reserve_type·year_month 조합이면 재계산 전에 지우고 다시 넣는다
+        -- (lib/reserves.ts runMonthlySettlement). withdrawal은 대표가 실제로
+        -- 세금을 납부하거나 비용을 지출했을 때 수동으로 기록한다.
+        CREATE TABLE IF NOT EXISTS reserve_transactions (
+          id SERIAL PRIMARY KEY,
+          reserve_type TEXT NOT NULL,
+          transaction_type TEXT NOT NULL, -- 'deposit' | 'withdrawal'
+          amount INTEGER NOT NULL,
+          year_month TEXT NOT NULL,
+          memo TEXT NOT NULL DEFAULT '',
+          source TEXT NOT NULL DEFAULT 'manual', -- 'monthly_settlement' | 'manual'
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_reserve_transactions_type ON reserve_transactions(reserve_type);
+        CREATE INDEX IF NOT EXISTS idx_reserve_transactions_month ON reserve_transactions(year_month);
 
         -- PT 세션마다 남기는 운동 일지. 통증 척도·운동수행 능력은 그날 세션 전체에
         -- 대한 주관적 점수 하나씩(0~10)이고, exercises에는 그날 수행한 운동 목록
@@ -1119,6 +1143,20 @@ export interface PayrollRecordRow {
   referral_payment_amount: number;
   referral_entries: unknown;
   result: unknown;
+  created_at: string;
+}
+
+export type ReserveTransactionType = "deposit" | "withdrawal";
+export type ReserveTransactionSource = "monthly_settlement" | "manual";
+
+export interface ReserveTransactionRow {
+  id: number;
+  reserve_type: string;
+  transaction_type: ReserveTransactionType;
+  amount: number;
+  year_month: string;
+  memo: string;
+  source: ReserveTransactionSource;
   created_at: string;
 }
 

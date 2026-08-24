@@ -42,6 +42,25 @@ export const SHORTENED_LEAVE_HOUR_OPTIONS = Array.from(
   (_, i) => i + 1,
 ); // [1, 2]
 
+// 저수지(세금·예비비) 관리 대시보드에서 다루는 항목들. rateDescription은
+// 화면에 그대로 표시하는 안내 문구일 뿐, 실제 계산식은 lib/reserves.ts
+// runMonthlySettlement에 있다.
+export const RESERVE_TYPE_OPTIONS = [
+  { value: "vat", label: "부가가치세", rateDescription: "매출의 10%" },
+  { value: "income_tax", label: "종합소득세 예비비", rateDescription: "월 순이익의 15%" },
+  { value: "severance", label: "퇴직금 예비비", rateDescription: "정직원 급여의 8.33%" },
+  { value: "withholding_tax", label: "원천세", rateDescription: "당월 발생액" },
+  { value: "social_insurance", label: "4대보험", rateDescription: "당월 발생액" },
+  { value: "refund_defense", label: "환불 방어금", rateDescription: "잔여 세션 가치의 10%" },
+  { value: "depreciation", label: "감가상각비", rateDescription: "매출의 5%" },
+] as const;
+
+export type ReserveType = (typeof RESERVE_TYPE_OPTIONS)[number]["value"];
+
+export const RESERVE_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  RESERVE_TYPE_OPTIONS.map((option) => [option.value, option.label]),
+);
+
 export const PURPOSE_OPTIONS = [
   { value: "rehab", label: "재활" },
   { value: "posture", label: "체형교정" },

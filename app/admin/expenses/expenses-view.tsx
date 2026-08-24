@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExpenseRow } from "@/lib/db";
 import { ExpenseMonthPicker } from "./expense-month-picker";
+import { ReserveDashboard } from "./reserve-dashboard";
 
 function addMonthsToMonthKey(monthKey: string, delta: number): string {
   const [y, m] = monthKey.split("-").map(Number);
@@ -27,16 +28,11 @@ const AMOUNT_QUICK_ADD = [
   { label: "+100만", value: 1000000 },
 ];
 
-export function ExpensesView({
-  monthKey,
-  expenses,
-  paymentTotals,
-}: {
-  monthKey: string;
-  expenses: ExpenseRow[];
-  paymentTotals: { card: number; transfer: number };
-}) {
+export function ExpensesView({ monthKey }: { monthKey: string }) {
   const router = useRouter();
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
+  const [paymentTotals, setPaymentTotals] = useState({ card: 0, transfer: 0 });
+  const [loading, setLoading] = useState(true);
   const [item, setItem] = useState("");
   const [amount, setAmount] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -46,6 +42,31 @@ export function ExpensesView({
   const [error, setError] = useState<string | null>(null);
 
   const total = expenses.reduce((sum, e) => sum + e.amount * e.quantity, 0);
+
+  async function loadLedger() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/ledger?month=${monthKey}`);
+      const data = await res.json();
+      if (res.ok) {
+        setExpenses(data.expenses);
+        setPaymentTotals(data.paymentTotals);
+      } else {
+        setError(data.error ?? "불러오기에 실패했어요.");
+      }
+    } catch {
+      setError("네트워크 오류가 발생했어요.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void (async () => {
+      await loadLedger();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey]);
 
   function goToMonth(key: string) {
     router.push(`/admin/expenses?month=${key}`);
@@ -86,7 +107,7 @@ export function ExpensesView({
       setAmount("");
       setQuantity("1");
       setNote("");
-      router.refresh();
+      await loadLedger();
     } catch {
       setError("네트워크 오류가 발생했어요.");
     } finally {
@@ -103,14 +124,16 @@ export function ExpensesView({
         window.alert("삭제에 실패했어요.");
         return;
       }
-      router.refresh();
+      await loadLedger();
     } finally {
       setDeletingId(null);
     }
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_260px] items-start">
+    <div>
+      <ReserveDashboard monthKey={monthKey} />
+      <div className="grid gap-6 lg:grid-cols-[1fr_260px] items-start">
       <div className="min-w-0">
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <button
@@ -203,7 +226,11 @@ export function ExpensesView({
           {error && <p className="text-xs text-coral mt-2">{error}</p>}
         </div>
 
-        {expenses.length === 0 ? (
+        {loading ? (
+          <div className="rounded-2xl bg-white border border-line/60 px-5 py-8 text-center text-ink/40 text-sm">
+            불러오는 중...
+          </div>
+        ) : expenses.length === 0 ? (
           <div className="rounded-2xl bg-white border border-line/60 px-5 py-8 text-center text-ink/40 text-sm">
             이번 달 지출 내역이 없어요.
           </div>
@@ -279,6 +306,7 @@ export function ExpensesView({
             </span>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
