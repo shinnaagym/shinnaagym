@@ -10,6 +10,7 @@ import type {
   RecurringEventRow,
   SettingsMemoRow,
 } from "@/lib/db";
+import { LEAVE_TYPE_LABELS, LEAVE_TYPE_OPTIONS, type LeaveTypeValue } from "@/lib/constants";
 import { SyncDiagnostics } from "./sync-diagnostics";
 import { MemoPad } from "../memo-pad";
 
@@ -141,26 +142,186 @@ function shiftMonthKey(monthKey: string, delta: number): string {
 
 type DutyOverrideMap = Record<string, { coachId: number | null; coachName: string | null }>;
 type BlockedDayMap = Record<string, { coachId: number; coachName: string; memo: string }[]>;
+type CoachLeaveMap = Record<string, { id: number; coachId: number; coachName: string; leaveType: string }[]>;
+type PromoPostMap = Record<string, { id: number; coachId: number; coachName: string }[]>;
 
-/** 토요일마다 당직 코치를 배정하는 월별 캘린더. 코치별 당직은 월 1회로
-    제한되며(서버에서 검증), 같은 달에 등록된 휴가(수업 불가 표시)도 함께
-    보여줘 당직 배정할 때 참고할 수 있게 한다. */
+/** 코치 한 명의 휴가·포스팅 기록을 날짜 하나에 대해 추가/삭제하는 모달.
+    "+기록" 버튼을 눌러 연다. */
+function DayDetailModal({
+  date,
+  coaches,
+  leaves,
+  posts,
+  onClose,
+  onAddLeave,
+  onRemoveLeave,
+  onAddPost,
+  onRemovePost,
+}: {
+  date: string;
+  coaches: CoachRow[];
+  leaves: CoachLeaveMap[string];
+  posts: PromoPostMap[string];
+  onClose: () => void;
+  onAddLeave: (coachId: number, leaveType: LeaveTypeValue) => void;
+  onRemoveLeave: (id: number) => void;
+  onAddPost: (coachId: number) => void;
+  onRemovePost: (id: number) => void;
+}) {
+  const [leaveCoachId, setLeaveCoachId] = useState(coaches[0]?.id ?? 0);
+  const [leaveType, setLeaveType] = useState<LeaveTypeValue>(LEAVE_TYPE_OPTIONS[0].value);
+  const [postCoachId, setPostCoachId] = useState(coaches[0]?.id ?? 0);
+  const [, m, d] = date.split("-").map(Number);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-base">
+            {m}월 {d}일
+          </h3>
+          <button type="button" onClick={onClose} className="text-sm text-ink/40 hover:text-ink">
+            닫기
+          </button>
+        </div>
+
+        <div className="mb-5">
+          <p className="mb-2 text-xs font-medium text-ink/60">휴가</p>
+          <div className="mb-2 space-y-1.5">
+            {leaves.map((l) => (
+              <div
+                key={l.id}
+                className="flex items-center justify-between rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900"
+              >
+                <span>
+                  {l.coachName} · {LEAVE_TYPE_LABELS[l.leaveType] ?? l.leaveType}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveLeave(l.id)}
+                  className="text-red-400 hover:underline"
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
+            {leaves.length === 0 && <p className="text-xs text-ink/30">등록된 휴가가 없어요.</p>}
+          </div>
+          {coaches.length > 0 && (
+            <div className="flex gap-1.5">
+              <select
+                value={leaveCoachId}
+                onChange={(e) => setLeaveCoachId(Number(e.target.value))}
+                className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+              >
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={leaveType}
+                onChange={(e) => setLeaveType(e.target.value as LeaveTypeValue)}
+                className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+              >
+                {LEAVE_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => onAddLeave(leaveCoachId, leaveType)}
+                className="shrink-0 rounded-lg bg-ink px-3 text-xs text-white transition hover:bg-coral"
+              >
+                추가
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-medium text-ink/60">홍보 포스팅</p>
+          <div className="mb-2 space-y-1.5">
+            {posts.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between rounded-lg bg-sky-50 px-2.5 py-1.5 text-xs text-sky-900"
+              >
+                <span>{p.coachName} · 포스팅 완료</span>
+                <button
+                  type="button"
+                  onClick={() => onRemovePost(p.id)}
+                  className="text-red-400 hover:underline"
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
+            {posts.length === 0 && <p className="text-xs text-ink/30">등록된 포스팅이 없어요.</p>}
+          </div>
+          {coaches.length > 0 && (
+            <div className="flex gap-1.5">
+              <select
+                value={postCoachId}
+                onChange={(e) => setPostCoachId(Number(e.target.value))}
+                className="min-w-0 flex-1 rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+              >
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => onAddPost(postCoachId)}
+                className="shrink-0 rounded-lg bg-ink px-3 text-xs text-white transition hover:bg-coral"
+              >
+                추가
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 토요일마다 당직 코치를 배정하고, 코치별 휴가·홍보 포스팅 기록을 함께 관리하는
+    월별 캘린더. 코치별 당직은 월 1회로 제한되며(서버에서 검증), 스케줄표의
+    "수업 불가" 표시(휴가)도 함께 보여줘 당직 배정할 때 참고할 수 있게 한다. */
 function DutyCalendar({
   coaches,
   initialMonth,
   initialOverrides,
   initialBlockedDays,
+  initialCoachLeaves,
+  initialPromoPosts,
 }: {
   coaches: CoachRow[];
   initialMonth: string;
   initialOverrides: DutyOverrideMap;
   initialBlockedDays: BlockedDayMap;
+  initialCoachLeaves: CoachLeaveMap;
+  initialPromoPosts: PromoPostMap;
 }) {
   const [month, setMonth] = useState(initialMonth);
   const [overrides, setOverrides] = useState<DutyOverrideMap>(initialOverrides);
   const [blockedDays, setBlockedDays] = useState<BlockedDayMap>(initialBlockedDays);
+  const [leaves, setLeaves] = useState<CoachLeaveMap>(initialCoachLeaves);
+  const [posts, setPosts] = useState<PromoPostMap>(initialPromoPosts);
   const [loading, setLoading] = useState(false);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   async function goToMonth(nextMonth: string) {
     setMonth(nextMonth);
@@ -172,6 +333,8 @@ function DutyCalendar({
       if (res.ok) {
         setOverrides(data.overrides);
         setBlockedDays(data.blocked);
+        setLeaves(data.leaves);
+        setPosts(data.posts);
       }
     } finally {
       setLoading(false);
@@ -198,6 +361,44 @@ function DutyCalendar({
       const data = await res.json().catch(() => ({}));
       setCalendarError(data.error ?? "당직 지정에 실패했습니다.");
     }
+  }
+
+  async function addLeave(date: string, coachId: number, leaveType: LeaveTypeValue) {
+    const res = await fetch("/api/admin/coach-leaves", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coachId, date, leaveType }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setLeaves((prev) => ({ ...prev, [date]: [...(prev[date] ?? []), data.entry] }));
+    } else {
+      setCalendarError(data.error ?? "휴가 등록에 실패했습니다.");
+    }
+  }
+
+  async function removeLeave(date: string, id: number) {
+    setLeaves((prev) => ({ ...prev, [date]: (prev[date] ?? []).filter((l) => l.id !== id) }));
+    await fetch(`/api/admin/coach-leaves?id=${id}`, { method: "DELETE" });
+  }
+
+  async function addPost(date: string, coachId: number) {
+    const res = await fetch("/api/admin/promo-posts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coachId, date }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setPosts((prev) => ({ ...prev, [date]: [...(prev[date] ?? []), data.entry] }));
+    } else {
+      setCalendarError(data.error ?? "포스팅 등록에 실패했습니다.");
+    }
+  }
+
+  async function removePost(date: string, id: number) {
+    setPosts((prev) => ({ ...prev, [date]: (prev[date] ?? []).filter((p) => p.id !== id) }));
+    await fetch(`/api/admin/promo-posts?id=${id}`, { method: "DELETE" });
   }
 
   const days = daysInCalendarMonth(month);
@@ -239,6 +440,8 @@ function DutyCalendar({
           const dayNum = Number(d.split("-")[2]);
           const duty = overrides[d];
           const blockedToday = blockedDays[d] ?? [];
+          const leavesToday = leaves[d] ?? [];
+          const postsToday = posts[d] ?? [];
           return (
             <div
               key={d}
@@ -267,18 +470,54 @@ function DutyCalendar({
               )}
               {blockedToday.map((b, i) => (
                 <span
-                  key={i}
+                  key={`b${i}`}
                   title={b.memo}
                   className="truncate rounded bg-slate-200 px-1 py-0.5 text-[9px] text-slate-700"
                 >
                   {b.coachName} · {b.memo || "휴가"}
                 </span>
               ))}
+              {leavesToday.map((l) => (
+                <span
+                  key={`l${l.id}`}
+                  className="truncate rounded bg-amber-100 px-1 py-0.5 text-[9px] text-amber-800"
+                >
+                  {l.coachName} · {LEAVE_TYPE_LABELS[l.leaveType] ?? l.leaveType}
+                </span>
+              ))}
+              {postsToday.map((p) => (
+                <span
+                  key={`p${p.id}`}
+                  className="truncate rounded bg-sky-100 px-1 py-0.5 text-[9px] text-sky-800"
+                >
+                  {p.coachName} · 포스팅
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={() => setSelectedDate(d)}
+                className="mt-auto text-left text-[9px] text-ink/30 hover:text-coral"
+              >
+                + 기록
+              </button>
             </div>
           );
         })}
       </div>
       {calendarError && <p className="text-sm text-coral mt-3">{calendarError}</p>}
+      {selectedDate && (
+        <DayDetailModal
+          date={selectedDate}
+          coaches={coaches}
+          leaves={leaves[selectedDate] ?? []}
+          posts={posts[selectedDate] ?? []}
+          onClose={() => setSelectedDate(null)}
+          onAddLeave={(coachId, leaveType) => addLeave(selectedDate, coachId, leaveType)}
+          onRemoveLeave={(id) => removeLeave(selectedDate, id)}
+          onAddPost={(coachId) => addPost(selectedDate, coachId)}
+          onRemovePost={(id) => removePost(selectedDate, id)}
+        />
+      )}
     </div>
   );
 }
@@ -293,6 +532,8 @@ export function SettingsView({
   initialDutyMonth,
   initialDutyOverrides,
   initialBlockedDays,
+  initialCoachLeaves,
+  initialPromoPosts,
   initialRecurringEvents,
   initialSettingsMemos,
   initialCoachWorkingHours,
@@ -306,6 +547,8 @@ export function SettingsView({
   initialDutyMonth: string;
   initialDutyOverrides: DutyOverrideMap;
   initialBlockedDays: BlockedDayMap;
+  initialCoachLeaves: CoachLeaveMap;
+  initialPromoPosts: PromoPostMap;
   initialRecurringEvents: RecurringEventRow[];
   initialSettingsMemos: SettingsMemoRow[];
   initialCoachWorkingHours: Record<number, CoachWorkingHours>;
@@ -667,17 +910,21 @@ export function SettingsView({
       </section>
 
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
-        <h2 className="font-display text-lg mb-1">토요일 당직</h2>
+        <h2 className="font-display text-lg mb-1">당직 · 휴가 · 홍보 포스팅 캘린더</h2>
         <p className="text-xs text-ink/50 mb-4">
-          토요일마다 당직 코치 한 명을 배정하세요(9~15시 고정 근무). 같은 코치를 한
-          달에 두 번 이상 당직으로 배정할 수는 없어요. 코치별로 등록된 휴가도 함께
-          표시되니 참고해서 배정하세요.
+          토요일마다 당직 코치 한 명을 배정하세요(9~15시 고정 근무, 같은 코치를 한
+          달에 두 번 이상 배정할 수는 없어요). 날짜 칸의 &quot;+ 기록&quot;을 누르면
+          코치별 휴가(단축근무 · 휴무 · 연속 휴가 · 병가 · 생일휴가)와 정직원의
+          블로그·인스타그램 홍보 포스팅(2주 1회) 기록을 남길 수 있어요 — 당직 배정
+          시 참고하세요.
         </p>
         <DutyCalendar
           coaches={coaches.filter((c) => c.active)}
           initialMonth={initialDutyMonth}
           initialOverrides={initialDutyOverrides}
           initialBlockedDays={initialBlockedDays}
+          initialCoachLeaves={initialCoachLeaves}
+          initialPromoPosts={initialPromoPosts}
         />
       </section>
 

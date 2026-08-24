@@ -5,8 +5,10 @@ import {
   getCoachWorkingHours,
   getDutyOverridesForMonth,
   listBlockedDaysForMonth,
+  listCoachLeavesForMonth,
   listCoaches,
   listHolidays,
+  listPromoPostsForMonth,
 } from "@/lib/schedule";
 import { koreaCurrentMonthKey } from "@/lib/date";
 import { listRecurringEvents } from "@/lib/recurring-events";
@@ -30,6 +32,8 @@ export default async function AdminSettingsPage() {
     currentDeviceId,
     dutyOverrides,
     blockedDays,
+    coachLeaves,
+    promoPosts,
     recurringEvents,
     settingsMemos,
     coachWorkingHours,
@@ -41,6 +45,8 @@ export default async function AdminSettingsPage() {
     getDeviceId(),
     getDutyOverridesForMonth(currentMonth),
     listBlockedDaysForMonth(currentMonth),
+    listCoachLeavesForMonth(currentMonth),
+    listPromoPostsForMonth(currentMonth),
     listRecurringEvents(),
     listSettingsMemos(),
     getCoachWorkingHours(),
@@ -61,6 +67,8 @@ export default async function AdminSettingsPage() {
         initialDutyMonth={currentMonth}
         initialDutyOverrides={dutyOverrides}
         initialBlockedDays={blockedDays}
+        initialCoachLeaves={coachLeaves}
+        initialPromoPosts={promoPosts}
         initialRecurringEvents={recurringEvents}
         initialSettingsMemos={settingsMemos}
         initialCoachWorkingHours={coachWorkingHours}

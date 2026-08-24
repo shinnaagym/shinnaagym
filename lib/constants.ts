@@ -5,6 +5,23 @@ export const BOOKING_WINDOW_DAYS = 90;
 // 오픈일 전에는 사전예약을 받지 않는다 — 이 날짜 이전은 달력에서 선택할 수 없다.
 export const BOOKING_START_DATE = "2026-09-15";
 
+// 취업규칙 제6조(단축근무 및 휴무) 기준 휴가 종류. 당직 캘린더에서 코치별
+// 휴가를 기록할 때 이 중 하나를 고른다(한도는 참고용 안내 문구로만 노출하고,
+// 실제 신청 건수 집계·제한은 하지 않는다).
+export const LEAVE_TYPE_OPTIONS = [
+  { value: "shortened", label: "단축근무", limit: "1일 2시간, 월 4회 이내" },
+  { value: "day_off", label: "휴무", limit: "월 2일 이내" },
+  { value: "extended", label: "연속 휴가", limit: "3일 이상, 연 5일 이내" },
+  { value: "sick", label: "병가", limit: "연 3일" },
+  { value: "birthday", label: "생일휴가", limit: "연 1일" },
+] as const;
+
+export type LeaveTypeValue = (typeof LEAVE_TYPE_OPTIONS)[number]["value"];
+
+export const LEAVE_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  LEAVE_TYPE_OPTIONS.map((option) => [option.value, option.label]),
+);
+
 export const PURPOSE_OPTIONS = [
   { value: "rehab", label: "재활" },
   { value: "posture", label: "체형교정" },
