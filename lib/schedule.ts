@@ -955,6 +955,30 @@ export interface CoachLeaveEntry {
   coachId: number;
   coachName: string;
   leaveType: string;
+  /** leaveType이 "shortened"일 때만 값이 있다: "late_start"(출근 지연) | "early_leave"(조기 퇴근). */
+  direction: string | null;
+  /** leaveType이 "shortened"일 때만 값이 있다(1~2). */
+  hours: number | null;
+}
+
+const COACH_LEAVE_SELECT_FIELDS = `l.id, l.leave_date, l.coach_id, c.name AS coach_name, l.leave_type, l.direction, l.hours`;
+
+function toCoachLeaveEntry(r: {
+  id: number;
+  coach_id: number;
+  coach_name: string;
+  leave_type: string;
+  direction: string | null;
+  hours: number | null;
+}): CoachLeaveEntry {
+  return {
+    id: r.id,
+    coachId: r.coach_id,
+    coachName: r.coach_name,
+    leaveType: r.leave_type,
+    direction: r.direction,
+    hours: r.hours,
+  };
 }
 
 /** "YYYY-MM" 한 달 동안 등록된 코치별 휴가(coach_leaves)를 날짜별로 묶어
@@ -963,8 +987,16 @@ export async function listCoachLeavesForMonth(
   monthKey: string,
 ): Promise<Record<string, CoachLeaveEntry[]>> {
   const [from, to] = monthKeyRange(monthKey);
-  const result = await query<{ id: number; leave_date: string; coach_id: number; coach_name: string; leave_type: string }>(
-    `SELECT l.id, l.leave_date, l.coach_id, c.name AS coach_name, l.leave_type
+  const result = await query<{
+    id: number;
+    leave_date: string;
+    coach_id: number;
+    coach_name: string;
+    leave_type: string;
+    direction: string | null;
+    hours: number | null;
+  }>(
+    `SELECT ${COACH_LEAVE_SELECT_FIELDS}
      FROM coach_leaves l JOIN coaches c ON c.id = l.coach_id
      WHERE l.leave_date >= $1 AND l.leave_date < $2
      ORDER BY l.leave_date ASC, l.id ASC`,
@@ -972,12 +1004,36 @@ export async function listCoachLeavesForMonth(
   );
   const map: Record<string, CoachLeaveEntry[]> = {};
   for (const r of result.rows) {
-    (map[r.leave_date] ??= []).push({
-      id: r.id,
-      coachId: r.coach_id,
-      coachName: r.coach_name,
-      leaveType: r.leave_type,
-    });
+    (map[r.leave_date] ??= []).push(toCoachLeaveEntry(r));
+  }
+  return map;
+}
+
+/** 특정 날짜들(스케줄표 한 주)에 대한 코치별 휴가를 조회한다. 캐싱하지 않는다 —
+    설정 페이지에서 바로바로 등록/삭제되므로 스케줄표를 볼 때마다 최신 값을
+    가져와야 한다. */
+export async function getCoachLeavesForDates(
+  dateKeys: string[],
+): Promise<Record<string, CoachLeaveEntry[]>> {
+  if (dateKeys.length === 0) return {};
+  const result = await query<{
+    id: number;
+    leave_date: string;
+    coach_id: number;
+    coach_name: string;
+    leave_type: string;
+    direction: string | null;
+    hours: number | null;
+  }>(
+    `SELECT ${COACH_LEAVE_SELECT_FIELDS}
+     FROM coach_leaves l JOIN coaches c ON c.id = l.coach_id
+     WHERE l.leave_date = ANY($1)
+     ORDER BY l.leave_date ASC, l.id ASC`,
+    [dateKeys],
+  );
+  const map: Record<string, CoachLeaveEntry[]> = {};
+  for (const r of result.rows) {
+    (map[r.leave_date] ??= []).push(toCoachLeaveEntry(r));
   }
   return map;
 }
@@ -986,14 +1042,23 @@ export async function addCoachLeave(
   coachId: number,
   date: string,
   leaveType: string,
+  direction: string | null = null,
+  hours: number | null = null,
 ): Promise<CoachLeaveEntry> {
   const result = await query<{ id: number; coach_name: string }>(
-    `INSERT INTO coach_leaves (coach_id, leave_date, leave_type)
-     VALUES ($1, $2, $3)
+    `INSERT INTO coach_leaves (coach_id, leave_date, leave_type, direction, hours)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id, (SELECT name FROM coaches WHERE id = $1) AS coach_name`,
-    [coachId, date, leaveType],
+    [coachId, date, leaveType, direction, hours],
   );
-  return { id: result.rows[0].id, coachId, coachName: result.rows[0].coach_name, leaveType };
+  return {
+    id: result.rows[0].id,
+    coachId,
+    coachName: result.rows[0].coach_name,
+    leaveType,
+    direction,
+    hours,
+  };
 }
 
 export async function removeCoachLeave(id: number): Promise<void> {

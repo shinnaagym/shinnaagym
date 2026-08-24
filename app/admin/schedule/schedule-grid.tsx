@@ -2,11 +2,29 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { COACH_COLOR_PALETTE, SCHEDULE_HOUR_ROWS, SCHEDULE_SATURDAY_HOURS } from "@/lib/constants";
+import {
+  BUSINESS_END_HOUR,
+  BUSINESS_START_HOUR,
+  COACH_COLOR_PALETTE,
+  LEAVE_TYPE_LABELS,
+  SCHEDULE_HOUR_ROWS,
+  SCHEDULE_SATURDAY_HOURS,
+  SHORTENED_LEAVE_DIRECTION_LABELS,
+} from "@/lib/constants";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import type { CoachRow, PtType, ScheduleMemoRow, SessionEntryType, SessionStatus } from "@/lib/db";
-import type { CoachScheduleStats, CoachWorkingHours, MemberWithProgress } from "@/lib/schedule";
+import type { CoachLeaveEntry, CoachScheduleStats, CoachWorkingHours, MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
+
+/** 휴가 표시 문구. 단축근무는 "단축근무(출근 지연 2h)"처럼 방향·시간을 덧붙인다. */
+function formatLeaveBadge(l: CoachLeaveEntry): string {
+  const base = LEAVE_TYPE_LABELS[l.leaveType] ?? l.leaveType;
+  if (l.leaveType === "shortened" && l.direction && l.hours) {
+    const dir = SHORTENED_LEAVE_DIRECTION_LABELS[l.direction] ?? l.direction;
+    return `${base}(${dir} ${l.hours}h)`;
+  }
+  return base;
+}
 import { MemoPad } from "../memo-pad";
 
 type SessionWithMember = {
@@ -234,6 +252,7 @@ export function ScheduleGrid({
   initialMemos,
   dutyOverrides,
   coachWorkingHours,
+  coachLeaves,
 }: {
   weekStart: string;
   dateKeys: string[];
@@ -250,6 +269,9 @@ export function ScheduleGrid({
   dutyOverrides: Record<string, { coachId: number | null; coachName: string | null }>;
   /** 코치별 근무시간(평일/토요일). 값이 없는 코치는 제한 없음으로 취급한다. */
   coachWorkingHours: Record<number, CoachWorkingHours>;
+  /** 날짜별 코치 휴가 기록. 단축근무 외 유형은 그날 종일 근무 외 시간으로
+      표시하고, 단축근무는 출근/퇴근 시간을 보정한다(예약 자체는 막지 않음). */
+  coachLeaves: Record<string, CoachLeaveEntry[]>;
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
@@ -287,20 +309,48 @@ export function ScheduleGrid({
       하루 종일 근무 외 시간으로 취급한다. 공휴일(토요일 제외)은 모든 코치가
       토요일과 같은 단축 시간(9~15시)으로 근무한다. 평일은 요일별(월~금,
       0~4)로 다른 시간대를 쓸 수 있고, 설정이 없는 코치는 항상 false(제한 없음). */
+  function leavesFor(coachId: number, date: string): CoachLeaveEntry[] {
+    return (coachLeaves[date] ?? []).filter((l) => l.coachId === coachId);
+  }
+
   function isOutsideWorkingHours(coachId: number, date: string, hour: number): boolean {
     const weekdayIndex = dateKeys.indexOf(date);
+    const leavesToday = leavesFor(coachId, date);
+    // 단축근무 외 휴가(휴무/연속 휴가/병가/생일휴가)는 그날 종일 근무 외 시간으로
+    // 취급한다 — 예약 자체를 막지는 않고 회색 표시만 한다.
+    if (leavesToday.some((l) => l.leaveType !== "shortened")) return true;
+
+    let start: number | undefined;
+    let end: number | undefined;
     if (weekdayIndex === 5) {
       const duty = resolveDuty(date);
       if (!duty || duty.coachId !== coachId) return true;
-      return hour < SCHEDULE_SATURDAY_HOURS.start || hour >= SCHEDULE_SATURDAY_HOURS.end;
+      start = SCHEDULE_SATURDAY_HOURS.start;
+      end = SCHEDULE_SATURDAY_HOURS.end;
+    } else if (holidayMap[date]) {
+      start = SCHEDULE_SATURDAY_HOURS.start;
+      end = SCHEDULE_SATURDAY_HOURS.end;
+    } else {
+      const wh = coachWorkingHours[coachId];
+      if (wh) {
+        start = wh.weekdayStarts[weekdayIndex];
+        end = wh.weekdayEnds[weekdayIndex];
+      }
     }
-    if (holidayMap[date]) {
-      return hour < SCHEDULE_SATURDAY_HOURS.start || hour >= SCHEDULE_SATURDAY_HOURS.end;
+
+    // 단축근무는 출근을 늦추거나(late_start) 퇴근을 당긴다(early_leave). 코치
+    // 근무시간 제한이 따로 없어도(start/end 미설정) 스튜디오 영업시간을 기준으로
+    // 보정한다.
+    const shortened = leavesToday.find((l) => l.leaveType === "shortened");
+    if (shortened?.direction && shortened.hours) {
+      let baseStart = start ?? BUSINESS_START_HOUR;
+      let baseEnd = end ?? BUSINESS_END_HOUR;
+      if (shortened.direction === "late_start") baseStart += shortened.hours;
+      else baseEnd -= shortened.hours;
+      start = baseStart;
+      end = baseEnd;
     }
-    const wh = coachWorkingHours[coachId];
-    if (!wh) return false;
-    const start = wh.weekdayStarts[weekdayIndex];
-    const end = wh.weekdayEnds[weekdayIndex];
+
     if (start === undefined || end === undefined) return false;
     return hour < start || hour >= end;
   }
@@ -845,6 +895,11 @@ export function ScheduleGrid({
                           </button>
                         );
                       })()}
+                    {leavesFor(singleCoach.id, d).map((l) => (
+                      <p key={l.id} className="text-[9px] text-amber-700 truncate" title={formatLeaveBadge(l)}>
+                        {formatLeaveBadge(l)}
+                      </p>
+                    ))}
                   </div>
                 );
               })}
@@ -1006,6 +1061,15 @@ export function ScheduleGrid({
                           <p className={`text-[10px] font-medium truncate px-1 ${palette?.headerText ?? "text-ink/50"}`}>
                             {c.name}
                           </p>
+                          {leavesFor(c.id, d).map((l) => (
+                            <p
+                              key={l.id}
+                              className="text-[8px] text-amber-700 truncate px-1"
+                              title={formatLeaveBadge(l)}
+                            >
+                              {formatLeaveBadge(l)}
+                            </p>
+                          ))}
                         </div>
                       );
                     }),

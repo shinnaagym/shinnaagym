@@ -22,6 +22,26 @@ export const LEAVE_TYPE_LABELS: Record<string, string> = Object.fromEntries(
   LEAVE_TYPE_OPTIONS.map((option) => [option.value, option.label]),
 );
 
+// 단축근무(leave_type: "shortened")를 고르면 추가로 출근을 늦출지/퇴근을
+// 당길지와 몇 시간인지를 함께 지정한다. 근무조(오전조 9~17시 등) 기준으로
+// 앞뒤 최대 2시간까지만 줄일 수 있다.
+export const SHORTENED_LEAVE_DIRECTION_OPTIONS = [
+  { value: "late_start", label: "출근 지연" },
+  { value: "early_leave", label: "조기 퇴근" },
+] as const;
+
+export type ShortenedLeaveDirection = (typeof SHORTENED_LEAVE_DIRECTION_OPTIONS)[number]["value"];
+
+export const SHORTENED_LEAVE_DIRECTION_LABELS: Record<string, string> = Object.fromEntries(
+  SHORTENED_LEAVE_DIRECTION_OPTIONS.map((option) => [option.value, option.label]),
+);
+
+export const SHORTENED_LEAVE_MAX_HOURS = 2;
+export const SHORTENED_LEAVE_HOUR_OPTIONS = Array.from(
+  { length: SHORTENED_LEAVE_MAX_HOURS },
+  (_, i) => i + 1,
+); // [1, 2]
+
 export const PURPOSE_OPTIONS = [
   { value: "rehab", label: "재활" },
   { value: "posture", label: "체형교정" },
