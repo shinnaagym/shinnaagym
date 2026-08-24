@@ -53,7 +53,7 @@ export default async function AdminSettingsPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
+    <div className="mx-auto max-w-full px-4 py-6 sm:px-6 sm:py-8 md:max-w-3xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Settings</p>
       <h1 className="font-display text-2xl mb-1">설정</h1>
       <p className="text-sm text-ink/50 mb-6">코치·근무시간·당직 같은 운영 기본값을 관리하세요.</p>
