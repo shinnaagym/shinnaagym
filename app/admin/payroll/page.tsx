@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { isAdminAuthed } from "@/lib/auth";
+import { isAdminAuthed, isPayrollAuthed } from "@/lib/auth";
 import { koreaCurrentMonthKey } from "@/lib/date";
 import { listCoaches } from "@/lib/schedule";
 import { PayrollGated } from "./payroll-gated";
@@ -9,6 +9,9 @@ export default async function PayrollPage() {
     redirect("/admin");
   }
 
+  // 가계부 2차 비밀번호로 이미 인증되어 있으면(같은 비밀번호를 공유) 급여
+  // 계산 비밀번호 화면을 건너뛴다.
+  const initialUnlocked = await isPayrollAuthed();
   const coaches = await listCoaches(true);
 
   return (
@@ -19,7 +22,11 @@ export default async function PayrollPage() {
         직원을 선택하고 정산월을 고르면 입사일과 진행 수업 횟수를 불러와요. 자동으로 불러온
         값은 오차 보정을 위해 직접 고쳐 쓸 수 있어요.
       </p>
-      <PayrollGated coaches={coaches} defaultYearMonth={koreaCurrentMonthKey()} />
+      <PayrollGated
+        coaches={coaches}
+        defaultYearMonth={koreaCurrentMonthKey()}
+        initialUnlocked={initialUnlocked}
+      />
     </div>
   );
 }

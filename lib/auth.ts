@@ -138,9 +138,13 @@ function parsePayrollSessionToken(token: string | undefined | null): boolean {
   return timingSafeEqual(a, b);
 }
 
+// 가계부(2차 비밀번호)에 이미 들어와 있다면 급여 계산도 같은 비밀번호로
+// 보호되는 화면이라 다시 물어보지 않는다 — 가계부 세션이 유효하면 급여
+// 세션이 따로 없어도 인증된 것으로 본다.
 export async function isPayrollAuthed(): Promise<boolean> {
   const store = await cookies();
-  return parsePayrollSessionToken(store.get(PAYROLL_SESSION_COOKIE_NAME)?.value);
+  if (parsePayrollSessionToken(store.get(PAYROLL_SESSION_COOKIE_NAME)?.value)) return true;
+  return parseLedgerSessionToken(store.get(LEDGER_SESSION_COOKIE_NAME)?.value);
 }
 
 export async function setPayrollSessionCookie(): Promise<void> {

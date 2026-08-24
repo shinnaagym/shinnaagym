@@ -18,8 +18,10 @@ import type {
 import {
   addDaysToKey,
   addMonthsToKey,
+  isValidDateKey,
   koreaCurrentHour,
   koreaTodayKey,
+  mondayOfWeek,
   monthKeyRange,
   monthKeysRange,
 } from "./date";
@@ -1045,7 +1047,31 @@ export async function checkLeaveRequest(
   if (!option) return;
 
   const today = koreaTodayKey();
-  if (option.noticeDays > 0) {
+  if (leaveType === "birthday") {
+    // 생일휴가는 신청시기(며칠 전) 대신 "생일이 포함된 주(월~일) 안"에서만
+    // 쓸 수 있다. 생일 미등록(빈 문자열) 코치는 주 범위를 계산할 수 없으니
+    // 이 제약 없이 통과시킨다.
+    const coachResult = await query<{ birthday: string }>(
+      `SELECT birthday FROM coaches WHERE id = $1`,
+      [coachId],
+    );
+    const birthday = coachResult.rows[0]?.birthday ?? "";
+    if (birthday) {
+      const year = date.slice(0, 4);
+      let birthdayThisYear = `${year}-${birthday.slice(5)}`;
+      // 2/29 생일이 평년과 만나는 경우처럼 존재하지 않는 날짜가 되면 2/28로 보정한다.
+      if (!isValidDateKey(birthdayThisYear)) {
+        birthdayThisYear = `${year}-02-28`;
+      }
+      const weekStart = mondayOfWeek(birthdayThisYear);
+      const weekEnd = addDaysToKey(weekStart, 6);
+      if (date < weekStart || date > weekEnd) {
+        throw new LeaveValidationError(
+          `생일휴가는 생일이 포함된 주(${weekStart} ~ ${weekEnd}) 안에서만 사용할 수 있어요. 그 외 기간은 대표 승인이 필요해요.`,
+        );
+      }
+    }
+  } else if (option.noticeDays > 0) {
     const earliest = addDaysToKey(today, option.noticeDays);
     if (date < earliest) {
       throw new LeaveValidationError(

@@ -24,6 +24,10 @@ import { MemoPad } from "../memo-pad";
 
 const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i); // 0~24시(종료 시각용 24 포함)
 
+// 휴가 규정표를 근거 조항(제6조/제11조)별로 나눠 보여주기 위한 등장 순서
+// 그대로의 중복 제거 목록.
+const LEAVE_RULE_GROUPS = Array.from(new Set(LEAVE_TYPE_OPTIONS.map((o) => o.ruleLabel)));
+
 // lib/recurring-events.ts는 서버 전용 DB 클라이언트(pg)를 물고 있어 클라이언트
 // 컴포넌트에서 import하면 번들이 깨지므로, 라벨만 이 파일에 그대로 복제해 둔다.
 const CYCLE_LABELS: Record<RecurringEventCycle, string> = {
@@ -694,31 +698,35 @@ function DutyCalendar({
           </table>
         </div>
 
-        <div className="mt-5">
-          <p className="mb-2 text-xs font-medium text-ink/60">휴가 규정(취업규칙 제6조)</p>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] text-xs">
-              <thead>
-                <tr className="text-left text-ink/40 border-b border-line/50">
-                  <th className="py-1.5 pr-2 font-medium">구분</th>
-                  <th className="px-2 py-1.5 font-medium">한도</th>
-                  <th className="px-2 py-1.5 font-medium">신청 시기</th>
-                  <th className="px-2 py-1.5 font-medium">급여</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line/40">
-                {LEAVE_TYPE_OPTIONS.map((o) => (
-                  <tr key={o.value}>
-                    <td className="py-1.5 pr-2 whitespace-nowrap">{o.label}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">{o.limitLabel}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">{o.noticeLabel}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">{o.payLabel}</td>
+        {LEAVE_RULE_GROUPS.map((ruleLabel) => (
+          <div key={ruleLabel} className="mt-5">
+            <p className="mb-2 text-xs font-medium text-ink/60">휴가 규정({ruleLabel})</p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-xs">
+                <thead>
+                  <tr className="text-left text-ink/40 border-b border-line/50">
+                    <th className="py-1.5 pr-2 font-medium">구분</th>
+                    <th className="px-2 py-1.5 font-medium">한도</th>
+                    <th className="px-2 py-1.5 font-medium">신청 시기</th>
+                    <th className="px-2 py-1.5 font-medium">급여</th>
+                    <th className="px-2 py-1.5 font-medium">경조금</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-line/40">
+                  {LEAVE_TYPE_OPTIONS.filter((o) => o.ruleLabel === ruleLabel).map((o) => (
+                    <tr key={o.value}>
+                      <td className="py-1.5 pr-2 whitespace-nowrap">{o.label}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{o.limitLabel}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{o.noticeLabel}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{o.payLabel}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{o.amountLabel ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
       {selectedDate && (
