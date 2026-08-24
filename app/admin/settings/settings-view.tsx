@@ -189,7 +189,8 @@ function DayDetailModal({
     leaveType: LeaveTypeValue,
     direction: ShortenedLeaveDirection | null,
     hours: number | null,
-  ) => void;
+    overridePassword?: string,
+  ) => Promise<{ ok: boolean; error?: string; needsOverride?: boolean }>;
   onRemoveLeave: (id: number) => void;
   onAddPost: (coachId: number) => void;
   onRemovePost: (id: number) => void;
@@ -201,7 +202,31 @@ function DayDetailModal({
   );
   const [shortenedHours, setShortenedHours] = useState(SHORTENED_LEAVE_HOUR_OPTIONS[0]);
   const [postCoachId, setPostCoachId] = useState(coaches[0]?.id ?? 0);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [needsOverride, setNeedsOverride] = useState(false);
+  const [overridePassword, setOverridePassword] = useState("");
+  const [submittingLeave, setSubmittingLeave] = useState(false);
   const [, m, d] = date.split("-").map(Number);
+
+  async function submitLeave() {
+    setSubmittingLeave(true);
+    const result = await onAddLeave(
+      leaveCoachId,
+      leaveType,
+      leaveType === "shortened" ? shortenedDirection : null,
+      leaveType === "shortened" ? shortenedHours : null,
+      needsOverride ? overridePassword : undefined,
+    );
+    setSubmittingLeave(false);
+    if (result.ok) {
+      setLeaveError(null);
+      setNeedsOverride(false);
+      setOverridePassword("");
+    } else {
+      setLeaveError(result.error ?? "휴가 등록에 실패했습니다.");
+      setNeedsOverride(!!result.needsOverride);
+    }
+  }
 
   return (
     <div
@@ -295,19 +320,27 @@ function DayDetailModal({
                   </select>
                 </div>
               )}
+              {leaveError && <p className="text-xs text-coral">{leaveError}</p>}
+              {needsOverride && (
+                <input
+                  type="password"
+                  value={overridePassword}
+                  onChange={(e) => setOverridePassword(e.target.value)}
+                  placeholder="대표 승인 비밀번호"
+                  className="w-full rounded-lg border border-coral/50 px-2 py-1.5 text-xs outline-none focus:border-coral"
+                />
+              )}
               <button
                 type="button"
-                onClick={() =>
-                  onAddLeave(
-                    leaveCoachId,
-                    leaveType,
-                    leaveType === "shortened" ? shortenedDirection : null,
-                    leaveType === "shortened" ? shortenedHours : null,
-                  )
-                }
-                className="w-full rounded-lg bg-ink px-3 py-1.5 text-xs text-white transition hover:bg-coral"
+                onClick={submitLeave}
+                disabled={submittingLeave}
+                className="w-full rounded-lg bg-ink px-3 py-1.5 text-xs text-white transition hover:bg-coral disabled:opacity-50"
               >
-                휴가 추가
+                {submittingLeave
+                  ? "처리 중..."
+                  : needsOverride
+                    ? "대표 승인으로 강행 등록"
+                    : "휴가 추가"}
               </button>
             </div>
           )}
@@ -362,8 +395,8 @@ function DayDetailModal({
 }
 
 /** 토요일마다 당직 코치를 배정하고, 코치별 휴가·홍보 포스팅 기록을 함께 관리하는
-    월별 캘린더. 코치별 당직은 월 1회로 제한되며(서버에서 검증), 스케줄표의
-    "수업 불가" 표시(휴가)도 함께 보여줘 당직 배정할 때 참고할 수 있게 한다. */
+    월별 캘린더. 스케줄표의 "수업 불가" 표시(휴가)도 함께 보여줘 당직 배정할 때
+    참고할 수 있게 한다. */
 function DutyCalendar({
   coaches,
   initialMonth,
@@ -434,18 +467,19 @@ function DutyCalendar({
     leaveType: LeaveTypeValue,
     direction: ShortenedLeaveDirection | null,
     hours: number | null,
-  ) {
+    overridePassword?: string,
+  ): Promise<{ ok: boolean; error?: string; needsOverride?: boolean }> {
     const res = await fetch("/api/admin/coach-leaves", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coachId, date, leaveType, direction, hours }),
+      body: JSON.stringify({ coachId, date, leaveType, direction, hours, overridePassword }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setLeaves((prev) => ({ ...prev, [date]: [...(prev[date] ?? []), data.entry] }));
-    } else {
-      setCalendarError(data.error ?? "휴가 등록에 실패했습니다.");
+      return { ok: true };
     }
+    return { ok: false, error: data.error ?? "휴가 등록에 실패했습니다.", needsOverride: !!data.needsOverride };
   }
 
   async function removeLeave(date: string, id: number) {
@@ -476,13 +510,15 @@ function DutyCalendar({
   const leadingBlanks = calendarWeekdayOf(days[0]);
   const [year, monthNum] = month.split("-").map(Number);
 
-  // 코치 x 휴가 유형별 사용 일수, 코치별 포스팅 횟수(현재 보고 있는 달 기준).
+  // 코치 x 휴가 유형별 사용량(현재 보고 있는 달 기준). 단축근무는 일수가 아니라
+  // 총 시간(hours 합계)으로, 나머지 유형은 일수(entry 개수)로 센다.
   const leaveStats = useMemo(() => {
     const counts: Record<number, Record<string, number>> = {};
     for (const entries of Object.values(leaves)) {
       for (const l of entries) {
         const coachCounts = (counts[l.coachId] ??= {});
-        coachCounts[l.leaveType] = (coachCounts[l.leaveType] ?? 0) + 1;
+        const amount = l.leaveType === "shortened" ? (l.hours ?? 0) : 1;
+        coachCounts[l.leaveType] = (coachCounts[l.leaveType] ?? 0) + amount;
       }
     }
     return counts;
@@ -611,7 +647,8 @@ function DutyCalendar({
                 <th className="py-1.5 pr-2 text-left font-medium">코치</th>
                 {LEAVE_TYPE_OPTIONS.map((o) => (
                   <th key={o.value} className="px-2 py-1.5 text-center font-medium">
-                    {o.label}
+                    <p>{o.label}</p>
+                    <p className="font-normal text-ink/30">{o.limitLabel}</p>
                   </th>
                 ))}
                 <th className="py-1.5 pl-2 text-center font-medium">포스팅</th>
@@ -622,16 +659,17 @@ function DutyCalendar({
                 <tr key={c.id}>
                   <td className="py-1.5 pr-2">{c.name}</td>
                   {LEAVE_TYPE_OPTIONS.map((o) => {
-                    const count = leaveStats[c.id]?.[o.value] ?? 0;
+                    const amount = leaveStats[c.id]?.[o.value] ?? 0;
+                    const unit = o.limitUnit === "hours" ? "시간" : "일";
                     return (
                       <td
                         key={o.value}
                         className={[
                           "px-2 py-1.5 text-center",
-                          count > 0 ? "font-medium text-amber-800" : "text-ink/25",
+                          amount > 0 ? "font-medium text-amber-800" : "text-ink/25",
                         ].join(" ")}
                       >
-                        {count > 0 ? `${count}일` : "-"}
+                        {amount > 0 ? `${amount}${unit}` : "-"}
                       </td>
                     );
                   })}
@@ -655,6 +693,32 @@ function DutyCalendar({
             </tbody>
           </table>
         </div>
+
+        <div className="mt-5">
+          <p className="mb-2 text-xs font-medium text-ink/60">휴가 규정(취업규칙 제6조)</p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[420px] text-xs">
+              <thead>
+                <tr className="text-left text-ink/40 border-b border-line/50">
+                  <th className="py-1.5 pr-2 font-medium">구분</th>
+                  <th className="px-2 py-1.5 font-medium">한도</th>
+                  <th className="px-2 py-1.5 font-medium">신청 시기</th>
+                  <th className="px-2 py-1.5 font-medium">급여</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line/40">
+                {LEAVE_TYPE_OPTIONS.map((o) => (
+                  <tr key={o.value}>
+                    <td className="py-1.5 pr-2 whitespace-nowrap">{o.label}</td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">{o.limitLabel}</td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">{o.noticeLabel}</td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">{o.payLabel}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       {selectedDate && (
@@ -664,8 +728,8 @@ function DutyCalendar({
           leaves={leaves[selectedDate] ?? []}
           posts={posts[selectedDate] ?? []}
           onClose={() => setSelectedDate(null)}
-          onAddLeave={(coachId, leaveType, direction, hours) =>
-            addLeave(selectedDate, coachId, leaveType, direction, hours)
+          onAddLeave={(coachId, leaveType, direction, hours, overridePassword) =>
+            addLeave(selectedDate, coachId, leaveType, direction, hours, overridePassword)
           }
           onRemoveLeave={(id) => removeLeave(selectedDate, id)}
           onAddPost={(coachId) => addPost(selectedDate, coachId)}
@@ -1066,11 +1130,10 @@ export function SettingsView({
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">당직 · 휴가 · 홍보 포스팅 캘린더</h2>
         <p className="text-xs text-ink/50 mb-4">
-          토요일마다 당직 코치 한 명을 배정하세요(9~15시 고정 근무, 같은 코치를 한
-          달에 두 번 이상 배정할 수는 없어요). 날짜 칸의 &quot;+ 기록&quot;을 누르면
-          코치별 휴가(단축근무 · 휴무 · 연속 휴가 · 병가 · 생일휴가)와 정직원의
-          블로그·인스타그램 홍보 포스팅(2주 1회) 기록을 남길 수 있어요 — 당직 배정
-          시 참고하세요.
+          토요일마다 당직 코치 한 명을 배정하세요(9~15시 고정 근무). 날짜 칸의
+          &quot;+ 기록&quot;을 누르면 코치별 휴가(단축근무 · 휴무 · 연속 휴가 · 병가 ·
+          생일휴가)와 정직원의 블로그·인스타그램 홍보 포스팅(2주 1회) 기록을 남길
+          수 있어요 — 당직 배정 시 참고하세요.
         </p>
         <DutyCalendar
           coaches={coaches.filter((c) => c.active)}

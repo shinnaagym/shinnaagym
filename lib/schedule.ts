@@ -23,7 +23,7 @@ import {
   monthKeyRange,
   monthKeysRange,
 } from "./date";
-import { scheduleHoursForWeekday, type DayHours } from "./constants";
+import { LEAVE_TYPE_OPTIONS, scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
 
@@ -155,18 +155,6 @@ export async function setDutyOverride(
   const jsWeekday = new Date(`${date}T00:00:00Z`).getUTCDay();
   if (jsWeekday !== 6) {
     throw new DutyAssignmentError("당직은 토요일에만 배정할 수 있어요.");
-  }
-  const monthKey = date.slice(0, 7);
-  const conflict = await query<{ override_date: string }>(
-    `SELECT override_date FROM duty_overrides
-     WHERE coach_id = $1 AND override_date <> $2 AND override_date >= $3 AND override_date < $4`,
-    [coachId, date, ...monthKeyRange(monthKey)],
-  );
-  if (conflict.rows.length > 0) {
-    const [, m, d] = conflict.rows[0].override_date.split("-");
-    throw new DutyAssignmentError(
-      `이 코치는 이미 이번 달 ${Number(m)}/${Number(d)}에 당직으로 배정되어 있어요. 코치별 당직은 월 1회로 제한돼요.`,
-    );
   }
   await query(
     `INSERT INTO duty_overrides (override_date, coach_id) VALUES ($1, $2)
@@ -1038,13 +1026,69 @@ export async function getCoachLeavesForDates(
   return map;
 }
 
+/** checkLeaveRequest가 신청시기·한도 위반을 발견하면 던지는 에러. API
+    라우트는 이 에러를 잡아 400 + needsOverride:true로 응답하고, 대표
+    승인 비밀번호(checkLedgerPassword)가 함께 오면 addCoachLeave를
+    override=true로 다시 호출해 등록을 강행한다. */
+export class LeaveValidationError extends Error {}
+
+/** 취업규칙 제6조 기준 신청시기(며칠 전까지 신청해야 하는지)와 한도(월/연
+    사용량)를 검증한다. leaveType이 LEAVE_TYPE_OPTIONS에 없는 값이면(방어적
+    코드) 검증 없이 통과시킨다. */
+export async function checkLeaveRequest(
+  coachId: number,
+  date: string,
+  leaveType: string,
+  hours: number | null,
+): Promise<void> {
+  const option = LEAVE_TYPE_OPTIONS.find((o) => o.value === leaveType);
+  if (!option) return;
+
+  const today = koreaTodayKey();
+  if (option.noticeDays > 0) {
+    const earliest = addDaysToKey(today, option.noticeDays);
+    if (date < earliest) {
+      throw new LeaveValidationError(
+        `${option.label}는 ${option.noticeLabel} 신청해야 해요. 신청 가능한 가장 빠른 날짜는 ${earliest}예요.`,
+      );
+    }
+  }
+
+  const periodKey = option.limitPeriod === "month" ? date.slice(0, 7) : date.slice(0, 4);
+  const [rangeStart, rangeEnd] =
+    option.limitPeriod === "month"
+      ? monthKeyRange(periodKey)
+      : [`${periodKey}-01-01`, `${Number(periodKey) + 1}-01-01`];
+
+  const { rows } = await query<{ total_hours: string | null; total_days: string }>(
+    `SELECT COALESCE(SUM(hours), 0) AS total_hours, COUNT(*) AS total_days
+     FROM coach_leaves
+     WHERE coach_id = $1 AND leave_type = $2 AND leave_date >= $3 AND leave_date < $4`,
+    [coachId, leaveType, rangeStart, rangeEnd],
+  );
+  const currentUsage =
+    option.limitUnit === "hours" ? Number(rows[0]?.total_hours ?? 0) : Number(rows[0]?.total_days ?? 0);
+  const addition = option.limitUnit === "hours" ? (hours ?? 0) : 1;
+  const nextUsage = currentUsage + addition;
+  if (nextUsage > option.limitAmount) {
+    const unitLabel = option.limitUnit === "hours" ? "시간" : "일";
+    throw new LeaveValidationError(
+      `${option.label} 한도(${option.limitLabel})를 초과해요. 현재 ${currentUsage}${unitLabel} 사용, 추가하면 ${nextUsage}${unitLabel}이 돼요.`,
+    );
+  }
+}
+
 export async function addCoachLeave(
   coachId: number,
   date: string,
   leaveType: string,
   direction: string | null = null,
   hours: number | null = null,
+  override = false,
 ): Promise<CoachLeaveEntry> {
+  if (!override) {
+    await checkLeaveRequest(coachId, date, leaveType, hours);
+  }
   const result = await query<{ id: number; coach_name: string }>(
     `INSERT INTO coach_leaves (coach_id, leave_date, leave_type, direction, hours)
      VALUES ($1, $2, $3, $4, $5)
