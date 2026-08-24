@@ -84,22 +84,22 @@ function detectShift(hours: CoachWorkingHours | undefined): ShiftKey | null {
   return null;
 }
 
-/** 코치 한 명의 근무 조(오전/오후)를 고르는 행. 클릭하는 즉시 저장된다. */
-function CoachShiftRow({
-  coachName,
+/** 코치 한 명의 근무 조(오전/오후)를 고르는 위젯. 클릭하는 즉시 저장된다.
+    코치 관리 섹션의 코치별 행 안에 인라인으로 들어가므로 이름은 표시하지
+    않는다. */
+function ShiftPresetPicker({
   saved,
   onSelect,
   onClear,
 }: {
-  coachName: string;
   saved: CoachWorkingHours | undefined;
   onSelect: (hours: CoachWorkingHours) => void;
   onClear: () => void;
 }) {
   const current = detectShift(saved);
   return (
-    <div className="py-2.5 flex items-center gap-3 flex-wrap">
-      <span className="text-sm w-16 shrink-0">{coachName}</span>
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[11px] text-ink/40">근무 조</span>
       <div className="flex gap-1.5 flex-wrap">
         {(Object.keys(SHIFT_PRESETS) as ShiftKey[]).map((key) => (
           <button
@@ -709,7 +709,6 @@ function DutyCalendar({
                     <th className="px-2 py-1.5 font-medium">한도</th>
                     <th className="px-2 py-1.5 font-medium">신청 시기</th>
                     <th className="px-2 py-1.5 font-medium">급여</th>
-                    <th className="px-2 py-1.5 font-medium">경조금</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line/40">
@@ -719,7 +718,6 @@ function DutyCalendar({
                       <td className="px-2 py-1.5 whitespace-nowrap">{o.limitLabel}</td>
                       <td className="px-2 py-1.5 whitespace-nowrap">{o.noticeLabel}</td>
                       <td className="px-2 py-1.5 whitespace-nowrap">{o.payLabel}</td>
-                      <td className="px-2 py-1.5 whitespace-nowrap">{o.amountLabel ?? "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1008,7 +1006,10 @@ export function SettingsView({
         <h2 className="font-display text-lg mb-1">코치 관리</h2>
         <p className="text-xs text-ink/50 mb-4">
           지금은 신종수 코치 1명이지만, 나중에 코치가 추가되면 여기서 등록해주세요. 등록하는
-          즉시 스케줄표에 컬럼이 생깁니다.
+          즉시 스케줄표에 컬럼이 생깁니다. 근무 조(오전조 9~17시 · 오후조 14~22시)를
+          지정하면 스케줄표에서 그 시간 외 칸이 회색으로 표시돼요(예약 자체가 막히진
+          않아요). 지정하지 않으면 스튜디오 영업시간 전체가 근무시간으로 취급되고,
+          토요일 근무는 아래 당직 캘린더에서 별도로 배정합니다.
         </p>
         <div className="divide-y divide-line/50">
           {coaches.map((c) => (
@@ -1084,6 +1085,13 @@ export function SettingsView({
                   />
                 </span>
               </div>
+              {c.active && (
+                <ShiftPresetPicker
+                  saved={coachWorkingHours[c.id]}
+                  onSelect={(hours) => saveCoachWorkingHours(c.id, hours)}
+                  onClear={() => clearCoachWorkingHours(c.id)}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -1106,32 +1114,6 @@ export function SettingsView({
           >
             추가
           </button>
-        </div>
-      </section>
-
-      <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
-        <h2 className="font-display text-lg mb-1">근무시간 설정</h2>
-        <p className="text-xs text-ink/50 mb-4">
-          코치별로 오전조(9~17시) 또는 오후조(14~22시) 중 하나를 지정하면, 스케줄표에서
-          그 시간 외 칸이 회색으로 표시돼요(예약 자체가 막히진 않아요). 지정하지 않은
-          코치는 스튜디오 영업시간 전체가 근무시간으로 취급돼 회색 표시가 나타나지
-          않아요. 토요일 근무는 아래 당직 캘린더에서 별도로 배정합니다.
-        </p>
-        <div className="divide-y divide-line/50">
-          {coaches
-            .filter((c) => c.active)
-            .map((c) => (
-              <CoachShiftRow
-                key={c.id}
-                coachName={c.name}
-                saved={coachWorkingHours[c.id]}
-                onSelect={(hours) => saveCoachWorkingHours(c.id, hours)}
-                onClear={() => clearCoachWorkingHours(c.id)}
-              />
-            ))}
-          {coaches.filter((c) => c.active).length === 0 && (
-            <p className="text-sm text-ink/40 py-2.5">재직 중인 코치가 없어요.</p>
-          )}
         </div>
       </section>
 

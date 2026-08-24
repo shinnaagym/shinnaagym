@@ -9,9 +9,8 @@ export const BOOKING_START_DATE = "2026-09-15";
 // 캘린더에서 코치별 휴가를 기록할 때 이 중 하나를 고른다. limitPeriod/
 // limitUnit/limitAmount와 noticeDays는 서버 검증(lib/schedule.ts
 // checkLeaveRequest)에서 실제로 쓰는 값이고, limitLabel/noticeLabel/
-// payLabel/amountLabel/ruleLabel은 화면 표시용 문구다 — 숫자가 바뀌면
-// 반드시 둘 다 같이 고쳐야 한다. amountLabel은 경조사 지원금처럼 일수 외에
-// 별도로 지급되는 금액이 있는 유형에만 채운다(없으면 null).
+// payLabel/ruleLabel은 화면 표시용 문구다 — 숫자가 바뀌면 반드시 둘 다
+// 같이 고쳐야 한다.
 export const LEAVE_TYPE_OPTIONS = [
   {
     value: "shortened",
@@ -24,7 +23,6 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 3,
     noticeLabel: "3일 전",
     payLabel: "유급",
-    amountLabel: null,
   },
   {
     value: "day_off",
@@ -37,7 +35,6 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 14,
     noticeLabel: "2주 전",
     payLabel: "유급",
-    amountLabel: null,
   },
   {
     value: "extended",
@@ -50,7 +47,6 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 30,
     noticeLabel: "1개월 전",
     payLabel: "유급",
-    amountLabel: null,
   },
   {
     value: "sick",
@@ -63,7 +59,6 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 0,
     noticeLabel: "당일 가능",
     payLabel: "유급",
-    amountLabel: null,
   },
   {
     value: "birthday",
@@ -79,7 +74,6 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 0,
     noticeLabel: "생일이 포함된 주(월~일)만",
     payLabel: "유급",
-    amountLabel: null,
   },
   {
     value: "marriage",
@@ -92,7 +86,6 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 0,
     noticeLabel: "당일 가능",
     payLabel: "유급",
-    amountLabel: "200,000원 및 화환",
   },
   {
     value: "bereavement",
@@ -105,7 +98,6 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 0,
     noticeLabel: "당일 가능",
     payLabel: "유급",
-    amountLabel: "200,000원 및 조화",
   },
   {
     value: "childbirth",
@@ -118,7 +110,6 @@ export const LEAVE_TYPE_OPTIONS = [
     noticeDays: 0,
     noticeLabel: "당일 가능",
     payLabel: "유급",
-    amountLabel: "100,000원",
   },
 ] as const;
 

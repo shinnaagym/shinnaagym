@@ -134,7 +134,7 @@ export function ExpensesView({ monthKey }: { monthKey: string }) {
   return (
     <div>
       <ReserveDashboard monthKey={monthKey} />
-      <div className="grid gap-6 lg:grid-cols-[1fr_260px] items-start">
+      <div className="grid gap-6 lg:grid-cols-[1fr_260px] xl:grid-cols-[1fr_300px] items-start">
       <div className="min-w-0">
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <button

@@ -122,6 +122,10 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
     }
   }
 
+  const totalBalance = balances
+    ? Object.values(balances).reduce((sum, v) => sum + v, 0)
+    : null;
+
   return (
     <div className="rounded-2xl bg-white border border-line/60 shadow-sm p-6 mb-6">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
@@ -140,6 +144,13 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
         차감하세요. &quot;{formatMonthLabel(monthKey)} 정산&quot;은 몇 번을 눌러도 그 달 자동
         적립액을 새로 계산해 덮어쓸 뿐, 직접 기록한 적립·차감은 건드리지 않아요.
       </p>
+
+      {totalBalance !== null && (
+        <div className="rounded-xl bg-ink text-white px-5 py-4 mb-4 flex items-center justify-between">
+          <span className="text-sm text-white/70">저수지 전체 누적 잔액</span>
+          <span className="text-xl font-semibold">{formatWon(totalBalance)}</span>
+        </div>
+      )}
 
       {error && <p className="text-sm text-coral mb-3">{error}</p>}
 
@@ -162,7 +173,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
       {loading ? (
         <p className="text-sm text-ink/40 py-6 text-center">불러오는 중...</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {RESERVE_TYPE_OPTIONS.map((option) => {
             const monthly = monthlyDeposits?.[option.value] ?? 0;
             const balance = balances?.[option.value] ?? 0;
