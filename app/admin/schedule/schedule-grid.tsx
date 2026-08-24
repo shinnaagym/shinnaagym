@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { COACH_COLOR_PALETTE, SCHEDULE_HOUR_ROWS } from "@/lib/constants";
+import { COACH_COLOR_PALETTE, SCHEDULE_HOUR_ROWS, SCHEDULE_SATURDAY_HOURS } from "@/lib/constants";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import type { CoachRow, PtType, ScheduleMemoRow, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { CoachScheduleStats, CoachWorkingHours, MemberWithProgress } from "@/lib/schedule";
@@ -232,7 +232,6 @@ export function ScheduleGrid({
   holidayMap,
   coachStats,
   initialMemos,
-  dutyRoster,
   dutyOverrides,
   coachWorkingHours,
 }: {
@@ -246,10 +245,8 @@ export function ScheduleGrid({
   holidayMap: Record<string, string>;
   coachStats: Record<number, CoachScheduleStats>;
   initialMemos: ScheduleMemoRow[];
-  /** weekday(0=월~6=일) -> 당직 코치 기본값. dateKeys 배열의 인덱스와 같은 규칙. */
-  dutyRoster: Record<number, { coachId: number; coachName: string }>;
-  /** 날짜(YYYY-MM-DD) -> 그 날짜만의 당직 예외(이번 주만 변경 등). coachId가
-      null이면 그 날짜는 당직자 없음을 명시적으로 나타낸다. */
+  /** 날짜(YYYY-MM-DD, 토요일만) -> 당직 코치. coachId가 null이면 그 토요일은
+      당직자 없음(휴무)을 명시적으로 나타낸다. */
   dutyOverrides: Record<string, { coachId: number | null; coachName: string | null }>;
   /** 코치별 근무시간(평일/토요일). 값이 없는 코치는 제한 없음으로 취급한다. */
   coachWorkingHours: Record<number, CoachWorkingHours>;
@@ -272,7 +269,6 @@ export function ScheduleGrid({
   /** "복사"로 담아둔 일정(들). 다른 빈 칸에 우클릭하면 여기 담긴 내용을
       그대로 붙여넣을 수 있다. */
   const [clipboard, setClipboard] = useState<SessionWithMember[] | null>(null);
-  const [dutyRosterState] = useState(dutyRoster);
   const [dutyOverridesState, setDutyOverridesState] = useState(dutyOverrides);
   const [dutyEditDate, setDutyEditDate] = useState<{ date: string; weekday: number } | null>(null);
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
@@ -280,24 +276,29 @@ export function ScheduleGrid({
 
   const effectiveCoaches = coaches.length > 0 ? coaches : [];
 
-  /** 그 날짜의 당직자를 계산한다: 이번 주만의 예외(dutyOverridesState)가
-      있으면 그걸 우선 쓰고, 없으면 요일 기본값(dutyRosterState)을 쓴다.
-      예외가 coachId: null이면 "이 날짜는 당직자 없음"을 뜻한다. */
-  function resolveDuty(date: string, weekday: number): { coachId: number | null; coachName: string | null } | null {
-    if (date in dutyOverridesState) return dutyOverridesState[date];
-    return dutyRosterState[weekday] ?? null;
+  /** 그 토요일의 당직자를 계산한다. 배정이 없으면 null, coachId: null이면
+      "이 토요일은 당직자 없음"을 뜻한다. */
+  function resolveDuty(date: string): { coachId: number | null; coachName: string | null } | null {
+    return dutyOverridesState[date] ?? null;
   }
 
-  /** 코치의 근무시간 설정 밖인지를 판단한다. 설정이 없는 코치는 항상 false(제한
-      없음). 공휴일은 토요일과 같은 단축 운영이라 토요일 근무시간을 기준으로 본다.
-      평일은 요일별(월~금, 0~4)로 다른 시간대를 쓸 수 있다. */
+  /** 코치의 근무시간 설정 밖인지를 판단한다. 토요일은 코치별 설정이 아니라
+      당직 배정을 따른다 — 그 토요일 당직 코치만 9~15시 근무, 나머지 코치는
+      하루 종일 근무 외 시간으로 취급한다. 공휴일(토요일 제외)은 모든 코치가
+      토요일과 같은 단축 시간(9~15시)으로 근무한다. 평일은 요일별(월~금,
+      0~4)로 다른 시간대를 쓸 수 있고, 설정이 없는 코치는 항상 false(제한 없음). */
   function isOutsideWorkingHours(coachId: number, date: string, hour: number): boolean {
+    const weekdayIndex = dateKeys.indexOf(date);
+    if (weekdayIndex === 5) {
+      const duty = resolveDuty(date);
+      if (!duty || duty.coachId !== coachId) return true;
+      return hour < SCHEDULE_SATURDAY_HOURS.start || hour >= SCHEDULE_SATURDAY_HOURS.end;
+    }
+    if (holidayMap[date]) {
+      return hour < SCHEDULE_SATURDAY_HOURS.start || hour >= SCHEDULE_SATURDAY_HOURS.end;
+    }
     const wh = coachWorkingHours[coachId];
     if (!wh) return false;
-    const weekdayIndex = dateKeys.indexOf(date);
-    if (weekdayIndex === 5 || !!holidayMap[date]) {
-      return hour < wh.saturdayStart || hour >= wh.saturdayEnd;
-    }
     const start = wh.weekdayStarts[weekdayIndex];
     const end = wh.weekdayEnds[weekdayIndex];
     if (start === undefined || end === undefined) return false;
@@ -629,10 +630,12 @@ export function ScheduleGrid({
     router.push(`/admin/schedule?week=${year}-${String(month).padStart(2, "0")}-01`);
   }
 
-  /** 스케줄표에서 당직을 바꾸면 항상 "이번 주(이 날짜)만"의 예외로 저장한다
-      (요일 반복 기본값은 설정 페이지에서만 바꾼다). coachId가 undefined면
-      이 날짜의 예외를 지워 요일 기본값으로 되돌린다. */
+  /** 토요일 당직을 지정/해제한다. coachId가 undefined면 그 날짜의 당직 지정을
+      완전히 지우고, null이면 "이 토요일은 당직자 없음"을 명시적으로 저장한다.
+      코치별 당직은 월 1회로 제한돼 있어(setDutyOverride), 서버가 거부하면
+      낙관적으로 바꿔둔 화면 상태를 되돌리고 사유를 안내한다. */
   async function assignDutyOverride(date: string, coachId: number | null | undefined) {
+    const prevState = dutyOverridesState;
     const coach = typeof coachId === "number" ? effectiveCoaches.find((c) => c.id === coachId) : null;
     setDutyOverridesState((prev) => {
       const next = { ...prev };
@@ -641,13 +644,18 @@ export function ScheduleGrid({
       return next;
     });
     setDutyEditDate(null);
-    await fetch("/api/admin/duty-override", {
+    const res = await fetch("/api/admin/duty-override", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
         coachId === undefined ? { date, clear: true } : { date, coachId },
       ),
     });
+    if (!res.ok) {
+      setDutyOverridesState(prevState);
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "당직 지정에 실패했습니다.");
+    }
   }
 
   return (
@@ -815,27 +823,28 @@ export function ScheduleGrid({
                         🎂 {birthdayCoachNamesFor(d).join(", ")} 생일
                       </p>
                     )}
-                    {(() => {
-                      const resolved = resolveDuty(d, i);
-                      const label =
-                        resolved === null
-                          ? "당직 지정"
-                          : resolved.coachId === null
-                            ? "당직 없음"
-                            : `당직 ${resolved.coachName}`;
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => setDutyEditDate({ date: d, weekday: i })}
-                          className={[
-                            "text-[9px] truncate block w-full hover:underline",
-                            resolved ? "text-coral/80" : "text-ink/30",
-                          ].join(" ")}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })()}
+                    {i === 5 &&
+                      (() => {
+                        const resolved = resolveDuty(d);
+                        const label =
+                          resolved === null
+                            ? "당직 지정"
+                            : resolved.coachId === null
+                              ? "당직 없음"
+                              : `당직 ${resolved.coachName}`;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setDutyEditDate({ date: d, weekday: i })}
+                            className={[
+                              "text-[9px] truncate block w-full hover:underline",
+                              resolved ? "text-coral/80" : "text-ink/30",
+                            ].join(" ")}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })()}
                   </div>
                 );
               })}
@@ -953,27 +962,28 @@ export function ScheduleGrid({
                         🎂 {birthdayCoachNamesFor(d).join(", ")} 생일
                       </p>
                     )}
-                    {(() => {
-                      const resolved = resolveDuty(d, i);
-                      const label =
-                        resolved === null
-                          ? "당직 지정"
-                          : resolved.coachId === null
-                            ? "당직 없음"
-                            : `당직 ${resolved.coachName}`;
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => setDutyEditDate({ date: d, weekday: i })}
-                          className={[
-                            "text-[9px] truncate block w-full hover:underline",
-                            resolved ? "text-coral/80" : "text-ink/30",
-                          ].join(" ")}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })()}
+                    {i === 5 &&
+                      (() => {
+                        const resolved = resolveDuty(d);
+                        const label =
+                          resolved === null
+                            ? "당직 지정"
+                            : resolved.coachId === null
+                              ? "당직 없음"
+                              : `당직 ${resolved.coachName}`;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setDutyEditDate({ date: d, weekday: i })}
+                            className={[
+                              "text-[9px] truncate block w-full hover:underline",
+                              resolved ? "text-coral/80" : "text-ink/30",
+                            ].join(" ")}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })()}
                   </div>
                 );
               })}
@@ -1222,7 +1232,7 @@ export function ScheduleGrid({
           date={dutyEditDate.date}
           dateLabel={`${Number(dutyEditDate.date.split("-")[1])}/${Number(dutyEditDate.date.split("-")[2])}(${WEEKDAY_LABELS[dutyEditDate.weekday]})`}
           coaches={effectiveCoaches}
-          resolved={resolveDuty(dutyEditDate.date, dutyEditDate.weekday)}
+          resolved={resolveDuty(dutyEditDate.date)}
           hasOverride={dutyEditDate.date in dutyOverridesState}
           onClose={() => setDutyEditDate(null)}
           onAssign={assignDutyOverride}
@@ -2302,9 +2312,9 @@ function EditMergedBlockModal({
   );
 }
 
-/** 스케줄표 요일 헤더의 "당직 OOO" 표시를 눌렀을 때 뜨는, 그 날짜만의 당직자를
-    바꾸는 모달. 여기서 바꾸는 값은 항상 "이번 주(이 날짜)만" 적용되는 예외이고,
-    매주 반복되는 기본 담당자는 설정 페이지에서만 바꿀 수 있다. */
+/** 스케줄표 토요일 헤더의 "당직 OOO" 표시를 눌렀을 때 뜨는, 그 토요일의
+    당직자를 바꾸는 모달. 코치별 당직은 월 1회로 제한된다(설정 페이지의
+    당직 캘린더에서도 같은 규칙으로 배정할 수 있다). */
 function DutyEditModal({
   date,
   dateLabel,
@@ -2327,8 +2337,8 @@ function DutyEditModal({
     <ModalShell title={`${dateLabel} 당직자`} onClose={onClose}>
       <div className="space-y-4">
         <p className="text-xs text-ink/50">
-          여기서 바꾸면 이번 주({dateLabel})만 적용돼요. 매주 반복되는 기본
-          담당자는 설정 페이지에서 바꿀 수 있어요.
+          당직 코치는 9~15시로 근무해요. 같은 코치를 한 달에 두 번 이상
+          당직으로 배정할 수는 없어요.
         </p>
         <div className="space-y-2">
           {coaches.map((c) => (
@@ -2360,7 +2370,7 @@ function DutyEditModal({
               : "border-line hover:bg-bone",
           ].join(" ")}
         >
-          이번 주는 당직 없음
+          이 토요일은 당직 없음
         </button>
         {hasOverride && (
           <button
@@ -2368,7 +2378,7 @@ function DutyEditModal({
             onClick={() => onAssign(date, undefined)}
             className="w-full rounded-full border border-line py-2.5 text-sm text-red-500 hover:bg-red-50 transition"
           >
-            예외 취소하고 기본값으로 되돌리기
+            당직 지정 취소
           </button>
         )}
       </div>

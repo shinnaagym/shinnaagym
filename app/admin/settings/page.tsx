@@ -3,10 +3,12 @@ import { getDeviceId, isAdminAuthed } from "@/lib/auth";
 import {
   getActiveMemberCountsByCoach,
   getCoachWorkingHours,
-  getDutyRoster,
+  getDutyOverridesForMonth,
+  listBlockedDaysForMonth,
   listCoaches,
   listHolidays,
 } from "@/lib/schedule";
+import { koreaCurrentMonthKey } from "@/lib/date";
 import { listRecurringEvents } from "@/lib/recurring-events";
 import { listSettingsMemos } from "@/lib/settings-memos";
 import { BUILD_ID } from "@/lib/build-info";
@@ -18,13 +20,16 @@ export default async function AdminSettingsPage() {
     redirect("/admin");
   }
 
+  const currentMonth = koreaCurrentMonthKey();
+
   const [
     coaches,
     holidays,
     memberCounts,
     devices,
     currentDeviceId,
-    dutyRoster,
+    dutyOverrides,
+    blockedDays,
     recurringEvents,
     settingsMemos,
     coachWorkingHours,
@@ -34,7 +39,8 @@ export default async function AdminSettingsPage() {
     getActiveMemberCountsByCoach(),
     listActiveDevices(),
     getDeviceId(),
-    getDutyRoster(),
+    getDutyOverridesForMonth(currentMonth),
+    listBlockedDaysForMonth(currentMonth),
     listRecurringEvents(),
     listSettingsMemos(),
     getCoachWorkingHours(),
@@ -44,7 +50,7 @@ export default async function AdminSettingsPage() {
     <div className="mx-auto max-w-4xl px-6 py-8">
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Settings</p>
       <h1 className="font-display text-2xl mb-1">설정</h1>
-      <p className="text-sm text-ink/50 mb-6">코치·근무시간·당직자 같은 운영 기본값을 관리하세요.</p>
+      <p className="text-sm text-ink/50 mb-6">코치·근무시간·당직 같은 운영 기본값을 관리하세요.</p>
       <SettingsView
         initialCoaches={coaches}
         initialHolidays={holidays}
@@ -52,7 +58,9 @@ export default async function AdminSettingsPage() {
         buildId={BUILD_ID}
         initialDevices={devices}
         currentDeviceId={currentDeviceId ?? null}
-        initialDutyRoster={dutyRoster}
+        initialDutyMonth={currentMonth}
+        initialDutyOverrides={dutyOverrides}
+        initialBlockedDays={blockedDays}
         initialRecurringEvents={recurringEvents}
         initialSettingsMemos={settingsMemos}
         initialCoachWorkingHours={coachWorkingHours}

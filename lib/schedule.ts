@@ -88,45 +88,19 @@ export async function getActiveMemberCountsByCoach(): Promise<Record<number, num
   return Object.fromEntries(result.rows.map((r) => [r.coach_id, Number(r.count)]));
 }
 
-// ---- 당직자(요일별 고정 담당 코치) ----
+// ---- 토요일 당직 ----
 
-// 공휴일·코치 목록처럼 자주 바뀌지 않는 참조성 데이터라 같은 방식으로 캐싱한다.
-// weekday: 0=월요일 ~ 6=일요일.
-export const getDutyRoster = unstable_cache(
-  async (): Promise<Record<number, { coachId: number; coachName: string }>> => {
-    const result = await query<{ weekday: number; coach_id: number; coach_name: string }>(
-      `SELECT d.weekday, d.coach_id, c.name AS coach_name
-       FROM duty_roster d JOIN coaches c ON c.id = d.coach_id`,
-    );
-    return Object.fromEntries(
-      result.rows.map((r) => [r.weekday, { coachId: r.coach_id, coachName: r.coach_name }]),
-    );
-  },
-  ["duty-roster"],
-  { tags: ["duty-roster"], revalidate: 300 },
-);
-
-/** coachId가 null이면 해당 요일의 당직 지정을 해제한다. */
-export async function setDutyAssignment(weekday: number, coachId: number | null): Promise<void> {
-  if (coachId === null) {
-    await query(`DELETE FROM duty_roster WHERE weekday = $1`, [weekday]);
-  } else {
-    await query(
-      `INSERT INTO duty_roster (weekday, coach_id) VALUES ($1, $2)
-       ON CONFLICT (weekday) DO UPDATE SET coach_id = EXCLUDED.coach_id`,
-      [weekday, coachId],
-    );
-  }
-  revalidateTag("duty-roster", { expire: 0 });
-}
+/** setDutyOverride에서 "토요일이 아님" / "월 1회 초과"처럼 요청 자체를 거부해야
+    할 때 던지는 에러. API 라우트에서 이 타입만 400으로 변환한다. */
+export class DutyAssignmentError extends Error {}
 
 export interface DutyOverride {
   coachId: number | null;
   coachName: string | null;
 }
 
-/** 특정 날짜들에 대한 당직 예외(이번 주만 변경 등)를 조회한다. 캐싱하지
-    않는다 — 스케줄표를 볼 때마다 실시간으로 반영돼야 한다. */
+/** 특정 날짜들에 대한 당직 배정을 조회한다. 캐싱하지 않는다 — 스케줄표를 볼
+    때마다 실시간으로 반영돼야 한다. */
 export async function getDutyOverridesForDates(
   dateKeys: string[],
 ): Promise<Record<string, DutyOverride>> {
@@ -142,21 +116,63 @@ export async function getDutyOverridesForDates(
   );
 }
 
-/** coachId가 undefined면 이 날짜의 예외 지정을 완전히 지워 요일 기본값으로
-    되돌린다. null이면 "이 날짜는 당직자 없음"을 명시적으로 저장한다. */
+/** "YYYY-MM" 한 달 전체의 당직 배정을 조회한다(설정 페이지 캘린더용). */
+export async function getDutyOverridesForMonth(
+  monthKey: string,
+): Promise<Record<string, DutyOverride>> {
+  const [from, to] = monthKeyRange(monthKey);
+  const result = await query<{ override_date: string; coach_id: number | null; coach_name: string | null }>(
+    `SELECT o.override_date, o.coach_id, c.name AS coach_name
+     FROM duty_overrides o LEFT JOIN coaches c ON c.id = o.coach_id
+     WHERE o.override_date >= $1 AND o.override_date < $2`,
+    [from, to],
+  );
+  return Object.fromEntries(
+    result.rows.map((r) => [r.override_date, { coachId: r.coach_id, coachName: r.coach_name }]),
+  );
+}
+
+/** coachId가 undefined면 이 날짜의 당직 지정을 지운다. null이면 "이 날짜는
+    당직자 없음"을 명시적으로 저장한다. 실제 코치를 배정할 때는 토요일인지,
+    그 코치가 같은 달에 이미 다른 토요일 당직을 서고 있지 않은지 검증한다
+    (코치별 월 1회 한정). */
 export async function setDutyOverride(
   date: string,
   coachId: number | null | undefined,
 ): Promise<void> {
   if (coachId === undefined) {
     await query(`DELETE FROM duty_overrides WHERE override_date = $1`, [date]);
-  } else {
+    return;
+  }
+  if (coachId === null) {
     await query(
-      `INSERT INTO duty_overrides (override_date, coach_id) VALUES ($1, $2)
-       ON CONFLICT (override_date) DO UPDATE SET coach_id = EXCLUDED.coach_id`,
-      [date, coachId],
+      `INSERT INTO duty_overrides (override_date, coach_id) VALUES ($1, NULL)
+       ON CONFLICT (override_date) DO UPDATE SET coach_id = NULL`,
+      [date],
+    );
+    return;
+  }
+  const jsWeekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  if (jsWeekday !== 6) {
+    throw new DutyAssignmentError("당직은 토요일에만 배정할 수 있어요.");
+  }
+  const monthKey = date.slice(0, 7);
+  const conflict = await query<{ override_date: string }>(
+    `SELECT override_date FROM duty_overrides
+     WHERE coach_id = $1 AND override_date <> $2 AND override_date >= $3 AND override_date < $4`,
+    [coachId, date, ...monthKeyRange(monthKey)],
+  );
+  if (conflict.rows.length > 0) {
+    const [, m, d] = conflict.rows[0].override_date.split("-");
+    throw new DutyAssignmentError(
+      `이 코치는 이미 이번 달 ${Number(m)}/${Number(d)}에 당직으로 배정되어 있어요. 코치별 당직은 월 1회로 제한돼요.`,
     );
   }
+  await query(
+    `INSERT INTO duty_overrides (override_date, coach_id) VALUES ($1, $2)
+     ON CONFLICT (override_date) DO UPDATE SET coach_id = EXCLUDED.coach_id`,
+    [date, coachId],
+  );
 }
 
 // ---- 코치별 근무시간(평일/토요일) ----
@@ -903,6 +919,33 @@ export async function listSessionsInRange(
     [fromKey, toKey],
   );
   return result.rows;
+}
+
+export interface BlockedDayEntry {
+  coachId: number;
+  coachName: string;
+  memo: string;
+}
+
+/** "YYYY-MM" 한 달 동안 코치별 휴가/병가 등 "수업 불가" 표시(entry_type='blocked')를
+    날짜별로 묶어 반환한다(설정 페이지 당직 캘린더에서 휴가 표시용). 같은 날 여러
+    시간대에 걸쳐 등록돼도 코치·사유가 같으면 한 번만 나타난다. */
+export async function listBlockedDaysForMonth(
+  monthKey: string,
+): Promise<Record<string, BlockedDayEntry[]>> {
+  const [from, to] = monthKeyRange(monthKey);
+  const result = await query<{ session_date: string; coach_id: number; coach_name: string; memo: string }>(
+    `SELECT DISTINCT s.session_date, s.coach_id, c.name AS coach_name, s.memo
+     FROM class_sessions s JOIN coaches c ON c.id = s.coach_id
+     WHERE s.entry_type = 'blocked' AND s.session_date >= $1 AND s.session_date < $2
+     ORDER BY s.session_date ASC`,
+    [from, to],
+  );
+  const map: Record<string, BlockedDayEntry[]> = {};
+  for (const r of result.rows) {
+    (map[r.session_date] ??= []).push({ coachId: r.coach_id, coachName: r.coach_name, memo: r.memo });
+  }
+  return map;
 }
 
 export async function listMemberSessions(memberId: number): Promise<SessionWithMember[]> {

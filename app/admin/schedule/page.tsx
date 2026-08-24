@@ -6,7 +6,6 @@ import {
   getCoachWorkingHours,
   getDayHoursForRange,
   getDutyOverridesForDates,
-  getDutyRoster,
   listCoaches,
   listHolidays,
   listMembersWithProgress,
@@ -46,7 +45,6 @@ export default async function AdminSchedulePage({
     holidays,
     coachStats,
     memos,
-    dutyRoster,
     dutyOverrides,
     coachWorkingHours,
   ] = await Promise.all([
@@ -57,7 +55,6 @@ export default async function AdminSchedulePage({
     listHolidays(),
     getAllCoachScheduleStats(monthKey, weekStart, weekEnd),
     listScheduleMemos(),
-    getDutyRoster(),
     getDutyOverridesForDates(dateKeys),
     getCoachWorkingHours(),
   ]);
@@ -85,7 +82,6 @@ export default async function AdminSchedulePage({
         holidayMap={holidayMap}
         coachStats={Object.fromEntries(coachStats)}
         initialMemos={memos}
-        dutyRoster={dutyRoster}
         dutyOverrides={dutyOverrides}
         coachWorkingHours={coachWorkingHours}
       />
