@@ -14,6 +14,11 @@ const DEVICE_ID_TTL_MS = 2 * 365 * 24 * 60 * 60 * 1000; // 2년(기기 식별용
 export const PAYROLL_SESSION_COOKIE_NAME = "shinna_payroll_session";
 const PAYROLL_SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2시간
 
+// 가계부(저수지 관리 포함)도 급여 계산과 마찬가지로 대표만 봐야 하는 민감한
+// 화면이라 별도 2차 비밀번호를 둔다. 급여 세션과는 완전히 독립적인 세션이다.
+export const LEDGER_SESSION_COOKIE_NAME = "shinna_ledger_session";
+const LEDGER_SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2시간
+
 function getSecret(): string {
   return process.env.ADMIN_SESSION_SECRET || "dev-only-insecure-secret-change-me";
 }
@@ -152,4 +157,53 @@ export async function setPayrollSessionCookie(): Promise<void> {
 export async function clearPayrollSessionCookie(): Promise<void> {
   const store = await cookies();
   store.delete(PAYROLL_SESSION_COOKIE_NAME);
+}
+
+export function checkLedgerPassword(candidate: string): boolean {
+  const expected = process.env.LEDGER_PASSWORD || "qw152426350";
+  const a = Buffer.from(candidate);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function createLedgerSessionToken(): string {
+  const expires = Date.now() + LEDGER_SESSION_TTL_MS;
+  return `${expires}.${sign(`ledger:${expires}`)}`;
+}
+
+function parseLedgerSessionToken(token: string | undefined | null): boolean {
+  if (!token) return false;
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  const [expiresStr, signature] = parts;
+  const expires = Number(expiresStr);
+  if (!Number.isFinite(expires) || Date.now() > expires) return false;
+
+  const expected = sign(`ledger:${expiresStr}`);
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+export async function isLedgerAuthed(): Promise<boolean> {
+  const store = await cookies();
+  return parseLedgerSessionToken(store.get(LEDGER_SESSION_COOKIE_NAME)?.value);
+}
+
+export async function setLedgerSessionCookie(): Promise<void> {
+  const store = await cookies();
+  store.set(LEDGER_SESSION_COOKIE_NAME, createLedgerSessionToken(), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: LEDGER_SESSION_TTL_MS / 1000,
+  });
+}
+
+export async function clearLedgerSessionCookie(): Promise<void> {
+  const store = await cookies();
+  store.delete(LEDGER_SESSION_COOKIE_NAME);
 }

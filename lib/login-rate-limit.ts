@@ -1,8 +1,8 @@
 import { query } from "./db";
 
-/** 관리자 공용 비밀번호와 급여 2차 비밀번호는 서로 다른 시도라, 한쪽 실패가
-    다른 쪽 잠금에 영향을 주지 않도록 scope로 분리해서 센다. */
-export type LoginScope = "admin" | "payroll";
+/** 관리자 공용 비밀번호와 급여·가계부 2차 비밀번호는 서로 다른 시도라, 한쪽
+    실패가 다른 쪽 잠금에 영향을 주지 않도록 scope로 분리해서 센다. */
+export type LoginScope = "admin" | "payroll" | "ledger";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
