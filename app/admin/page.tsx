@@ -11,7 +11,7 @@ export default async function AdminLoginPage() {
 
   return (
     <main className="flex-1 flex items-center justify-center px-6 py-24">
-      <div className="w-full max-w-xs">
+      <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <Image src="/logo.png" alt="신나아짐" width={1585} height={488} className="h-10 w-auto mb-4" />
           <p className="text-xs tracking-[0.2em] text-gold-deep uppercase mb-1">Admin</p>
