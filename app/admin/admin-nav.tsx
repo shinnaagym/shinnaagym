@@ -17,7 +17,6 @@ const DEFAULT_TABS = [
   { href: "/admin/reservations", label: "사전예약" },
   { href: "/admin/intake", label: "초진 문진표" },
   { href: "/admin/assessments", label: "평가지" },
-  { href: "/admin/notices", label: "공지사항" },
   { href: "/admin/expenses", label: "가계부" },
   { href: "/admin/settings", label: "설정" },
 ];
