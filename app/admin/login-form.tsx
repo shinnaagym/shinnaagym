@@ -53,7 +53,7 @@ export function LoginForm({ recaptchaSiteKey }: { recaptchaSiteKey: string }) {
       sitekey: recaptchaSiteKey,
       callback: (token) => setRecaptchaToken(token),
       "expired-callback": () => setRecaptchaToken(null),
-      size: "compact",
+      size: "normal",
     });
   }, [recaptchaSiteKey]);
 
@@ -105,7 +105,7 @@ export function LoginForm({ recaptchaSiteKey }: { recaptchaSiteKey: string }) {
   return (
     <>
       <Script src="https://www.google.com/recaptcha/api.js?onload=onRecaptchaApiLoad&render=explicit" strategy="afterInteractive" />
-      <form onSubmit={handleSubmit} className="w-full max-w-xs space-y-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1.5">관리자 비밀번호</label>
           <input
