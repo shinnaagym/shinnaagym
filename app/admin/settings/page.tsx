@@ -13,6 +13,7 @@ import {
 import { koreaCurrentMonthKey } from "@/lib/date";
 import { listRecurringEvents } from "@/lib/recurring-events";
 import { listSettingsMemos } from "@/lib/settings-memos";
+import { listNotices } from "@/lib/notices";
 import { BUILD_ID } from "@/lib/build-info";
 import { listActiveDevices } from "@/lib/devices";
 import { SettingsView } from "./settings-view";
@@ -37,6 +38,7 @@ export default async function AdminSettingsPage() {
     recurringEvents,
     settingsMemos,
     coachWorkingHours,
+    notices,
   ] = await Promise.all([
     listCoaches(),
     listHolidays(),
@@ -50,6 +52,7 @@ export default async function AdminSettingsPage() {
     listRecurringEvents(),
     listSettingsMemos(),
     getCoachWorkingHours(),
+    listNotices(),
   ]);
 
   return (
@@ -72,6 +75,8 @@ export default async function AdminSettingsPage() {
         initialRecurringEvents={recurringEvents}
         initialSettingsMemos={settingsMemos}
         initialCoachWorkingHours={coachWorkingHours}
+        initialNotices={notices.filter((n) => n.category === "notice")}
+        initialEvents={notices.filter((n) => n.category === "event")}
       />
     </div>
   );

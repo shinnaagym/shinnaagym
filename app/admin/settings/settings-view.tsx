@@ -6,6 +6,7 @@ import type {
   CoachRow,
   EmploymentType,
   HolidayRow,
+  NoticeRow,
   RecurringEventCycle,
   RecurringEventRow,
   SettingsMemoRow,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/constants";
 import { SyncDiagnostics } from "./sync-diagnostics";
 import { MemoPad } from "../memo-pad";
+import { NoticesView } from "../notices/notices-view";
 
 const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i); // 0~24시(종료 시각용 24 포함)
 
@@ -765,6 +767,8 @@ export function SettingsView({
   initialRecurringEvents,
   initialSettingsMemos,
   initialCoachWorkingHours,
+  initialNotices,
+  initialEvents,
 }: {
   initialCoaches: CoachRow[];
   initialHolidays: HolidayRow[];
@@ -780,6 +784,8 @@ export function SettingsView({
   initialRecurringEvents: RecurringEventRow[];
   initialSettingsMemos: SettingsMemoRow[];
   initialCoachWorkingHours: Record<number, CoachWorkingHours>;
+  initialNotices: NoticeRow[];
+  initialEvents: NoticeRow[];
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   const [holidays, setHolidays] = useState(initialHolidays);
@@ -1183,6 +1189,8 @@ export function SettingsView({
         </div>
         {error && <p className="text-sm text-coral mt-3">{error}</p>}
       </section>
+
+      <NoticesView initialNotices={initialNotices} initialEvents={initialEvents} />
 
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">정기 일정</h2>
