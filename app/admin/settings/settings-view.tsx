@@ -520,15 +520,14 @@ function DutyCalendar({
   const leadingBlanks = calendarWeekdayOf(days[0]);
   const [year, monthNum] = month.split("-").map(Number);
 
-  // 코치 x 휴가 유형별 사용량(현재 보고 있는 달 기준). 단축근무는 일수가 아니라
-  // 총 시간(hours 합계)으로, 나머지 유형은 일수(entry 개수)로 센다.
+  // 코치 x 휴가 유형별 사용량(현재 보고 있는 달 기준). 모든 유형이 일수/횟수
+  // (entry 개수) 기준 한도라 그대로 개수를 센다.
   const leaveStats = useMemo(() => {
     const counts: Record<number, Record<string, number>> = {};
     for (const entries of Object.values(leaves)) {
       for (const l of entries) {
         const coachCounts = (counts[l.coachId] ??= {});
-        const amount = l.leaveType === "shortened" ? (l.hours ?? 0) : 1;
-        coachCounts[l.leaveType] = (coachCounts[l.leaveType] ?? 0) + amount;
+        coachCounts[l.leaveType] = (coachCounts[l.leaveType] ?? 0) + 1;
       }
     }
     return counts;
@@ -670,7 +669,7 @@ function DutyCalendar({
                   <td className="py-1.5 pr-2">{c.name}</td>
                   {LEAVE_TYPE_OPTIONS.map((o) => {
                     const amount = leaveStats[c.id]?.[o.value] ?? 0;
-                    const unit = o.limitUnit === "hours" ? "시간" : "일";
+                    const unit = o.value === "shortened" ? "회" : "일";
                     return (
                       <td
                         key={o.value}
