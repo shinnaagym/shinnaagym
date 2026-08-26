@@ -69,7 +69,7 @@ export default async function AdminSchedulePage({
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl 2xl:max-w-[1900px] px-6 py-8">
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Schedule</p>
       <h1 className="font-display text-2xl mb-1">스케줄</h1>
       <p className="text-sm text-ink/50 mb-6">주간 수업표를 확인하고 예약을 관리하세요.</p>
