@@ -671,12 +671,12 @@ function DutyCalendar({
           {year}년 {monthNum}월 통계 · 월 단위 한도는 이번달, 연 단위 한도는 {year}년 전체 사용량이에요
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[480px] text-xs">
+          <table className="min-w-[480px] text-xs">
             <thead>
               <tr className="text-ink/40">
-                <th className="py-1.5 pr-2 text-left font-medium">코치</th>
+                <th className="py-1.5 pr-2 text-left font-medium whitespace-nowrap">코치</th>
                 {LEAVE_TYPE_OPTIONS.map((o) => (
-                  <th key={o.value} className="px-2 py-1.5 text-center font-medium">
+                  <th key={o.value} className="px-2 py-1.5 text-center font-medium whitespace-nowrap">
                     <p>{o.label}</p>
                     <p className="font-normal text-ink/30">{o.limitLabel}</p>
                     <p className="font-normal text-ink/25">
@@ -684,13 +684,13 @@ function DutyCalendar({
                     </p>
                   </th>
                 ))}
-                <th className="py-1.5 pl-2 text-center font-medium">포스팅</th>
+                <th className="py-1.5 pl-2 text-center font-medium whitespace-nowrap">포스팅</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/40">
               {coaches.map((c) => (
                 <tr key={c.id}>
-                  <td className="py-1.5 pr-2">{c.name}</td>
+                  <td className="py-1.5 pr-2 whitespace-nowrap">{c.name}</td>
                   {LEAVE_TYPE_OPTIONS.map((o) => {
                     const amount =
                       o.limitPeriod === "year"
@@ -701,7 +701,7 @@ function DutyCalendar({
                       <td
                         key={o.value}
                         className={[
-                          "px-2 py-1.5 text-center",
+                          "px-2 py-1.5 text-center whitespace-nowrap",
                           amount > 0 ? "font-medium text-amber-800" : "text-ink/25",
                         ].join(" ")}
                       >
@@ -711,7 +711,7 @@ function DutyCalendar({
                   })}
                   <td
                     className={[
-                      "py-1.5 pl-2 text-center",
+                      "py-1.5 pl-2 text-center whitespace-nowrap",
                       (postStats[c.id] ?? 0) > 0 ? "font-medium text-sky-800" : "text-ink/25",
                     ].join(" ")}
                   >
