@@ -18,10 +18,8 @@ import type {
 import {
   addDaysToKey,
   addMonthsToKey,
-  isValidDateKey,
   koreaCurrentHour,
   koreaTodayKey,
-  mondayOfWeek,
   monthKeyRange,
   monthKeysRange,
 } from "./date";
@@ -1041,37 +1039,12 @@ export async function checkLeaveRequest(
   coachId: number,
   date: string,
   leaveType: string,
-  hours: number | null,
 ): Promise<void> {
   const option = LEAVE_TYPE_OPTIONS.find((o) => o.value === leaveType);
   if (!option) return;
 
   const today = koreaTodayKey();
-  if (leaveType === "birthday") {
-    // 생일휴가는 신청시기(며칠 전) 대신 "생일이 포함된 주(월~일) 안"에서만
-    // 쓸 수 있다. 생일 미등록(빈 문자열) 코치는 주 범위를 계산할 수 없으니
-    // 이 제약 없이 통과시킨다.
-    const coachResult = await query<{ birthday: string }>(
-      `SELECT birthday FROM coaches WHERE id = $1`,
-      [coachId],
-    );
-    const birthday = coachResult.rows[0]?.birthday ?? "";
-    if (birthday) {
-      const year = date.slice(0, 4);
-      let birthdayThisYear = `${year}-${birthday.slice(5)}`;
-      // 2/29 생일이 평년과 만나는 경우처럼 존재하지 않는 날짜가 되면 2/28로 보정한다.
-      if (!isValidDateKey(birthdayThisYear)) {
-        birthdayThisYear = `${year}-02-28`;
-      }
-      const weekStart = mondayOfWeek(birthdayThisYear);
-      const weekEnd = addDaysToKey(weekStart, 6);
-      if (date < weekStart || date > weekEnd) {
-        throw new LeaveValidationError(
-          `생일휴가는 생일이 포함된 주(${weekStart} ~ ${weekEnd}) 안에서만 사용할 수 있어요. 그 외 기간은 대표 승인이 필요해요.`,
-        );
-      }
-    }
-  } else if (option.noticeDays > 0) {
+  if (option.noticeDays > 0) {
     const earliest = addDaysToKey(today, option.noticeDays);
     if (date < earliest) {
       throw new LeaveValidationError(
@@ -1086,18 +1059,16 @@ export async function checkLeaveRequest(
       ? monthKeyRange(periodKey)
       : [`${periodKey}-01-01`, `${Number(periodKey) + 1}-01-01`];
 
-  const { rows } = await query<{ total_hours: string | null; total_days: string }>(
-    `SELECT COALESCE(SUM(hours), 0) AS total_hours, COUNT(*) AS total_days
+  const { rows } = await query<{ total_days: string }>(
+    `SELECT COUNT(*) AS total_days
      FROM coach_leaves
      WHERE coach_id = $1 AND leave_type = $2 AND leave_date >= $3 AND leave_date < $4`,
     [coachId, leaveType, rangeStart, rangeEnd],
   );
-  const currentUsage =
-    option.limitUnit === "hours" ? Number(rows[0]?.total_hours ?? 0) : Number(rows[0]?.total_days ?? 0);
-  const addition = option.limitUnit === "hours" ? (hours ?? 0) : 1;
-  const nextUsage = currentUsage + addition;
+  const currentUsage = Number(rows[0]?.total_days ?? 0);
+  const nextUsage = currentUsage + 1;
   if (nextUsage > option.limitAmount) {
-    const unitLabel = option.limitUnit === "hours" ? "시간" : "일";
+    const unitLabel = leaveType === "shortened" ? "회" : "일";
     throw new LeaveValidationError(
       `${option.label} 한도(${option.limitLabel})를 초과해요. 현재 ${currentUsage}${unitLabel} 사용, 추가하면 ${nextUsage}${unitLabel}이 돼요.`,
     );
@@ -1113,7 +1084,7 @@ export async function addCoachLeave(
   override = false,
 ): Promise<CoachLeaveEntry> {
   if (!override) {
-    await checkLeaveRequest(coachId, date, leaveType, hours);
+    await checkLeaveRequest(coachId, date, leaveType);
   }
   const result = await query<{ id: number; coach_name: string }>(
     `INSERT INTO coach_leaves (coach_id, leave_date, leave_type, direction, hours)
