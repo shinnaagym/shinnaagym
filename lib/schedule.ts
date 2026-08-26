@@ -997,6 +997,26 @@ export async function listCoachLeavesForMonth(
   return map;
 }
 
+/** "YYYY" 한 해 동안 코치별·휴가유형별 사용 횟수를 집계한다(당직 캘린더 통계용).
+    연 단위 한도(연속 휴가·병가·생일휴가 등)는 보고 있는 달만으로는 실제 사용량을
+    알 수 없어서 따로 필요하다. */
+export async function getCoachLeaveYearCounts(
+  year: string,
+): Promise<Record<number, Record<string, number>>> {
+  const result = await query<{ coach_id: number; leave_type: string; cnt: string }>(
+    `SELECT coach_id, leave_type, COUNT(*) AS cnt
+     FROM coach_leaves
+     WHERE leave_date >= $1 AND leave_date < $2
+     GROUP BY coach_id, leave_type`,
+    [`${year}-01-01`, `${Number(year) + 1}-01-01`],
+  );
+  const map: Record<number, Record<string, number>> = {};
+  for (const r of result.rows) {
+    (map[r.coach_id] ??= {})[r.leave_type] = Number(r.cnt);
+  }
+  return map;
+}
+
 /** 특정 날짜들(스케줄표 한 주)에 대한 코치별 휴가를 조회한다. 캐싱하지 않는다 —
     설정 페이지에서 바로바로 등록/삭제되므로 스케줄표를 볼 때마다 최신 값을
     가져와야 한다. */
