@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getDeviceId, isAdminAuthed } from "@/lib/auth";
 import {
   getActiveMemberCountsByCoach,
+  getCoachLeaveYearCounts,
   getCoachWorkingHours,
   getDutyOverridesForMonth,
   listBlockedDaysForMonth,
@@ -39,6 +40,7 @@ export default async function AdminSettingsPage() {
     settingsMemos,
     coachWorkingHours,
     notices,
+    leaveYearCounts,
   ] = await Promise.all([
     listCoaches(),
     listHolidays(),
@@ -53,6 +55,7 @@ export default async function AdminSettingsPage() {
     listSettingsMemos(),
     getCoachWorkingHours(),
     listNotices(),
+    getCoachLeaveYearCounts(currentMonth.slice(0, 4)),
   ]);
 
   return (
@@ -71,6 +74,7 @@ export default async function AdminSettingsPage() {
         initialDutyOverrides={dutyOverrides}
         initialBlockedDays={blockedDays}
         initialCoachLeaves={coachLeaves}
+        initialLeaveYearCounts={leaveYearCounts}
         initialPromoPosts={promoPosts}
         initialRecurringEvents={recurringEvents}
         initialSettingsMemos={settingsMemos}

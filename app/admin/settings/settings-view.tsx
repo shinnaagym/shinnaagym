@@ -165,6 +165,9 @@ type CoachLeaveMap = Record<
   { id: number; coachId: number; coachName: string; leaveType: string; direction: string | null; hours: number | null }[]
 >;
 type PromoPostMap = Record<string, { id: number; coachId: number; coachName: string }[]>;
+/** 코치별·휴가유형별 "올해" 누적 사용 횟수. 연 단위 한도(연속 휴가·병가·생일휴가
+    등)는 보고 있는 달의 leaves만으로는 알 수 없어서 별도로 내려받는다. */
+type LeaveYearCounts = Record<number, Record<string, number>>;
 
 /** 휴가 표시 문구를 만든다. 단축근무는 "단축근무(출근 지연 2시간)"처럼 방향·시간을 덧붙인다. */
 function formatLeaveLabel(entry: { leaveType: string; direction: string | null; hours: number | null }): string {
@@ -413,6 +416,7 @@ function DutyCalendar({
   initialOverrides,
   initialBlockedDays,
   initialCoachLeaves,
+  initialLeaveYearCounts,
   initialPromoPosts,
 }: {
   coaches: CoachRow[];
@@ -420,12 +424,14 @@ function DutyCalendar({
   initialOverrides: DutyOverrideMap;
   initialBlockedDays: BlockedDayMap;
   initialCoachLeaves: CoachLeaveMap;
+  initialLeaveYearCounts: LeaveYearCounts;
   initialPromoPosts: PromoPostMap;
 }) {
   const [month, setMonth] = useState(initialMonth);
   const [overrides, setOverrides] = useState<DutyOverrideMap>(initialOverrides);
   const [blockedDays, setBlockedDays] = useState<BlockedDayMap>(initialBlockedDays);
   const [leaves, setLeaves] = useState<CoachLeaveMap>(initialCoachLeaves);
+  const [yearCounts, setYearCounts] = useState<LeaveYearCounts>(initialLeaveYearCounts);
   const [posts, setPosts] = useState<PromoPostMap>(initialPromoPosts);
   const [loading, setLoading] = useState(false);
   const [calendarError, setCalendarError] = useState<string | null>(null);
@@ -442,6 +448,7 @@ function DutyCalendar({
         setOverrides(data.overrides);
         setBlockedDays(data.blocked);
         setLeaves(data.leaves);
+        setYearCounts(data.yearCounts);
         setPosts(data.posts);
       }
     } finally {
@@ -487,13 +494,27 @@ function DutyCalendar({
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setLeaves((prev) => ({ ...prev, [date]: [...(prev[date] ?? []), data.entry] }));
+      setYearCounts((prev) => ({
+        ...prev,
+        [coachId]: { ...prev[coachId], [leaveType]: (prev[coachId]?.[leaveType] ?? 0) + 1 },
+      }));
       return { ok: true };
     }
     return { ok: false, error: data.error ?? "휴가 등록에 실패했습니다.", needsOverride: !!data.needsOverride };
   }
 
   async function removeLeave(date: string, id: number) {
+    const removed = leaves[date]?.find((l) => l.id === id);
     setLeaves((prev) => ({ ...prev, [date]: (prev[date] ?? []).filter((l) => l.id !== id) }));
+    if (removed) {
+      setYearCounts((prev) => ({
+        ...prev,
+        [removed.coachId]: {
+          ...prev[removed.coachId],
+          [removed.leaveType]: Math.max(0, (prev[removed.coachId]?.[removed.leaveType] ?? 0) - 1),
+        },
+      }));
+    }
     await fetch(`/api/admin/coach-leaves?id=${id}`, { method: "DELETE" });
   }
 
@@ -647,7 +668,7 @@ function DutyCalendar({
 
       <div className="mt-6 border-t border-line/50 pt-4">
         <p className="mb-2 text-xs font-medium text-ink/60">
-          {year}년 {monthNum}월 통계
+          {year}년 {monthNum}월 통계 · 월 단위 한도는 이번달, 연 단위 한도는 {year}년 전체 사용량이에요
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px] text-xs">
@@ -658,6 +679,9 @@ function DutyCalendar({
                   <th key={o.value} className="px-2 py-1.5 text-center font-medium">
                     <p>{o.label}</p>
                     <p className="font-normal text-ink/30">{o.limitLabel}</p>
+                    <p className="font-normal text-ink/25">
+                      ({o.limitPeriod === "year" ? `${year}년 누적` : "이번달"})
+                    </p>
                   </th>
                 ))}
                 <th className="py-1.5 pl-2 text-center font-medium">포스팅</th>
@@ -668,7 +692,10 @@ function DutyCalendar({
                 <tr key={c.id}>
                   <td className="py-1.5 pr-2">{c.name}</td>
                   {LEAVE_TYPE_OPTIONS.map((o) => {
-                    const amount = leaveStats[c.id]?.[o.value] ?? 0;
+                    const amount =
+                      o.limitPeriod === "year"
+                        ? (yearCounts[c.id]?.[o.value] ?? 0)
+                        : (leaveStats[c.id]?.[o.value] ?? 0);
                     const unit = o.value === "shortened" ? "회" : "일";
                     return (
                       <td
@@ -762,6 +789,7 @@ export function SettingsView({
   initialDutyOverrides,
   initialBlockedDays,
   initialCoachLeaves,
+  initialLeaveYearCounts,
   initialPromoPosts,
   initialRecurringEvents,
   initialSettingsMemos,
@@ -779,6 +807,7 @@ export function SettingsView({
   initialDutyOverrides: DutyOverrideMap;
   initialBlockedDays: BlockedDayMap;
   initialCoachLeaves: CoachLeaveMap;
+  initialLeaveYearCounts: LeaveYearCounts;
   initialPromoPosts: PromoPostMap;
   initialRecurringEvents: RecurringEventRow[];
   initialSettingsMemos: SettingsMemoRow[];
@@ -1140,6 +1169,7 @@ export function SettingsView({
           initialOverrides={initialDutyOverrides}
           initialBlockedDays={initialBlockedDays}
           initialCoachLeaves={initialCoachLeaves}
+          initialLeaveYearCounts={initialLeaveYearCounts}
           initialPromoPosts={initialPromoPosts}
         />
       </section>
