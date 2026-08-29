@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { PURPOSE_OPTIONS, businessHours, BOOKING_START_DATE, BOOKING_WINDOW_DAYS } from "@/lib/constants";
 import { addDaysToKey, koreaCurrentHour, koreaTodayKey } from "@/lib/date";
+import { trackEvent } from "@/lib/analytics";
 
 type TakenSlot = { date: string; hour: number };
 
@@ -109,6 +110,12 @@ export function ReservationForm() {
     setSelectedHour(null);
     setSuccess(null);
     setError(null);
+    trackEvent("select_date", { date: key });
+  }
+
+  function selectHour(hour: number) {
+    setSelectedHour(hour);
+    if (selectedDate) trackEvent("select_reservation_slot", { date: selectedDate, hour });
   }
 
   function togglePurpose(value: string) {
@@ -121,28 +128,38 @@ export function ReservationForm() {
     e.preventDefault();
     setError(null);
 
+    function fail(reason: string) {
+      setError(reason);
+      trackEvent("reservation_validation_error", { reason });
+    }
+
     if (!selectedDate || selectedHour === null) {
-      setError("예약 날짜와 시간을 선택해주세요.");
+      fail("예약 날짜와 시간을 선택해주세요.");
       return;
     }
     if (!name.trim()) {
-      setError("성함을 입력해주세요.");
+      fail("성함을 입력해주세요.");
       return;
     }
     if (!age || Number(age) < 1 || Number(age) > 120) {
-      setError("나이를 올바르게 입력해주세요.");
+      fail("나이를 올바르게 입력해주세요.");
       return;
     }
     if (!phone.trim()) {
-      setError("연락처를 입력해주세요.");
+      fail("연락처를 입력해주세요.");
       return;
     }
     if (purposes.length === 0) {
-      setError("운동 목적을 하나 이상 선택해주세요.");
+      fail("운동 목적을 하나 이상 선택해주세요.");
       return;
     }
 
     setSubmitting(true);
+    trackEvent("submit_reservation_attempt", {
+      date: selectedDate,
+      hour: selectedHour,
+      purposes: purposes.join(","),
+    });
     try {
       const res = await fetch("/api/reservations", {
         method: "POST",
@@ -160,9 +177,18 @@ export function ReservationForm() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "예약 중 오류가 발생했습니다.");
+        trackEvent("reservation_error", { reason: data.error ?? "server_error" });
         await refreshTaken();
         return;
       }
+      // 사전예약 신청하기 제출 성공 = 퍼널의 전환(conversion) 지점.
+      // GA4 관리자에서 이 이벤트를 "주요 이벤트(key event)"로 표시해두면 전환으로 집계된다.
+      trackEvent("generate_lead", {
+        method: "사전예약",
+        reservation_date: selectedDate,
+        reservation_hour: selectedHour,
+        purposes: purposes.join(","),
+      });
       setSuccess({ date: selectedDate, hour: selectedHour });
       setName("");
       setAge("");
@@ -174,6 +200,7 @@ export function ReservationForm() {
       await refreshTaken();
     } catch {
       setError("네트워크 오류로 예약에 실패했어요. 다시 시도해주세요.");
+      trackEvent("reservation_error", { reason: "network" });
     } finally {
       setSubmitting(false);
     }
@@ -253,7 +280,7 @@ export function ReservationForm() {
                     key={h}
                     type="button"
                     disabled={isTaken}
-                    onClick={() => setSelectedHour(h)}
+                    onClick={() => selectHour(h)}
                     className={[
                       "px-3.5 py-2 rounded-full text-[13px] border transition-all duration-200",
                       isTaken
