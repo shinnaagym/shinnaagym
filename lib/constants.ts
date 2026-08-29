@@ -3,7 +3,7 @@ export const BUSINESS_START_HOUR = 9;
 export const BUSINESS_END_HOUR = 22;
 export const BOOKING_WINDOW_DAYS = 90;
 // 오픈일 전에는 사전예약을 받지 않는다 — 이 날짜 이전은 달력에서 선택할 수 없다.
-export const BOOKING_START_DATE = "2026-09-15";
+export const BOOKING_START_DATE = "2026-09-28";
 
 // 취업규칙 제6조(단축근무 및 휴무)·제11조(경조사 지원) 기준 휴가 종류. 당직
 // 캘린더에서 코치별 휴가를 기록할 때 이 중 하나를 고른다. limitPeriod/
