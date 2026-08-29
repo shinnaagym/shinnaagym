@@ -381,7 +381,17 @@ const ASSESSMENT_PLAN = [
   },
 ];
 
+// GET도 허용하는 이유: 이 엔드포인트는 터미널 없이 폰 브라우저에서 링크
+// 하나만 탭해서 실행할 수 있어야 한다(POST 전용이면 curl 등이 필요함).
+export async function GET(req: NextRequest) {
+  return handle(req);
+}
+
 export async function POST(req: NextRequest) {
+  return handle(req);
+}
+
+async function handle(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   if (searchParams.get("key") !== SEED_KEY) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
