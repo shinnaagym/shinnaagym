@@ -1,7 +1,9 @@
 import Image from "next/image";
+import Script from "next/script";
 import { IntroOverlay } from "@/app/components/IntroOverlay";
 import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
+import { GA_MEASUREMENT_ID } from "@/lib/analytics";
 
 const TRAINER_NAME = "신종수";
 const TRAINER_BIO_LINE_1 = "병원에서의 재활 경험과 헬스장 현장의 트레이닝 노하우를 가진 물리치료사 입니다.";
@@ -77,6 +79,27 @@ export default function Home() {
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap"
       />
+
+      {/* GA4는 사전예약 랜딩(이 페이지)에서만 불러온다 — 관리자 페이지까지
+          같이 잡으면 내부 직원 사용이 전환 퍼널 데이터에 섞인다.
+          NEXT_PUBLIC_GA_ID 미설정 시(로컬/프리뷰 배포) 아예 로드하지 않는다. */}
+      {GA_MEASUREMENT_ID && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+            strategy="afterInteractive"
+          />
+          <Script id="ga4-init" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              window.gtag = gtag;
+              gtag('js', new Date());
+              gtag('config', '${GA_MEASUREMENT_ID}');
+            `}
+          </Script>
+        </>
+      )}
 
       <IntroOverlay />
 
