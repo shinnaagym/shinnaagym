@@ -37,8 +37,8 @@ export function IntakeLanding({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removedIds, setRemovedIds] = useState<Set<number>>(new Set());
+  const [removedMemberIds, setRemovedMemberIds] = useState<Set<number>>(new Set());
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [deletingAll, setDeletingAll] = useState(false);
 
   async function handleDelete(memberId: number, memberName: string) {
     if (!window.confirm(`${memberName}님의 초진 문진표를 삭제할까요? 되돌릴 수 없어요.`)) return;
@@ -58,54 +58,34 @@ export function IntakeLanding({
     }
   }
 
-  async function handleDeleteAll() {
-    const doneIds = members
-      .filter((m) => timestampMap.has(m.id) && !removedIds.has(m.id))
-      .map((m) => m.id);
-    if (doneIds.length === 0) return;
-    if (
-      !window.confirm(
-        `작성 완료된 초진 문진표 ${doneIds.length}건을 모두 삭제할까요? 되돌릴 수 없어요.`,
-      )
-    )
-      return;
-    setDeletingAll(true);
+  // 아직 문진표를 작성하지 않은(미작성) 항목은 지울 문진표 자체가 없으므로,
+  // 목록에서 이 항목을 없애려면 회원 정보 자체를 삭제한다.
+  async function handleDeleteMember(memberId: number, memberName: string) {
+    if (!window.confirm(`${memberName}님 항목을 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setDeletingId(memberId);
     try {
-      const results = await Promise.all(
-        doneIds.map((id) =>
-          fetch(`/api/admin/members/${id}/intake`, { method: "DELETE" }).then((res) => ({
-            id,
-            ok: res.ok,
-          })),
-        ),
-      );
-      const succeeded = results.filter((r) => r.ok).map((r) => r.id);
-      if (succeeded.length > 0) {
-        setRemovedIds((prev) => {
-          const next = new Set(prev);
-          succeeded.forEach((id) => next.add(id));
-          return next;
-        });
-        router.refresh();
+      const res = await fetch(`/api/admin/members/${memberId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        window.alert("삭제에 실패했어요.");
+        return;
       }
-      if (succeeded.length < doneIds.length) {
-        window.alert(`${doneIds.length - succeeded.length}건은 삭제에 실패했어요.`);
-      }
+      setRemovedMemberIds((prev) => new Set(prev).add(memberId));
+      router.refresh();
     } catch {
       window.alert("네트워크 오류가 발생했어요.");
     } finally {
-      setDeletingAll(false);
+      setDeletingId(null);
     }
   }
 
-  const doneCount = useMemo(
-    () => members.filter((m) => timestampMap.has(m.id) && !removedIds.has(m.id)).length,
-    [members, timestampMap, removedIds],
-  );
-
   const filtered = useMemo(() => {
     const q = search.trim();
-    const base = q ? members.filter((m) => m.name.includes(q) || m.phone.includes(q)) : members;
+    const visible = members.filter((m) => !removedMemberIds.has(m.id));
+    const base = q ? visible.filter((m) => m.name.includes(q) || m.phone.includes(q)) : visible;
     if (sortMode === "name") {
       return [...base].sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -119,7 +99,7 @@ export function IntakeLanding({
       if (bAt) return 1;
       return a.name.localeCompare(b.name);
     });
-  }, [members, search, sortMode, timestampMap]);
+  }, [members, search, sortMode, timestampMap, removedMemberIds]);
 
   async function handleCreate() {
     const trimmedName = name.trim();
@@ -190,38 +170,26 @@ export function IntakeLanding({
         className="w-full rounded-full border border-line bg-white px-4 py-2 text-sm outline-none focus:border-coral mb-3"
       />
 
-      <div className="flex items-center justify-between gap-2 mb-4 text-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="text-ink/40">정렬</span>
-          {(
-            [
-              ["date", "최신 작성순"],
-              ["name", "이름순"],
-            ] as const
-          ).map(([mode, label]) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setSortMode(mode)}
-              className={[
-                "rounded-full px-3 py-1 font-medium transition",
-                sortMode === mode ? "bg-coral text-white" : "bg-bone/70 text-ink/60 hover:bg-bone",
-              ].join(" ")}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {doneCount > 0 && (
+      <div className="flex items-center gap-1.5 mb-4 text-xs">
+        <span className="text-ink/40">정렬</span>
+        {(
+          [
+            ["date", "최신 작성순"],
+            ["name", "이름순"],
+          ] as const
+        ).map(([mode, label]) => (
           <button
+            key={mode}
             type="button"
-            onClick={handleDeleteAll}
-            disabled={deletingAll}
-            className="shrink-0 whitespace-nowrap rounded-full border border-coral/40 text-coral px-3 py-1 font-medium hover:bg-coral/10 transition disabled:opacity-50"
+            onClick={() => setSortMode(mode)}
+            className={[
+              "rounded-full px-3 py-1 font-medium transition",
+              sortMode === mode ? "bg-coral text-white" : "bg-bone/70 text-ink/60 hover:bg-bone",
+            ].join(" ")}
           >
-            {deletingAll ? "삭제 중..." : `모두 삭제 (${doneCount})`}
+            {label}
           </button>
-        )}
+        ))}
       </div>
 
       {filtered.length === 0 ? (
@@ -263,16 +231,16 @@ export function IntakeLanding({
                     </span>
                   </div>
                 </button>
-                {done && (
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(m.id, m.name)}
-                    disabled={deletingId === m.id}
-                    className="text-xs text-coral hover:opacity-70 disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {deletingId === m.id ? "삭제 중..." : "삭제"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    done ? handleDelete(m.id, m.name) : handleDeleteMember(m.id, m.name)
+                  }
+                  disabled={deletingId === m.id}
+                  className="text-xs text-coral hover:opacity-70 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {deletingId === m.id ? "삭제 중..." : "삭제"}
+                </button>
               </li>
             );
           })}
