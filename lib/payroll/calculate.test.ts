@@ -10,6 +10,7 @@ import {
   tenureBucket,
 } from "./calculate.ts";
 import {
+  DEFAULT_INSURANCE_RATES,
   REGULAR_MANDATORY_SESSIONS,
   REGULAR_RATE_1ON1,
   REGULAR_RATE_2ON1,
@@ -268,4 +269,91 @@ test("팀장(team_lead) 유형은 정직원과 동일한 급여 규칙을 쓰고
   });
   assert.equal(teamLeadType.teamLeadAllowance, REGULAR_TEAM_LEAD_ALLOWANCE);
   assert.deepEqual(teamLeadType, { ...regularWithCheckbox, employmentType: "team_lead" });
+});
+
+test("국민연금은 4.75%, 건강/고용보험과 함께 기본값(config.ts)이 그대로 적용됨", () => {
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  // 보수월액 = 총지급액 - 식대(비과세) = 기본급만 있는 케이스.
+  const taxableAmount = REGULAR_BASE_SALARY;
+  assert.equal(result.insuranceRatesUsed, DEFAULT_INSURANCE_RATES);
+  assert.equal(result.deductions.nationalPension, Math.round(taxableAmount * 0.0475));
+  assert.equal(result.deductions.healthInsurance, Math.round(taxableAmount * 0.03545));
+  assert.equal(
+    result.deductions.longTermCare,
+    Math.round(result.deductions.healthInsurance * 0.1295),
+  );
+  assert.equal(result.deductions.employmentInsurance, Math.round(taxableAmount * 0.009));
+});
+
+test("국민연금 상한액을 넘으면 초과분에 보험료가 붙지 않음(건강·고용보험은 상한 없음)", () => {
+  // 보수월액이 상한액(300만원)을 넘도록 소개 인센티브를 크게 잡는다. 두 케이스
+  // 모두 상한액을 넘지만 초과 폭이 다르게(150만원 vs 500만원 인센티브) 잡아,
+  // 국민연금은 그대로인데 건강·고용보험은 더 커지는지 확인한다.
+  const insuranceRates = {
+    ...DEFAULT_INSURANCE_RATES,
+    nationalPensionCap: 3_000_000,
+  };
+  const atCap = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 30_000_000, // 인센티브 150만원 -> 보수월액 330만원
+    insuranceRates,
+  });
+  const overCap = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 100_000_000, // 인센티브 500만원 -> 보수월액 680만원
+    insuranceRates,
+  });
+  assert.ok(atCap.taxableAmount > insuranceRates.nationalPensionCap);
+  assert.ok(overCap.taxableAmount > insuranceRates.nationalPensionCap);
+  // 상한액을 넘겨도 국민연금은 상한액 × 요율에서 더 늘지 않는다.
+  assert.equal(overCap.deductions.nationalPension, atCap.deductions.nationalPension);
+  assert.equal(
+    overCap.deductions.nationalPension,
+    Math.round(insuranceRates.nationalPensionCap * insuranceRates.nationalPensionRate),
+  );
+  // 건강보험·고용보험은 상한이 없어 보수월액이 늘어난 만큼 함께 늘어난다.
+  assert.ok(overCap.deductions.healthInsurance > atCap.deductions.healthInsurance);
+  assert.ok(overCap.deductions.employmentInsurance > atCap.deductions.employmentInsurance);
+});
+
+test("insuranceRates를 지정하면 그 값이 그대로 계산·결과에 반영됨", () => {
+  const customRates = {
+    nationalPensionRate: 0.05,
+    nationalPensionCap: 5_000_000,
+    healthInsuranceRate: 0.04,
+    longTermCareRateOfHealthInsurance: 0.13,
+    employmentInsuranceRate: 0.01,
+  };
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    insuranceRates: customRates,
+  });
+  assert.deepEqual(result.insuranceRatesUsed, customRates);
+  const taxableAmount = REGULAR_BASE_SALARY;
+  assert.equal(result.deductions.nationalPension, Math.round(taxableAmount * customRates.nationalPensionRate));
+  assert.equal(result.deductions.healthInsurance, Math.round(taxableAmount * customRates.healthInsuranceRate));
 });

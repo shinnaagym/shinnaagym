@@ -2,11 +2,8 @@
 // 클라이언트(실시간 미리보기) 양쪽에서 그대로 import해 쓸 수 있고, node --test로
 // 단위 테스트하기 쉽다.
 import {
-  EMPLOYMENT_INSURANCE_RATE,
+  DEFAULT_INSURANCE_RATES,
   FREELANCER_WITHHOLDING_RATE,
-  HEALTH_INSURANCE_RATE,
-  LONG_TERM_CARE_RATE_OF_HEALTH_INSURANCE,
-  NATIONAL_PENSION_RATE,
   REFERRAL_INCENTIVE_RATE,
   REGULAR_BASE_SALARY,
   REGULAR_MANDATORY_SESSIONS,
@@ -18,6 +15,7 @@ import {
   rate1on1For,
   rate2on1For,
   type EmploymentType,
+  type InsuranceRates,
   type TenureBucket,
 } from "./config.ts";
 
@@ -168,6 +166,8 @@ export interface PayrollInput {
    * 모드(오버라이드 지정 시)에서는 계산하지 않고 null을 반환한다.
    */
   tenureBucketOverride?: TenureBucket;
+  /** 지정하지 않으면 config.ts의 DEFAULT_INSURANCE_RATES(기본값)를 쓴다. */
+  insuranceRates?: InsuranceRates;
 }
 
 export interface PayrollDeductions {
@@ -203,6 +203,10 @@ export interface PayrollResult {
   netPay: number;
   /** 근속 1년 미만이거나 시뮬레이션(tenureBucketOverride 지정) 모드면 null. */
   severanceEstimate: number | null;
+  /** 이 계산에 실제로 쓰인 4대보험 요율/상한액(입력에 없으면 기본값). 화면에
+      요율을 표시할 때와 저장된 이력을 나중에 다시 볼 때 실제 적용값을
+      보여주기 위해 결과에 함께 담아둔다. */
+  insuranceRatesUsed: InsuranceRates;
 }
 
 function round(n: number): number {
@@ -219,6 +223,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   } = input;
   const sessionCount1on1 = Math.max(0, input.sessionCount1on1);
   const sessionCount2on1 = Math.max(0, input.sessionCount2on1);
+  const rates = input.insuranceRates ?? DEFAULT_INSURANCE_RATES;
 
   const referenceDate = monthEndDateKey(yearMonth);
   const tenure = input.tenureBucketOverride ?? tenureBucket(hiredAt, referenceDate);
@@ -256,6 +261,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
       },
       netPay: 0,
       severanceEstimate: null,
+      insuranceRatesUsed: rates,
     };
   }
 
@@ -288,10 +294,12 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   let taxableAmount: number;
   if (isRegularPayScale(employmentType)) {
     taxableAmount = Math.max(0, grossPay - mealAllowance);
-    const nationalPension = round(taxableAmount * NATIONAL_PENSION_RATE);
-    const healthInsurance = round(taxableAmount * HEALTH_INSURANCE_RATE);
-    const longTermCare = round(healthInsurance * LONG_TERM_CARE_RATE_OF_HEALTH_INSURANCE);
-    const employmentInsurance = round(taxableAmount * EMPLOYMENT_INSURANCE_RATE);
+    // 국민연금만 기준소득월액 상한액을 적용한다(건강보험·고용보험은 상한 없음).
+    const pensionBase = Math.min(taxableAmount, rates.nationalPensionCap);
+    const nationalPension = round(pensionBase * rates.nationalPensionRate);
+    const healthInsurance = round(taxableAmount * rates.healthInsuranceRate);
+    const longTermCare = round(healthInsurance * rates.longTermCareRateOfHealthInsurance);
+    const employmentInsurance = round(taxableAmount * rates.employmentInsuranceRate);
     deductions = {
       nationalPension,
       healthInsurance,
@@ -343,5 +351,6 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     deductions,
     netPay,
     severanceEstimate,
+    insuranceRatesUsed: rates,
   };
 }

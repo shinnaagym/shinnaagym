@@ -50,15 +50,44 @@ export const FREELANCER_RATE_2ON1 = 42_000;
 export const VAT_RATE = 0.1;
 export const REFERRAL_INCENTIVE_RATE = 0.05;
 
-// ── 4대보험 요율 (2025년 기준) ───────────────────────────
-// 국민연금: 4.5% (근로자 부담분)
-export const NATIONAL_PENSION_RATE = 0.045;
-// 건강보험: 3.545% (근로자 부담분)
+// ── 4대보험 요율 (2026년 기준) ───────────────────────────
+// 아래 값들은 관리자 페이지(급여 계산 > 요율 설정)에 저장된 값이 없을 때
+// 쓰는 기본값이다. 실제 계산에 쓰는 값은 DB에 저장된 설정을 우선하고,
+// 저장된 값이 없으면 이 기본값으로 자동 대체된다(lib/payroll.ts의
+// getInsuranceRates 참고). 코드에서 요율을 직접 하드코딩해 쓰는 곳이
+// 이 파일 하나뿐이도록 유지한다.
+
+// 국민연금: 9.5%, 근로자 부담은 절반인 4.75%
+export const NATIONAL_PENSION_RATE = 0.0475;
+// 국민연금 기준소득월액 상한액(2026.7~2027.6 적용분). 보수월액이 이 금액을
+// 넘으면 초과분에는 보험료가 붙지 않는다 — min(보수월액, 상한액) × 요율로
+// 계산한다. 매년 7월에 상·하한액이 바뀌므로, 바뀌면 이 값(또는 관리자
+// 페이지의 저장된 설정값)만 갱신하면 된다.
+export const NATIONAL_PENSION_CAP = 6_590_000;
+// 건강보험: 3.545% (근로자 부담분, 상한 없음)
 export const HEALTH_INSURANCE_RATE = 0.03545;
-// 장기요양보험료 = 건강보험료 × 12.95%
+// 장기요양보험료 = 건강보험료 × 12.95% (상한 없음)
 export const LONG_TERM_CARE_RATE_OF_HEALTH_INSURANCE = 0.1295;
-// 고용보험: 0.9% (근로자 부담분)
+// 고용보험: 0.9% (근로자 부담분, 상한 없음)
 export const EMPLOYMENT_INSURANCE_RATE = 0.009;
+
+/** 관리자 페이지(급여 계산 > 요율 설정)에서 수정 가능한 4대보험 요율/상한액 값 묶음. */
+export interface InsuranceRates {
+  nationalPensionRate: number;
+  nationalPensionCap: number;
+  healthInsuranceRate: number;
+  longTermCareRateOfHealthInsurance: number;
+  employmentInsuranceRate: number;
+}
+
+/** DB에 저장된 설정이 없을 때 쓰는 기본 요율(위 상수 값과 항상 같다). */
+export const DEFAULT_INSURANCE_RATES: InsuranceRates = {
+  nationalPensionRate: NATIONAL_PENSION_RATE,
+  nationalPensionCap: NATIONAL_PENSION_CAP,
+  healthInsuranceRate: HEALTH_INSURANCE_RATE,
+  longTermCareRateOfHealthInsurance: LONG_TERM_CARE_RATE_OF_HEALTH_INSURANCE,
+  employmentInsuranceRate: EMPLOYMENT_INSURANCE_RATE,
+};
 
 // ── 프리랜서 원천징수 ────────────────────────────────────
 // 소득세 3% + 지방소득세 0.3% = 3.3%
