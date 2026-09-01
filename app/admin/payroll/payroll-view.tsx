@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CoachRow, EmploymentType } from "@/lib/db";
+import type { InsuranceRates } from "@/lib/payroll";
 import {
   calculatePayroll,
   computeReferralSupplyAmount,
@@ -12,6 +13,7 @@ import {
 import { PrintButton } from "@/app/components/PrintButton";
 import { PayrollResultCards } from "./payroll-result";
 import { PayrollHistory } from "./payroll-history";
+import { PayrollInsuranceSettings } from "./payroll-insurance-settings";
 
 const TENURE_BUCKETS = ["under1", "1to2", "over2"] as const;
 
@@ -36,11 +38,14 @@ const REFERRAL_PAYMENT_METHOD_LABEL: Record<ReferralPaymentMethod, string> = {
 export function PayrollView({
   coaches,
   defaultYearMonth,
+  initialInsuranceRates,
 }: {
   coaches: CoachRow[];
   defaultYearMonth: string;
+  initialInsuranceRates: InsuranceRates;
 }) {
-  const [tab, setTab] = useState<"calc" | "history">("calc");
+  const [tab, setTab] = useState<"calc" | "history" | "rates">("calc");
+  const [insuranceRates, setInsuranceRates] = useState<InsuranceRates>(initialInsuranceRates);
 
   const [coachSelection, setCoachSelection] = useState<string>("");
   const [manualName, setManualName] = useState("");
@@ -141,6 +146,7 @@ export function PayrollView({
       sessionCount2on1: Number(sessionCount2on1) || 0,
       referralSupplyAmount,
       allocationOrder,
+      insuranceRates,
     }),
     [
       employmentType,
@@ -151,6 +157,7 @@ export function PayrollView({
       sessionCount2on1,
       referralSupplyAmount,
       allocationOrder,
+      insuranceRates,
     ],
   );
 
@@ -232,10 +239,22 @@ export function PayrollView({
         >
           월별 이력
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("rates")}
+          className={[
+            "px-4 py-1.5 rounded-full text-sm font-medium transition-colors",
+            tab === "rates" ? "bg-coral text-white shadow-sm" : "text-ink/60 hover:text-ink",
+          ].join(" ")}
+        >
+          요율 설정
+        </button>
       </div>
 
       {tab === "history" ? (
         <PayrollHistory coaches={coaches} />
+      ) : tab === "rates" ? (
+        <PayrollInsuranceSettings rates={insuranceRates} onSaved={setInsuranceRates} />
       ) : (
         <div className="space-y-6">
           <div className="no-print rounded-2xl border border-line/60 bg-white shadow-sm p-5 space-y-4">

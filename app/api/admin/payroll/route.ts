@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed, isPayrollAuthed } from "@/lib/auth";
 import { isValidMonthKey } from "@/lib/date";
-import { listPayrollRecords, savePayrollRecord, type ReferralEntry } from "@/lib/payroll";
+import { getInsuranceRates, listPayrollRecords, savePayrollRecord, type ReferralEntry } from "@/lib/payroll";
 import {
   calculatePayroll,
   computeReferralSupplyAmount,
@@ -133,6 +133,9 @@ export async function POST(req: NextRequest) {
 
   // 클라이언트가 보낸 결과 숫자는 신뢰하지 않고, 서버에서 동일한 순수 함수로
   // 다시 계산해 저장한다(화면 표시용 미리보기와 저장값이 항상 같은 로직을 타게 함).
+  // 4대보험 요율도 클라이언트 값을 믿지 않고 저장된 설정(없으면 기본값)을 서버에서
+  // 직접 불러와 쓴다.
+  const insuranceRates = await getInsuranceRates();
   const result = calculatePayroll({
     employmentType,
     hiredAt,
@@ -142,6 +145,7 @@ export async function POST(req: NextRequest) {
     sessionCount2on1,
     referralSupplyAmount: computeReferralSupplyAmount(referralEntries ?? []),
     allocationOrder,
+    insuranceRates,
   });
 
   const record = await savePayrollRecord({

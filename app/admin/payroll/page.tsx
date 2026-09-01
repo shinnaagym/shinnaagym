@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { isAdminAuthed, isPayrollAuthed } from "@/lib/auth";
 import { koreaCurrentMonthKey } from "@/lib/date";
 import { listCoaches } from "@/lib/schedule";
+import { getInsuranceRates } from "@/lib/payroll";
 import { PayrollGated } from "./payroll-gated";
 
 export default async function PayrollPage() {
@@ -12,7 +13,7 @@ export default async function PayrollPage() {
   // 가계부 2차 비밀번호로 이미 인증되어 있으면(같은 비밀번호를 공유) 급여
   // 계산 비밀번호 화면을 건너뛴다.
   const initialUnlocked = await isPayrollAuthed();
-  const coaches = await listCoaches(true);
+  const [coaches, insuranceRates] = await Promise.all([listCoaches(true), getInsuranceRates()]);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -26,6 +27,7 @@ export default async function PayrollPage() {
         coaches={coaches}
         defaultYearMonth={koreaCurrentMonthKey()}
         initialUnlocked={initialUnlocked}
+        initialInsuranceRates={insuranceRates}
       />
     </div>
   );

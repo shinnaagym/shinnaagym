@@ -1,9 +1,11 @@
 import { query } from "./db";
-import type { EmploymentType, PayrollRecordRow } from "./db";
+import type { EmploymentType, InsuranceSettingsRow, PayrollRecordRow } from "./db";
 import type { PayrollResult, ReferralEntry } from "./payroll/calculate";
+import { DEFAULT_INSURANCE_RATES, type InsuranceRates } from "./payroll/config";
 import { koreaTodayKey } from "./date";
 
 export type { ReferralEntry, ReferralPaymentMethod } from "./payroll/calculate";
+export type { InsuranceRates } from "./payroll/config";
 
 export interface CoachMonthSessionCounts {
   sessionCount1on1: number;
@@ -105,4 +107,45 @@ export async function listPayrollRecords(
 
 export async function deletePayrollRecord(id: number): Promise<void> {
   await query(`DELETE FROM payroll_records WHERE id = $1`, [id]);
+}
+
+/** 저장된 4대보험 요율 설정을 읽는다. 저장된 값이 없으면(대표가 아직 한
+    번도 고치지 않았으면) config.ts의 기본값을 그대로 돌려준다. */
+export async function getInsuranceRates(): Promise<InsuranceRates> {
+  const result = await query<InsuranceSettingsRow>(
+    `SELECT * FROM insurance_settings WHERE id = 1`,
+  );
+  const row = result.rows[0];
+  if (!row) return DEFAULT_INSURANCE_RATES;
+  return {
+    nationalPensionRate: row.national_pension_rate,
+    nationalPensionCap: row.national_pension_cap,
+    healthInsuranceRate: row.health_insurance_rate,
+    longTermCareRateOfHealthInsurance: row.long_term_care_rate,
+    employmentInsuranceRate: row.employment_insurance_rate,
+  };
+}
+
+export async function saveInsuranceRates(rates: InsuranceRates): Promise<InsuranceRates> {
+  await query(
+    `INSERT INTO insurance_settings
+       (id, national_pension_rate, national_pension_cap, health_insurance_rate,
+        long_term_care_rate, employment_insurance_rate, updated_at)
+     VALUES (1, $1, $2, $3, $4, $5, now())
+     ON CONFLICT (id) DO UPDATE SET
+       national_pension_rate = EXCLUDED.national_pension_rate,
+       national_pension_cap = EXCLUDED.national_pension_cap,
+       health_insurance_rate = EXCLUDED.health_insurance_rate,
+       long_term_care_rate = EXCLUDED.long_term_care_rate,
+       employment_insurance_rate = EXCLUDED.employment_insurance_rate,
+       updated_at = now()`,
+    [
+      rates.nationalPensionRate,
+      rates.nationalPensionCap,
+      rates.healthInsuranceRate,
+      rates.longTermCareRateOfHealthInsurance,
+      rates.employmentInsuranceRate,
+    ],
+  );
+  return rates;
 }

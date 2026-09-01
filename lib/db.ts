@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 27;
+const SCHEMA_VERSION = 28;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -458,6 +458,20 @@ function runFullMigration(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_payroll_records_year_month ON payroll_records(year_month);
         CREATE INDEX IF NOT EXISTS idx_payroll_records_coach_id ON payroll_records(coach_id);
+
+        -- 4대보험 요율/상한액 설정. 대표가 급여 계산 페이지(요율 설정 탭)에서
+        -- 언제든 고칠 수 있는 단일 행(id=1로 고정) 설정값이다. 이 행이 없으면
+        -- lib/payroll/config.ts의 DEFAULT_INSURANCE_RATES를 대신 쓴다
+        -- (lib/payroll.ts의 getInsuranceRates 참고).
+        CREATE TABLE IF NOT EXISTS insurance_settings (
+          id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+          national_pension_rate NUMERIC NOT NULL,
+          national_pension_cap INTEGER NOT NULL,
+          health_insurance_rate NUMERIC NOT NULL,
+          long_term_care_rate NUMERIC NOT NULL,
+          employment_insurance_rate NUMERIC NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
 
         -- 저수지(세금·예비비) 관리용 적립/차감 통합 히스토리. reserve_type은
         -- lib/constants.ts의 RESERVE_TYPE_OPTIONS 값(vat/income_tax/severance/
@@ -1144,6 +1158,16 @@ export interface PayrollRecordRow {
   referral_entries: unknown;
   result: unknown;
   created_at: string;
+}
+
+export interface InsuranceSettingsRow {
+  id: number;
+  national_pension_rate: number;
+  national_pension_cap: number;
+  health_insurance_rate: number;
+  long_term_care_rate: number;
+  employment_insurance_rate: number;
+  updated_at: string;
 }
 
 export type ReserveTransactionType = "deposit" | "withdrawal";

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { CoachRow } from "@/lib/db";
+import type { InsuranceRates } from "@/lib/payroll";
 import { PayrollGate } from "./payroll-gate";
 import { PayrollView } from "./payroll-view";
 
@@ -16,10 +17,12 @@ export function PayrollGated({
   coaches,
   defaultYearMonth,
   initialUnlocked,
+  initialInsuranceRates,
 }: {
   coaches: CoachRow[];
   defaultYearMonth: string;
   initialUnlocked: boolean;
+  initialInsuranceRates: InsuranceRates;
 }) {
   const [unlocked, setUnlocked] = useState(initialUnlocked);
 
@@ -27,5 +30,11 @@ export function PayrollGated({
     return <PayrollGate onUnlock={() => setUnlocked(true)} />;
   }
 
-  return <PayrollView coaches={coaches} defaultYearMonth={defaultYearMonth} />;
+  return (
+    <PayrollView
+      coaches={coaches}
+      defaultYearMonth={defaultYearMonth}
+      initialInsuranceRates={initialInsuranceRates}
+    />
+  );
 }

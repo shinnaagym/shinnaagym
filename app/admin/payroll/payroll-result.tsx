@@ -1,9 +1,18 @@
 import type { EmploymentType } from "@/lib/db";
 import type { ReferralEntry, ReferralPaymentMethod } from "@/lib/payroll";
 import type { PayrollResult } from "@/lib/payroll/calculate";
+import { DEFAULT_INSURANCE_RATES } from "@/lib/payroll/config";
 
 function formatWon(n: number): string {
   return `₩${Math.round(n).toLocaleString("ko-KR")}`;
+}
+
+// 요율 라벨(예: "국민연금(4.75%)")에 쓸 문자열. 저장된 요율을 그대로 보여줘야
+// 하므로 하드코딩하지 않고 실제 계산에 쓰인 값(PayrollResult.insuranceRatesUsed)에서
+// 매번 계산한다. 부동소수점 오차로 4.750000000000001 같은 값이 나오는 걸 막기
+// 위해 소수 4자리까지 반올림한 뒤 뒤에 붙는 불필요한 0을 정리한다.
+function formatPercent(rate: number): string {
+  return `${(Math.round(rate * 100 * 10_000) / 10_000).toString()}%`;
 }
 
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
@@ -208,6 +217,10 @@ export function PayrollSpecCard({
   result: PayrollResult;
   referralEntries?: ReferralEntry[];
 }) {
+  // 이 필드가 생기기 전에 저장된 예전 이력에는 insuranceRatesUsed가 없을 수
+  // 있어, 그런 경우 라벨 표시용으로만 기본값을 대신 쓴다(저장된 공제 금액
+  // 자체는 그대로 보여준다 — 라벨의 %만 근사치가 될 수 있다).
+  const ratesUsed = result.insuranceRatesUsed ?? DEFAULT_INSURANCE_RATES;
   return (
     <div className="rounded-2xl border border-line/60 bg-white shadow-sm p-5">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -249,10 +262,22 @@ export function PayrollSpecCard({
       <div className="text-sm divide-y divide-line/40 mt-3 pt-3 border-t border-line/60">
         {result.employmentType === "regular" ? (
           <>
-            <SpecRow label="국민연금(4.5%)" value={result.deductions.nationalPension} negative />
-            <SpecRow label="건강보험(3.545%)" value={result.deductions.healthInsurance} negative />
+            <SpecRow
+              label={`국민연금(${formatPercent(ratesUsed.nationalPensionRate)})`}
+              value={result.deductions.nationalPension}
+              negative
+            />
+            <SpecRow
+              label={`건강보험(${formatPercent(ratesUsed.healthInsuranceRate)})`}
+              value={result.deductions.healthInsurance}
+              negative
+            />
             <SpecRow label="장기요양보험" value={result.deductions.longTermCare} negative />
-            <SpecRow label="고용보험(0.9%)" value={result.deductions.employmentInsurance} negative />
+            <SpecRow
+              label={`고용보험(${formatPercent(ratesUsed.employmentInsuranceRate)})`}
+              value={result.deductions.employmentInsurance}
+              negative
+            />
           </>
         ) : (
           <SpecRow label="원천징수(3.3%)" value={result.deductions.freelancerWithholding} negative />
@@ -270,6 +295,13 @@ export function PayrollSpecCard({
         <p className="text-xs text-ink/50 mt-2">
           퇴직금 누적 예상액(간이 계산): {formatWon(result.severanceEstimate)} — 실제 퇴직금은
           퇴사 직전 3개월 평균임금 기준이라 차이가 날 수 있어요.
+        </p>
+      )}
+
+      {result.employmentType === "regular" && (
+        <p className="text-xs text-ink/40 mt-2">
+          * 4대보험은 실제로는 전년도 보수총액으로 정한 보수월액 기준으로 부과되며, 이듬해
+          정산됩니다. 이 화면은 당월 급여 기준 참고 계산입니다.
         </p>
       )}
     </div>
