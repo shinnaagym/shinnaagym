@@ -357,3 +357,72 @@ test("insuranceRates를 지정하면 그 값이 그대로 계산·결과에 반�
   assert.equal(result.deductions.nationalPension, Math.round(taxableAmount * customRates.nationalPensionRate));
   assert.equal(result.deductions.healthInsurance, Math.round(taxableAmount * customRates.healthInsuranceRate));
 });
+
+test("declaredMonthlyCompensation이 없으면 당월 급여 기준(current-month)으로 4대보험을 계산함", () => {
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  assert.equal(result.insuranceBaseSource, "current-month");
+  assert.equal(result.insuranceBaseAmount, result.taxableAmount);
+  assert.equal(result.taxableAmount, REGULAR_BASE_SALARY);
+  assert.equal(
+    result.deductions.nationalPension,
+    Math.round(REGULAR_BASE_SALARY * DEFAULT_INSURANCE_RATES.nationalPensionRate),
+  );
+});
+
+test("declaredMonthlyCompensation을 지정하면 그 금액을 4대보험 산정 기준으로 그대로 씀(당월 급여와 무관)", () => {
+  const declared = 3_500_000;
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 70, // 수업료가 붙어 당월 급여(taxableAmount)는 declared와 달라짐
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    declaredMonthlyCompensation: declared,
+  });
+  assert.equal(result.insuranceBaseSource, "declared");
+  assert.equal(result.insuranceBaseAmount, declared);
+  assert.notEqual(result.taxableAmount, declared); // 당월 급여 자체(표시용)는 그대로 별도로 계산됨
+  assert.equal(
+    result.deductions.nationalPension,
+    Math.round(Math.min(declared, DEFAULT_INSURANCE_RATES.nationalPensionCap) * DEFAULT_INSURANCE_RATES.nationalPensionRate),
+  );
+  assert.equal(
+    result.deductions.healthInsurance,
+    Math.round(declared * DEFAULT_INSURANCE_RATES.healthInsuranceRate),
+  );
+});
+
+test("declaredMonthlyCompensation이 0 이하이거나 없으면(null) 신고값을 무시하고 당월 급여 기준으로 돌아감", () => {
+  const zero = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    declaredMonthlyCompensation: 0,
+  });
+  const nullValue = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2020-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    declaredMonthlyCompensation: null,
+  });
+  assert.equal(zero.insuranceBaseSource, "current-month");
+  assert.equal(nullValue.insuranceBaseSource, "current-month");
+});

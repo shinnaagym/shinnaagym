@@ -168,6 +168,13 @@ export interface PayrollInput {
   tenureBucketOverride?: TenureBucket;
   /** 지정하지 않으면 config.ts의 DEFAULT_INSURANCE_RATES(기본값)를 쓴다. */
   insuranceRates?: InsuranceRates;
+  /**
+   * 대표가 직접 신고한 4대보험 산정 기준 보수월액(원). null/undefined/0
+   * 이하면 당월 급여 기준(taxableAmount = 총지급액 - 식대)으로 계산한다.
+   * 값이 있으면 그 금액을 그대로 4대보험 산정 기준으로 쓴다(국민연금은
+   * 여전히 상한액을 적용).
+   */
+  declaredMonthlyCompensation?: number | null;
 }
 
 export interface PayrollDeductions {
@@ -207,6 +214,11 @@ export interface PayrollResult {
       요율을 표시할 때와 저장된 이력을 나중에 다시 볼 때 실제 적용값을
       보여주기 위해 결과에 함께 담아둔다. */
   insuranceRatesUsed: InsuranceRates;
+  /** 4대보험(국민연금/건강보험/고용보험) 계산에 실제로 쓰인 보수월액. */
+  insuranceBaseAmount: number;
+  /** insuranceBaseAmount의 출처. "declared"면 신고한 보수월액을 그대로 쓴
+      것이고, "current-month"면 당월 급여(taxableAmount)로 계산한 참고값이다. */
+  insuranceBaseSource: "declared" | "current-month";
 }
 
 function round(n: number): number {
@@ -262,6 +274,8 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
       netPay: 0,
       severanceEstimate: null,
       insuranceRatesUsed: rates,
+      insuranceBaseAmount: 0,
+      insuranceBaseSource: "current-month",
     };
   }
 
@@ -292,14 +306,26 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
 
   let deductions: PayrollDeductions;
   let taxableAmount: number;
+  let insuranceBaseAmount: number;
+  let insuranceBaseSource: "declared" | "current-month";
   if (isRegularPayScale(employmentType)) {
     taxableAmount = Math.max(0, grossPay - mealAllowance);
+    // 신고한 보수월액이 있으면 그 금액을 4대보험 산정 기준으로 쓰고, 없으면
+    // 당월 급여(taxableAmount)로 계산한 참고값을 쓴다.
+    const declared = input.declaredMonthlyCompensation;
+    if (typeof declared === "number" && declared > 0) {
+      insuranceBaseAmount = declared;
+      insuranceBaseSource = "declared";
+    } else {
+      insuranceBaseAmount = taxableAmount;
+      insuranceBaseSource = "current-month";
+    }
     // 국민연금만 기준소득월액 상한액을 적용한다(건강보험·고용보험은 상한 없음).
-    const pensionBase = Math.min(taxableAmount, rates.nationalPensionCap);
+    const pensionBase = Math.min(insuranceBaseAmount, rates.nationalPensionCap);
     const nationalPension = round(pensionBase * rates.nationalPensionRate);
-    const healthInsurance = round(taxableAmount * rates.healthInsuranceRate);
+    const healthInsurance = round(insuranceBaseAmount * rates.healthInsuranceRate);
     const longTermCare = round(healthInsurance * rates.longTermCareRateOfHealthInsurance);
-    const employmentInsurance = round(taxableAmount * rates.employmentInsuranceRate);
+    const employmentInsurance = round(insuranceBaseAmount * rates.employmentInsuranceRate);
     deductions = {
       nationalPension,
       healthInsurance,
@@ -310,6 +336,8 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     };
   } else {
     taxableAmount = grossPay;
+    insuranceBaseAmount = 0;
+    insuranceBaseSource = "current-month";
     const freelancerWithholding = round(grossPay * FREELANCER_WITHHOLDING_RATE);
     deductions = {
       nationalPension: 0,
@@ -352,5 +380,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     netPay,
     severanceEstimate,
     insuranceRatesUsed: rates,
+    insuranceBaseAmount,
+    insuranceBaseSource,
   };
 }

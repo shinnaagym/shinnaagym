@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
         sessionCount2on1?: unknown;
         referralEntries?: unknown;
         allocationOrder?: unknown;
+        declaredMonthlyCompensation?: unknown;
       }
     | null;
 
@@ -117,6 +118,12 @@ export async function POST(req: NextRequest) {
       : undefined;
   const coachId =
     typeof body?.coachId === "number" && Number.isInteger(body.coachId) ? body.coachId : null;
+  const declaredMonthlyCompensation =
+    typeof body?.declaredMonthlyCompensation === "number" &&
+    Number.isFinite(body.declaredMonthlyCompensation) &&
+    body.declaredMonthlyCompensation > 0
+      ? body.declaredMonthlyCompensation
+      : null;
 
   if (
     !employeeName ||
@@ -146,6 +153,7 @@ export async function POST(req: NextRequest) {
     referralSupplyAmount: computeReferralSupplyAmount(referralEntries ?? []),
     allocationOrder,
     insuranceRates,
+    declaredMonthlyCompensation,
   });
 
   const record = await savePayrollRecord({
