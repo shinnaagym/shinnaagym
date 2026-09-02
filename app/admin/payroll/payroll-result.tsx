@@ -221,6 +221,10 @@ export function PayrollSpecCard({
   // 있어, 그런 경우 라벨 표시용으로만 기본값을 대신 쓴다(저장된 공제 금액
   // 자체는 그대로 보여준다 — 라벨의 %만 근사치가 될 수 있다).
   const ratesUsed = result.insuranceRatesUsed ?? DEFAULT_INSURANCE_RATES;
+  // 이 필드들이 생기기 전에 저장된 예전 이력에는 없을 수 있어, 그런 경우
+  // 당월 급여 기준(taxableAmount)으로 계산했던 것으로 간주한다.
+  const insuranceBaseSource = result.insuranceBaseSource ?? "current-month";
+  const insuranceBaseAmount = result.insuranceBaseAmount ?? result.taxableAmount;
   return (
     <div className="rounded-2xl border border-line/60 bg-white shadow-sm p-5">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -260,6 +264,15 @@ export function PayrollSpecCard({
       )}
 
       <div className="text-sm divide-y divide-line/40 mt-3 pt-3 border-t border-line/60">
+        {result.employmentType === "regular" && (
+          <div className="flex items-center justify-between py-1 text-ink/50">
+            <span>
+              보수월액(
+              {insuranceBaseSource === "declared" ? "고지 예정액" : "당월 기준 참고 계산"})
+            </span>
+            <span>{formatWon(insuranceBaseAmount)}</span>
+          </div>
+        )}
         {result.employmentType === "regular" ? (
           <>
             <SpecRow
@@ -298,12 +311,18 @@ export function PayrollSpecCard({
         </p>
       )}
 
-      {result.employmentType === "regular" && (
-        <p className="text-xs text-ink/40 mt-2">
-          * 4대보험은 실제로는 전년도 보수총액으로 정한 보수월액 기준으로 부과되며, 이듬해
-          정산됩니다. 이 화면은 당월 급여 기준 참고 계산입니다.
-        </p>
-      )}
+      {result.employmentType === "regular" &&
+        (insuranceBaseSource === "declared" ? (
+          <p className="text-xs text-ink/40 mt-2">
+            * 보수월액(고지 예정액)을 직접 입력해 그 금액 기준으로 4대보험을 계산했어요. 국민연금은
+            상한액 적용 후, 실제 신고·고지 시점과 다르면 차이가 날 수 있어요.
+          </p>
+        ) : (
+          <p className="text-xs text-ink/40 mt-2">
+            * 4대보험은 실제로는 전년도 보수총액으로 정한 보수월액 기준으로 부과되며, 이듬해
+            정산됩니다. 이 화면은 당월 급여 기준 참고 계산입니다.
+          </p>
+        ))}
     </div>
   );
 }

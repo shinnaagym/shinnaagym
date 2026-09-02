@@ -64,6 +64,16 @@ export function PayrollView({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // 직원별로 신고해둔 4대보험 산정 기준 보수월액. coaches prop을 초기값으로
+  // 시작해, 저장에 성공하면 그 결과로만 갱신한다(서버 재조회 없이 화면에
+  // 바로 반영하기 위함).
+  const [savedDeclaredComp, setSavedDeclaredComp] = useState<Record<number, number | null>>(() =>
+    Object.fromEntries(coaches.map((c) => [c.id, c.declared_monthly_compensation])),
+  );
+  const [declaredMonthlyCompensation, setDeclaredMonthlyCompensation] = useState("");
+  const [savingDeclaredComp, setSavingDeclaredComp] = useState(false);
+  const [declaredCompMessage, setDeclaredCompMessage] = useState<string | null>(null);
+
   const selectedCoach = useMemo(
     () =>
       coachSelection && coachSelection !== "manual"
@@ -81,6 +91,9 @@ export function PayrollView({
       setEmploymentType(selectedCoach.employment_type);
       setHiredAt(selectedCoach.hired_at);
       setIsTeamLead(selectedCoach.is_team_lead);
+      const saved = savedDeclaredComp[selectedCoach.id];
+      setDeclaredMonthlyCompensation(saved != null ? String(saved) : "");
+      setDeclaredCompMessage(null);
     }
   }
 
@@ -136,6 +149,10 @@ export function PayrollView({
     })),
   );
 
+  const declaredMonthlyCompensationValue = declaredMonthlyCompensation.trim()
+    ? Number(declaredMonthlyCompensation) || null
+    : null;
+
   const baseInput: PayrollInput = useMemo(
     () => ({
       employmentType,
@@ -147,6 +164,7 @@ export function PayrollView({
       referralSupplyAmount,
       allocationOrder,
       insuranceRates,
+      declaredMonthlyCompensation: declaredMonthlyCompensationValue,
     }),
     [
       employmentType,
@@ -158,8 +176,39 @@ export function PayrollView({
       referralSupplyAmount,
       allocationOrder,
       insuranceRates,
+      declaredMonthlyCompensationValue,
     ],
   );
+
+  async function handleSaveDeclaredComp() {
+    if (!selectedCoach) return;
+    const trimmed = declaredMonthlyCompensation.trim();
+    if (trimmed && (!Number.isFinite(Number(trimmed)) || Number(trimmed) <= 0)) {
+      setDeclaredCompMessage("보수월액은 0보다 큰 숫자여야 해요.");
+      return;
+    }
+    const amount = trimmed ? Number(trimmed) : null;
+    setSavingDeclaredComp(true);
+    setDeclaredCompMessage(null);
+    try {
+      const res = await fetch(`/api/admin/payroll/coaches/${selectedCoach.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ declaredMonthlyCompensation: amount }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDeclaredCompMessage(data.error ?? "저장에 실패했어요.");
+        return;
+      }
+      setSavedDeclaredComp((prev) => ({ ...prev, [selectedCoach.id]: amount }));
+      setDeclaredCompMessage(amount ? "저장했어요." : "삭제했어요. 당월 급여 기준으로 계산돼요.");
+    } catch {
+      setDeclaredCompMessage("네트워크 오류가 발생했어요.");
+    } finally {
+      setSavingDeclaredComp(false);
+    }
+  }
 
   const result = useMemo(() => calculatePayroll(baseInput), [baseInput]);
 
@@ -365,6 +414,44 @@ export function PayrollView({
                   onChange={(e) => setSessionCount2on1(e.target.value)}
                   className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                 />
+              </div>
+              <div className="col-span-full">
+                <label className="block text-xs text-ink/50 mb-1">보수월액(4대보험 신고액, 선택)</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={declaredMonthlyCompensation}
+                      onChange={(e) => {
+                        setDeclaredMonthlyCompensation(e.target.value);
+                        setDeclaredCompMessage(null);
+                      }}
+                      placeholder="비워두면 당월 급여 기준으로 계산"
+                      className="w-56 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                    />
+                    <span className="text-sm text-ink/40 shrink-0">원</span>
+                  </div>
+                  {selectedCoach ? (
+                    <button
+                      type="button"
+                      onClick={handleSaveDeclaredComp}
+                      disabled={savingDeclaredComp}
+                      className="shrink-0 rounded-full border border-coral/40 text-coral px-3 py-1.5 text-xs font-medium hover:bg-coral/10 transition disabled:opacity-50"
+                    >
+                      {savingDeclaredComp ? "저장 중..." : "직원 정보에 저장"}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-ink/40">
+                      직원을 선택해야 저장할 수 있어요(선택 전엔 이 계산에만 임시로 반영돼요)
+                    </span>
+                  )}
+                  {declaredCompMessage && <span className="text-xs text-sage">{declaredCompMessage}</span>}
+                </div>
+                <p className="text-[11px] text-ink/40 mt-1">
+                  값을 입력하면 그 금액을 4대보험(국민연금·건강보험·고용보험) 산정 기준으로 그대로
+                  쓰고, 비워두면 지금처럼 당월 급여 기준으로 계산해요.
+                </p>
               </div>
               <div className="col-span-full">
                 <label className="block text-xs text-ink/50 mb-1">

@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 28;
+const SCHEMA_VERSION = 29;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -569,6 +569,9 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS hired_at TEXT NOT NULL DEFAULT '';
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS is_team_lead BOOLEAN NOT NULL DEFAULT false;
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS birthday TEXT NOT NULL DEFAULT '';
+            -- 대표가 급여 계산 페이지에서 직원별로 직접 신고한 4대보험 산정
+            -- 기준(보수월액). NULL이면 당월 급여 기준으로 계산한다(기존 방식).
+            ALTER TABLE coaches ADD COLUMN IF NOT EXISTS declared_monthly_compensation INTEGER;
             ALTER TABLE payroll_records ADD COLUMN IF NOT EXISTS referral_entries JSONB NOT NULL DEFAULT '[]'::jsonb;
           ALTER TABLE packages ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb;
@@ -788,6 +791,9 @@ export interface CoachRow {
   is_team_lead: boolean;
   /** YYYY-MM-DD. 연도는 무시하고 월·일만 스케줄표 생일 표시에 쓴다. 미입력 시 빈 문자열. */
   birthday: string;
+  /** 대표가 직접 신고한 4대보험 산정 기준 보수월액(원). 없으면(NULL) 당월
+      급여 기준으로 계산한다 — lib/payroll/calculate.ts 참고. */
+  declared_monthly_compensation: number | null;
   created_at: string;
 }
 

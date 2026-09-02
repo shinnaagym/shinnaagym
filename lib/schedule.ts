@@ -78,6 +78,16 @@ export async function setCoachEmploymentInfo(
   revalidateTag("coaches", { expire: 0 });
 }
 
+/** 대표가 급여 계산 페이지에서 신고하는 4대보험 산정 기준 보수월액을
+    저장한다. null이면 신고 해제(당월 급여 기준 계산으로 되돌림). */
+export async function setCoachDeclaredMonthlyCompensation(
+  id: number,
+  amount: number | null,
+): Promise<void> {
+  await query(`UPDATE coaches SET declared_monthly_compensation = $2 WHERE id = $1`, [id, amount]);
+  revalidateTag("coaches", { expire: 0 });
+}
+
 /** 코치별 담당 활성 회원 수 (퇴사 처리 전 경고용). */
 export async function getActiveMemberCountsByCoach(): Promise<Record<number, number>> {
   const result = await query<{ coach_id: number; count: string }>(
