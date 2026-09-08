@@ -1268,6 +1268,25 @@ export async function updateSession(
     id,
     ...values,
   ]);
+
+  // 사전예약으로 자동 연동된 일정(reservations.class_session_id)의 날짜/시간을
+  // 여기서 옮기면, 사전예약 랜딩페이지 달력이 새 시간을 막고 옛 시간은 다시
+  // 열어주도록 reservations 쪽 기록도 함께 맞춰준다(getTakenSlots 참고).
+  if (input.sessionDate !== undefined || input.sessionHour !== undefined) {
+    try {
+      await query(
+        `UPDATE reservations r
+           SET reservation_date = cs.session_date, reservation_hour = cs.session_hour
+          FROM class_sessions cs
+         WHERE cs.id = $1 AND r.class_session_id = cs.id`,
+        [id],
+      );
+    } catch {
+      // 옮기려는 시간에 다른 사전예약이 이미 있는 등(reservations의
+      // UNIQUE(reservation_date, reservation_hour) 위반) 극히 드문 충돌이면,
+      // 일정 이동 자체는 이미 성공했으니 reservations 동기화만 조용히 건너뛴다.
+    }
+  }
 }
 
 export async function deleteSession(id: number): Promise<void> {
