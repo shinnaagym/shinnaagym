@@ -87,6 +87,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "이미 지난 시간은 예약할 수 없어요." }, { status: 400 });
   }
 
+  // reservations 테이블의 UNIQUE 제약은 사전예약끼리의 중복만 막아준다.
+  // 관리자가 스케줄표에 직접 등록한(또는 다른 시간으로 옮긴) PT수업·상담과
+  // 겹치는 것도 막기 위해, 저장 전에 class_sessions도 함께 확인한다.
+  const scheduleConflict = await query(
+    `SELECT 1 FROM class_sessions
+      WHERE session_date = $1 AND session_hour = $2
+        AND entry_type IN ('session', 'consultation')
+        AND status NOT IN ('cancelled', 'no_show')
+      LIMIT 1`,
+    [date, hourNum],
+  );
+  if (scheduleConflict.rows.length > 0) {
+    return NextResponse.json(
+      { error: "이미 예약된 시간이에요. 다른 시간을 선택해주세요." },
+      { status: 409 },
+    );
+  }
+
   try {
     const result = await query<ReservationRow>(
       `INSERT INTO reservations
