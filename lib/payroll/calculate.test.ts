@@ -426,3 +426,128 @@ test("declaredMonthlyCompensation이 0 이하이거나 없으면(null) 신고값
   assert.equal(zero.insuranceBaseSource, "current-month");
   assert.equal(nullValue.insuranceBaseSource, "current-month");
 });
+
+test("sessionDates1on1을 주면 입사 기념일 이후 초과 수업만 인상된 단가로 계산됨(세션 날짜 정밀 계산)", () => {
+  // 입사 2026-10-12 -> 1주년 2027-10-12. 60회는 의무수업(기존 방식과 동일하게
+  // 무료), 초과 10회는 전부 기념일 이후(2027-10-12~10-21) 날짜라 전부 32,000원.
+  const beforeDates = Array(60).fill("2027-09-15");
+  const afterDates = ["2027-10-12", "2027-10-13", "2027-10-14", "2027-10-15", "2027-10-16",
+    "2027-10-17", "2027-10-18", "2027-10-19", "2027-10-20", "2027-10-21"];
+  const sessionDates1on1 = [...beforeDates, ...afterDates];
+  assert.equal(sessionDates1on1.length, 70);
+
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-10-12",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 70,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessionDates1on1,
+  });
+
+  // 정산월 말일(2027-10-31) 기준으로는 이미 "1년 이상 2년 미만"이라 기존
+  // 방식(월 전체 한 단가)으로 계산해도 결과가 같아 보일 수 있으니, 굳이
+  // 다른(더 낮은) 단가를 가정한 아래 케이스와 비교해 실제로 날짜별로 계산이
+  // 갈리는지까지 확인한다.
+  assert.equal(result.excessTotal, 10);
+  assert.equal(result.lessonFee1on1, 10 * REGULAR_RATE_1ON1["1to2"]);
+});
+
+test("세션 날짜 정밀 계산: 초과 수업 중 일부만 기념일을 지났으면 그만큼만 인상된 단가 적용", () => {
+  // 60회는 의무수업, 나머지 10회가 초과. 그중 가장 최근 5회(기념일 이후)만
+  // 32,000원, 그보다 이른(기념일 이전) 5회는 그대로 30,000원이어야 한다 —
+  // "의무수업은 이번 달 먼저 진행한 순서대로 채워지고, 가장 최근 진행분이
+  // 초과분"이라는 가정.
+  const mandatoryDates = Array(60).fill("2027-09-15");
+  const beforeAnniversaryExcess = Array(5).fill("2027-10-11"); // 기념일(10-12) 이전
+  const afterAnniversaryExcess = Array(5).fill("2027-10-15"); // 기념일 이후
+  const sessionDates1on1 = [...mandatoryDates, ...beforeAnniversaryExcess, ...afterAnniversaryExcess];
+  assert.equal(sessionDates1on1.length, 70);
+
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-10-12",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 70,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessionDates1on1,
+  });
+
+  const expected = 5 * REGULAR_RATE_1ON1["1to2"] + 5 * REGULAR_RATE_1ON1["under1"];
+  assert.equal(result.excessTotal, 10);
+  assert.equal(result.lessonFee1on1, expected);
+  // 정산월 말일 기준 한 단가로만 계산하는 기존 방식(월말 근속 "1to2")과는
+  // 다른 결과여야 정밀 계산이 실제로 작동한 것이다.
+  assert.notEqual(result.lessonFee1on1, 10 * REGULAR_RATE_1ON1["1to2"]);
+});
+
+test("세션 날짜 정밀 계산: 1:1/2:1이 섞여 초과 횟수가 소수(비례 안분)여도 경계 세션에만 가중치를 나눠 정확히 계산", () => {
+  // 1:1 50회 + 2:1 20회 = 70회, 의무수업 60회 제외 초과 10회를 비례 안분하면
+  // excess1on1 = 10 * 50/70 = 50/7 ≈ 7.142857...(정수 아님).
+  // 1:1 세션 날짜: 최근 7회는 기념일 이후(32,000원), 그 다음(8번째로 최근)
+  // 1회부터는 기념일 이전(30,000원) — 경계에 걸린 8번째 세션만 1/7만큼만
+  // 인상된 단가가 아닌 이전 단가로 반영돼야 한다.
+  const afterAnniversary7 = Array(7).fill("2027-10-15");
+  const beforeAnniversary43 = Array(43).fill("2027-09-15");
+  const sessionDates1on1 = [...beforeAnniversary43, ...afterAnniversary7];
+  assert.equal(sessionDates1on1.length, 50);
+
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-10-12",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 50,
+    sessionCount2on1: 20,
+    referralSupplyAmount: 0,
+    allocationOrder: "proportional",
+    sessionDates1on1,
+  });
+
+  const excess1on1 = (10 * 50) / 70;
+  const fullWeightAfter = 7;
+  const partialWeightBefore = excess1on1 - fullWeightAfter;
+  const expected = Math.round(
+    fullWeightAfter * REGULAR_RATE_1ON1["1to2"] + partialWeightBefore * REGULAR_RATE_1ON1["under1"],
+  );
+  assert.equal(result.lessonFee1on1, expected);
+});
+
+test("세션 날짜 정밀 계산: 날짜 목록 길이가 sessionCount1on1과 다르면(수동 보정) 기존 방식으로 돌아감", () => {
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-10-12",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 70, // 관리자가 손으로 70으로 고쳤다고 가정
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessionDates1on1: ["2027-09-15"], // 자동 로드된 옛 날짜 목록(길이 불일치)
+  });
+  // 정산월 말일(2027-10-31) 기준 근속은 "1to2"이므로, 기존 방식대로 초과
+  // 10회 전부 32,000원으로 계산돼야 한다(날짜 목록은 무시됨).
+  assert.equal(result.lessonFee1on1, 10 * REGULAR_RATE_1ON1["1to2"]);
+});
+
+test("세션 날짜 정밀 계산: 근속 시뮬레이션(tenureBucketOverride)에서는 항상 무시되고 지정한 구간 하나로 계산됨", () => {
+  const afterAnniversary10 = Array(10).fill("2027-10-15");
+  const mandatory60 = Array(60).fill("2027-09-15");
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-10-12",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 70,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessionDates1on1: [...mandatory60, ...afterAnniversary10],
+    tenureBucketOverride: "under1",
+  });
+  // 오버라이드로 "1년 미만"을 강제했으니, 날짜상 전부 기념일 이후라도
+  // 30,000원 하나로 계산돼야 한다.
+  assert.equal(result.lessonFee1on1, 10 * REGULAR_RATE_1ON1["under1"]);
+});

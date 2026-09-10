@@ -156,6 +156,17 @@ export interface PayrollInput {
   isTeamLead: boolean; // 정직원 여부 체크박스. team_lead 유형은 이 값과 무관하게 항상 팀장수당 적용.
   sessionCount1on1: number;
   sessionCount2on1: number;
+  /**
+   * 이번 정산월에 진행한 1:1 수업의 실제 날짜(YYYY-MM-DD) 목록. 길이가
+   * sessionCount1on1과 정확히 같을 때만 "세션 날짜 단위 정밀 계산"을 쓴다
+   * (입사 기념일이 정산월 중간에 있으면, 기념일 이후 초과 수업만 인상된
+   * 단가를 적용). 길이가 다르거나(예: 관리자가 횟수만 손으로 고쳐 입력)
+   * 아예 지정하지 않으면 기존처럼 정산월 말일 기준 근속 구간 하나로
+   * 전체 초과 수업료를 계산한다. 2:1 수업은 근속에 따른 단가 차이가
+   * 없어(REGULAR_RATE_2ON1/FREELANCER_RATE_2ON1이 고정값) 날짜 목록이
+   * 필요 없다.
+   */
+  sessionDates1on1?: string[];
   /** 소개 결제 내역을 computeReferralSupplyAmount()로 환산한 공급가액 합계. */
   referralSupplyAmount: number;
   allocationOrder?: AllocationOrder;
@@ -225,6 +236,36 @@ function round(n: number): number {
   return Math.round(n);
 }
 
+/**
+ * 1:1 초과 수업료를, "의무수업은 이번 달 먼저 진행한 수업부터 채워지고
+ * 그 이후(가장 최근) 진행분이 초과분"이라는 가정 아래 세션 날짜 단위로
+ * 계산한다. excessCount가 소수(진행 비율 안분 등으로 1:1/2:1이 섞인
+ * 경우)여도, 가장 오래된 초과 세션 하나에만 비례 가중치를 줘 정확히
+ * 처리한다. 날짜 목록이 없거나 excessCount와 개수가 안 맞으면(관리자가
+ * 횟수만 수동으로 고쳐 입력한 경우 등) 호출자가 판단해 이 함수를 호출하지
+ * 않고 기존 방식(정산월 말일 기준 근속 구간 하나)으로 계산해야 한다.
+ */
+function lessonFee1on1ByDate(
+  sessionDates: string[],
+  excessCount: number,
+  employmentType: EmploymentType,
+  hiredAt: string,
+): number {
+  if (excessCount <= 0) return 0;
+  // 최근 날짜부터 내림차순 정렬해, 뒤(최근)에서부터 초과 횟수만큼 채운다.
+  const sortedDesc = [...sessionDates].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+  let remaining = excessCount;
+  let total = 0;
+  for (const date of sortedDesc) {
+    if (remaining <= 0) break;
+    const weight = Math.min(1, remaining);
+    const bucket = tenureBucket(hiredAt, date);
+    total += weight * rate1on1For(employmentType, bucket);
+    remaining -= weight;
+  }
+  return total;
+}
+
 export function calculatePayroll(input: PayrollInput): PayrollResult {
   const {
     employmentType,
@@ -292,7 +333,20 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
 
   const rate1on1 = rate1on1For(employmentType, tenure);
   const rate2on1 = rate2on1For(employmentType);
-  const lessonFee1on1 = round(excess1on1 * rate1on1);
+  // 시뮬레이션(tenureBucketOverride 지정) 모드는 하나의 근속 구간을 가정한
+  // 비교용이라 세션 날짜 정밀 계산을 쓰지 않는다. 그 외에는 실제 수업 날짜
+  // 목록이 있고 그 개수가 sessionCount1on1과 정확히 일치할 때만 정밀 계산을
+  // 쓰고, 아니면 기존처럼 정산월 말일 기준 근속 구간 하나로 계산한다(2:1은
+  // 근속과 무관한 고정 단가라 항상 기존 방식 그대로).
+  const canUsePreciseDates =
+    !input.tenureBucketOverride &&
+    input.sessionDates1on1 !== undefined &&
+    input.sessionDates1on1.length === sessionCount1on1;
+  const lessonFee1on1 = round(
+    canUsePreciseDates
+      ? lessonFee1on1ByDate(input.sessionDates1on1!, excess1on1, employmentType, hiredAt)
+      : excess1on1 * rate1on1,
+  );
   const lessonFee2on1 = round(excess2on1 * rate2on1);
   const lessonFeeTotal = lessonFee1on1 + lessonFee2on1;
 

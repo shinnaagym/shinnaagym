@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed, isPayrollAuthed } from "@/lib/auth";
-import { isValidMonthKey } from "@/lib/date";
+import { isValidDateKey, isValidMonthKey } from "@/lib/date";
 import { getInsuranceRates, listPayrollRecords, savePayrollRecord, type ReferralEntry } from "@/lib/payroll";
 import {
   calculatePayroll,
@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
         isTeamLead?: unknown;
         sessionCount1on1?: unknown;
         sessionCount2on1?: unknown;
+        sessionDates1on1?: unknown;
         referralEntries?: unknown;
         allocationOrder?: unknown;
         declaredMonthlyCompensation?: unknown;
@@ -106,6 +107,14 @@ export async function POST(req: NextRequest) {
     typeof body?.sessionCount2on1 === "number" && Number.isFinite(body.sessionCount2on1)
       ? body.sessionCount2on1
       : NaN;
+  // 세션 날짜 단위 근속 구간 정밀 계산용(입사 기념일이 정산월 중간에 있을
+  // 때). 형식이 안 맞는 값이 섞여 있으면 통째로 무시해, calculatePayroll이
+  // (길이가 sessionCount1on1과 안 맞으니) 기존 방식으로 안전하게 돌아가게 한다.
+  const sessionDates1on1 =
+    Array.isArray(body?.sessionDates1on1) &&
+    body.sessionDates1on1.every((d) => typeof d === "string" && isValidDateKey(d))
+      ? (body.sessionDates1on1 as string[])
+      : undefined;
   const referralEntries =
     body?.referralEntries === undefined ? [] : parseReferralEntries(body.referralEntries);
   // 화면 표시·이력 보관용 원 결제금액 합계(결제 수단 무관). 실제 인센티브 계산은
@@ -150,6 +159,7 @@ export async function POST(req: NextRequest) {
     isTeamLead,
     sessionCount1on1,
     sessionCount2on1,
+    sessionDates1on1,
     referralSupplyAmount: computeReferralSupplyAmount(referralEntries ?? []),
     allocationOrder,
     insuranceRates,
