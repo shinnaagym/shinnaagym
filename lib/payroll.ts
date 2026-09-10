@@ -10,33 +10,43 @@ export type { InsuranceRates } from "./payroll/config";
 export interface CoachMonthSessionCounts {
   sessionCount1on1: number;
   sessionCount2on1: number;
+  /** 이번 정산월에 진행한 1:1 수업의 실제 날짜(YYYY-MM-DD) 목록. 입사
+      기념일이 정산월 중간에 있어도 세션 날짜 단위로 정확한 단가를 적용할
+      수 있도록 calculatePayroll에 그대로 넘겨준다(lib/payroll/calculate.ts
+      참고). 2:1은 근속과 무관한 고정 단가라 날짜 목록이 필요 없다. */
+  sessionDates1on1: string[];
 }
 
-/** 코치 한 명의 특정 정산월(1:1/2:1) 진행 수업 횟수. 노쇼도 포함(취소만 제외).
-    아직 지나지 않은(오늘 이후) 예약은 진행한 수업이 아니므로 제외한다 —
-    이번 달 정산을 월 중간에 계산해도 미래 예약분까지 급여에 잡히지 않게 한다. */
+/** 코치 한 명의 특정 정산월(1:1/2:1) 진행 수업 횟수와 1:1 수업의 실제
+    날짜 목록. 노쇼도 포함(취소만 제외). 아직 지나지 않은(오늘 이후)
+    예약은 진행한 수업이 아니므로 제외한다 — 이번 달 정산을 월 중간에
+    계산해도 미래 예약분까지 급여에 잡히지 않게 한다. */
 export async function getCoachSessionCountsForMonth(
   coachId: number,
   yearMonth: string,
 ): Promise<CoachMonthSessionCounts> {
-  const result = await query<{ pt_type: "1:1" | "2:1"; count: string }>(
-    `SELECT pt_type, COUNT(*) as count
+  const result = await query<{ pt_type: "1:1" | "2:1"; session_date: string }>(
+    `SELECT pt_type, session_date
      FROM class_sessions
      WHERE coach_id = $1
        AND entry_type = 'session'
        AND status <> 'cancelled'
        AND LEFT(session_date, 7) = $2
-       AND session_date <= $3
-     GROUP BY pt_type`,
+       AND session_date <= $3`,
     [coachId, yearMonth, koreaTodayKey()],
   );
   let sessionCount1on1 = 0;
   let sessionCount2on1 = 0;
+  const sessionDates1on1: string[] = [];
   for (const row of result.rows) {
-    if (row.pt_type === "1:1") sessionCount1on1 = Number(row.count);
-    else if (row.pt_type === "2:1") sessionCount2on1 = Number(row.count);
+    if (row.pt_type === "1:1") {
+      sessionCount1on1++;
+      sessionDates1on1.push(row.session_date);
+    } else if (row.pt_type === "2:1") {
+      sessionCount2on1++;
+    }
   }
-  return { sessionCount1on1, sessionCount2on1 };
+  return { sessionCount1on1, sessionCount2on1, sessionDates1on1 };
 }
 
 export interface SavePayrollRecordInput {
