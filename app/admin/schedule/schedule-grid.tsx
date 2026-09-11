@@ -58,6 +58,65 @@ function formatHourMinute(hour: number, minute: number): string {
   return `${hour}:${String(minute).padStart(2, "0")}`;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+interface CalendarCell {
+  key: string;
+  dateKey: string;
+  day: number;
+  inMonth: boolean;
+}
+
+/** "YYYY-MM" 월의 달력을 월요일 시작 7일씩 주 단위로 나눠 반환한다(날짜
+    선택 팝오버와 월간 보기 양쪽에서 공용으로 쓴다). 이전/다음 달 빈 칸도
+    실제 날짜(dateKey)를 채워 넣어, 눌렀을 때 그 날짜로 바로 이동할 수 있게
+    한다(inMonth만 false로 구분). */
+function buildCalendarWeeks(monthKey: string): CalendarCell[][] {
+  const [year, month] = monthKey.split("-").map(Number);
+  const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
+  const leadDays = (firstOfMonth.getUTCDay() + 6) % 7; // 0=월 ~ 6=일
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  const cells: CalendarCell[] = [];
+  for (let i = leadDays; i > 0; i--) {
+    const dt = new Date(Date.UTC(year, month - 1, 1 - i));
+    cells.push({
+      key: `lead-${i}`,
+      dateKey: `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`,
+      day: dt.getUTCDate(),
+      inMonth: false,
+    });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ key: `d-${d}`, dateKey: `${year}-${pad2(month)}-${pad2(d)}`, day: d, inMonth: true });
+  }
+  while (cells.length % 7 !== 0) {
+    const idx = cells.length - (leadDays + daysInMonth);
+    const dt = new Date(Date.UTC(year, month, idx + 1));
+    cells.push({
+      key: `trail-${idx}`,
+      dateKey: `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`,
+      day: dt.getUTCDate(),
+      inMonth: false,
+    });
+  }
+
+  const weeks: CalendarCell[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+/** "YYYY-MM"에 개월 수를 더한다(음수 가능). */
+function addMonthsToMonthKey(monthKey: string, delta: number): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const total = year * 12 + (month - 1) + delta;
+  const nextYear = Math.floor(total / 12);
+  const nextMonth = (total % 12) + 1;
+  return `${nextYear}-${pad2(nextMonth)}`;
+}
+
 const CATEGORY_LABELS: Record<SessionEntryType, string> = {
   session: "PT 수업",
   consultation: "상담",
@@ -295,6 +354,38 @@ export function ScheduleGrid({
   const [dutyEditDate, setDutyEditDate] = useState<{ date: string; weekday: number } | null>(null);
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
   const allGridScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // 주간/월간 보기 전환. 월간 보기는 이 상태가 바뀔 때만 해당 월의 일정을
+  // 별도로 불러온다(기본 주간 보기는 기존처럼 서버에서 그 주 데이터만 받아와
+  // 빠르게 뜨고, 월간 보기를 쓸 때만 추가 요청이 나가게 하기 위함).
+  const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const [monthCursor, setMonthCursor] = useState(weekStart.slice(0, 7)); // "YYYY-MM"
+  const [monthSessions, setMonthSessions] = useState<SessionWithMember[] | null>(null);
+  const [monthLoading, setMonthLoading] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerCursor, setPickerCursor] = useState(weekStart.slice(0, 7)); // "YYYY-MM"
+
+  useEffect(() => {
+    if (viewMode !== "month") return;
+    let cancelled = false;
+    async function loadMonthSessions() {
+      setMonthLoading(true);
+      try {
+        const [y, m] = monthCursor.split("-").map(Number);
+        const from = `${monthCursor}-01`;
+        const to = `${monthCursor}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+        const res = await fetch(`/api/admin/sessions?from=${from}&to=${to}`);
+        const data = res.ok ? await res.json() : null;
+        if (!cancelled) setMonthSessions(data?.sessions ?? []);
+      } finally {
+        if (!cancelled) setMonthLoading(false);
+      }
+    }
+    void loadMonthSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode, monthCursor]);
 
   const effectiveCoaches = coaches.length > 0 ? coaches : [];
 
@@ -674,12 +765,6 @@ export function ScheduleGrid({
     router.push("/admin/schedule");
   }
 
-  /** 연/월을 고르면 그 달 1일이 속한 주로 바로 이동한다(1일이 아니어도
-      서버에서 mondayOfWeek로 그 주의 월요일을 계산해준다). */
-  function goToYearMonth(year: number, month: number) {
-    router.push(`/admin/schedule?week=${year}-${String(month).padStart(2, "0")}-01`);
-  }
-
   /** 토요일 당직을 지정/해제한다. coachId가 undefined면 그 날짜의 당직 지정을
       완전히 지우고, null이면 "이 토요일은 당직자 없음"을 명시적으로 저장한다.
       서버가 거부하면(토요일이 아닌 날짜 등) 낙관적으로 바꿔둔 화면 상태를
@@ -752,59 +837,113 @@ export function ScheduleGrid({
         ))}
       </div>
 
-      {/* 주간 네비게이션 */}
+      {/* 보기 전환 + 날짜 네비게이션 */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => goWeek(-7)}
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
-          >
-            ‹ 이전 주
-          </button>
-          <button
-            onClick={goToday}
-            className="rounded-full bg-ink text-white px-4 py-1.5 text-sm hover:bg-coral transition"
-          >
-            오늘
-          </button>
-          <button
-            onClick={() => goWeek(7)}
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
-          >
-            다음 주 ›
-          </button>
-          {(() => {
-            const [wsYear, wsMonth] = weekStart.split("-").map(Number);
-            const currentYear = Number(today.split("-")[0]);
-            const YEAR_RANGE = 2;
-            const years = Array.from({ length: YEAR_RANGE * 2 + 1 }, (_, i) => currentYear - YEAR_RANGE + i);
-            return (
-              <span className="flex items-center gap-1">
-                <select
-                  value={wsYear}
-                  onChange={(e) => goToYearMonth(Number(e.target.value), wsMonth)}
-                  className="rounded-full border border-line bg-white px-3 py-1.5 text-sm outline-none"
-                >
-                  {years.map((y) => (
-                    <option key={y} value={y}>
-                      {y}년
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={wsMonth}
-                  onChange={(e) => goToYearMonth(wsYear, Number(e.target.value))}
-                  className="rounded-full border border-line bg-white px-3 py-1.5 text-sm outline-none"
-                >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                    <option key={m} value={m}>
-                      {m}월
-                    </option>
-                  ))}
-                </select>
-              </span>
-            );
-          })()}
+          <span className="flex items-center gap-1 rounded-full bg-bone/70 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("week")}
+              className={[
+                "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
+                viewMode === "week" ? "bg-coral text-white shadow-sm" : "text-ink/60 hover:text-ink",
+              ].join(" ")}
+            >
+              주간
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMonthCursor(weekStart.slice(0, 7));
+                setViewMode("month");
+              }}
+              className={[
+                "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
+                viewMode === "month" ? "bg-coral text-white shadow-sm" : "text-ink/60 hover:text-ink",
+              ].join(" ")}
+            >
+              월간
+            </button>
+          </span>
+
+          {viewMode === "week" ? (
+            <>
+              <button
+                onClick={() => goWeek(-7)}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
+              >
+                ‹ 이전 주
+              </button>
+              <button
+                onClick={goToday}
+                className="rounded-full bg-ink text-white px-4 py-1.5 text-sm hover:bg-coral transition"
+              >
+                오늘
+              </button>
+              <button
+                onClick={() => goWeek(7)}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
+              >
+                다음 주 ›
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setMonthCursor((m) => addMonthsToMonthKey(m, -1))}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
+              >
+                ‹ 이전 달
+              </button>
+              <button
+                onClick={() => setMonthCursor(today.slice(0, 7))}
+                className="rounded-full bg-ink text-white px-4 py-1.5 text-sm hover:bg-coral transition"
+              >
+                오늘
+              </button>
+              <button
+                onClick={() => setMonthCursor((m) => addMonthsToMonthKey(m, 1))}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm hover:bg-bone transition"
+              >
+                다음 달 ›
+              </button>
+            </>
+          )}
+
+          <span className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setPickerCursor(viewMode === "month" ? monthCursor : weekStart.slice(0, 7));
+                setShowDatePicker((v) => !v);
+              }}
+              className="rounded-full border border-line bg-white px-3.5 py-1.5 text-sm hover:bg-bone transition"
+            >
+              📅{" "}
+              {viewMode === "month"
+                ? `${monthCursor.split("-")[0]}년 ${Number(monthCursor.split("-")[1])}월`
+                : `${weekStart.split("-")[0]}년 ${Number(weekStart.split("-")[1])}월`}
+            </button>
+            {showDatePicker && (
+              <DatePickerPopover
+                monthKey={pickerCursor}
+                today={today}
+                selectedDateKey={viewMode === "month" ? `${monthCursor}-01` : weekStart}
+                onPrevMonth={() => setPickerCursor((m) => addMonthsToMonthKey(m, -1))}
+                onNextMonth={() => setPickerCursor((m) => addMonthsToMonthKey(m, 1))}
+                onPick={(dateKey) => {
+                  setShowDatePicker(false);
+                  if (viewMode === "month") {
+                    setMonthCursor(dateKey.slice(0, 7));
+                  } else {
+                    router.push(`/admin/schedule?week=${dateKey}`);
+                  }
+                }}
+                onClose={() => setShowDatePicker(false)}
+              />
+            )}
+          </span>
+
           {effectiveCoaches.length > 1 && (
             <select
               value={coachFilter}
@@ -822,7 +961,7 @@ export function ScheduleGrid({
             </select>
           )}
         </div>
-        <p className="font-display text-lg">{formatWeekLabel(dateKeys)}</p>
+        {viewMode === "week" && <p className="font-display text-lg">{formatWeekLabel(dateKeys)}</p>}
       </div>
 
       <MemoPad
@@ -833,7 +972,7 @@ export function ScheduleGrid({
       />
 
       {/* 코치를 한 명만 선택하면 그 코치의 이번 주 전체를 한 번에 보여준다. */}
-      {singleCoach ? (
+      {viewMode === "week" && (singleCoach ? (
         <>
           <div className="rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto mb-4">
             <div
@@ -1133,6 +1272,21 @@ export function ScheduleGrid({
           </div>
         );
       })()
+      ))}
+
+      {viewMode === "month" && (
+        <MonthView
+          monthCursor={monthCursor}
+          today={today}
+          sessions={monthSessions}
+          loading={monthLoading}
+          coachFilter={coachFilter}
+          onPickDay={(dateKey) => {
+            setViewMode("week");
+            router.push(`/admin/schedule?week=${dateKey}`);
+          }}
+          onPickSession={(session) => setEditTarget(session)}
+        />
       )}
 
       {createTarget && (
@@ -1306,6 +1460,190 @@ export function ScheduleGrid({
       {loading && (
         <p className="text-xs text-ink/40 mt-2">불러오는 중...</p>
       )}
+    </div>
+  );
+}
+
+/** 연도·월 드롭다운 대신 쓰는 날짜 선택 팝오버. 원하는 년/월로 이동하고
+    특정 날짜를 직접 눌러 고를 수 있다. */
+function DatePickerPopover({
+  monthKey,
+  today,
+  selectedDateKey,
+  onPrevMonth,
+  onNextMonth,
+  onPick,
+  onClose,
+}: {
+  monthKey: string;
+  today: string;
+  selectedDateKey: string;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  onPick: (dateKey: string) => void;
+  onClose: () => void;
+}) {
+  const weeks = useMemo(() => buildCalendarWeeks(monthKey), [monthKey]);
+  const [year, month] = monthKey.split("-").map(Number);
+  return (
+    <>
+      {/* 팝오버 바깥을 누르면 닫히도록, 화면 전체를 덮는 투명 오버레이를 깐다. */}
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="absolute z-50 mt-2 w-72 rounded-2xl border border-line/60 bg-white shadow-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <button
+            type="button"
+            onClick={onPrevMonth}
+            className="rounded-full w-7 h-7 flex items-center justify-center text-ink/50 hover:bg-bone transition"
+          >
+            ‹
+          </button>
+          <p className="font-display text-sm">
+            {year}년 {month}월
+          </p>
+          <button
+            type="button"
+            onClick={onNextMonth}
+            className="rounded-full w-7 h-7 flex items-center justify-center text-ink/50 hover:bg-bone transition"
+          >
+            ›
+          </button>
+        </div>
+        <div className="grid grid-cols-7 text-center text-[11px] text-ink/40 mb-1">
+          {WEEKDAY_LABELS.map((w) => (
+            <div key={w}>{w}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-0.5">
+          {weeks.flat().map((cell) => (
+            <button
+              key={cell.key}
+              type="button"
+              onClick={() => onPick(cell.dateKey)}
+              className={[
+                "aspect-square rounded-full text-xs transition",
+                !cell.inMonth ? "text-ink/25 hover:bg-bone" : "hover:bg-bone",
+                cell.dateKey === today ? "font-semibold text-coral" : "",
+                cell.dateKey === selectedDateKey ? "bg-coral text-white hover:bg-coral" : "",
+              ].join(" ")}
+            >
+              {cell.day}
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+const MONTH_VIEW_MAX_VISIBLE = 3;
+
+/** 한 달 전체를 한눈에 보는 달력 형태 보기. 주간 보기처럼 시간대별로 칸을
+    나누지는 않고(칸이 너무 좁아짐), 날짜 칸마다 그날 일정을 시간순으로
+    몇 건만 줄여 보여주고 나머지는 "+N건 더보기"로 묶는다. 일정을 누르면
+    주간 보기와 똑같은 상세 모달이 뜨고, 빈 날짜 숫자를 누르면 그 주의
+    주간 보기로 이동한다(칸이 좁아 여기서 바로 새 일정을 추가하지는 않음). */
+function MonthView({
+  monthCursor,
+  today,
+  sessions,
+  loading,
+  coachFilter,
+  onPickDay,
+  onPickSession,
+}: {
+  monthCursor: string;
+  today: string;
+  sessions: SessionWithMember[] | null;
+  loading: boolean;
+  coachFilter: number | "all";
+  onPickDay: (dateKey: string) => void;
+  onPickSession: (session: SessionWithMember) => void;
+}) {
+  const weeks = useMemo(() => buildCalendarWeeks(monthCursor), [monthCursor]);
+
+  const sessionsByDate = useMemo(() => {
+    const map = new Map<string, SessionWithMember[]>();
+    for (const s of sessions ?? []) {
+      if (s.status === "cancelled") continue;
+      if (coachFilter !== "all" && s.coach_id !== coachFilter) continue;
+      const list = map.get(s.session_date) ?? [];
+      list.push(s);
+      map.set(s.session_date, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.session_hour - b.session_hour || a.session_minute - b.session_minute);
+    }
+    return map;
+  }, [sessions, coachFilter]);
+
+  return (
+    <div className="rounded-2xl bg-white border border-line/60 shadow-sm p-3 mb-4">
+      {loading && <p className="text-xs text-ink/40 mb-2">불러오는 중...</p>}
+      <div className="grid grid-cols-7 text-center text-xs text-ink/50 mb-1">
+        {WEEKDAY_LABELS.map((w) => (
+          <div key={w} className="py-1">
+            {w}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {weeks.flat().map((cell) => {
+          const daySessions = sessionsByDate.get(cell.dateKey) ?? [];
+          const visible = daySessions.slice(0, MONTH_VIEW_MAX_VISIBLE);
+          const hiddenCount = daySessions.length - visible.length;
+          const isToday = cell.dateKey === today;
+          const weekday = (new Date(`${cell.dateKey}T00:00:00Z`).getUTCDay() + 6) % 7; // 0=월 ~ 6=일
+          const isSunday = weekday === 6;
+          return (
+            <div
+              key={cell.key}
+              className={[
+                "min-h-[88px] rounded-lg border p-1 align-top",
+                cell.inMonth ? "border-line/40" : "border-transparent bg-bone/20",
+                isToday ? "ring-2 ring-coral/50" : "",
+              ].join(" ")}
+            >
+              <button
+                type="button"
+                onClick={() => onPickDay(cell.dateKey)}
+                className={[
+                  "text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center mb-1 transition",
+                  !cell.inMonth ? "text-ink/25" : isSunday ? "text-red-400" : "text-ink/70",
+                  isToday ? "bg-coral text-white" : "hover:bg-bone",
+                ].join(" ")}
+              >
+                {cell.day}
+              </button>
+              <div className="space-y-0.5">
+                {visible.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => onPickSession(s)}
+                    title={`${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}`}
+                    className={["block w-full truncate rounded px-1 py-0.5 text-left text-[10px] border", entryStyle(s)].join(
+                      " ",
+                    )}
+                  >
+                    {s.session_hour}:{pad2(s.session_minute)} {entryIcon(s)}
+                    {entryMainLabel(s)}
+                  </button>
+                ))}
+                {hiddenCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onPickDay(cell.dateKey)}
+                    className="block w-full text-left text-[10px] text-ink/40 hover:text-coral px-1"
+                  >
+                    +{hiddenCount}건 더보기
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1813,16 +2151,19 @@ function MoveSessionSection({
     <div className="space-y-2 rounded-2xl border border-line/60 bg-bone/30 p-3">
       <p className="text-sm font-medium">이동할 날짜·시간</p>
       <div className="grid grid-cols-2 gap-2">
+        {/* 날짜 입력칸은 브라우저 기본 UI(달력 아이콘 등) 때문에 실제 내용
+            너비가 grid의 1fr 몫보다 커질 수 있어, min-w-0이 없으면 이 칸이
+            더 넓어지고 옆 시간 select 칸이 눌려 두 칸이 반반으로 안 맞는다. */}
         <input
           type="date"
           value={moveDate}
           onChange={(e) => onMoveDateChange(e.target.value)}
-          className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          className="w-full min-w-0 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
         />
         <select
           value={moveHour}
           onChange={(e) => onMoveHourChange(Number(e.target.value))}
-          className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+          className="w-full min-w-0 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
         >
           {SCHEDULE_HOUR_ROWS.map((h) => (
             <option key={h} value={h}>
