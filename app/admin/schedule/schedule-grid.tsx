@@ -1783,15 +1783,39 @@ function MonthView({
                     daySessions={daySessions}
                     dayLeaves={leaves[cell.dateKey] ?? []}
                   />
-                  {/* 상담·개인 일정 등 "수업수"에 안 잡히는 항목은 몇 건만 따로 보여준다. */}
+                  {/* 상담·개인 일정 등 "수업수"에 안 잡히는 항목은 몇 건만 따로 보여준다.
+                      전체 코치에게 똑같이(같은 시각·같은 종류·같은 메모) 등록된 일정은
+                      코치 수만큼 반복해서 보여주지 않고 하나로 묶어서 보여준다. */}
                   {(() => {
                     const nonSessionEntries = daySessions.filter((s) => s.entry_type !== "session");
-                    const visibleOther = nonSessionEntries.slice(0, MONTH_VIEW_MAX_VISIBLE);
-                    const hiddenOther = nonSessionEntries.length - visibleOther.length;
+                    const groupMap = new Map<string, SessionWithMember[]>();
+                    for (const s of nonSessionEntries) {
+                      const key = `${s.entry_type}|${s.session_hour}|${s.session_minute}|${s.memo}`;
+                      const list = groupMap.get(key) ?? [];
+                      list.push(s);
+                      groupMap.set(key, list);
+                    }
+                    const allCoachIds = new Set(coaches.map((c) => c.id));
+                    const otherGroups = Array.from(groupMap.values())
+                      .map((list) => {
+                        const coachIdsInGroup = new Set(list.map((s) => s.coach_id));
+                        const isCommonToAll =
+                          coaches.length > 1 &&
+                          coachIdsInGroup.size === allCoachIds.size &&
+                          [...allCoachIds].every((id) => coachIdsInGroup.has(id));
+                        return { representative: list[0], count: list.length, isCommonToAll };
+                      })
+                      .sort(
+                        (a, b) =>
+                          a.representative.session_hour - b.representative.session_hour ||
+                          a.representative.session_minute - b.representative.session_minute
+                      );
+                    const visibleOther = otherGroups.slice(0, MONTH_VIEW_MAX_VISIBLE);
+                    const hiddenOther = otherGroups.length - visibleOther.length;
                     if (visibleOther.length === 0) return null;
                     return (
                       <div className="space-y-0.5 mt-0.5 border-t border-line/30 pt-0.5">
-                        {visibleOther.map((s) => (
+                        {visibleOther.map(({ representative: s, isCommonToAll }) => (
                           <button
                             key={s.id}
                             type="button"
@@ -1799,7 +1823,9 @@ function MonthView({
                               e.stopPropagation();
                               onPickSession(s);
                             }}
-                            title={`${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}`}
+                            title={`${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}${
+                              isCommonToAll ? " (전체)" : ""
+                            }`}
                             className={[
                               "block w-full truncate rounded px-1 py-0.5 text-left text-[9px] border",
                               entryStyle(s),
