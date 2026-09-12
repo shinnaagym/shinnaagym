@@ -1585,8 +1585,6 @@ function DatePickerPopover({
   );
 }
 
-const MONTH_VIEW_MAX_VISIBLE = 6;
-
 // 9~21시 13타임을 4·4·5로 3줄에 나눠 보여준다(코치를 한 명만 볼 때, 칸 하나에
 // 그날 시간대를 전부 압축해서 보여주기 위함).
 const MONTH_SINGLE_COACH_HOUR_ROWS: number[][] = [
@@ -1783,70 +1781,49 @@ function MonthView({
                     daySessions={daySessions}
                     dayLeaves={leaves[cell.dateKey] ?? []}
                   />
-                  {/* 상담·개인 일정 등 "수업수"에 안 잡히는 항목은 몇 건만 따로 보여준다.
-                      전체 코치에게 똑같이(같은 시각·같은 종류·같은 메모) 등록된 일정은
-                      코치 수만큼 반복해서 보여주지 않고 하나로 묶어서 보여준다. */}
+                  {/* 상담·개인 일정 등 "수업수"에 안 잡히는 항목은 코치별로 세로 열을
+                      나눠 보여준다. 한 줄로 쌓으면 짧은 글자에도 칸 너비를 다 차지해
+                      빈 공간이 많이 남으므로, 코치 수만큼 열을 나눠 옆으로 배치해
+                      가로 공간을 활용한다(열 순서는 위 코치별 수업수 요약과 동일). */}
                   {(() => {
                     const nonSessionEntries = daySessions.filter((s) => s.entry_type !== "session");
-                    const groupMap = new Map<string, SessionWithMember[]>();
+                    if (nonSessionEntries.length === 0 || coaches.length === 0) return null;
+                    const byCoach = new Map<number, SessionWithMember[]>();
                     for (const s of nonSessionEntries) {
-                      const key = `${s.entry_type}|${s.session_hour}|${s.session_minute}|${s.memo}`;
-                      const list = groupMap.get(key) ?? [];
+                      const list = byCoach.get(s.coach_id) ?? [];
                       list.push(s);
-                      groupMap.set(key, list);
+                      byCoach.set(s.coach_id, list);
                     }
-                    const allCoachIds = new Set(coaches.map((c) => c.id));
-                    const otherGroups = Array.from(groupMap.values())
-                      .map((list) => {
-                        const coachIdsInGroup = new Set(list.map((s) => s.coach_id));
-                        const isCommonToAll =
-                          coaches.length > 1 &&
-                          coachIdsInGroup.size === allCoachIds.size &&
-                          [...allCoachIds].every((id) => coachIdsInGroup.has(id));
-                        return { representative: list[0], count: list.length, isCommonToAll };
-                      })
-                      .sort(
-                        (a, b) =>
-                          a.representative.session_hour - b.representative.session_hour ||
-                          a.representative.session_minute - b.representative.session_minute
-                      );
-                    const visibleOther = otherGroups.slice(0, MONTH_VIEW_MAX_VISIBLE);
-                    const hiddenOther = otherGroups.length - visibleOther.length;
-                    if (visibleOther.length === 0) return null;
+                    for (const list of byCoach.values()) {
+                      list.sort((a, b) => a.session_hour - b.session_hour || a.session_minute - b.session_minute);
+                    }
                     return (
-                      <div className="space-y-0.5 mt-0.5 border-t border-line/30 pt-0.5">
-                        {visibleOther.map(({ representative: s, isCommonToAll }) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onPickSession(s);
-                            }}
-                            title={`${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}${
-                              isCommonToAll ? " (전체)" : ""
-                            }`}
-                            className={[
-                              "block w-full truncate rounded px-1 py-0.5 text-left text-[9px] border",
-                              entryStyle(s),
-                            ].join(" ")}
-                          >
-                            {s.session_hour}시 {entryIcon(s)}
-                            {entryMainLabel(s)}
-                          </button>
+                      <div
+                        className="grid gap-0.5 mt-0.5 border-t border-line/30 pt-0.5"
+                        style={{ gridTemplateColumns: `repeat(${coaches.length}, minmax(0, 1fr))` }}
+                      >
+                        {coaches.map((c) => (
+                          <div key={c.id} className="space-y-0.5">
+                            {(byCoach.get(c.id) ?? []).map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onPickSession(s);
+                                }}
+                                title={`${c.name} · ${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}`}
+                                className={[
+                                  "block w-full truncate rounded px-0.5 py-0.5 text-center text-[8px] border",
+                                  entryStyle(s),
+                                ].join(" ")}
+                              >
+                                {s.session_hour}
+                                {entryIcon(s)}
+                              </button>
+                            ))}
+                          </div>
                         ))}
-                        {hiddenOther > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onPickDay(cell.dateKey);
-                            }}
-                            className="block w-full text-left text-[9px] text-ink/40 hover:text-coral px-1"
-                          >
-                            +{hiddenOther}건 더보기
-                          </button>
-                        )}
                       </div>
                     );
                   })()}
