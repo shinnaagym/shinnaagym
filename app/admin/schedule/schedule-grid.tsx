@@ -1814,12 +1814,14 @@ function MonthView({
                                 }}
                                 title={`${c.name} · ${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}`}
                                 className={[
-                                  "block w-full truncate rounded px-0.5 py-0.5 text-center text-[8px] border",
+                                  "block w-full rounded px-0.5 py-0.5 text-left text-[8px] leading-tight border",
                                   entryStyle(s),
                                 ].join(" ")}
                               >
-                                {s.session_hour}
-                                {entryIcon(s)}
+                                <span className="block font-medium">
+                                  {s.session_hour}시 {entryIcon(s)}
+                                </span>
+                                <span className="block break-words">{entryMainLabel(s)}</span>
                               </button>
                             ))}
                           </div>
