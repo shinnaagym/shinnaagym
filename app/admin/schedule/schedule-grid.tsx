@@ -1727,113 +1727,124 @@ function MonthView({
     return map;
   }, [sessions, isSingleCoach, coachFilter]);
 
+  // 모바일·태블릿처럼 화면이 좁을 때는 7일 칸을 억지로 욱여넣어 글자가
+  // 뭉개지는 대신, 칸마다 최소 너비를 보장하고 옆으로 슬라이드(가로 스크롤)해서
+  // 보게 한다. 화면이 이 최소 너비보다 넓으면(대부분의 데스크톱) 평소처럼
+  // 스크롤 없이 7일이 한 화면에 꽉 찬다.
+  const minColumnWidth = isSingleCoach ? 150 : 120;
   return (
     <div className="rounded-2xl bg-white border border-line/60 shadow-sm p-3 mb-4">
       {loading && <p className="text-xs text-ink/40 mb-2">불러오는 중...</p>}
-      <div className="grid grid-cols-7 text-center text-xs text-ink/50 mb-1">
-        {WEEKDAY_LABELS.map((w) => (
-          <div key={w} className="py-1">
-            {w}
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: `${minColumnWidth * 7}px` }}>
+          <div className="grid grid-cols-7 text-center text-xs text-ink/50 mb-1">
+            {WEEKDAY_LABELS.map((w) => (
+              <div key={w} className="py-1">
+                {w}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {weeks.flat().map((cell) => {
-          const daySessions = sessionsByDate.get(cell.dateKey) ?? [];
-          const isToday = cell.dateKey === today;
-          const weekday = (new Date(`${cell.dateKey}T00:00:00Z`).getUTCDay() + 6) % 7; // 0=월 ~ 6=일
-          const isSunday = weekday === 6;
-          const totalCount = daySessions.filter((s) => s.entry_type === "session").length;
-          return (
-            <div
-              key={cell.key}
-              onClick={() => onPickDay(cell.dateKey)}
-              className={[
-                "rounded-lg border p-1 align-top cursor-pointer transition hover:border-coral/40",
-                isSingleCoach ? "min-h-[108px]" : "min-h-[68px]",
-                cell.inMonth ? "border-line/40" : "border-transparent bg-bone/20",
-                isToday ? "ring-2 ring-coral/50" : "",
-              ].join(" ")}
-            >
-              <div className="flex items-center gap-1 mb-1">
-                <span
+          <div className="grid grid-cols-7 gap-1">
+            {weeks.flat().map((cell) => {
+              const daySessions = sessionsByDate.get(cell.dateKey) ?? [];
+              const isToday = cell.dateKey === today;
+              const weekday = (new Date(`${cell.dateKey}T00:00:00Z`).getUTCDay() + 6) % 7; // 0=월 ~ 6=일
+              const isSunday = weekday === 6;
+              const totalCount = daySessions.filter((s) => s.entry_type === "session").length;
+              return (
+                <div
+                  key={cell.key}
+                  onClick={() => onPickDay(cell.dateKey)}
                   className={[
-                    "text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center transition",
-                    !cell.inMonth ? "text-ink/25" : isSunday ? "text-red-400" : "text-ink/70",
-                    isToday ? "bg-coral text-white" : "",
+                    "rounded-lg border p-1 align-top cursor-pointer transition hover:border-coral/40",
+                    isSingleCoach ? "min-h-[108px]" : "min-h-[68px]",
+                    cell.inMonth ? "border-line/40" : "border-transparent bg-bone/20",
+                    isToday ? "ring-2 ring-coral/50" : "",
                   ].join(" ")}
                 >
-                  {cell.day}
-                </span>
-                {totalCount > 0 && <span className="text-[10px] font-medium text-ink/40">{totalCount}</span>}
-              </div>
+                  <div className="flex items-center gap-1 mb-1">
+                    <span
+                      className={[
+                        "text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center transition",
+                        !cell.inMonth ? "text-ink/25" : isSunday ? "text-red-400" : "text-ink/70",
+                        isToday ? "bg-coral text-white" : "",
+                      ].join(" ")}
+                    >
+                      {cell.day}
+                    </span>
+                    {totalCount > 0 && <span className="text-[10px] font-medium text-ink/40">{totalCount}</span>}
+                  </div>
 
-              {isSingleCoach ? (
-                <SingleCoachDayCellContent
-                  daySessions={daySessions}
-                  onPickSession={onPickSession}
-                  onCreateSlot={(hour) => onCreateSlot(cell.dateKey, hour, coachFilter as number)}
-                />
-              ) : cell.inMonth ? (
-                <>
-                  <AllCoachesDayCellContent
-                    coaches={coaches}
-                    daySessions={daySessions}
-                    dayLeaves={leaves[cell.dateKey] ?? []}
-                  />
-                  {/* 상담·개인 일정 등 "수업수"에 안 잡히는 항목은 코치별로 세로 열을
-                      나눠 보여준다. 한 줄로 쌓으면 짧은 글자에도 칸 너비를 다 차지해
-                      빈 공간이 많이 남으므로, 코치 수만큼 열을 나눠 옆으로 배치해
-                      가로 공간을 활용한다(열 순서는 위 코치별 수업수 요약과 동일). */}
-                  {(() => {
-                    const nonSessionEntries = daySessions.filter((s) => s.entry_type !== "session");
-                    if (nonSessionEntries.length === 0 || coaches.length === 0) return null;
-                    const byCoach = new Map<number, SessionWithMember[]>();
-                    for (const s of nonSessionEntries) {
-                      const list = byCoach.get(s.coach_id) ?? [];
-                      list.push(s);
-                      byCoach.set(s.coach_id, list);
-                    }
-                    for (const list of byCoach.values()) {
-                      list.sort((a, b) => a.session_hour - b.session_hour || a.session_minute - b.session_minute);
-                    }
-                    return (
-                      <div
-                        className="grid gap-0.5 mt-0.5 border-t border-line/30 pt-0.5"
-                        style={{ gridTemplateColumns: `repeat(${coaches.length}, minmax(0, 1fr))` }}
-                      >
-                        {coaches.map((c) => (
-                          <div key={c.id} className="space-y-0.5">
-                            {(byCoach.get(c.id) ?? []).map((s) => (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onPickSession(s);
-                                }}
-                                title={`${c.name} · ${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}`}
-                                className={[
-                                  "block w-full rounded px-0.5 py-0.5 text-left text-[8px] leading-tight border",
-                                  entryStyle(s),
-                                ].join(" ")}
-                              >
-                                <span className="block font-medium">
-                                  {s.session_hour}시 {entryIcon(s)}
-                                </span>
-                                <span className="block break-words">{entryMainLabel(s)}</span>
-                              </button>
+                  {isSingleCoach ? (
+                    <SingleCoachDayCellContent
+                      daySessions={daySessions}
+                      onPickSession={onPickSession}
+                      onCreateSlot={(hour) => onCreateSlot(cell.dateKey, hour, coachFilter as number)}
+                    />
+                  ) : cell.inMonth ? (
+                    <>
+                      <AllCoachesDayCellContent
+                        coaches={coaches}
+                        daySessions={daySessions}
+                        dayLeaves={leaves[cell.dateKey] ?? []}
+                      />
+                      {/* 상담·개인 일정 등 "수업수"에 안 잡히는 항목은 코치별로 세로 열을
+                          나눠 보여준다. 한 줄로 쌓으면 짧은 글자에도 칸 너비를 다 차지해
+                          빈 공간이 많이 남으므로, 코치 수만큼 열을 나눠 옆으로 배치해
+                          가로 공간을 활용한다(열 순서는 위 코치별 수업수 요약과 동일). */}
+                      {(() => {
+                        const nonSessionEntries = daySessions.filter((s) => s.entry_type !== "session");
+                        if (nonSessionEntries.length === 0 || coaches.length === 0) return null;
+                        const byCoach = new Map<number, SessionWithMember[]>();
+                        for (const s of nonSessionEntries) {
+                          const list = byCoach.get(s.coach_id) ?? [];
+                          list.push(s);
+                          byCoach.set(s.coach_id, list);
+                        }
+                        for (const list of byCoach.values()) {
+                          list.sort(
+                            (a, b) => a.session_hour - b.session_hour || a.session_minute - b.session_minute
+                          );
+                        }
+                        return (
+                          <div
+                            className="grid gap-0.5 mt-0.5 border-t border-line/30 pt-0.5"
+                            style={{ gridTemplateColumns: `repeat(${coaches.length}, minmax(0, 1fr))` }}
+                          >
+                            {coaches.map((c) => (
+                              <div key={c.id} className="space-y-0.5">
+                                {(byCoach.get(c.id) ?? []).map((s) => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onPickSession(s);
+                                    }}
+                                    title={`${c.name} · ${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}`}
+                                    className={[
+                                      "block w-full rounded px-0.5 py-0.5 text-left text-[8px] leading-tight border",
+                                      entryStyle(s),
+                                    ].join(" ")}
+                                  >
+                                    <span className="block font-medium">
+                                      {s.session_hour}시 {entryIcon(s)}
+                                    </span>
+                                    <span className="block break-words">{entryMainLabel(s)}</span>
+                                  </button>
+                                ))}
+                              </div>
                             ))}
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </>
-              ) : null}
-            </div>
-          );
-        })}
+                        );
+                      })()}
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
