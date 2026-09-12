@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BUSINESS_END_HOUR,
@@ -115,6 +115,25 @@ function addMonthsToMonthKey(monthKey: string, delta: number): string {
   const nextYear = Math.floor(total / 12);
   const nextMonth = (total % 12) + 1;
   return `${nextYear}-${pad2(nextMonth)}`;
+}
+
+/** 월간 보기용 세션·휴무 데이터를 서버에서 받아온다. */
+async function fetchMonthData(
+  monthCursor: string
+): Promise<{ sessions: SessionWithMember[]; leaves: Record<string, CoachLeaveEntry[]> }> {
+  const [y, m] = monthCursor.split("-").map(Number);
+  const from = `${monthCursor}-01`;
+  const to = `${monthCursor}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+  const [sessionsRes, dutyRes] = await Promise.all([
+    fetch(`/api/admin/sessions?from=${from}&to=${to}`),
+    fetch(`/api/admin/duty-calendar?month=${monthCursor}`),
+  ]);
+  const sessionsData = sessionsRes.ok ? await sessionsRes.json() : null;
+  const dutyData = dutyRes.ok ? await dutyRes.json() : null;
+  return {
+    sessions: sessionsData?.sessions ?? [],
+    leaves: dutyData?.leaves ?? {},
+  };
 }
 
 const CATEGORY_LABELS: Record<SessionEntryType, string> = {
@@ -366,30 +385,33 @@ export function ScheduleGrid({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerCursor, setPickerCursor] = useState(weekStart.slice(0, 7)); // "YYYY-MM"
 
+  const loadMonthData = useCallback(async () => {
+    setMonthLoading(true);
+    try {
+      const { sessions, leaves } = await fetchMonthData(monthCursor);
+      setMonthSessions(sessions);
+      setMonthLeaves(leaves);
+    } finally {
+      setMonthLoading(false);
+    }
+  }, [monthCursor]);
+
   useEffect(() => {
     if (viewMode !== "month") return;
     let cancelled = false;
-    async function loadMonthData() {
+    async function run() {
       setMonthLoading(true);
       try {
-        const [y, m] = monthCursor.split("-").map(Number);
-        const from = `${monthCursor}-01`;
-        const to = `${monthCursor}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
-        const [sessionsRes, dutyRes] = await Promise.all([
-          fetch(`/api/admin/sessions?from=${from}&to=${to}`),
-          fetch(`/api/admin/duty-calendar?month=${monthCursor}`),
-        ]);
-        const sessionsData = sessionsRes.ok ? await sessionsRes.json() : null;
-        const dutyData = dutyRes.ok ? await dutyRes.json() : null;
+        const { sessions, leaves } = await fetchMonthData(monthCursor);
         if (!cancelled) {
-          setMonthSessions(sessionsData?.sessions ?? []);
-          setMonthLeaves(dutyData?.leaves ?? {});
+          setMonthSessions(sessions);
+          setMonthLeaves(leaves);
         }
       } finally {
         if (!cancelled) setMonthLoading(false);
       }
     }
-    void loadMonthData();
+    void run();
     return () => {
       cancelled = true;
     };
@@ -1295,6 +1317,7 @@ export function ScheduleGrid({
             router.push(`/admin/schedule?week=${dateKey}`);
           }}
           onPickSession={(session) => setEditTarget(session)}
+          onCreateSlot={(date, hour, coachId) => setCreateTarget({ date, hour, coachId })}
         />
       )}
 
@@ -1310,7 +1333,11 @@ export function ScheduleGrid({
           onCreated={async () => {
             setCreateTarget(null);
             setLoading(true);
-            await refreshSessions();
+            if (viewMode === "month") {
+              await loadMonthData();
+            } else {
+              await refreshSessions();
+            }
             setLoading(false);
           }}
         />
@@ -1558,7 +1585,7 @@ function DatePickerPopover({
   );
 }
 
-const MONTH_VIEW_MAX_VISIBLE = 3;
+const MONTH_VIEW_MAX_VISIBLE = 6;
 
 // 9~21시 13타임을 4·4·5로 3줄에 나눠 보여준다(코치를 한 명만 볼 때, 칸 하나에
 // 그날 시간대를 전부 압축해서 보여주기 위함).
@@ -1568,10 +1595,10 @@ const MONTH_SINGLE_COACH_HOUR_ROWS: number[][] = [
   SCHEDULE_HOUR_ROWS.slice(8, 13),
 ];
 
-/** "코치 전체"로 볼 때의 날짜 칸 내용 — 개별 일정 대신 코치별 수업수·총
-    수업수·휴무만 압축해서 보여준다(칸 하나에 코치 3명 이상의 개별 일정을
-    다 나열하면 너무 빽빽해지므로, 자세히 보려면 날짜를 눌러 주간 보기로
-    이동하게 한다). */
+/** "코치 전체"로 볼 때의 날짜 칸 내용 — 코치별 수업수를 한 줄로 압축해서
+    보여준다(코치가 늘어나도 세로 공간을 차지하지 않게). 총 수업수는 이
+    칸이 아니라 날짜 숫자 옆에 표시한다(MonthView 참고). 개별 일정은
+    자세히 보려면 날짜를 눌러 주간 보기로 이동하게 한다. */
 function AllCoachesDayCellContent({
   coaches,
   daySessions,
@@ -1582,32 +1609,20 @@ function AllCoachesDayCellContent({
   dayLeaves: CoachLeaveEntry[];
 }) {
   const countsByCoach = new Map<number, number>();
-  let total = 0;
   for (const s of daySessions) {
     if (s.entry_type !== "session") continue;
     countsByCoach.set(s.coach_id, (countsByCoach.get(s.coach_id) ?? 0) + 1);
-    total += 1;
   }
   if (coaches.length === 0) return null;
+  const summary = coaches.map((c) => `${c.name} ${countsByCoach.get(c.id) ?? 0}`).join("  ");
+  const leaveSummary = dayLeaves.map((l) => `${l.coachName} ${formatLeaveBadge(l)}`).join(", ");
   return (
-    <div className="space-y-0.5 text-[9px] leading-tight">
-      {coaches.map((c) => (
-        <div key={c.id} className="flex items-center justify-between gap-1 text-ink/60">
-          <span className="truncate">{c.name}</span>
-          <span className="shrink-0">{countsByCoach.get(c.id) ?? 0}</span>
-        </div>
-      ))}
-      {coaches.length > 1 && (
-        <div className="flex items-center justify-between gap-1 font-medium text-ink/80 border-t border-line/30 pt-0.5">
-          <span>합계</span>
-          <span>{total}</span>
-        </div>
-      )}
+    <div className="text-[9px] leading-tight">
+      <p className="truncate text-ink/60" title={summary}>
+        {summary}
+      </p>
       {dayLeaves.length > 0 && (
-        <p
-          className="truncate text-coral/70"
-          title={dayLeaves.map((l) => `${l.coachName} ${formatLeaveBadge(l)}`).join(", ")}
-        >
+        <p className="truncate text-coral/70" title={leaveSummary}>
           휴무 {dayLeaves.map((l) => l.coachName).join(",")}
         </p>
       )}
@@ -1617,17 +1632,17 @@ function AllCoachesDayCellContent({
 
 /** 코치를 한 명만 볼 때의 날짜 칸 내용 — "+N건 더보기" 없이 9~21시를 4·4·5
     3줄로 압축해, 그날 진행하는 모든 시간대를 한 칸 안에서 바로 볼 수 있게
-    한다. 시간 표시도 "12:00" 대신 "12시"로 줄여 좁은 칸에 맞춘다. */
+    한다. 시간 표시도 "12:00" 대신 "12시"로 줄여 좁은 칸에 맞춘다. 일정이
+    있는 시간을 누르면 상세 모달이, 빈 시간을 누르면 그 자리에 바로 새
+    일정을 잡을 수 있는 등록 창이 뜬다(주간 보기의 "+9시 추가"와 동일). */
 function SingleCoachDayCellContent({
   daySessions,
   onPickSession,
-  onPickDay,
-  dateKey,
+  onCreateSlot,
 }: {
   daySessions: SessionWithMember[];
   onPickSession: (session: SessionWithMember) => void;
-  onPickDay: (dateKey: string) => void;
-  dateKey: string;
+  onCreateSlot: (hour: number) => void;
 }) {
   const sessionByHour = new Map(daySessions.map((s) => [s.session_hour, s]));
   return (
@@ -1644,11 +1659,15 @@ function SingleCoachDayCellContent({
               <button
                 key={h}
                 type="button"
-                onClick={() => (s ? onPickSession(s) : onPickDay(dateKey))}
-                title={s ? `${h}시 ${entryIcon(s)}${entryMainLabel(s)}` : `${h}시`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (s) onPickSession(s);
+                  else onCreateSlot(h);
+                }}
+                title={s ? `${h}시 ${entryIcon(s)}${entryMainLabel(s)}` : `${h}시 · 새 일정 추가`}
                 className={[
                   "rounded px-0.5 py-0.5 text-[8px] leading-tight truncate border",
-                  s ? entryStyle(s) : "border-line/30 text-ink/35 hover:bg-bone",
+                  s ? entryStyle(s) : "border-line/30 text-ink/35 hover:border-coral/40 hover:text-coral",
                 ].join(" ")}
               >
                 {s ? entryMainLabel(s) || `${h}시` : `${h}시`}
@@ -1662,11 +1681,13 @@ function SingleCoachDayCellContent({
 }
 
 /** 한 달 전체를 한눈에 보는 달력 형태 보기. "코치 전체"로 볼 때는 날짜
-    칸마다 코치별 수업수·총 수업수·휴무를 압축해서 보여주고, 코치를 한
-    명만 고르면 그날 9~21시 전체 시간대를 4·4·5 3줄로 압축해 한 칸 안에서
-    바로 볼 수 있게 한다. 일정을 누르면 주간 보기와 똑같은 상세 모달이
-    뜨고, 빈 날짜 숫자(또는 빈 시간칸)를 누르면 그 주의 주간 보기로
-    이동한다(칸이 좁아 여기서 바로 새 일정을 추가하지는 않음). */
+    칸마다 코치별 수업수를 한 줄로, 그날 총 수업수는 날짜 숫자 옆에,
+    휴무는 그 아래 압축해서 보여준다. 코치를 한 명만 고르면 그날 9~21시
+    전체 시간대를 4·4·5 3줄로 압축해 한 칸 안에서 바로 볼 수 있다.
+    일정을 누르면 주간 보기와 똑같은 상세 모달이 뜨고, 빈 시간칸을
+    누르면 그 자리에 바로 새 일정을 등록할 수 있다. 칸의 나머지 빈
+    공간(날짜 숫자, 코치별 수업수 줄 등)을 누르면 그 주의 주간 보기로
+    바로 이동한다. */
 function MonthView({
   monthCursor,
   today,
@@ -1677,6 +1698,7 @@ function MonthView({
   coachFilter,
   onPickDay,
   onPickSession,
+  onCreateSlot,
 }: {
   monthCursor: string;
   today: string;
@@ -1687,6 +1709,7 @@ function MonthView({
   coachFilter: number | "all";
   onPickDay: (dateKey: string) => void;
   onPickSession: (session: SessionWithMember) => void;
+  onCreateSlot: (date: string, hour: number, coachId: number) => void;
 }) {
   const weeks = useMemo(() => buildCalendarWeeks(monthCursor), [monthCursor]);
   const isSingleCoach = coachFilter !== "all";
@@ -1722,34 +1745,36 @@ function MonthView({
           const isToday = cell.dateKey === today;
           const weekday = (new Date(`${cell.dateKey}T00:00:00Z`).getUTCDay() + 6) % 7; // 0=월 ~ 6=일
           const isSunday = weekday === 6;
+          const totalCount = daySessions.filter((s) => s.entry_type === "session").length;
           return (
             <div
               key={cell.key}
+              onClick={() => onPickDay(cell.dateKey)}
               className={[
-                "rounded-lg border p-1 align-top",
-                isSingleCoach ? "min-h-[108px]" : "min-h-[92px]",
+                "rounded-lg border p-1 align-top cursor-pointer transition hover:border-coral/40",
+                isSingleCoach ? "min-h-[108px]" : "min-h-[68px]",
                 cell.inMonth ? "border-line/40" : "border-transparent bg-bone/20",
                 isToday ? "ring-2 ring-coral/50" : "",
               ].join(" ")}
             >
-              <button
-                type="button"
-                onClick={() => onPickDay(cell.dateKey)}
-                className={[
-                  "text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center mb-1 transition",
-                  !cell.inMonth ? "text-ink/25" : isSunday ? "text-red-400" : "text-ink/70",
-                  isToday ? "bg-coral text-white" : "hover:bg-bone",
-                ].join(" ")}
-              >
-                {cell.day}
-              </button>
+              <div className="flex items-center gap-1 mb-1">
+                <span
+                  className={[
+                    "text-xs font-medium rounded-full w-5 h-5 flex items-center justify-center transition",
+                    !cell.inMonth ? "text-ink/25" : isSunday ? "text-red-400" : "text-ink/70",
+                    isToday ? "bg-coral text-white" : "",
+                  ].join(" ")}
+                >
+                  {cell.day}
+                </span>
+                {totalCount > 0 && <span className="text-[10px] font-medium text-ink/40">{totalCount}</span>}
+              </div>
 
               {isSingleCoach ? (
                 <SingleCoachDayCellContent
                   daySessions={daySessions}
                   onPickSession={onPickSession}
-                  onPickDay={onPickDay}
-                  dateKey={cell.dateKey}
+                  onCreateSlot={(hour) => onCreateSlot(cell.dateKey, hour, coachFilter as number)}
                 />
               ) : cell.inMonth ? (
                 <>
@@ -1770,7 +1795,10 @@ function MonthView({
                           <button
                             key={s.id}
                             type="button"
-                            onClick={() => onPickSession(s)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPickSession(s);
+                            }}
                             title={`${formatHourMinute(s.session_hour, s.session_minute)} ${entryMainLabel(s)}`}
                             className={[
                               "block w-full truncate rounded px-1 py-0.5 text-left text-[9px] border",
@@ -1784,7 +1812,10 @@ function MonthView({
                         {hiddenOther > 0 && (
                           <button
                             type="button"
-                            onClick={() => onPickDay(cell.dateKey)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPickDay(cell.dateKey);
+                            }}
                             className="block w-full text-left text-[9px] text-ink/40 hover:text-coral px-1"
                           >
                             +{hiddenOther}건 더보기
