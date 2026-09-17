@@ -206,7 +206,7 @@ export function ReservationForm() {
     }
   }
 
-  const hours = businessHours();
+  const hours = businessHours(selectedDate);
 
   return (
     <div className="grid gap-10 md:grid-cols-[1.1fr_1fr]">

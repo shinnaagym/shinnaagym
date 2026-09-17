@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, UNIQUE_VIOLATION, type ReservationRow } from "@/lib/db";
-import {
-  BUSINESS_START_HOUR,
-  BUSINESS_END_HOUR,
-  PURPOSE_OPTIONS,
-} from "@/lib/constants";
+import { businessHours, PURPOSE_OPTIONS } from "@/lib/constants";
 import { isWithinBookingWindow, koreaCurrentHour, koreaTodayKey } from "@/lib/date";
 import { getTakenSlots } from "@/lib/reservations";
 import { notifyNewReservation } from "@/lib/notify";
@@ -75,11 +71,7 @@ export async function POST(req: NextRequest) {
   }
 
   const hourNum = Number(hour);
-  if (
-    !Number.isInteger(hourNum) ||
-    hourNum < BUSINESS_START_HOUR ||
-    hourNum >= BUSINESS_END_HOUR
-  ) {
+  if (!Number.isInteger(hourNum) || !businessHours(date).includes(hourNum)) {
     return NextResponse.json({ error: "예약 시간을 올바르게 선택해주세요." }, { status: 400 });
   }
 

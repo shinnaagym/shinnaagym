@@ -254,16 +254,19 @@ export const COACH_COLOR_PALETTE: CoachColorStyle[] = [
   { header: "bg-[#f3e9d2]", headerText: "text-[#8a6a1f]", accent: "border-l-[#cdae6a]" },
 ];
 
-export function businessHours(): number[] {
-  const hours: number[] = [];
-  for (let h = BUSINESS_START_HOUR; h < BUSINESS_END_HOUR; h++) hours.push(h);
-  return hours;
-}
-
 // ---- 오픈 후 실제 수업 스케줄표(관리자/회원 화면) 전용 운영시간 ----
-// 사전예약 폼(위 businessHours)과는 별개로, 실제 매장 운영시간(요일별로 다름)을 반영한다.
 export const SCHEDULE_WEEKDAY_HOURS = { start: 9, end: 22 } as const; // 월~금
 export const SCHEDULE_SATURDAY_HOURS = { start: 9, end: 15 } as const; // 토요일 · 공휴일
+
+// 사전예약 폼에서 고를 수 있는 시간대. 토요일은 15시까지만 영업하므로
+// 마지막 예약 가능 시간이 14시(14:00~15:00)까지로 줄어든다.
+export function businessHours(dateKey?: string | null): number[] {
+  const isSaturday = !!dateKey && new Date(`${dateKey}T00:00:00`).getDay() === 6;
+  const end = isSaturday ? SCHEDULE_SATURDAY_HOURS.end : BUSINESS_END_HOUR;
+  const hours: number[] = [];
+  for (let h = BUSINESS_START_HOUR; h < end; h++) hours.push(h);
+  return hours;
+}
 // 그리드에 표시할 시간 행의 전체 범위(가장 넓은 평일 기준). 토/공휴일은 15시 이후를 흐리게 표시한다.
 export const SCHEDULE_HOUR_ROWS = Array.from(
   { length: SCHEDULE_WEEKDAY_HOURS.end - SCHEDULE_WEEKDAY_HOURS.start },
