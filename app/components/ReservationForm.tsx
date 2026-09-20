@@ -101,7 +101,9 @@ export function ReservationForm() {
   }
 
   function isSelectable(key: string) {
-    return key >= minKey && key <= maxKey;
+    // 일요일은 휴무라 예약을 받지 않는다.
+    const isSunday = new Date(`${key}T00:00:00`).getDay() === 0;
+    return !isSunday && key >= minKey && key <= maxKey;
   }
 
   function selectDate(key: string) {
