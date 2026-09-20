@@ -258,11 +258,12 @@ export const COACH_COLOR_PALETTE: CoachColorStyle[] = [
 export const SCHEDULE_WEEKDAY_HOURS = { start: 9, end: 22 } as const; // 월~금
 export const SCHEDULE_SATURDAY_HOURS = { start: 9, end: 15 } as const; // 토요일 · 공휴일
 
-// 사전예약 폼에서 고를 수 있는 시간대. 토요일은 15시까지만 영업하므로
-// 마지막 예약 가능 시간이 14시(14:00~15:00)까지로 줄어든다.
+// 사전예약 폼에서 고를 수 있는 시간대. 일요일은 휴무라 예약을 받지 않고,
+// 토요일은 15시까지만 영업하므로 마지막 예약 가능 시간이 14시(14:00~15:00)까지로 줄어든다.
 export function businessHours(dateKey?: string | null): number[] {
-  const isSaturday = !!dateKey && new Date(`${dateKey}T00:00:00`).getDay() === 6;
-  const end = isSaturday ? SCHEDULE_SATURDAY_HOURS.end : BUSINESS_END_HOUR;
+  const weekday = dateKey ? new Date(`${dateKey}T00:00:00`).getDay() : null;
+  if (weekday === 0) return [];
+  const end = weekday === 6 ? SCHEDULE_SATURDAY_HOURS.end : BUSINESS_END_HOUR;
   const hours: number[] = [];
   for (let h = BUSINESS_START_HOUR; h < end; h++) hours.push(h);
   return hours;
