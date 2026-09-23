@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { addDaysToKey, koreaCurrentMonthKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
+import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import {
   getAllCoachScheduleStats,
   getCoachLeavesForDates,
@@ -32,7 +32,9 @@ export default async function AdminSchedulePage({
   const dateKeys = Array.from({ length: 6 }, (_, i) => addDaysToKey(weekStart, i));
   const weekEnd = dateKeys[dateKeys.length - 1];
 
-  const monthKey = koreaCurrentMonthKey();
+  // KPI 카드의 "OO월 수업수/상담수/노쇼"는 실제 오늘이 속한 달이 아니라
+  // 지금 보고 있는 주(week)가 속한 달 기준으로 보여준다.
+  const monthKey = weekStart.slice(0, 7);
 
   // 스터디/독서 모임 같은 정기 일정의 이번 달·다음 달 발생분이 아직 스케줄표에
   // 없으면 미리 채워 넣는다 — 세션 목록을 읽기 전에 끝나야 그리드에 바로 보인다.
