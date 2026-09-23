@@ -825,13 +825,16 @@ export function ScheduleGrid({
 
   return (
     <div>
-      {/* KPI 카드 — 코치를 한 명 선택하면 그 코치의, "코치 전체"면 전체 합산 이번 달/이번 주 통계를 보여준다. */}
+      {/* KPI 카드 — 코치를 한 명 선택하면 그 코치의, "코치 전체"면 전체 합산 통계를 보여준다.
+          "OO월" 카드들은 실제 오늘이 아니라 지금 보고 있는 주(weekStart)가 속한 달 기준이라,
+          지난달·다음달 주간을 보고 있으면 그 달의 통계로 자동으로 바뀐다. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {(() => {
           const stats = singleCoach ? coachStats[singleCoach.id] : totalStats;
+          const statsMonth = Number(weekStart.split("-")[1]);
           return [
             {
-              label: "이번 달 수업수",
+              label: `${statsMonth}월 수업수`,
               value: (stats?.monthPt ?? 0) + (stats?.monthPair ?? 0),
               detail: `1:1 ${stats?.monthPt ?? 0}회 · 2:1 ${stats?.monthPair ?? 0}회`,
               color: "text-ink",
@@ -843,13 +846,13 @@ export function ScheduleGrid({
               color: "text-coral",
             },
             {
-              label: "이번달 상담수",
+              label: `${statsMonth}월 상담수`,
               value: stats?.monthConsultation ?? 0,
               detail: null,
               color: "text-sage",
             },
             {
-              label: "이번달 노쇼",
+              label: `${statsMonth}월 노쇼`,
               value: (stats?.monthNoShowSession ?? 0) + (stats?.monthNoShowConsultation ?? 0),
               detail: `PT ${stats?.monthNoShowSession ?? 0}회 · 상담 ${stats?.monthNoShowConsultation ?? 0}회`,
               color: "text-red-500",
