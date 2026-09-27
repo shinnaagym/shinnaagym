@@ -20,7 +20,7 @@ export default async function Image({ params }: { params: Promise<{ token: strin
   // 회원 조회가 실패(DB 오류 등)해도 이미지 자체는 항상 생성되도록, 조회
   // 실패는 기본 문구로 조용히 대체한다(전체 실패 시 카톡 등에서 이 이미지
   // 대신 기본 아이콘으로 대체돼버리는 것을 막기 위함).
-  let subtitle = "PRE-OPEN RESERVATION";
+  let subtitle = "RESERVATION";
   try {
     const member = await getMemberByToken(token);
     if (member) {

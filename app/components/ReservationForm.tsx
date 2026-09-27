@@ -405,7 +405,7 @@ export function ReservationForm() {
             disabled={submitting}
             className="w-full rounded-full bg-[#1F2A24] text-[#EFE6D3] py-3.5 text-[15px] font-medium transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
           >
-            {submitting ? "예약 처리 중..." : "사전예약 신청하기"}
+            {submitting ? "예약 처리 중..." : "예약 신청하기"}
           </button>
         </form>
       )}
