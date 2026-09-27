@@ -197,7 +197,7 @@ export default function Home() {
             href="#reserve"
             className="hero-fade-4 group inline-flex items-center gap-2 rounded-full bg-[#8A6D3B] px-6 py-3.5 text-lg font-semibold text-[#F6F1E7] shadow-lg shadow-black/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl sm:text-xl"
           >
-            지금 사전예약하기
+            지금 예약하기
             <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
           </a>
         </div>
@@ -423,7 +423,7 @@ export default function Home() {
           <p>
             문의 · <span className="font-medium text-[#8A6D3B]">010-2496-8088</span>
           </p>
-          <p>정확한 오픈일은 사전예약해주신 분들께 가장 먼저 안내드릴게요.</p>
+          <p>정확한 오픈일은 예약해주신 분들께 가장 먼저 안내드릴게요.</p>
         </div>
       </footer>
     </>

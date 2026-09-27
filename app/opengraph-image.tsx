@@ -42,7 +42,7 @@ export default async function Image() {
             fontFamily: "Pretendard",
           }}
         >
-          PRE-OPEN RESERVATION
+          RESERVATION
         </div>
       </div>
     ),
