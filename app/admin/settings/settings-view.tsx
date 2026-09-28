@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { isMoreThanDaysAgo } from "@/lib/date";
 import type {
   AdminDeviceRow,
   CoachRow,
@@ -816,6 +817,11 @@ export function SettingsView({
   initialEvents: NoticeRow[];
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
+  // 퇴사 처리(active=false) 후 한 달 넘게 재직 전환을 하지 않은 코치는 목록에서
+  // 이름만 숨긴다 — 급여·스케줄 등 과거 기록은 삭제되지 않고 그대로 남는다.
+  const visibleCoaches = coaches.filter(
+    (c) => c.active || !c.deactivated_at || !isMoreThanDaysAgo(c.deactivated_at, 30),
+  );
   const [holidays, setHolidays] = useState(initialHolidays);
   const [coachWorkingHours, setCoachWorkingHours] = useState(initialCoachWorkingHours);
   const [newCoachName, setNewCoachName] = useState("");
@@ -1050,7 +1056,7 @@ export function SettingsView({
           토요일 근무는 아래 당직 캘린더에서 별도로 배정합니다.
         </p>
         <div className="divide-y divide-line/50">
-          {coaches.map((c) => (
+          {visibleCoaches.map((c) => (
             <div key={c.id} className="py-2.5 flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
