@@ -604,12 +604,16 @@ export function ScheduleGrid({
   }
 
   /** 일정 칸을 오른쪽 클릭(또는 길게 눌러)하면 종류별 자주 쓰는 동작만 모은
-      빠른 메뉴를 띄운다. PT 수업은 노쇼/취소/삭제, 개인 일정은 완료 처리/삭제,
-      수업 불가는 삭제만 — 상담처럼 여기서 다루지 않는 종류는 기본 동작(브라우저
-      메뉴)을 그대로 둔다. */
+      빠른 메뉴를 띄운다. PT 수업·상담은 복사/노쇼/취소/삭제, 개인 일정은
+      복사/완료 처리/삭제, 수업 불가는 복사/삭제만 지원한다. */
   function openQuickMenu(e: React.MouseEvent, sessionsForMenu: SessionWithMember[]) {
     const first = sessionsForMenu[0];
-    if (first.entry_type !== "session" && first.entry_type !== "memo" && first.entry_type !== "blocked") {
+    if (
+      first.entry_type !== "session" &&
+      first.entry_type !== "consultation" &&
+      first.entry_type !== "memo" &&
+      first.entry_type !== "blocked"
+    ) {
       return;
     }
     e.preventDefault();
@@ -1391,46 +1395,49 @@ export function ScheduleGrid({
               top: Math.min(contextMenu.y, window.innerHeight - 160),
             }}
           >
-            {contextMenu.kind === "entry" && contextMenu.sessions[0].entry_type === "session" && (
-              <>
-                <button
-                  onClick={() => copyToClipboard(contextMenu.sessions)}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
-                >
-                  복사
-                </button>
-                {contextMenu.sessions[0].member_id !== null && (
+            {contextMenu.kind === "entry" &&
+              (contextMenu.sessions[0].entry_type === "session" ||
+                contextMenu.sessions[0].entry_type === "consultation") && (
+                <>
                   <button
-                    onClick={() => {
-                      const memberId = contextMenu.sessions[0].member_id;
-                      setContextMenu(null);
-                      router.push(`/admin/members/${memberId}/pt-log`);
-                    }}
+                    onClick={() => copyToClipboard(contextMenu.sessions)}
                     className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
                   >
-                    PT 일지
+                    복사
                   </button>
-                )}
-                <button
-                  onClick={() => quickPatch(contextMenu.sessions, { status: "no_show" })}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
-                >
-                  노쇼 처리
-                </button>
-                <button
-                  onClick={() => quickPatch(contextMenu.sessions, { status: "cancelled" })}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
-                >
-                  취소 처리
-                </button>
-                <button
-                  onClick={() => quickDelete(contextMenu.sessions)}
-                  className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-bone transition"
-                >
-                  기록 삭제
-                </button>
-              </>
-            )}
+                  {contextMenu.sessions[0].entry_type === "session" &&
+                    contextMenu.sessions[0].member_id !== null && (
+                      <button
+                        onClick={() => {
+                          const memberId = contextMenu.sessions[0].member_id;
+                          setContextMenu(null);
+                          router.push(`/admin/members/${memberId}/pt-log`);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                      >
+                        PT 일지
+                      </button>
+                    )}
+                  <button
+                    onClick={() => quickPatch(contextMenu.sessions, { status: "no_show" })}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                  >
+                    노쇼 처리
+                  </button>
+                  <button
+                    onClick={() => quickPatch(contextMenu.sessions, { status: "cancelled" })}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
+                  >
+                    취소 처리
+                  </button>
+                  <button
+                    onClick={() => quickDelete(contextMenu.sessions)}
+                    className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-bone transition"
+                  >
+                    기록 삭제
+                  </button>
+                </>
+              )}
             {contextMenu.kind === "entry" && contextMenu.sessions[0].entry_type === "memo" && (
               <>
                 <button
