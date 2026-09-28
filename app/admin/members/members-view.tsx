@@ -1158,7 +1158,7 @@ function FixedSlotSchedule({
           const key = `${pickerCell.weekday}-${pickerCell.hour}`;
           const current = allByCell.get(key) ?? [];
           const availableMembers = members
-            .filter((m) => m.status === "active")
+            .filter((m) => m.status === "active" && !m.is_lead)
             .filter((m) => {
               if (coachFilter === "unassigned") return m.coach_id === null;
               if (coachFilter === "all") return true;

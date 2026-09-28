@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { cache } from "react";
 import { revalidateTag, unstable_cache } from "next/cache";
-import { query, UNIQUE_VIOLATION } from "./db";
+import { query } from "./db";
 import type {
   ClassSessionRow,
   CoachRow,
@@ -15,14 +15,7 @@ import type {
   PtType,
   SessionStatus,
 } from "./db";
-import {
-  addDaysToKey,
-  addMonthsToKey,
-  koreaCurrentHour,
-  koreaTodayKey,
-  monthKeyRange,
-  monthKeysRange,
-} from "./date";
+import { addDaysToKey, addMonthsToKey, koreaTodayKey, monthKeyRange, monthKeysRange } from "./date";
 import { LEAVE_TYPE_OPTIONS, scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
@@ -579,37 +572,6 @@ export async function deleteFixedSlotsByMember(memberId: number): Promise<void> 
   await query(`DELETE FROM fixed_slots WHERE member_id = $1`, [memberId]);
 }
 
-/** 회원의 가장 최근 결제 패키지의 PT 유형(없으면 1:1). */
-async function getLatestPtType(memberId: number): Promise<PtType> {
-  const result = await query<{ pt_type: PtType }>(
-    `SELECT pt_type FROM packages WHERE member_id = $1 ORDER BY purchased_at DESC LIMIT 1`,
-    [memberId],
-  );
-  return result.rows[0]?.pt_type ?? "1:1";
-}
-
-/** 아직 스케줄표에 예약으로 배정되지 않은 잔여 회차 수(= 잔여 회차 - 이미 잡힌 건수). */
-async function getUnallocatedSessionCount(memberId: number): Promise<number> {
-  const result = await query<{ total: string | null; taken: string }>(
-    `SELECT
-       (SELECT COALESCE(SUM(total_sessions), 0) FROM packages WHERE member_id = $1) as total,
-       (SELECT COUNT(*) FROM class_sessions
-          WHERE member_id = $1 AND entry_type = 'session' AND status <> 'cancelled') as taken`,
-    [memberId],
-  );
-  const row = result.rows[0];
-  const total = Number(row?.total ?? 0);
-  const taken = Number(row?.taken ?? 0);
-  return Math.max(0, total - taken);
-}
-
-/** YYYY-MM-DD 날짜의 요일을 0=월 ... 6=일 인덱스로 변환 (fixed_slots.weekday와 동일한 규칙). */
-function mondayIndexedWeekday(dateKey: string): number {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const jsDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=일 ... 6=토
-  return jsDay === 0 ? 6 : jsDay - 1;
-}
-
 export interface FixedSlotBackfillResult {
   slot: FixedSlotRow;
   created: number;
@@ -646,53 +608,14 @@ export async function addFixedSlotWithBackfill(
     throw new Error(`이미 이 시간대에 ${conflict.rows[0].member_name} 회원이 배정되어 있어요.`);
   }
 
+  // 고정 시간대는 "이 요일·시간에는 이 회원이 온다"는 배정 정보만 저장한다.
+  // 예전에는 여기서 잔여 회차만큼 스케줄표에 실제 예약을 몇 달치씩 미리
+  // 만들어 채워 넣었는데, 그러면 아직 오지 않은 먼 미래 예약들이 회원 상세의
+  // "가능한 요일·시간" 목록을 가득 채워 정작 확인해야 할 가까운 예약을
+  // 찾기 어렵게 만들었다. 이제는 실제 수업 예약은 스케줄표에서 직접
+  // 잡도록 하고, 고정 시간대는 배정 표시 용도로만 쓴다.
   const slot = await addFixedSlot(memberId, weekday, hour);
-
-  const unallocated = await getUnallocatedSessionCount(memberId);
-  if (unallocated <= 0) {
-    return { slot, created: 0, skippedDates: [], createdSessionIds: [] };
-  }
-
-  const ptType = await getLatestPtType(memberId);
-  const todayKey = koreaTodayKey();
-  const todayWeekday = mondayIndexedWeekday(todayKey);
-
-  let offset = (weekday - todayWeekday + 7) % 7;
-  if (offset === 0 && hour <= koreaCurrentHour()) {
-    offset = 7;
-  }
-  let candidateDate = addDaysToKey(todayKey, offset);
-
-  let created = 0;
-  const skippedDates: string[] = [];
-  const createdSessionIds: number[] = [];
-  const MAX_ATTEMPTS = 104; // 최대 2년치까지만 시도(무한 루프 방지)
-  let attempts = 0;
-
-  while (created < unallocated && attempts < MAX_ATTEMPTS) {
-    attempts += 1;
-    try {
-      const createdSession = await createSession({
-        memberId,
-        coachId: member.coach_id,
-        date: candidateDate,
-        hour,
-        entryType: "session",
-        ptType,
-      });
-      createdSessionIds.push(createdSession.id);
-      created += 1;
-    } catch (err: unknown) {
-      if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === UNIQUE_VIOLATION) {
-        skippedDates.push(candidateDate);
-      } else {
-        throw err;
-      }
-    }
-    candidateDate = addDaysToKey(candidateDate, 7);
-  }
-
-  return { slot, created, skippedDates, createdSessionIds };
+  return { slot, created: 0, skippedDates: [], createdSessionIds: [] };
 }
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {
@@ -1447,7 +1370,7 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
          LEFT JOIN (
            SELECT member_id, COUNT(*) as package_count FROM packages GROUP BY member_id
          ) pkg ON pkg.member_id = m.id
-         WHERE m.coach_id IS NOT NULL AND m.deleted_at IS NULL
+         WHERE m.coach_id IS NOT NULL AND m.deleted_at IS NULL AND m.is_lead = false
          GROUP BY m.coach_id`,
       ),
       query<{ coach_id: number; consultation_count: string; success_count: string }>(
