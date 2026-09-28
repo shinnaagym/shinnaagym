@@ -111,7 +111,7 @@ export default async function MyReservationPage({
 
   const today = koreaTodayKey();
   const upcoming = sessions
-    .filter((s) => s.session_date >= today && s.status !== "cancelled")
+    .filter((s) => s.entry_type === "session" && s.session_date >= today && s.status !== "cancelled")
     .sort((a, b) =>
       a.session_date === b.session_date
         ? a.session_hour - b.session_hour
