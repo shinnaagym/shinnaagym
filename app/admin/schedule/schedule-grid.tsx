@@ -202,9 +202,10 @@ function minutePrefix(session: SessionWithMember): string {
   return session.session_minute ? `(${session.session_minute})` : "";
 }
 
-/** 세션 pill에 표시할 "진행/총" 회차 문구. 개인 일정·수업 불가는 대상이 없어 null. */
+/** 세션 pill에 표시할 "진행/총" 회차 문구. 실제 PT 수업(1:1/2:1)에만 표시하고,
+    상담·개인 일정·수업 불가는 패키지 회차를 소진하는 게 아니므로 표시하지 않는다. */
 function progressLabel(session: SessionWithMember): string | null {
-  if (isSimpleEntry(session)) return null;
+  if (session.entry_type !== "session") return null;
   const total = Number(session.total_sessions);
   if (!total) return null;
   return `${session.ordinal ?? "-"}/${total}`;

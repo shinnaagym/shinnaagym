@@ -842,7 +842,7 @@ const SESSION_SELECT_FIELDS = `
   s.*, m.name as member_name, c.name as coach_name,
   (CASE WHEN s.member_id IS NULL THEN NULL ELSE (
     SELECT COUNT(*) FROM class_sessions s2
-    WHERE s2.member_id = s.member_id AND s2.status <> 'cancelled'
+    WHERE s2.member_id = s.member_id AND s2.status <> 'cancelled' AND s2.entry_type = 'session'
       AND (s2.session_date, s2.session_hour) <= (s.session_date, s.session_hour)
   ) END) as ordinal,
   (CASE WHEN s.member_id IS NULL THEN NULL ELSE (
