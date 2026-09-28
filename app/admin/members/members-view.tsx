@@ -583,7 +583,7 @@ export function MembersView({
           >
             <option value="all">담당 코치 전체</option>
             <option value="unassigned">미지정</option>
-            {coaches.map((c) => (
+            {activeCoaches.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -890,7 +890,7 @@ export function MembersView({
       <FixedSlotSchedule
         fixedSlots={fixedSlots}
         members={members}
-        coaches={coaches}
+        coaches={activeCoaches}
         coachFilter={coachFilter}
         coachName={
           coachFilter === "all"

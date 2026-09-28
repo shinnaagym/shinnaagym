@@ -15,6 +15,11 @@ export function koreaTodayKey(): string {
   return dateKey(kst.getUTCFullYear(), kst.getUTCMonth() + 1, kst.getUTCDate());
 }
 
+/** Whether an ISO timestamp is more than `days` days in the past. */
+export function isMoreThanDaysAgo(isoTimestamp: string, days: number): boolean {
+  return new Date(isoTimestamp).getTime() < Date.now() - days * 24 * 60 * 60 * 1000;
+}
+
 /** Adds `days` calendar days to a YYYY-MM-DD key and returns a new key. */
 export function addDaysToKey(key: string, days: number): string {
   const [y, m, d] = key.split("-").map(Number);

@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 29;
+const SCHEMA_VERSION = 30;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -715,6 +715,11 @@ function runFullMigration(): Promise<void> {
             -- 몇 시간(1~2)인지를 함께 기록한다.
             ALTER TABLE coach_leaves ADD COLUMN IF NOT EXISTS direction TEXT;
             ALTER TABLE coach_leaves ADD COLUMN IF NOT EXISTS hours SMALLINT;
+
+            -- 퇴사 처리(active=false) 시점을 기록해, 한 달이 지나도 재직으로
+            -- 전환하지 않으면 설정 페이지의 코치 관리 목록에서 이름을 숨긴다
+            -- (급여·스케줄 등 과거 기록 자체는 그대로 남는다).
+            ALTER TABLE coaches ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ;
             `,
           ),
           getPool().query(
@@ -794,6 +799,9 @@ export interface CoachRow {
   /** 대표가 직접 신고한 4대보험 산정 기준 보수월액(원). 없으면(NULL) 당월
       급여 기준으로 계산한다 — lib/payroll/calculate.ts 참고. */
   declared_monthly_compensation: number | null;
+  /** 퇴사 처리(active=false)한 시각. 재직으로 전환하면 다시 null이 된다.
+      한 달 넘게 이 상태로 남아있으면 코치 관리 목록에서 이름을 숨긴다. */
+  deactivated_at: string | null;
   created_at: string;
 }
 

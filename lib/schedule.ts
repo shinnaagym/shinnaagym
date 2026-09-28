@@ -46,7 +46,10 @@ export async function addCoach(name: string, phone = ""): Promise<CoachRow> {
 }
 
 export async function setCoachActive(id: number, active: boolean): Promise<void> {
-  await query(`UPDATE coaches SET active = $2 WHERE id = $1`, [id, active]);
+  await query(
+    `UPDATE coaches SET active = $2, deactivated_at = CASE WHEN $2 THEN NULL ELSE now() END WHERE id = $1`,
+    [id, active],
+  );
   revalidateTag("coaches", { expire: 0 });
 }
 
