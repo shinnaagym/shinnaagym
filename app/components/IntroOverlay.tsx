@@ -46,6 +46,15 @@ export function IntroOverlay() {
     on(window, "pointerdown", tryPlay);
     on(document, "visibilitychange", tryPlay);
 
+    // 안전장치: 자동재생도 막히고(일부 인앱 브라우저) 탭도 인식되지 않는
+    // 환경에서 사용자가 인트로에 갇히지 않도록, 4.6초가 지나면 무조건
+    // 다음 화면으로 넘긴다.
+    const timeoutId = window.setTimeout(() => {
+      cleanupRef.current();
+      setDone(true);
+    }, 4600);
+    removers.push(() => window.clearTimeout(timeoutId));
+
     cleanupRef.current = () => removers.forEach((remove) => remove());
     return () => cleanupRef.current();
   }, []);
@@ -66,7 +75,11 @@ export function IntroOverlay() {
     >
       <video
         ref={videoRef}
-        className="absolute inset-0 h-full w-full bg-[#1C1E22] object-contain"
+        // 일부 인앱 브라우저(카카오톡 등)는 재생 전 영상을 탭하면 우리 쪽
+        // onClick 대신 자체 재생 버튼 UI로 탭을 가로채, 화면을 눌러도 인트로가
+        // 안 넘어가는 문제가 있었다. pointer-events-none으로 영상은 탭을 아예
+        // 받지 않게 하고, 모든 탭이 부모 div의 onClick(finish)으로만 가게 한다.
+        className="pointer-events-none absolute inset-0 h-full w-full bg-[#1C1E22] object-contain"
         src="/videos/intro-logo.mp4"
         autoPlay
         muted
