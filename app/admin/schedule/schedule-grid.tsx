@@ -2722,6 +2722,16 @@ function EditSessionModal({
           </button>
         )}
 
+        {session.entry_type === "session" && session.member_id !== null && (
+          <button
+            type="button"
+            onClick={() => router.push(`/admin/members?open=${session.member_id}`)}
+            className="w-full rounded-full border border-line py-2.5 text-sm font-medium hover:border-coral/40 hover:text-coral transition"
+          >
+            👤 회원 정보
+          </button>
+        )}
+
         {session.entry_type === "consultation" && session.member_id !== null && (
           <div className="grid grid-cols-2 gap-2">
             <button
