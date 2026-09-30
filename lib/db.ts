@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 30;
+const SCHEMA_VERSION = 31;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -720,6 +720,13 @@ function runFullMigration(): Promise<void> {
             -- 전환하지 않으면 설정 페이지의 코치 관리 목록에서 이름을 숨긴다
             -- (급여·스케줄 등 과거 기록 자체는 그대로 남는다).
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ;
+
+            -- "가능한 요일·시간" 그리드에서 고른 칸을 "weekday-hour"(예: 2-13)
+            -- 형태로 그대로 저장한다. available_times(읽기용 요약 텍스트)와
+            -- 별도로 둬서, 고정 회원 시간표에서 "이 시간대에 가능한 다른 회원"을
+            -- 정확히 찾아낼 수 있게 한다(텍스트 요약은 범위 표기라 되짚어
+            -- 파싱하기 어려움).
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS available_slots TEXT[] NOT NULL DEFAULT '{}';
             `,
           ),
           getPool().query(
@@ -862,6 +869,10 @@ export interface MemberRow {
   notes: string;
   referrer: string;
   available_times: string;
+  /** "가능한 요일·시간" 그리드에서 고른 칸을 "weekday-hour"(0=월) 형태로 저장.
+      available_times는 사람이 읽기 위한 요약 텍스트이고, 이 필드는 "이
+      시간대에 가능한 회원"을 정확히 찾기 위한 용도(고정 회원 시간표 참고). */
+  available_slots: string[];
   followup_status: string;
   followup_memo: string;
   followup_updated_at: string | null;

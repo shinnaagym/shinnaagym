@@ -307,6 +307,8 @@ export interface MemberInput {
   notes: string;
   referrer?: string;
   availableTimes?: string;
+  /** "가능한 요일·시간" 그리드에서 고른 칸("weekday-hour" 형태). */
+  availableSlots?: string[];
   followupStatus?: string;
   followupMemo?: string;
   improvementDirection?: string;
@@ -316,8 +318,8 @@ export interface MemberInput {
 
 export async function createMember(input: MemberInput): Promise<MemberRow> {
   const result = await query<MemberRow>(
-    `INSERT INTO members (name, phone, coach_id, notes, referrer, available_times, token, is_lead)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    `INSERT INTO members (name, phone, coach_id, notes, referrer, available_times, available_slots, token, is_lead)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
     [
       input.name,
       input.phone,
@@ -325,6 +327,7 @@ export async function createMember(input: MemberInput): Promise<MemberRow> {
       input.notes,
       input.referrer ?? "",
       input.availableTimes ?? "",
+      input.availableSlots ?? [],
       generateMemberToken(),
       input.isLead ?? false,
     ],
@@ -363,6 +366,10 @@ export async function updateMember(
   if (input.availableTimes !== undefined) {
     fields.push(`available_times = $${++i}`);
     values.push(input.availableTimes);
+  }
+  if (input.availableSlots !== undefined) {
+    fields.push(`available_slots = $${++i}`);
+    values.push(input.availableSlots);
   }
   if (input.followupStatus !== undefined) {
     fields.push(`followup_status = $${++i}`);

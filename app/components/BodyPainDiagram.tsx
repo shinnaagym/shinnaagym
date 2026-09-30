@@ -47,6 +47,19 @@ const REGION_META: Record<
   hands: { label: "손", src: "/body-diagram/hands.png", width: 365, height: 292 },
 };
 
+// 전면/후면/발/손 그림은 몸의 양쪽이 한 그림에 같이 나오는데, 정면(전면)은 그림을
+// 보는 사람과 마주 보는 구도라 좌우가 뒤집혀 보인다(그림 왼쪽 = 사람 오른쪽).
+// 후면·발·손은 뒤집히지 않는다(그림 왼쪽 = 사람 왼쪽). 이 헷갈림을 없애려고
+// 그림 위 양쪽 모서리에 "좌"/"우" 표시를 그대로 얹어둔다. 좌측면/우측면은 몸
+// 전체가 아니라 한쪽만 나오는 그림이라(탭 이름에 이미 어느 쪽인지 나와있어)
+// 표시하지 않는다.
+const SIDE_LABELS: Partial<Record<BodyRegionKey, { imageLeft: "좌" | "우"; imageRight: "좌" | "우" }>> = {
+  front: { imageLeft: "우", imageRight: "좌" },
+  back: { imageLeft: "좌", imageRight: "우" },
+  feet: { imageLeft: "좌", imageRight: "우" },
+  hands: { imageLeft: "좌", imageRight: "우" },
+};
+
 function DiagramCanvas({
   regionKey,
   value,
@@ -180,6 +193,16 @@ function DiagramCanvas({
           draggable={false}
           className="absolute inset-0 h-full w-full object-contain pointer-events-none select-none"
         />
+        {SIDE_LABELS[regionKey] && (
+          <>
+            <span className="absolute top-1.5 left-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-ink/60 text-[10px] font-bold text-white pointer-events-none select-none">
+              {SIDE_LABELS[regionKey]!.imageLeft}
+            </span>
+            <span className="absolute top-1.5 right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-ink/60 text-[10px] font-bold text-white pointer-events-none select-none">
+              {SIDE_LABELS[regionKey]!.imageRight}
+            </span>
+          </>
+        )}
         {readOnly ? (
           value && (
             // eslint-disable-next-line @next/next/no-img-element

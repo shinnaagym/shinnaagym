@@ -117,6 +117,7 @@ export async function PATCH(
         notes?: unknown;
         referrer?: unknown;
         availableTimes?: unknown;
+        availableSlots?: unknown;
         followupStatus?: unknown;
         followupMemo?: unknown;
         improvementDirection?: unknown;
@@ -137,6 +138,9 @@ export async function PATCH(
   const referrer = typeof body.referrer === "string" ? body.referrer.trim() : undefined;
   const availableTimes =
     typeof body.availableTimes === "string" ? body.availableTimes.trim() : undefined;
+  const availableSlots = Array.isArray(body.availableSlots)
+    ? body.availableSlots.filter((s): s is string => typeof s === "string" && /^\d-\d{1,2}$/.test(s))
+    : undefined;
   const followupStatus =
     typeof body.followupStatus === "string" &&
     VALID_FOLLOWUP_STATUSES.includes(body.followupStatus)
@@ -163,6 +167,7 @@ export async function PATCH(
     notes,
     referrer,
     availableTimes,
+    availableSlots,
     followupStatus,
     followupMemo,
     improvementDirection,
@@ -176,6 +181,7 @@ export async function PATCH(
   if (notes !== undefined) prevValues.notes = before.notes;
   if (referrer !== undefined) prevValues.referrer = before.referrer;
   if (availableTimes !== undefined) prevValues.available_times = before.available_times;
+  if (availableSlots !== undefined) prevValues.available_slots = before.available_slots;
   if (followupStatus !== undefined) {
     prevValues.followup_status = before.followup_status;
     prevValues.followup_updated_at = before.followup_updated_at;
