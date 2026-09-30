@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
         notes?: unknown;
         referrer?: unknown;
         availableTimes?: unknown;
+        availableSlots?: unknown;
         totalSessions?: unknown;
         price?: unknown;
         ptType?: unknown;
@@ -72,6 +73,9 @@ export async function POST(req: NextRequest) {
   const referrer = typeof body?.referrer === "string" ? body.referrer.trim() : "";
   const availableTimes =
     typeof body?.availableTimes === "string" ? body.availableTimes.trim() : "";
+  const availableSlots = Array.isArray(body?.availableSlots)
+    ? body.availableSlots.filter((s): s is string => typeof s === "string" && /^\d-\d{1,2}$/.test(s))
+    : [];
   const coachId =
     typeof body?.coachId === "number" && Number.isInteger(body.coachId)
       ? body.coachId
@@ -143,6 +147,7 @@ export async function POST(req: NextRequest) {
       notes,
       referrer,
       availableTimes,
+      availableSlots,
       isLead: false,
     });
     member = (await getMemberById(existingMember.id))!;
@@ -158,11 +163,12 @@ export async function POST(req: NextRequest) {
         notes: existingMember.notes,
         referrer: existingMember.referrer,
         available_times: existingMember.available_times,
+        available_slots: existingMember.available_slots,
         is_lead: existingMember.is_lead,
       },
     });
   } else {
-    member = await createMember({ name, phone, coachId, notes, referrer, availableTimes });
+    member = await createMember({ name, phone, coachId, notes, referrer, availableTimes, availableSlots });
   }
 
   // 2:1 PT는 계약서에만 기록되던 "함께 등록하는 분"도 별도 회원 행으로 만들어

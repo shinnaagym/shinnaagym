@@ -137,17 +137,20 @@ function formatAvailability(selected: Set<string>): string {
     읽기 쉬운 텍스트로 변환해 부모의 텍스트 입력값을 갱신한다(기존 자유 텍스트는
     직접 수정도 계속 가능). */
 function AvailabilityGridPicker({
+  initialSlots,
   onChange,
   lockable = false,
 }: {
-  onChange: (text: string) => void;
+  /** 이전에 저장해둔 선택 칸("weekday-hour" 형태)으로 그리드를 복원한다. */
+  initialSlots?: string[];
+  onChange: (text: string, slots: string[]) => void;
   /** true면 기본은 잠금(보기 전용)이라 드래그가 안 먹고, "수정"을 눌러야 편집할
       수 있다. "저장"을 누르면 다시 잠긴다 — 스크롤하다 실수로 칸을 건드려 값이
       바뀌는 사고를 막기 위함(기존 회원 상세에서만 씀. 신규 등록 흐름은 아직 아무것도
       저장된 게 없어 잠글 필요가 없다). */
   lockable?: boolean;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(initialSlots));
   const selectedRef = useRef(selected);
   useEffect(() => {
     selectedRef.current = selected;
@@ -165,7 +168,7 @@ function AvailabilityGridPicker({
     else next.delete(key);
     selectedRef.current = next;
     setSelected(next);
-    onChange(formatAvailability(next));
+    onChange(formatAvailability(next), Array.from(next));
   }
 
   function handlePointerDown(weekday: number, hour: number) {
@@ -203,7 +206,7 @@ function AvailabilityGridPicker({
     const next = new Set<string>();
     selectedRef.current = next;
     setSelected(next);
-    onChange("");
+    onChange("", []);
   }
 
   return (
@@ -1007,17 +1010,20 @@ function FixedSlotSchedule({
 
   const [pickerCell, setPickerCell] = useState<{ weekday: number; hour: number } | null>(null);
   const [pickerMemberId, setPickerMemberId] = useState<number | "">("");
+  const [pickerTab, setPickerTab] = useState<"fixed" | "flexible">("fixed");
   const [pickerSaving, setPickerSaving] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
 
   function openPicker(weekday: number, hour: number) {
     setPickerCell({ weekday, hour });
     setPickerMemberId("");
+    setPickerTab("fixed");
     setPickerError(null);
   }
 
-  async function addPickerSlot() {
-    if (!pickerCell || pickerMemberId === "") return;
+  async function addPickerSlot(memberIdOverride?: number) {
+    const targetMemberId = memberIdOverride ?? pickerMemberId;
+    if (!pickerCell || targetMemberId === "") return;
     setPickerSaving(true);
     setPickerError(null);
     try {
@@ -1025,7 +1031,7 @@ function FixedSlotSchedule({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          memberId: pickerMemberId,
+          memberId: targetMemberId,
           weekday: pickerCell.weekday,
           hour: pickerCell.hour,
         }),
@@ -1166,6 +1172,19 @@ function FixedSlotSchedule({
             })
             .filter((m) => !current.some((entry) => entry.memberId === m.id))
             .sort((a, b) => a.name.localeCompare(b.name));
+          // "다른 가능한 시간" 탭 — 이 시간대가 고정은 아니어도, 회원 상세의
+          // "가능한 요일·시간" 그리드에서 이 칸을 가능하다고 표시해둔 회원들을
+          // 한눈에 보여줘서 바로 고정 배정할 수 있게 한다.
+          const flexibleMembers = members
+            .filter((m) => m.status === "active" && !m.is_lead)
+            .filter((m) => {
+              if (coachFilter === "unassigned") return m.coach_id === null;
+              if (coachFilter === "all") return true;
+              return m.coach_id === coachFilter;
+            })
+            .filter((m) => !current.some((entry) => entry.memberId === m.id))
+            .filter((m) => m.available_slots?.includes(key))
+            .sort((a, b) => a.name.localeCompare(b.name));
           return (
             <ModalShell
               title={`${FIXED_SLOT_WEEKDAY_LABELS[pickerCell.weekday]}요일 ${pickerCell.hour}시`}
@@ -1195,28 +1214,71 @@ function FixedSlotSchedule({
                   <p className="text-sm text-ink/40">아직 배정된 회원이 없어요.</p>
                 )}
 
-                <div className="flex items-center gap-2">
-                  <select
-                    value={pickerMemberId}
-                    onChange={(e) => setPickerMemberId(e.target.value === "" ? "" : Number(e.target.value))}
-                    className="flex-1 min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
-                  >
-                    <option value="">회원 선택</option>
-                    {availableMembers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex gap-1 rounded-lg bg-bone/60 p-1 text-sm">
                   <button
                     type="button"
-                    disabled={pickerSaving || pickerMemberId === ""}
-                    onClick={addPickerSlot}
-                    className="shrink-0 rounded-full bg-coral text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+                    onClick={() => setPickerTab("fixed")}
+                    className={[
+                      "flex-1 rounded-md py-1.5 font-medium transition",
+                      pickerTab === "fixed" ? "bg-white shadow-sm" : "text-ink/50",
+                    ].join(" ")}
                   >
-                    추가
+                    고정
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPickerTab("flexible")}
+                    className={[
+                      "flex-1 rounded-md py-1.5 font-medium transition",
+                      pickerTab === "flexible" ? "bg-white shadow-sm" : "text-ink/50",
+                    ].join(" ")}
+                  >
+                    다른 가능한 시간
                   </button>
                 </div>
+
+                {pickerTab === "fixed" ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={pickerMemberId}
+                      onChange={(e) => setPickerMemberId(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="flex-1 min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+                    >
+                      <option value="">회원 선택</option>
+                      {availableMembers.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={pickerSaving || pickerMemberId === ""}
+                      onClick={() => addPickerSlot()}
+                      className="shrink-0 rounded-full bg-coral text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+                    >
+                      추가
+                    </button>
+                  </div>
+                ) : flexibleMembers.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {flexibleMembers.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        disabled={pickerSaving}
+                        onClick={() => addPickerSlot(m.id)}
+                        className="rounded-full border border-line px-3 py-1.5 text-sm hover:border-coral hover:text-coral transition disabled:opacity-50"
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-ink/40">
+                    이 시간대를 가능한 시간으로 등록한 회원이 없어요.
+                  </p>
+                )}
                 {pickerError && <p className="text-sm text-coral">{pickerError}</p>}
               </div>
             </ModalShell>
@@ -1412,6 +1474,7 @@ function CreateMemberModal({
   const [coachId, setCoachId] = useState<number | "">(coaches[0]?.id ?? "");
   const [referrer, setReferrer] = useState("");
   const [availableTimes, setAvailableTimes] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [ptType, setPtType] = useState<PtType>("1:1");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
@@ -1479,6 +1542,7 @@ function CreateMemberModal({
           notes,
           referrer,
           availableTimes,
+          availableSlots,
           totalSessions: Number(totalSessions),
           price: Number(price || 0),
           ptType,
@@ -1647,7 +1711,13 @@ function CreateMemberModal({
             placeholder="예: 화·목 오전 10시"
             className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral mb-2"
           />
-          <AvailabilityGridPicker onChange={setAvailableTimes} lockable />
+          <AvailabilityGridPicker
+            onChange={(text, slots) => {
+              setAvailableTimes(text);
+              setAvailableSlots(slots);
+            }}
+            lockable
+          />
         </Field>
         <div>
           <p className="text-sm font-medium mb-2">고정 시간대</p>
@@ -2120,6 +2190,7 @@ function MemberDetailModal({
   const [status, setStatus] = useState<MemberStatus>(initialMember.status);
   const [referrer, setReferrer] = useState(initialMember.referrer);
   const [availableTimes, setAvailableTimes] = useState(initialMember.available_times);
+  const [availableSlots, setAvailableSlots] = useState<string[]>(initialMember.available_slots);
   const [notes, setNotes] = useState(initialMember.notes);
 
   const [editingPkgId, setEditingPkgId] = useState<number | null>(null);
@@ -2166,6 +2237,7 @@ function MemberDetailModal({
           status,
           referrer,
           availableTimes,
+          availableSlots,
           notes,
         }),
       });
@@ -2644,7 +2716,14 @@ function MemberDetailModal({
             placeholder="예: 화·목 오전 10시"
             className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral mb-2"
           />
-          <AvailabilityGridPicker onChange={setAvailableTimes} lockable />
+          <AvailabilityGridPicker
+            initialSlots={initialMember.available_slots}
+            onChange={(text, slots) => {
+              setAvailableTimes(text);
+              setAvailableSlots(slots);
+            }}
+            lockable
+          />
         </Field>
 
         <div>
