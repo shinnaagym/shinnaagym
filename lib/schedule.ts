@@ -7,6 +7,7 @@ import type {
   CoachRow,
   EmploymentType,
   FixedSlotRow,
+  FixedSlotType,
   HolidayRow,
   MemberRow,
   MemberStatus,
@@ -562,13 +563,14 @@ export async function addFixedSlot(
   memberId: number,
   weekday: number,
   hour: number,
+  slotType: FixedSlotType = "fixed",
 ): Promise<FixedSlotRow> {
   const result = await query<FixedSlotRow>(
-    `INSERT INTO fixed_slots (member_id, weekday, hour)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (member_id, weekday, hour) DO UPDATE SET member_id = EXCLUDED.member_id
+    `INSERT INTO fixed_slots (member_id, weekday, hour, slot_type)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (member_id, weekday, hour) DO UPDATE SET slot_type = EXCLUDED.slot_type
      RETURNING *`,
-    [memberId, weekday, hour],
+    [memberId, weekday, hour, slotType],
   );
   return result.rows[0];
 }
@@ -598,6 +600,7 @@ export async function addFixedSlotWithBackfill(
   memberId: number,
   weekday: number,
   hour: number,
+  slotType: FixedSlotType = "fixed",
 ): Promise<FixedSlotBackfillResult> {
   const member = await getMemberById(memberId);
   if (!member) {
@@ -607,15 +610,20 @@ export async function addFixedSlotWithBackfill(
     throw new Error("담당 코치를 먼저 지정해주세요.");
   }
 
-  // 한 시간대에는 코치당 회원 한 명만 고정 배정할 수 있다.
-  const conflict = await query<{ member_name: string }>(
-    `SELECT m.name as member_name FROM fixed_slots f
-     JOIN members m ON m.id = f.member_id
-     WHERE m.coach_id = $1 AND f.weekday = $2 AND f.hour = $3 AND f.member_id <> $4`,
-    [member.coach_id, weekday, hour, memberId],
-  );
-  if (conflict.rows.length > 0) {
-    throw new Error(`이미 이 시간대에 ${conflict.rows[0].member_name} 회원이 배정되어 있어요.`);
+  // 한 시간대에는 코치당 "고정"(확정) 배정 회원 한 명만 둘 수 있다. "다른
+  // 가능한 시간"(flexible)은 확정 배정이 아니라 후보 표시일 뿐이라 이 충돌
+  // 검사에서 제외한다 — 서로 겹쳐도, 심지어 고정 배정과 겹쳐도 상관없다.
+  if (slotType === "fixed") {
+    const conflict = await query<{ member_name: string }>(
+      `SELECT m.name as member_name FROM fixed_slots f
+       JOIN members m ON m.id = f.member_id
+       WHERE m.coach_id = $1 AND f.weekday = $2 AND f.hour = $3 AND f.member_id <> $4
+         AND f.slot_type = 'fixed'`,
+      [member.coach_id, weekday, hour, memberId],
+    );
+    if (conflict.rows.length > 0) {
+      throw new Error(`이미 이 시간대에 ${conflict.rows[0].member_name} 회원이 배정되어 있어요.`);
+    }
   }
 
   // 고정 시간대는 "이 요일·시간에는 이 회원이 온다"는 배정 정보만 저장한다.
@@ -624,7 +632,7 @@ export async function addFixedSlotWithBackfill(
   // "가능한 요일·시간" 목록을 가득 채워 정작 확인해야 할 가까운 예약을
   // 찾기 어렵게 만들었다. 이제는 실제 수업 예약은 스케줄표에서 직접
   // 잡도록 하고, 고정 시간대는 배정 표시 용도로만 쓴다.
-  const slot = await addFixedSlot(memberId, weekday, hour);
+  const slot = await addFixedSlot(memberId, weekday, hour, slotType);
   return { slot, created: 0, skippedDates: [], createdSessionIds: [] };
 }
 

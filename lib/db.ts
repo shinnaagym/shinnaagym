@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 31;
+const SCHEMA_VERSION = 32;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -181,6 +181,7 @@ function runFullMigration(): Promise<void> {
           member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
           weekday INTEGER NOT NULL, -- 0=월 ... 6=일
           hour INTEGER NOT NULL,
+          slot_type TEXT NOT NULL DEFAULT 'fixed', -- 'fixed' | 'flexible'
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           UNIQUE (member_id, weekday, hour)
         );
@@ -727,6 +728,12 @@ function runFullMigration(): Promise<void> {
             -- 정확히 찾아낼 수 있게 한다(텍스트 요약은 범위 표기라 되짚어
             -- 파싱하기 어려움).
             ALTER TABLE members ADD COLUMN IF NOT EXISTS available_slots TEXT[] NOT NULL DEFAULT '{}';
+
+            -- 고정 회원 시간표의 각 배정을 "고정"(그 시간에 반드시 오는, 다른 시간으로
+            -- 옮길 수 없는 확정 배정)과 "다른 가능한 시간"(가능한 후보 시간 — 여러 칸에
+            -- 동시에 걸쳐 있을 수 있고, 서로 겹쳐도 충돌로 취급하지 않음)으로 구분한다.
+            -- 기존 배정은 전부 확정 배정이었으므로 기본값을 'fixed'로 둔다.
+            ALTER TABLE fixed_slots ADD COLUMN IF NOT EXISTS slot_type TEXT NOT NULL DEFAULT 'fixed';
             `,
           ),
           getPool().query(
@@ -902,11 +909,17 @@ export interface PackageRow {
   payment_method: PaymentMethod;
 }
 
+/** "고정"은 그 시간에 반드시 오는 확정 배정(한 코치당 시간대에 한 명만 가능).
+    "flexible"은 가능한 후보 시간 — 한 회원이 여러 칸에 걸쳐 가질 수 있고,
+    다른 회원과 겹쳐도 충돌로 보지 않는다. */
+export type FixedSlotType = "fixed" | "flexible";
+
 export interface FixedSlotRow {
   id: number;
   member_id: number;
   weekday: number;
   hour: number;
+  slot_type: FixedSlotType;
   created_at: string;
 }
 

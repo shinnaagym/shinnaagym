@@ -6,6 +6,7 @@ import Link from "next/link";
 import type {
   CoachRow,
   ContractRow,
+  FixedSlotType,
   MemberStatus,
   PackageRow,
   PaymentMethod,
@@ -984,11 +985,11 @@ function FixedSlotSchedule({
   }, [fixedSlots, coachFilter]);
 
   const byCell = useMemo(() => {
-    const map = new Map<string, Array<{ name: string; coachId: number | null }>>();
+    const map = new Map<string, Array<{ name: string; coachId: number | null; slotType: FixedSlotType }>>();
     for (const slot of scopedSlots) {
       const key = `${slot.weekday}-${slot.hour}`;
       const entries = map.get(key) ?? [];
-      entries.push({ name: slot.member_name, coachId: slot.member_coach_id });
+      entries.push({ name: slot.member_name, coachId: slot.member_coach_id, slotType: slot.slot_type });
       map.set(key, entries);
     }
     return map;
@@ -998,11 +999,14 @@ function FixedSlotSchedule({
   // 그 시간대의 실제 전체 배정 현황을 알아야 하므로, 필터링 전 fixedSlots
   // 기준으로 따로 모은다.
   const allByCell = useMemo(() => {
-    const map = new Map<string, Array<{ id: number; memberId: number; name: string }>>();
+    const map = new Map<
+      string,
+      Array<{ id: number; memberId: number; name: string; slotType: FixedSlotType }>
+    >();
     for (const slot of fixedSlots) {
       const key = `${slot.weekday}-${slot.hour}`;
       const entries = map.get(key) ?? [];
-      entries.push({ id: slot.id, memberId: slot.member_id, name: slot.member_name });
+      entries.push({ id: slot.id, memberId: slot.member_id, name: slot.member_name, slotType: slot.slot_type });
       map.set(key, entries);
     }
     return map;
@@ -1011,6 +1015,8 @@ function FixedSlotSchedule({
   const [pickerCell, setPickerCell] = useState<{ weekday: number; hour: number } | null>(null);
   const [pickerMemberId, setPickerMemberId] = useState<number | "">("");
   const [pickerTab, setPickerTab] = useState<"fixed" | "flexible">("fixed");
+  // "다른 가능한 시간" 탭에서 한 회원에 대해 동시에 후보로 걸어둘 시간들(중복 선택).
+  const [flexibleHours, setFlexibleHours] = useState<Set<number>>(new Set());
   const [pickerSaving, setPickerSaving] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
 
@@ -1018,12 +1024,38 @@ function FixedSlotSchedule({
     setPickerCell({ weekday, hour });
     setPickerMemberId("");
     setPickerTab("fixed");
+    setFlexibleHours(new Set([hour]));
     setPickerError(null);
   }
 
-  async function addPickerSlot(memberIdOverride?: number) {
-    const targetMemberId = memberIdOverride ?? pickerMemberId;
-    if (!pickerCell || targetMemberId === "") return;
+  // 회원 상세의 "가능한 요일·시간" 그리드에서 이 요일에 표시해둔 시간들을 뽑아온다
+  // — "다른 가능한 시간" 탭에서 회원을 고르면 이 값들을 기본 선택값으로 미리 채워준다.
+  function hoursFromAvailableSlots(slots: string[] | undefined, weekday: number): number[] {
+    if (!slots) return [];
+    return slots
+      .filter((s) => s.startsWith(`${weekday}-`))
+      .map((s) => Number(s.split("-")[1]))
+      .filter((h) => Number.isInteger(h));
+  }
+
+  function selectFlexibleMember(member: MemberWithProgress) {
+    if (!pickerCell) return;
+    setPickerMemberId(member.id);
+    const suggested = hoursFromAvailableSlots(member.available_slots, pickerCell.weekday);
+    setFlexibleHours(new Set(suggested.length > 0 ? suggested : [pickerCell.hour]));
+  }
+
+  function toggleFlexibleHour(hour: number) {
+    setFlexibleHours((prev) => {
+      const next = new Set(prev);
+      if (next.has(hour)) next.delete(hour);
+      else next.add(hour);
+      return next;
+    });
+  }
+
+  async function addPickerSlot(memberId: number, hours: number[], slotType: FixedSlotType) {
+    if (!pickerCell || hours.length === 0) return;
     setPickerSaving(true);
     setPickerError(null);
     try {
@@ -1031,9 +1063,10 @@ function FixedSlotSchedule({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          memberId: targetMemberId,
+          memberId,
           weekday: pickerCell.weekday,
-          hour: pickerCell.hour,
+          hours,
+          slotType,
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -1041,17 +1074,8 @@ function FixedSlotSchedule({
         setPickerError(d.error ?? "추가에 실패했습니다.");
         return;
       }
-      const created = d.created ?? 0;
-      const skippedDates: string[] = d.skippedDates ?? [];
-      if (created > 0 || skippedDates.length > 0) {
-        let message = created > 0 ? `스케줄표에 ${created}건 자동 예약됐어요.` : "";
-        if (skippedDates.length > 0) {
-          message +=
-            (message ? "\n" : "") +
-            `${skippedDates.length}건은 이미 다른 예약이 있어 건너뛰었어요: ${skippedDates.join(", ")}`;
-        }
-        alert(message);
-      }
+      setPickerMemberId("");
+      setFlexibleHours(new Set([pickerCell.hour]));
       onChanged();
     } finally {
       setPickerSaving(false);
@@ -1077,7 +1101,9 @@ function FixedSlotSchedule({
         <span className="text-xs text-ink/40">시간대별 고정 회원 배정 현황</span>
       </div>
       <p className="text-xs text-ink/40 mb-3">
-        한 시간대에는 회원 한 명만 배정할 수 있어요. 기존에 중복 배정된 시간대는 옅은 붉은색 칸으로 표시돼요.
+        한 시간대에는 &ldquo;고정&rdquo; 회원 한 명만 배정할 수 있어요(꽉 찬 배지 = 이동할 수 없음). 점선
+        테두리 배지는 &ldquo;다른 가능한 시간&rdquo; 후보라 여러 칸·여러 명이 겹쳐도 괜찮아요. 고정
+        배정이 중복된 시간대는 옅은 붉은색 칸으로 표시돼요.
       </p>
       {coachFilter === "all" && coaches.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-3 text-xs text-ink/60">
@@ -1115,7 +1141,10 @@ function FixedSlotSchedule({
                   const entries = byCell.get(`${weekday}-${hour}`) ?? [];
                   // "전체" 보기에서는 같은 시간대에 코치마다 자기 회원이 있는 게 당연하니
                   // 겹침으로 보지 않는다. 한 코치가 겹치게 배정된 경우에만 표시한다.
-                  const over = coachFilter !== "all" && entries.length > FIXED_SLOT_CAPACITY;
+                  // "다른 가능한 시간"(flexible)은 확정 배정이 아니라 후보 표시일 뿐이라
+                  // 몇 명이 겹치든 충돌로 세지 않는다.
+                  const fixedCount = entries.filter((e) => e.slotType === "fixed").length;
+                  const over = coachFilter !== "all" && fixedCount > FIXED_SLOT_CAPACITY;
                   return (
                     <td
                       key={weekday}
@@ -1135,9 +1164,16 @@ function FixedSlotSchedule({
                             // 겹쳤다는 사실 자체는 칸 배경(bg-red-50)만으로 표시한다.
                             const coachStyle =
                               entry.coachId != null ? coachColorMap.get(entry.coachId) : undefined;
-                            const pillClass = coachStyle
-                              ? `${coachStyle.header} ${coachStyle.headerText}`
-                              : "bg-sage/15 text-ink/70";
+                            // "고정"은 꽉 채운 배지(이동할 수 없다는 뜻), "다른 가능한 시간"은
+                            // 점선 테두리만 있는 배지(아직 확정되지 않은 후보라는 뜻)로 구분한다.
+                            const pillClass =
+                              entry.slotType === "fixed"
+                                ? coachStyle
+                                  ? `${coachStyle.header} ${coachStyle.headerText}`
+                                  : "bg-sage/15 text-ink/70"
+                                : coachStyle
+                                  ? `border border-dashed ${coachStyle.border} ${coachStyle.headerText} bg-white`
+                                  : "border border-dashed border-line text-ink/60 bg-white";
                             return (
                               <span
                                 key={`${entry.name}-${i}`}
@@ -1185,6 +1221,8 @@ function FixedSlotSchedule({
             .filter((m) => !current.some((entry) => entry.memberId === m.id))
             .filter((m) => m.available_slots?.includes(key))
             .sort((a, b) => a.name.localeCompare(b.name));
+          const selectedMember =
+            pickerMemberId === "" ? null : members.find((m) => m.id === pickerMemberId) ?? null;
           return (
             <ModalShell
               title={`${FIXED_SLOT_WEEKDAY_LABELS[pickerCell.weekday]}요일 ${pickerCell.hour}시`}
@@ -1198,7 +1236,12 @@ function FixedSlotSchedule({
                         key={entry.id}
                         className="flex items-center justify-between rounded-lg border border-line/60 px-3 py-2 text-sm"
                       >
-                        <span>{entry.name}</span>
+                        <span>
+                          {entry.name}
+                          <span className="ml-1.5 text-xs text-ink/40">
+                            {entry.slotType === "fixed" ? "(고정)" : "(가능)"}
+                          </span>
+                        </span>
                         <button
                           type="button"
                           disabled={pickerSaving}
@@ -1217,7 +1260,10 @@ function FixedSlotSchedule({
                 <div className="flex gap-1 rounded-lg bg-bone/60 p-1 text-sm">
                   <button
                     type="button"
-                    onClick={() => setPickerTab("fixed")}
+                    onClick={() => {
+                      setPickerTab("fixed");
+                      setPickerMemberId("");
+                    }}
                     className={[
                       "flex-1 rounded-md py-1.5 font-medium transition",
                       pickerTab === "fixed" ? "bg-white shadow-sm" : "text-ink/50",
@@ -1227,7 +1273,11 @@ function FixedSlotSchedule({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPickerTab("flexible")}
+                    onClick={() => {
+                      setPickerTab("flexible");
+                      setPickerMemberId("");
+                      setFlexibleHours(new Set([pickerCell.hour]));
+                    }}
                     className={[
                       "flex-1 rounded-md py-1.5 font-medium transition",
                       pickerTab === "flexible" ? "bg-white shadow-sm" : "text-ink/50",
@@ -1254,30 +1304,88 @@ function FixedSlotSchedule({
                     <button
                       type="button"
                       disabled={pickerSaving || pickerMemberId === ""}
-                      onClick={() => addPickerSlot()}
+                      onClick={() => addPickerSlot(pickerMemberId as number, [pickerCell.hour], "fixed")}
                       className="shrink-0 rounded-full bg-coral text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
                     >
                       추가
                     </button>
                   </div>
-                ) : flexibleMembers.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {flexibleMembers.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        disabled={pickerSaving}
-                        onClick={() => addPickerSlot(m.id)}
-                        className="rounded-full border border-line px-3 py-1.5 text-sm hover:border-coral hover:text-coral transition disabled:opacity-50"
-                      >
-                        {m.name}
-                      </button>
-                    ))}
-                  </div>
                 ) : (
-                  <p className="text-sm text-ink/40">
-                    이 시간대를 가능한 시간으로 등록한 회원이 없어요.
-                  </p>
+                  <div className="space-y-2.5">
+                    {flexibleMembers.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {flexibleMembers.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => selectFlexibleMember(m)}
+                            className={[
+                              "rounded-full border px-3 py-1.5 text-sm transition",
+                              pickerMemberId === m.id
+                                ? "border-coral text-coral bg-coral/5"
+                                : "border-line hover:border-coral hover:text-coral",
+                            ].join(" ")}
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <select
+                      value={pickerMemberId}
+                      onChange={(e) => {
+                        const id = e.target.value === "" ? "" : Number(e.target.value);
+                        if (id === "") {
+                          setPickerMemberId("");
+                          return;
+                        }
+                        const member = availableMembers.find((m) => m.id === id);
+                        if (member) selectFlexibleMember(member);
+                      }}
+                      className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
+                    >
+                      <option value="">회원 선택</option>
+                      {availableMembers.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {selectedMember && (
+                      <div>
+                        <p className="text-xs text-ink/50 mb-1.5">가능한 시간(중복 선택 가능)</p>
+                        <div className="flex flex-wrap gap-1">
+                          {SCHEDULE_HOUR_ROWS.map((h) => (
+                            <button
+                              key={h}
+                              type="button"
+                              onClick={() => toggleFlexibleHour(h)}
+                              className={[
+                                "rounded-full border px-2.5 py-1 text-xs transition",
+                                flexibleHours.has(h)
+                                  ? "border-coral bg-coral text-white"
+                                  : "border-line text-ink/60 hover:border-coral hover:text-coral",
+                              ].join(" ")}
+                            >
+                              {h}시
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={pickerSaving || pickerMemberId === "" || flexibleHours.size === 0}
+                      onClick={() =>
+                        addPickerSlot(pickerMemberId as number, Array.from(flexibleHours), "flexible")
+                      }
+                      className="w-full rounded-full bg-coral text-white px-4 py-2 text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+                    >
+                      추가
+                    </button>
+                  </div>
                 )}
                 {pickerError && <p className="text-sm text-coral">{pickerError}</p>}
               </div>

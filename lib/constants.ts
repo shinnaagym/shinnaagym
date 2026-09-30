@@ -239,6 +239,9 @@ export interface CoachColorStyle {
   header: string;
   headerText: string;
   accent: string;
+  /** 고정 회원 시간표에서 "다른 가능한 시간"(미확정 후보) 배지의 테두리 색.
+      accent와 같은 색이지만 border-l-*가 아닌 사방 테두리용이라 값이 다르다. */
+  border: string;
 }
 
 // 신나아짐 브랜드 톤(골드·세이지·코랄 + 보조 색)에서 파생한 코치 색상 팔레트.
@@ -246,12 +249,27 @@ export interface CoachColorStyle {
 // 스케줄표와 회원 관리의 고정 회원 시간표가 모두 이 팔레트를 공유해, 같은
 // 코치는 어디서든 같은 색으로 보인다.
 export const COACH_COLOR_PALETTE: CoachColorStyle[] = [
-  { header: "bg-gold/15", headerText: "text-gold-deep", accent: "border-l-gold" },
-  { header: "bg-sage/20", headerText: "text-[#3f6357]", accent: "border-l-sage" },
-  { header: "bg-coral/12", headerText: "text-[#a84a2c]", accent: "border-l-coral" },
-  { header: "bg-[#e6ecec]", headerText: "text-[#3d5a5c]", accent: "border-l-[#8fadaf]" },
-  { header: "bg-[#f1e3e0]", headerText: "text-[#8a5347]", accent: "border-l-[#c98f83]" },
-  { header: "bg-[#f3e9d2]", headerText: "text-[#8a6a1f]", accent: "border-l-[#cdae6a]" },
+  { header: "bg-gold/15", headerText: "text-gold-deep", accent: "border-l-gold", border: "border-gold" },
+  { header: "bg-sage/20", headerText: "text-[#3f6357]", accent: "border-l-sage", border: "border-sage" },
+  { header: "bg-coral/12", headerText: "text-[#a84a2c]", accent: "border-l-coral", border: "border-coral" },
+  {
+    header: "bg-[#e6ecec]",
+    headerText: "text-[#3d5a5c]",
+    accent: "border-l-[#8fadaf]",
+    border: "border-[#8fadaf]",
+  },
+  {
+    header: "bg-[#f1e3e0]",
+    headerText: "text-[#8a5347]",
+    accent: "border-l-[#c98f83]",
+    border: "border-[#c98f83]",
+  },
+  {
+    header: "bg-[#f3e9d2]",
+    headerText: "text-[#8a6a1f]",
+    accent: "border-l-[#cdae6a]",
+    border: "border-[#cdae6a]",
+  },
 ];
 
 // ---- 오픈 후 실제 수업 스케줄표(관리자/회원 화면) 전용 운영시간 ----
