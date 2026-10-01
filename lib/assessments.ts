@@ -1,5 +1,11 @@
 import { query } from "./db";
-import type { AssessmentMovements, AssessmentRow, ExercisePerformanceEntry, PainTriggerEntry } from "./db";
+import type {
+  AssessmentMovements,
+  AssessmentRow,
+  CustomFunctionalTestEntry,
+  ExercisePerformanceEntry,
+  PainTriggerEntry,
+} from "./db";
 
 export interface CreateAssessmentInput {
   memberId: number;
@@ -13,6 +19,7 @@ export interface CreateAssessmentInput {
   hipHingeNote?: string;
   balanceNote?: string;
   ybtNote?: string;
+  customFunctionalTests?: CustomFunctionalTestEntry[];
   painTriggers?: PainTriggerEntry[];
   exercisePerformance?: ExercisePerformanceEntry[];
   odiAnswers?: Record<string, number>;
@@ -36,13 +43,13 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
     `INSERT INTO assessments (
        member_id, evaluator_name, evaluated_at, movements,
        core_note, squat_note, overhead_squat_note, pushup_note, hip_hinge_note,
-       balance_note, ybt_note,
+       balance_note, ybt_note, custom_functional_tests,
        pain_triggers, exercise_performance,
        odi_answers, ndi_answers, quickdash_answers, koos12_answers,
        faam_adl_answers, faam_sports_answers, nprs_rest, nprs_activity,
        functional_test_pain_free, hop_test_lsi, cmj_lsi, hamstring_lsi,
        asymptomatic_loading_weeks, startback_answers
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
      RETURNING *`,
     [
       input.memberId,
@@ -56,6 +63,7 @@ export async function createAssessment(input: CreateAssessmentInput): Promise<As
       input.hipHingeNote ?? "",
       input.balanceNote ?? "",
       input.ybtNote ?? "",
+      JSON.stringify(input.customFunctionalTests ?? []),
       JSON.stringify(input.painTriggers ?? []),
       JSON.stringify(input.exercisePerformance ?? []),
       JSON.stringify(input.odiAnswers ?? {}),
@@ -88,6 +96,7 @@ export interface UpdateAssessmentInput {
   hipHingeNote?: string;
   balanceNote?: string;
   ybtNote?: string;
+  customFunctionalTests?: CustomFunctionalTestEntry[];
   painTriggers?: PainTriggerEntry[];
   exercisePerformance?: ExercisePerformanceEntry[];
   odiAnswers?: Record<string, number>;
@@ -115,12 +124,13 @@ export async function updateAssessment(
        evaluator_name = $2, evaluated_at = $3, movements = $4,
        core_note = $5, squat_note = $6, overhead_squat_note = $7,
        pushup_note = $8, hip_hinge_note = $9, balance_note = $10, ybt_note = $11,
-       pain_triggers = $12,
-       exercise_performance = $13,
-       odi_answers = $14, ndi_answers = $15, quickdash_answers = $16, koos12_answers = $17,
-       faam_adl_answers = $18, faam_sports_answers = $19, nprs_rest = $20, nprs_activity = $21,
-       functional_test_pain_free = $22, hop_test_lsi = $23, cmj_lsi = $24, hamstring_lsi = $25,
-       asymptomatic_loading_weeks = $26, startback_answers = $27
+       custom_functional_tests = $12,
+       pain_triggers = $13,
+       exercise_performance = $14,
+       odi_answers = $15, ndi_answers = $16, quickdash_answers = $17, koos12_answers = $18,
+       faam_adl_answers = $19, faam_sports_answers = $20, nprs_rest = $21, nprs_activity = $22,
+       functional_test_pain_free = $23, hop_test_lsi = $24, cmj_lsi = $25, hamstring_lsi = $26,
+       asymptomatic_loading_weeks = $27, startback_answers = $28
      WHERE id = $1
      RETURNING *`,
     [
@@ -135,6 +145,7 @@ export async function updateAssessment(
       input.hipHingeNote ?? "",
       input.balanceNote ?? "",
       input.ybtNote ?? "",
+      JSON.stringify(input.customFunctionalTests ?? []),
       JSON.stringify(input.painTriggers ?? []),
       JSON.stringify(input.exercisePerformance ?? []),
       JSON.stringify(input.odiAnswers ?? {}),

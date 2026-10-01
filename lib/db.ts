@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 33;
+const SCHEMA_VERSION = 34;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -199,6 +199,7 @@ function runFullMigration(): Promise<void> {
           hip_hinge_note TEXT NOT NULL DEFAULT '',
           balance_note TEXT NOT NULL DEFAULT '',
           ybt_note TEXT NOT NULL DEFAULT '',
+          custom_functional_tests JSONB NOT NULL DEFAULT '[]'::jsonb,
           pain_trigger_note TEXT NOT NULL DEFAULT '',
           pain_scale INTEGER,
           pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -742,6 +743,12 @@ function runFullMigration(): Promise<void> {
             -- 똑같이 검사별로 독립된 TEXT 컬럼을 쓴다.
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS balance_note TEXT NOT NULL DEFAULT '';
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS ybt_note TEXT NOT NULL DEFAULT '';
+
+            -- "기능적 움직임 검사"에 미리 정의된 5+2개 항목 외에, 트레이너가 그때그때
+            -- 필요에 따라 임의의 검사를 추가로 기록할 수 있게 한다(제목+관찰 소견
+            -- 자유 입력, 여러 개 가능). 미리 정의된 항목과 달리 전용 컬럼을 두지 않고
+            -- 배열 하나로 둔다 — 개수가 고정돼 있지 않기 때문이다.
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS custom_functional_tests JSONB NOT NULL DEFAULT '[]'::jsonb;
             `,
           ),
           getPool().query(
@@ -1004,6 +1011,12 @@ export interface ExercisePerformanceEntry {
   rpe: number | null;
 }
 
+/** "기능적 움직임 검사"에서 미리 정의된 항목 외에 자유롭게 추가하는 검사 한 건. */
+export interface CustomFunctionalTestEntry {
+  title: string;
+  note: string;
+}
+
 export interface AssessmentRow {
   id: number;
   member_id: number;
@@ -1017,6 +1030,7 @@ export interface AssessmentRow {
   hip_hinge_note: string;
   balance_note: string;
   ybt_note: string;
+  custom_functional_tests: CustomFunctionalTestEntry[];
   // 레거시 단일 필드 — pain_triggers 도입 전에 저장된 평가에서만 값이 있다.
   pain_trigger_note: string;
   pain_scale: number | null;

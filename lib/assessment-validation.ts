@@ -14,7 +14,12 @@ import {
   STARTBACK_ITEMS,
   type PromItem,
 } from "./prom-instruments";
-import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "./db";
+import type {
+  AssessmentMovements,
+  CustomFunctionalTestEntry,
+  ExercisePerformanceEntry,
+  PainTriggerEntry,
+} from "./db";
 
 const VALID_MOVEMENT_IDS = new Set(
   ASSESSMENT_REGIONS.flatMap((region) => region.movements.map((m) => m.id)),
@@ -97,6 +102,22 @@ export function parseExercisePerformance(raw: unknown): ExercisePerformanceEntry
   return entries;
 }
 
+/** "기능적 움직임 검사"에서 자유롭게 추가한 검사 목록 — 제목 또는 관찰 소견 중
+    하나라도 채워진 항목만 남긴다. */
+export function parseCustomFunctionalTests(raw: unknown): CustomFunctionalTestEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const entries: CustomFunctionalTestEntry[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const title = typeof record.title === "string" ? record.title.trim() : "";
+    const note = typeof record.note === "string" ? record.note.trim() : "";
+    if (!title && !note) continue;
+    entries.push({ title, note });
+  }
+  return entries;
+}
+
 /** PROM 문항 답변 맵 공통 검증: 알려진 문항 key만, 해당 문항의 옵션 value 범위 내 숫자만 허용. */
 function parsePromAnswers(raw: unknown, items: readonly PromItem[]): Record<string, number> {
   const answers: Record<string, number> = {};
@@ -159,6 +180,7 @@ export interface ParsedAssessmentInput {
   hipHingeNote: string;
   balanceNote: string;
   ybtNote: string;
+  customFunctionalTests: CustomFunctionalTestEntry[];
   painTriggers: PainTriggerEntry[];
   exercisePerformance: ExercisePerformanceEntry[];
   odiAnswers: Record<string, number>;
@@ -188,6 +210,7 @@ export function parseAssessmentInput(body: Record<string, unknown> | null): Pars
     hipHingeNote: typeof body?.hipHingeNote === "string" ? body.hipHingeNote.trim() : "",
     balanceNote: typeof body?.balanceNote === "string" ? body.balanceNote.trim() : "",
     ybtNote: typeof body?.ybtNote === "string" ? body.ybtNote.trim() : "",
+    customFunctionalTests: parseCustomFunctionalTests(body?.customFunctionalTests),
     painTriggers: parsePainTriggers(body?.painTriggers),
     exercisePerformance: parseExercisePerformance(body?.exercisePerformance),
     odiAnswers: parseOdiAnswers(body?.odiAnswers),
