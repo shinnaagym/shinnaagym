@@ -18,7 +18,12 @@ import {
   computeStartBackScore,
 } from "@/lib/prom-instruments";
 import { computeE1rm } from "@/lib/exercise-performance";
-import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
+import type {
+  AssessmentMovements,
+  CustomFunctionalTestEntry,
+  ExercisePerformanceEntry,
+  PainTriggerEntry,
+} from "@/lib/db";
 
 export interface AssessmentDocumentData {
   evaluator_name: string;
@@ -31,6 +36,7 @@ export interface AssessmentDocumentData {
   hip_hinge_note: string;
   balance_note: string;
   ybt_note: string;
+  custom_functional_tests: CustomFunctionalTestEntry[];
   painTriggers: PainTriggerEntry[];
   exercisePerformance: ExercisePerformanceEntry[];
   odi_answers: Record<string, number>;
@@ -178,7 +184,7 @@ export function AssessmentDocument({
       status: startBackScore == null ? "unknown" : startBackScore.total <= 3 ? "pass" : "fail",
     },
     {
-      label: "기능적 움직임 검사 5개 모두 무통",
+      label: `기능적 움직임 검사 ${FUNCTIONAL_TESTS.length}개 모두 무통`,
       value: `${functionalTestsPainFreeCount}/${FUNCTIONAL_TESTS.length}`,
       status: functionalTestsPainFreeCount === 0 ? "unknown" : functionalTestsAllPainFree ? "pass" : "fail",
     },
@@ -289,6 +295,12 @@ export function AssessmentDocument({
             <div key={test.key} className="px-4 py-3">
               <p className="text-xs text-ink/40 mb-0.5">{test.label}</p>
               <p>{assessment[FUNCTIONAL_NOTE_FIELDS[test.key]] || "-"}</p>
+            </div>
+          ))}
+          {assessment.custom_functional_tests.map((entry, i) => (
+            <div key={`custom-${i}`} className="px-4 py-3">
+              <p className="text-xs text-ink/40 mb-0.5">{entry.title || "-"}</p>
+              <p>{entry.note || "-"}</p>
             </div>
           ))}
         </div>

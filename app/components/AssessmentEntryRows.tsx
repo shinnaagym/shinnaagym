@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { NRS_PAIN_OPTIONS } from "@/lib/assessment-movements";
-import type { ExercisePerformanceEntry } from "@/lib/db";
+import type { CustomFunctionalTestEntry, ExercisePerformanceEntry } from "@/lib/db";
 
 // h-10을 명시하는 이유: <input type="date">는 브라우저 자체 달력 아이콘 때문에
 // 같은 padding을 준 일반 텍스트 input보다 몇 px 더 높게 렌더링되는 경우가 있어,
@@ -188,6 +188,47 @@ export const ExercisePerformanceRow = memo(function ExercisePerformanceRow({
           </select>
         </div>
       </div>
+    </div>
+  );
+});
+
+// 평가 기록 작성 폼이 쓰는 "기능적 움직임 검사 — 추가 검사" 입력 한 줄.
+// 미리 정의된 코어/스쿼트/오버헤드스쿼트/푸쉬업/힙힌지/밸런스/YBT 외에
+// 트레이너가 그때그때 필요한 검사를 제목+관찰 소견 자유 입력으로 덧붙일
+// 때 쓴다(assessments.custom_functional_tests).
+export const CustomFunctionalTestRow = memo(function CustomFunctionalTestRow({
+  index,
+  entry,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  entry: CustomFunctionalTestEntry;
+  onChange: (index: number, patch: Partial<CustomFunctionalTestEntry>) => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-line/60 px-3 py-3 mb-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <label className="text-xs text-ink/40">검사 제목</label>
+        <button type="button" onClick={() => onRemove(index)} className="text-xs text-coral hover:opacity-70">
+          삭제
+        </button>
+      </div>
+      <input
+        value={entry.title}
+        onChange={(e) => onChange(index, { title: e.target.value })}
+        placeholder="예: 싱글레그 스쿼트"
+        className={inputClass() + " mb-2"}
+      />
+      <label className="block text-xs text-ink/40 mb-1.5">관찰 소견</label>
+      <textarea
+        value={entry.note}
+        onChange={(e) => onChange(index, { note: e.target.value })}
+        rows={2}
+        placeholder="관찰 소견"
+        className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
+      />
     </div>
   );
 });

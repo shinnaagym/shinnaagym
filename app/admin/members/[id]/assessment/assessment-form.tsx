@@ -39,10 +39,16 @@ import {
 import {
   PainTriggerRow,
   ExercisePerformanceRow,
+  CustomFunctionalTestRow,
   inputClass,
   type PainTriggerFormEntry,
 } from "@/app/components/AssessmentEntryRows";
-import type { AssessmentMovements, ExercisePerformanceEntry, PainTriggerEntry } from "@/lib/db";
+import type {
+  AssessmentMovements,
+  CustomFunctionalTestEntry,
+  ExercisePerformanceEntry,
+  PainTriggerEntry,
+} from "@/lib/db";
 
 interface MovementEntry {
   romPassive: string;
@@ -72,21 +78,85 @@ const EMPTY_FUNCTIONAL_NOTES: Record<FunctionalTestKey, string> = {
   ybt: "",
 };
 
-// YBT(Y-Balance Test)는 다른 기능적 검사와 달리 자유 서술이 아니라 방향별
-// 도달 거리(cm) 3개를 기록한다. 저장 컬럼은 다른 검사와 똑같이 TEXT 하나뿐이라
-// (ybt_note), 이 포맷 문자열로 변환해 저장하고 수정 시 다시 숫자 3개로 되짚어
-// 읽는다.
-const YBT_NOTE_PATTERN = /^뒤쪽\s*(.*?)cm\s*·\s*대각선\s*(.*?)cm\s*·\s*옆쪽\s*(.*?)cm$/;
-
-function parseYbtNote(note: string): { posterior: string; diagonal: string; lateral: string } {
-  const match = note.match(YBT_NOTE_PATTERN);
-  if (!match) return { posterior: "", diagonal: "", lateral: "" };
-  return { posterior: match[1], diagonal: match[2], lateral: match[3] };
+// YBT(Y-Balance Test)는 다른 기능적 검사와 달리 자유 서술이 아니라 지지하는
+// 다리(좌/우)별로 방향별 도달 거리(cm) 3개씩, 총 6개를 기록한다(검사 자체가
+// 한쪽 다리로 서서 반대쪽 다리를 뻗는 방식이라 좌우를 따로 재야 의미가 있다).
+// 저장 컬럼은 다른 검사와 똑같이 TEXT 하나뿐이라(ybt_note), 이 포맷 문자열로
+// 변환해 저장하고 수정 시 다시 숫자 6개로 되짚어 읽는다.
+interface YbtSideValues {
+  posterior: string;
+  diagonal: string;
+  lateral: string;
 }
 
-function formatYbtNote(posterior: string, diagonal: string, lateral: string): string {
-  if (!posterior.trim() && !diagonal.trim() && !lateral.trim()) return "";
-  return `뒤쪽 ${posterior}cm · 대각선 ${diagonal}cm · 옆쪽 ${lateral}cm`;
+const EMPTY_YBT_SIDE: YbtSideValues = { posterior: "", diagonal: "", lateral: "" };
+
+const YBT_NOTE_PATTERN =
+  /^좌측 - 뒤쪽\s*(.*?)cm\s*·\s*대각선\s*(.*?)cm\s*·\s*옆쪽\s*(.*?)cm\s*\/\s*우측 - 뒤쪽\s*(.*?)cm\s*·\s*대각선\s*(.*?)cm\s*·\s*옆쪽\s*(.*?)cm$/;
+
+function parseYbtNote(note: string): { left: YbtSideValues; right: YbtSideValues } {
+  const match = note.match(YBT_NOTE_PATTERN);
+  if (!match) return { left: EMPTY_YBT_SIDE, right: EMPTY_YBT_SIDE };
+  return {
+    left: { posterior: match[1], diagonal: match[2], lateral: match[3] },
+    right: { posterior: match[4], diagonal: match[5], lateral: match[6] },
+  };
+}
+
+function formatYbtNote(left: YbtSideValues, right: YbtSideValues): string {
+  const allEmpty = [left.posterior, left.diagonal, left.lateral, right.posterior, right.diagonal, right.lateral].every(
+    (v) => !v.trim(),
+  );
+  if (allEmpty) return "";
+  return (
+    `좌측 - 뒤쪽 ${left.posterior}cm · 대각선 ${left.diagonal}cm · 옆쪽 ${left.lateral}cm` +
+    ` / 우측 - 뒤쪽 ${right.posterior}cm · 대각선 ${right.diagonal}cm · 옆쪽 ${right.lateral}cm`
+  );
+}
+
+function YbtSideInputs({
+  label,
+  values,
+  onChange,
+}: {
+  label: string;
+  values: YbtSideValues;
+  onChange: (patch: Partial<YbtSideValues>) => void;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-ink/60 mb-1">{label}</p>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="text-xs text-ink/50">
+          뒤쪽(cm)
+          <input
+            value={values.posterior}
+            onChange={(e) => onChange({ posterior: e.target.value })}
+            placeholder="예: 62"
+            className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+          />
+        </label>
+        <label className="text-xs text-ink/50">
+          대각선(cm)
+          <input
+            value={values.diagonal}
+            onChange={(e) => onChange({ diagonal: e.target.value })}
+            placeholder="예: 58"
+            className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+          />
+        </label>
+        <label className="text-xs text-ink/50">
+          옆쪽(cm)
+          <input
+            value={values.lateral}
+            onChange={(e) => onChange({ lateral: e.target.value })}
+            placeholder="예: 55"
+            className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+          />
+        </label>
+      </div>
+    </div>
+  );
 }
 
 function YbtDirectionInputs({
@@ -96,42 +166,20 @@ function YbtDirectionInputs({
   note: string;
   onChange: (note: string) => void;
 }) {
-  const { posterior, diagonal, lateral } = parseYbtNote(note);
-
-  function update(patch: Partial<{ posterior: string; diagonal: string; lateral: string }>) {
-    const next = { posterior, diagonal, lateral, ...patch };
-    onChange(formatYbtNote(next.posterior, next.diagonal, next.lateral));
-  }
+  const { left, right } = parseYbtNote(note);
 
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <label className="text-xs text-ink/50">
-        뒤쪽(cm)
-        <input
-          value={posterior}
-          onChange={(e) => update({ posterior: e.target.value })}
-          placeholder="예: 62"
-          className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
-        />
-      </label>
-      <label className="text-xs text-ink/50">
-        대각선(cm)
-        <input
-          value={diagonal}
-          onChange={(e) => update({ diagonal: e.target.value })}
-          placeholder="예: 58"
-          className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
-        />
-      </label>
-      <label className="text-xs text-ink/50">
-        옆쪽(cm)
-        <input
-          value={lateral}
-          onChange={(e) => update({ lateral: e.target.value })}
-          placeholder="예: 55"
-          className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
-        />
-      </label>
+    <div className="space-y-3">
+      <YbtSideInputs
+        label="좌측"
+        values={left}
+        onChange={(patch) => onChange(formatYbtNote({ ...left, ...patch }, right))}
+      />
+      <YbtSideInputs
+        label="우측"
+        values={right}
+        onChange={(patch) => onChange(formatYbtNote(left, { ...right, ...patch }))}
+      />
     </div>
   );
 }
@@ -245,6 +293,7 @@ export interface AssessmentInitialData {
   hipHingeNote: string;
   balanceNote: string;
   ybtNote: string;
+  customFunctionalTests: CustomFunctionalTestEntry[];
   painTriggers: PainTriggerEntry[];
   exercisePerformance: ExercisePerformanceEntry[];
   odiAnswers: Record<string, number>;
@@ -312,6 +361,12 @@ export function AssessmentForm({
       initialData && initialData.exercisePerformance.length > 0
         ? initialData.exercisePerformance
         : [{ exercise: "", note: "", weight: null, reps: null, rpe: null }],
+  );
+  const [customFunctionalTests, setCustomFunctionalTests] = useState<CustomFunctionalTestEntry[]>(
+    () =>
+      initialData && initialData.customFunctionalTests.length > 0
+        ? initialData.customFunctionalTests
+        : [{ title: "", note: "" }],
   );
   const [odiAnswers, setOdiAnswers] = useState<Record<string, number>>(
     () => initialData?.odiAnswers ?? {},
@@ -405,7 +460,7 @@ export function AssessmentForm({
     faamSportsCriterion(faamSportsScore),
     startbackCriterion(startBackScore),
     {
-      label: "기능적 움직임 검사 5개 모두 무통",
+      label: `기능적 움직임 검사 ${FUNCTIONAL_TESTS.length}개 모두 무통`,
       value: `${functionalTestsPainFreeCount}/${FUNCTIONAL_TESTS.length}`,
       status: functionalTestsPainFreeCount === 0 ? "unknown" : functionalTestsAllPainFree ? "pass" : "fail",
     },
@@ -478,6 +533,21 @@ export function AssessmentForm({
     setExercisePerformance((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  const updateCustomFunctionalTest = useCallback(
+    (index: number, patch: Partial<CustomFunctionalTestEntry>) => {
+      setCustomFunctionalTests((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+    },
+    [],
+  );
+
+  function addCustomFunctionalTest() {
+    setCustomFunctionalTests((prev) => [...prev, { title: "", note: "" }]);
+  }
+
+  const removeCustomFunctionalTest = useCallback((index: number) => {
+    setCustomFunctionalTests((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const PROM_KEYS = ["odi", "ndi", "quickdash", "koos12", "faamAdl", "faamSports", "startback", "fitness"];
 
   function expandAll() {
@@ -513,6 +583,7 @@ export function AssessmentForm({
           hipHingeNote: functionalNotes.hipHinge,
           balanceNote: functionalNotes.balance,
           ybtNote: functionalNotes.ybt,
+          customFunctionalTests,
           painTriggers,
           exercisePerformance,
           odiAnswers,
@@ -661,6 +732,27 @@ export function AssessmentForm({
               )}
             </div>
           ))}
+        </div>
+        <div className="px-4 py-3 border-t border-line/50">
+          <p className="text-xs text-ink/50 mb-3">
+            위 항목에 없는 다른 검사를 했다면 추가해주세요. 여러 개면 하나씩 추가할 수 있어요.
+          </p>
+          {customFunctionalTests.map((entry, i) => (
+            <CustomFunctionalTestRow
+              key={i}
+              index={i}
+              entry={entry}
+              onChange={updateCustomFunctionalTest}
+              onRemove={removeCustomFunctionalTest}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={addCustomFunctionalTest}
+            className="rounded-full border border-coral text-coral px-4 py-2 text-sm font-medium hover:bg-coral/5 transition"
+          >
+            + 검사 추가
+          </button>
         </div>
       </Accordion>
 
