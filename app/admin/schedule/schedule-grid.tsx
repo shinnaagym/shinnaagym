@@ -837,29 +837,40 @@ export function ScheduleGrid({
         {(() => {
           const stats = singleCoach ? coachStats[singleCoach.id] : totalStats;
           const statsMonth = Number(weekStart.split("-")[1]);
+          // "코치 전체"로 볼 때만 각 코치가 몇 건씩 했는지 한 줄로 덧붙인다 — 코치를
+          // 한 명 선택하면 이미 그 코치만의 숫자라 굳이 또 나눠 보여줄 필요가 없다.
+          function perCoachLine(pick: (s: CoachScheduleStats | undefined) => number): string | null {
+            if (singleCoach) return null;
+            const parts = coaches.map((c) => `${c.name} ${pick(coachStats[c.id])}`);
+            return parts.length > 0 ? parts.join(" · ") : null;
+          }
           return [
             {
               label: `${statsMonth}월 수업수`,
               value: (stats?.monthPt ?? 0) + (stats?.monthPair ?? 0),
               detail: `1:1 ${stats?.monthPt ?? 0}회 · 2:1 ${stats?.monthPair ?? 0}회`,
+              perCoach: perCoachLine((s) => (s?.monthPt ?? 0) + (s?.monthPair ?? 0)),
               color: "text-ink",
             },
             {
               label: "이번 주 수업수",
               value: (stats?.weekPt ?? 0) + (stats?.weekPair ?? 0),
               detail: `1:1 ${stats?.weekPt ?? 0}회 · 2:1 ${stats?.weekPair ?? 0}회`,
+              perCoach: perCoachLine((s) => (s?.weekPt ?? 0) + (s?.weekPair ?? 0)),
               color: "text-coral",
             },
             {
               label: `${statsMonth}월 상담수`,
               value: stats?.monthConsultation ?? 0,
               detail: null,
+              perCoach: perCoachLine((s) => s?.monthConsultation ?? 0),
               color: "text-sage",
             },
             {
               label: `${statsMonth}월 노쇼`,
               value: (stats?.monthNoShowSession ?? 0) + (stats?.monthNoShowConsultation ?? 0),
               detail: `PT ${stats?.monthNoShowSession ?? 0}회 · 상담 ${stats?.monthNoShowConsultation ?? 0}회`,
+              perCoach: perCoachLine((s) => (s?.monthNoShowSession ?? 0) + (s?.monthNoShowConsultation ?? 0)),
               color: "text-red-500",
             },
           ];
@@ -871,6 +882,7 @@ export function ScheduleGrid({
             <p className="text-xs text-ink/50 mb-2">{card.label}</p>
             <p className={`text-2xl font-semibold ${card.color}`}>{card.value}</p>
             {card.detail && <p className="text-xs text-ink/40 mt-1">{card.detail}</p>}
+            {card.perCoach && <p className="text-xs text-ink/40 mt-1">{card.perCoach}</p>}
           </div>
         ))}
       </div>
