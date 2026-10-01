@@ -316,6 +316,7 @@ async function CoachReportSection({ monthKey }: { monthKey: string }) {
               <span>노쇼 {r.noShowCount}회</span>
               <span>재등록율 {formatRate(r.reRegistrationRate)}</span>
               <span>월 상담수 {r.consultationCount}명</span>
+              <span>상담 성공 {r.consultationSuccessCount}명</span>
               <span>상담 성공율 {formatRate(r.consultationSuccessRate)}</span>
             </div>
           </div>
@@ -336,6 +337,7 @@ async function CoachReportSection({ monthKey }: { monthKey: string }) {
               <th className="px-5 py-3 font-medium">매출</th>
               <th className="px-5 py-3 font-medium">재등록율</th>
               <th className="px-5 py-3 font-medium">월 상담수</th>
+              <th className="px-5 py-3 font-medium">상담 성공 수</th>
               <th className="px-5 py-3 font-medium">상담 성공율</th>
             </tr>
           </thead>
@@ -350,12 +352,13 @@ async function CoachReportSection({ monthKey }: { monthKey: string }) {
                 <td className="px-5 py-3 text-gold-deep font-medium">{formatWon(r.revenue)}</td>
                 <td className="px-5 py-3 text-ink/70">{formatRate(r.reRegistrationRate)}</td>
                 <td className="px-5 py-3 text-ink/70">{r.consultationCount}명</td>
+                <td className="px-5 py-3 text-ink/70">{r.consultationSuccessCount}명</td>
                 <td className="px-5 py-3 text-ink/70">{formatRate(r.consultationSuccessRate)}</td>
               </tr>
             ))}
             {coachReports.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-5 py-10 text-center text-ink/40">
+                <td colSpan={10} className="px-5 py-10 text-center text-ink/40">
                   코치가 없어요.
                 </td>
               </tr>

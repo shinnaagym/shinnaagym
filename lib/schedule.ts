@@ -1337,7 +1337,8 @@ export interface CoachMonthlyReport {
   churnedCount: number;
   reRegistrationRate: number | null; // 재등록 / (재등록 + 이탈), 분모 0이면 null
   consultationCount: number; // 그 달에 상담한 서로 다른 사람 수
-  consultationSuccessRate: number | null; // 그 중 (기간 제한 없이) 결제까지 이어진 비율, 분모 0이면 null
+  consultationSuccessCount: number; // 그 중 (기간 제한 없이) 결제까지 이어진 사람 수
+  consultationSuccessRate: number | null; // 위 수의 비율, 분모 0이면 null
 }
 
 /** yearMonth: "YYYY-MM" */
@@ -1441,6 +1442,7 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
       churnedCount: churned,
       reRegistrationRate: denom > 0 ? reRegistered / denom : null,
       consultationCount,
+      consultationSuccessCount,
       consultationSuccessRate: consultationCount > 0 ? consultationSuccessCount / consultationCount : null,
     };
   });
