@@ -29,6 +29,8 @@ export interface AssessmentDocumentData {
   overhead_squat_note: string;
   pushup_note: string;
   hip_hinge_note: string;
+  balance_note: string;
+  ybt_note: string;
   painTriggers: PainTriggerEntry[];
   exercisePerformance: ExercisePerformanceEntry[];
   odi_answers: Record<string, number>;
@@ -82,7 +84,9 @@ type NoteField =
   | "squat_note"
   | "overhead_squat_note"
   | "pushup_note"
-  | "hip_hinge_note";
+  | "hip_hinge_note"
+  | "balance_note"
+  | "ybt_note";
 
 const FUNCTIONAL_NOTE_FIELDS: Record<string, NoteField> = {
   core: "core_note",
@@ -90,6 +94,8 @@ const FUNCTIONAL_NOTE_FIELDS: Record<string, NoteField> = {
   overheadSquat: "overhead_squat_note",
   pushup: "pushup_note",
   hipHinge: "hip_hinge_note",
+  balance: "balance_note",
+  ybt: "ybt_note",
 };
 
 // 회원 개인 계약서 페이지와 같은 결의 읽기 전용 렌더러 — 관리자의 평가 상세보기

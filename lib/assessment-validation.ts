@@ -125,7 +125,7 @@ export const parseFaamSportsAnswers = (raw: unknown): Record<string, number> =>
 export const parseStartbackAnswers = (raw: unknown): Record<string, number> =>
   parsePromAnswers(raw, STARTBACK_ITEMS);
 
-/** 5개 기능적 움직임 검사(코어/스쿼트/오버헤드스쿼트/푸쉬업/힙힌지)의 "무통" 여부 맵. */
+/** 기능적 움직임 검사(코어/스쿼트/오버헤드스쿼트/푸쉬업/힙힌지/밸런스/YBT)의 "무통" 여부 맵. */
 export function parseFunctionalTestPainFree(raw: unknown): Record<string, boolean> {
   const result: Record<string, boolean> = {};
   if (!raw || typeof raw !== "object") return result;
@@ -157,6 +157,8 @@ export interface ParsedAssessmentInput {
   overheadSquatNote: string;
   pushupNote: string;
   hipHingeNote: string;
+  balanceNote: string;
+  ybtNote: string;
   painTriggers: PainTriggerEntry[];
   exercisePerformance: ExercisePerformanceEntry[];
   odiAnswers: Record<string, number>;
@@ -184,6 +186,8 @@ export function parseAssessmentInput(body: Record<string, unknown> | null): Pars
     overheadSquatNote: typeof body?.overheadSquatNote === "string" ? body.overheadSquatNote.trim() : "",
     pushupNote: typeof body?.pushupNote === "string" ? body.pushupNote.trim() : "",
     hipHingeNote: typeof body?.hipHingeNote === "string" ? body.hipHingeNote.trim() : "",
+    balanceNote: typeof body?.balanceNote === "string" ? body.balanceNote.trim() : "",
+    ybtNote: typeof body?.ybtNote === "string" ? body.ybtNote.trim() : "",
     painTriggers: parsePainTriggers(body?.painTriggers),
     exercisePerformance: parseExercisePerformance(body?.exercisePerformance),
     odiAnswers: parseOdiAnswers(body?.odiAnswers),

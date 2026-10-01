@@ -68,7 +68,73 @@ const EMPTY_FUNCTIONAL_NOTES: Record<FunctionalTestKey, string> = {
   overheadSquat: "",
   pushup: "",
   hipHinge: "",
+  balance: "",
+  ybt: "",
 };
+
+// YBT(Y-Balance Test)는 다른 기능적 검사와 달리 자유 서술이 아니라 방향별
+// 도달 거리(cm) 3개를 기록한다. 저장 컬럼은 다른 검사와 똑같이 TEXT 하나뿐이라
+// (ybt_note), 이 포맷 문자열로 변환해 저장하고 수정 시 다시 숫자 3개로 되짚어
+// 읽는다.
+const YBT_NOTE_PATTERN = /^뒤쪽\s*(.*?)cm\s*·\s*대각선\s*(.*?)cm\s*·\s*옆쪽\s*(.*?)cm$/;
+
+function parseYbtNote(note: string): { posterior: string; diagonal: string; lateral: string } {
+  const match = note.match(YBT_NOTE_PATTERN);
+  if (!match) return { posterior: "", diagonal: "", lateral: "" };
+  return { posterior: match[1], diagonal: match[2], lateral: match[3] };
+}
+
+function formatYbtNote(posterior: string, diagonal: string, lateral: string): string {
+  if (!posterior.trim() && !diagonal.trim() && !lateral.trim()) return "";
+  return `뒤쪽 ${posterior}cm · 대각선 ${diagonal}cm · 옆쪽 ${lateral}cm`;
+}
+
+function YbtDirectionInputs({
+  note,
+  onChange,
+}: {
+  note: string;
+  onChange: (note: string) => void;
+}) {
+  const { posterior, diagonal, lateral } = parseYbtNote(note);
+
+  function update(patch: Partial<{ posterior: string; diagonal: string; lateral: string }>) {
+    const next = { posterior, diagonal, lateral, ...patch };
+    onChange(formatYbtNote(next.posterior, next.diagonal, next.lateral));
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <label className="text-xs text-ink/50">
+        뒤쪽(cm)
+        <input
+          value={posterior}
+          onChange={(e) => update({ posterior: e.target.value })}
+          placeholder="예: 62"
+          className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        />
+      </label>
+      <label className="text-xs text-ink/50">
+        대각선(cm)
+        <input
+          value={diagonal}
+          onChange={(e) => update({ diagonal: e.target.value })}
+          placeholder="예: 58"
+          className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        />
+      </label>
+      <label className="text-xs text-ink/50">
+        옆쪽(cm)
+        <input
+          value={lateral}
+          onChange={(e) => update({ lateral: e.target.value })}
+          placeholder="예: 55"
+          className="mt-1 w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral"
+        />
+      </label>
+    </div>
+  );
+}
 
 const MovementRow = memo(function MovementRow({
   movement,
@@ -177,6 +243,8 @@ export interface AssessmentInitialData {
   overheadSquatNote: string;
   pushupNote: string;
   hipHingeNote: string;
+  balanceNote: string;
+  ybtNote: string;
   painTriggers: PainTriggerEntry[];
   exercisePerformance: ExercisePerformanceEntry[];
   odiAnswers: Record<string, number>;
@@ -228,6 +296,8 @@ export function AssessmentForm({
             overheadSquat: initialData.overheadSquatNote,
             pushup: initialData.pushupNote,
             hipHinge: initialData.hipHingeNote,
+            balance: initialData.balanceNote,
+            ybt: initialData.ybtNote,
           }
         : EMPTY_FUNCTIONAL_NOTES,
   );
@@ -441,6 +511,8 @@ export function AssessmentForm({
           overheadSquatNote: functionalNotes.overheadSquat,
           pushupNote: functionalNotes.pushup,
           hipHingeNote: functionalNotes.hipHinge,
+          balanceNote: functionalNotes.balance,
+          ybtNote: functionalNotes.ybt,
           painTriggers,
           exercisePerformance,
           odiAnswers,
@@ -571,15 +643,22 @@ export function AssessmentForm({
                   무통
                 </label>
               </div>
-              <textarea
-                value={functionalNotes[test.key]}
-                onChange={(e) =>
-                  setFunctionalNotes((prev) => ({ ...prev, [test.key]: e.target.value }))
-                }
-                rows={2}
-                placeholder="관찰 소견"
-                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
-              />
+              {test.key === "ybt" ? (
+                <YbtDirectionInputs
+                  note={functionalNotes.ybt}
+                  onChange={(note) => setFunctionalNotes((prev) => ({ ...prev, ybt: note }))}
+                />
+              ) : (
+                <textarea
+                  value={functionalNotes[test.key]}
+                  onChange={(e) =>
+                    setFunctionalNotes((prev) => ({ ...prev, [test.key]: e.target.value }))
+                  }
+                  rows={2}
+                  placeholder="관찰 소견"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
+                />
+              )}
             </div>
           ))}
         </div>
