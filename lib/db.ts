@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 32;
+const SCHEMA_VERSION = 33;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -197,6 +197,8 @@ function runFullMigration(): Promise<void> {
           overhead_squat_note TEXT NOT NULL DEFAULT '',
           pushup_note TEXT NOT NULL DEFAULT '',
           hip_hinge_note TEXT NOT NULL DEFAULT '',
+          balance_note TEXT NOT NULL DEFAULT '',
+          ybt_note TEXT NOT NULL DEFAULT '',
           pain_trigger_note TEXT NOT NULL DEFAULT '',
           pain_scale INTEGER,
           pain_triggers JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -734,6 +736,12 @@ function runFullMigration(): Promise<void> {
             -- 동시에 걸쳐 있을 수 있고, 서로 겹쳐도 충돌로 취급하지 않음)으로 구분한다.
             -- 기존 배정은 전부 확정 배정이었으므로 기본값을 'fixed'로 둔다.
             ALTER TABLE fixed_slots ADD COLUMN IF NOT EXISTS slot_type TEXT NOT NULL DEFAULT 'fixed';
+
+            -- 기능적 움직임 검사에 "밸런스(한 발 서기)"와 "YBT"를 추가하면서 생긴
+            -- 메모 컬럼. 기존 5개 검사(core/squat/overheadSquat/pushup/hipHinge)와
+            -- 똑같이 검사별로 독립된 TEXT 컬럼을 쓴다.
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS balance_note TEXT NOT NULL DEFAULT '';
+            ALTER TABLE assessments ADD COLUMN IF NOT EXISTS ybt_note TEXT NOT NULL DEFAULT '';
             `,
           ),
           getPool().query(
@@ -1007,6 +1015,8 @@ export interface AssessmentRow {
   overhead_squat_note: string;
   pushup_note: string;
   hip_hinge_note: string;
+  balance_note: string;
+  ybt_note: string;
   // 레거시 단일 필드 — pain_triggers 도입 전에 저장된 평가에서만 값이 있다.
   pain_trigger_note: string;
   pain_scale: number | null;

@@ -67,6 +67,8 @@ export default async function EditAssessmentPage({
           overheadSquatNote: assessment.overhead_squat_note,
           pushupNote: assessment.pushup_note,
           hipHingeNote: assessment.hip_hinge_note,
+          balanceNote: assessment.balance_note,
+          ybtNote: assessment.ybt_note,
           painTriggers: getPainTriggerEntries(assessment),
           exercisePerformance: assessment.exercise_performance,
           odiAnswers: assessment.odi_answers,

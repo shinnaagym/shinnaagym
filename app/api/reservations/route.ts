@@ -4,15 +4,16 @@ import { businessHours, PURPOSE_OPTIONS } from "@/lib/constants";
 import { isWithinBookingWindow, koreaCurrentHour, koreaTodayKey } from "@/lib/date";
 import { getTakenSlots } from "@/lib/reservations";
 import { notifyNewReservation } from "@/lib/notify";
-import { linkPreReservationToSchedule } from "@/lib/schedule";
+import { linkPreReservationToSchedule, listHolidays } from "@/lib/schedule";
 
 const PURPOSE_VALUES = new Set(PURPOSE_OPTIONS.map((option) => option.value));
 const PHONE_PATTERN = /^[0-9-+ ]{9,20}$/;
 
-// Public: returns which (date, hour) slots are already taken, no personal info.
+// Public: returns which (date, hour) slots are already taken + which dates are
+// holidays(토요일처럼 9~15시로 단축 영업), no personal info.
 export async function GET() {
-  const taken = await getTakenSlots();
-  return NextResponse.json({ taken });
+  const [taken, holidays] = await Promise.all([getTakenSlots(), listHolidays()]);
+  return NextResponse.json({ taken, holidays: holidays.map((h) => h.holiday_date) });
 }
 
 export async function POST(req: NextRequest) {
@@ -71,7 +72,8 @@ export async function POST(req: NextRequest) {
   }
 
   const hourNum = Number(hour);
-  if (!Number.isInteger(hourNum) || !businessHours(date).includes(hourNum)) {
+  const isHoliday = (await listHolidays()).some((h) => h.holiday_date === date);
+  if (!Number.isInteger(hourNum) || !businessHours(date, isHoliday).includes(hourNum)) {
     return NextResponse.json({ error: "예약 시간을 올바르게 선택해주세요." }, { status: 400 });
   }
 

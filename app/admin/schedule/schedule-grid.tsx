@@ -2713,23 +2713,29 @@ function EditSessionModal({
         </div>
 
         {session.entry_type === "session" && session.member_id !== null && (
-          <button
-            type="button"
-            onClick={() => router.push(`/admin/members/${session.member_id}/pt-log`)}
-            className="w-full rounded-full border border-line py-2.5 text-sm font-medium hover:border-coral/40 hover:text-coral transition"
-          >
-            📋 PT 일지
-          </button>
-        )}
-
-        {session.entry_type === "session" && session.member_id !== null && (
-          <button
-            type="button"
-            onClick={() => router.push(`/admin/members?open=${session.member_id}`)}
-            className="w-full rounded-full border border-line py-2.5 text-sm font-medium hover:border-coral/40 hover:text-coral transition"
-          >
-            👤 회원 정보
-          </button>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => router.push(`/admin/members/${session.member_id}/pt-log`)}
+              className="rounded-full border border-line py-2.5 text-xs sm:text-sm font-medium hover:border-coral/40 hover:text-coral transition"
+            >
+              📋 PT 일지
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/admin/members?open=${session.member_id}`)}
+              className="rounded-full border border-line py-2.5 text-xs sm:text-sm font-medium hover:border-coral/40 hover:text-coral transition"
+            >
+              👤 회원 정보
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(`/admin/members/${session.member_id}/intake`)}
+              className="rounded-full border border-line py-2.5 text-xs sm:text-sm font-medium hover:border-coral/40 hover:text-coral transition"
+            >
+              📝 문진표
+            </button>
+          </div>
         )}
 
         {session.entry_type === "consultation" && session.member_id !== null && (

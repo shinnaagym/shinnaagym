@@ -46,6 +46,7 @@ export function ReservationForm() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [taken, setTaken] = useState<Set<string>>(() => new Set());
+  const [holidays, setHolidays] = useState<Set<string>>(() => new Set());
 
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
@@ -62,17 +63,21 @@ export function ReservationForm() {
       const res = await fetch("/api/reservations", { cache: "no-store" });
       const data = await res.json();
       setTaken(toTakenSet(data.taken ?? []));
+      setHolidays(new Set<string>(data.holidays ?? []));
     } catch {
       // 네트워크 오류 시엔 목록을 갱신하지 못해도 예약 시도 시 서버가 다시 막아준다.
     }
   }
 
-  // 페이지 자체는 정적으로 즉시 렌더링하고, 예약 현황만 마운트 후 비동기로 불러온다
-  // (DB 조회가 홈페이지 첫 응답을 막지 않도록 하기 위함).
+  // 페이지 자체는 정적으로 즉시 렌더링하고, 예약 현황·공휴일 목록만 마운트 후
+  // 비동기로 불러온다(DB 조회가 홈페이지 첫 응답을 막지 않도록 하기 위함).
   useEffect(() => {
     fetch("/api/reservations", { cache: "no-store" })
       .then((res) => res.json())
-      .then((data) => setTaken(toTakenSet(data.taken ?? [])))
+      .then((data) => {
+        setTaken(toTakenSet(data.taken ?? []));
+        setHolidays(new Set<string>(data.holidays ?? []));
+      })
       .catch(() => {
         // 네트워크 오류 시엔 목록을 갱신하지 못해도 예약 시도 시 서버가 다시 막아준다.
       });
@@ -208,7 +213,7 @@ export function ReservationForm() {
     }
   }
 
-  const hours = businessHours(selectedDate);
+  const hours = businessHours(selectedDate, selectedDate ? holidays.has(selectedDate) : false);
 
   return (
     <div className="grid gap-10 md:grid-cols-[1.1fr_1fr]">

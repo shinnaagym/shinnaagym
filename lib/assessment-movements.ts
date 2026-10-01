@@ -49,6 +49,16 @@ export const ASSESSMENT_REGIONS: RegionDef[] = [
         en: "Horizontal / Adduction (L)",
         ko: "수평 모음(좌측)",
       },
+      {
+        id: "shoulder-horizontal-abduction-r",
+        en: "Horizontal / Abduction (R)",
+        ko: "수평 벌림(우측)",
+      },
+      {
+        id: "shoulder-horizontal-abduction-l",
+        en: "Horizontal / Abduction (L)",
+        ko: "수평 벌림(좌측)",
+      },
       { id: "shoulder-external-rotation-r", en: "External rotation (R)", ko: "외회전(우측)" },
       { id: "shoulder-external-rotation-l", en: "External rotation (L)", ko: "외회전(좌측)" },
       { id: "shoulder-internal-rotation-r", en: "Internal rotation (R)", ko: "내회전(우측)" },
@@ -151,16 +161,16 @@ export const ASSESSMENT_REGIONS: RegionDef[] = [
       { id: "lumbar-side-glide-l", en: "Side glide (L)", ko: "측면 글라이딩(좌측)" },
       { id: "lumbar-rotation-r", en: "Rotation (R)", ko: "회전(우측)" },
       { id: "lumbar-rotation-l", en: "Rotation (L)", ko: "회전(좌측)" },
-      { id: "lumbar-single-leg-stance-r", en: "Single leg stance (R)", ko: "한 발 서기(우측)" },
-      { id: "lumbar-single-leg-stance-l", en: "Single leg stance (L)", ko: "한 발 서기(좌측)" },
     ],
   },
   {
     key: "hip",
     label: "고관절 (Hip)",
     movements: [
-      { id: "hip-flexion-slr-r", en: "Flexion [SLR] (R)", ko: "굽힘(하지직거상, 우측)" },
-      { id: "hip-flexion-slr-l", en: "Flexion [SLR] (L)", ko: "굽힘(하지직거상, 좌측)" },
+      { id: "hip-flexion-r", en: "Flexion (R)", ko: "굽힘(우측)" },
+      { id: "hip-flexion-l", en: "Flexion (L)", ko: "굽힘(좌측)" },
+      { id: "hip-slr-r", en: "SLR (R)", ko: "하지직거상(우측)" },
+      { id: "hip-slr-l", en: "SLR (L)", ko: "하지직거상(좌측)" },
       { id: "hip-extension-r", en: "Extension (R)", ko: "폄(우측)" },
       { id: "hip-extension-l", en: "Extension (L)", ko: "폄(좌측)" },
       { id: "hip-external-rotation-r", en: "External rotation (R)", ko: "외회전(우측)" },
@@ -245,6 +255,8 @@ export const FUNCTIONAL_TESTS = [
   { key: "overheadSquat", label: "오버헤드 스쿼트" },
   { key: "pushup", label: "푸쉬업" },
   { key: "hipHinge", label: "힙힌지" },
+  { key: "balance", label: "밸런스 (한 발 서기)" },
+  { key: "ybt", label: "YBT (Y-Balance Test)" },
 ] as const;
 
 export type FunctionalTestKey = (typeof FUNCTIONAL_TESTS)[number]["key"];
