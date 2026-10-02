@@ -145,7 +145,6 @@ export const RESERVE_TYPE_OPTIONS = [
   { value: "severance", label: "퇴직금 예비비", rateDescription: "정직원 급여의 8.33%" },
   { value: "withholding_tax", label: "원천세", rateDescription: "당월 발생액" },
   { value: "social_insurance", label: "4대보험", rateDescription: "당월 발생액" },
-  { value: "refund_defense", label: "환불 방어금", rateDescription: "잔여 세션 가치의 10%" },
   { value: "depreciation", label: "감가상각비", rateDescription: "매출의 5%" },
 ] as const;
 

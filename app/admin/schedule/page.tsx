@@ -12,7 +12,7 @@ import {
   listMembersWithProgress,
   listSessionsInRange,
 } from "@/lib/schedule";
-import { listScheduleMemos } from "@/lib/schedule-memos";
+import { getDailyScheduleMemos } from "@/lib/daily-schedule-memos";
 import { ensureRecurringEventSessions } from "@/lib/recurring-events";
 import { ScheduleGrid } from "./schedule-grid";
 
@@ -47,7 +47,7 @@ export default async function AdminSchedulePage({
     dayHours,
     holidays,
     coachStats,
-    memos,
+    dailyMemos,
     dutyOverrides,
     coachWorkingHours,
     coachLeaves,
@@ -58,7 +58,7 @@ export default async function AdminSchedulePage({
     getDayHoursForRange(dateKeys),
     listHolidays(),
     getAllCoachScheduleStats(monthKey, weekStart, weekEnd),
-    listScheduleMemos(),
+    getDailyScheduleMemos(dateKeys),
     getDutyOverridesForDates(dateKeys),
     getCoachWorkingHours(),
     getCoachLeavesForDates(dateKeys),
@@ -86,7 +86,7 @@ export default async function AdminSchedulePage({
         dayHours={dayHours}
         holidayMap={holidayMap}
         coachStats={Object.fromEntries(coachStats)}
-        initialMemos={memos}
+        initialDailyMemos={dailyMemos}
         dutyOverrides={dutyOverrides}
         coachWorkingHours={coachWorkingHours}
         coachLeaves={coachLeaves}

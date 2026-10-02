@@ -8,15 +8,15 @@ import { computeIncomeTaxBreakdown, type IncomeTaxBreakdown } from "./income-tax
 
 const VAT_RATE = 0.1; // 부가가치세: 카드 매출의 10%
 const SEVERANCE_RATE = 0.0833; // 퇴직금 예비비: 정직원 급여의 8.33%(1/12 근사치)
-const REFUND_DEFENSE_RATE = 0.1; // 환불 방어금: 잔여 세션 가치의 10%
 const DEPRECIATION_RATE = 0.05; // 감가상각비: 매출의 5%
 
 function round(n: number): number {
   return Math.round(n);
 }
 
-/** 저수지 계산에는 항상 이 7종 전부를 다루고, 데이터가 없는 타입도 0으로
-    채워서 반환한다 — 화면에서 "이 저수지는 왜 안 보이지?" 같은 혼란을 막는다. */
+/** 저수지 계산에는 항상 RESERVE_TYPE_OPTIONS 전부를 다루고, 데이터가 없는
+    타입도 0으로 채워서 반환한다 — 화면에서 "이 저수지는 왜 안 보이지?" 같은
+    혼란을 막는다. */
 function zeroedReserveMap(): Record<ReserveType, number> {
   return Object.fromEntries(RESERVE_TYPE_OPTIONS.map((o) => [o.value, 0])) as Record<
     ReserveType,
@@ -168,8 +168,8 @@ export interface MonthlySettlementResult {
   deposits: Record<ReserveType, number>;
 }
 
-/** "이번 달 정산" — 그 달의 매출·지출·급여·잔여 세션 가치를 바탕으로 7개
-    저수지의 당월 적립액을 계산해 저장한다. source='monthly_settlement'인
+/** "이번 달 정산" — 그 달의 매출·지출·급여·잔여 세션 가치를 바탕으로 저수지별
+    당월 적립액을 계산해 저장한다. source='monthly_settlement'인
     기존 행을 먼저 지우고 다시 넣기 때문에(멱등) 그 달 데이터가 나중에
     수정돼도(지출 추가 등) 버튼을 다시 눌러 재계산할 수 있다 — 대표가 수동으로
     기록한 적립/차감(source='manual')은 건드리지 않는다. */
@@ -209,13 +209,16 @@ export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySe
     severance: round(regularPayrollGross * SEVERANCE_RATE),
     withholding_tax: round(withholdingTotal),
     social_insurance: round(socialInsuranceTotal),
-    refund_defense: round(remainingSessionValue * REFUND_DEFENSE_RATE),
     depreciation: round(revenue * DEPRECIATION_RATE),
   };
 
+  // reserve_type도 함께 걸러서, 과거에는 자동 정산 대상이었지만 지금은 더
+  // 이상 RESERVE_TYPE_OPTIONS에 없는 유형(예: 환불 방어금)의 기존 기록은
+  // 재정산 때 건드리지 않고 그대로 남겨둔다.
   await query(
-    `DELETE FROM reserve_transactions WHERE year_month = $1 AND source = 'monthly_settlement'`,
-    [yearMonth],
+    `DELETE FROM reserve_transactions
+     WHERE year_month = $1 AND source = 'monthly_settlement' AND reserve_type = ANY($2)`,
+    [yearMonth, RESERVE_TYPE_OPTIONS.map((o) => o.value)],
   );
   for (const option of RESERVE_TYPE_OPTIONS) {
     const amount = deposits[option.value];
