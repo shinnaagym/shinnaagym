@@ -46,6 +46,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
   const [editAmount, setEditAmount] = useState("");
   const [editMemo, setEditMemo] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [incomeTaxOpen, setIncomeTaxOpen] = useState(false);
 
   async function loadReserves(month: string, options?: { silent?: boolean }) {
     if (!options?.silent) setLoading(true);
@@ -273,15 +274,27 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
                   </div>
                 )}
                 {option.value === "income_tax" && (
-                  <IncomeTaxDetail
-                    monthKey={monthKey}
-                    breakdown={incomeTaxBreakdown}
-                    onSaved={() => loadReserves(monthKey, { silent: true })}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setIncomeTaxOpen((v) => !v)}
+                    className="mt-1 rounded-full border border-line px-3 py-1.5 text-xs hover:bg-white transition"
+                  >
+                    {incomeTaxOpen ? "닫기" : "필요경비 설정 · 과세표준 수정"}
+                  </button>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!loading && incomeTaxOpen && (
+        <div className="mt-3">
+          <IncomeTaxDetail
+            monthKey={monthKey}
+            breakdown={incomeTaxBreakdown}
+            onSaved={() => loadReserves(monthKey, { silent: true })}
+          />
         </div>
       )}
 
