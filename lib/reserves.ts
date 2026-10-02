@@ -4,9 +4,9 @@ import { RESERVE_TYPE_OPTIONS, type ReserveType } from "./constants";
 import { getPaymentTotalsForMonth, listExpensesByMonth } from "./expenses";
 import { listPayrollRecords } from "./payroll";
 import type { PayrollResult } from "./payroll/calculate";
+import { computeIncomeTaxBreakdown, type IncomeTaxBreakdown } from "./income-tax";
 
-const VAT_RATE = 0.1; // 부가가치세: 매출의 10%
-const INCOME_TAX_RESERVE_RATE = 0.15; // 종합소득세 예비비: 월 순이익의 15%
+const VAT_RATE = 0.1; // 부가가치세: 카드 매출의 10%
 const SEVERANCE_RATE = 0.0833; // 퇴직금 예비비: 정직원 급여의 8.33%(1/12 근사치)
 const REFUND_DEFENSE_RATE = 0.1; // 환불 방어금: 잔여 세션 가치의 10%
 const DEPRECIATION_RATE = 0.05; // 감가상각비: 매출의 5%
@@ -164,6 +164,7 @@ export interface MonthlySettlementResult {
   withholdingTotal: number;
   socialInsuranceTotal: number;
   remainingSessionValue: number;
+  incomeTaxBreakdown: IncomeTaxBreakdown;
   deposits: Record<ReserveType, number>;
 }
 
@@ -173,12 +174,14 @@ export interface MonthlySettlementResult {
     수정돼도(지출 추가 등) 버튼을 다시 눌러 재계산할 수 있다 — 대표가 수동으로
     기록한 적립/차감(source='manual')은 건드리지 않는다. */
 export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySettlementResult> {
-  const [paymentTotals, expenses, payrollRecords, remainingSessionValue] = await Promise.all([
-    getPaymentTotalsForMonth(yearMonth),
-    listExpensesByMonth(yearMonth),
-    listPayrollRecords({ yearMonth }),
-    getRemainingSessionValue(),
-  ]);
+  const [paymentTotals, expenses, payrollRecords, remainingSessionValue, incomeTaxBreakdown] =
+    await Promise.all([
+      getPaymentTotalsForMonth(yearMonth),
+      listExpensesByMonth(yearMonth),
+      listPayrollRecords({ yearMonth }),
+      getRemainingSessionValue(),
+      computeIncomeTaxBreakdown(yearMonth),
+    ]);
 
   const revenue = paymentTotals.card + paymentTotals.transfer;
   const expenseTotal = expenses.reduce((sum, e) => sum + e.amount * e.quantity, 0);
@@ -201,8 +204,8 @@ export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySe
   }
 
   const deposits: Record<ReserveType, number> = {
-    vat: round(revenue * VAT_RATE),
-    income_tax: round(Math.max(0, netProfit) * INCOME_TAX_RESERVE_RATE),
+    vat: round(paymentTotals.card * VAT_RATE),
+    income_tax: incomeTaxBreakdown.reserveAmount,
     severance: round(regularPayrollGross * SEVERANCE_RATE),
     withholding_tax: round(withholdingTotal),
     social_insurance: round(socialInsuranceTotal),
@@ -230,6 +233,7 @@ export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySe
     withholdingTotal,
     socialInsuranceTotal,
     remainingSessionValue,
+    incomeTaxBreakdown,
     deposits,
   };
 }

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { RESERVE_TYPE_LABELS, RESERVE_TYPE_OPTIONS, type ReserveType } from "@/lib/constants";
 import type { ReserveTransactionRow } from "@/lib/db";
 import type { MonthlySettlementResult } from "@/lib/reserves";
+import type { IncomeTaxBreakdown } from "@/lib/income-tax";
+import { IncomeTaxDetail } from "./income-tax-detail";
 
 function formatWon(n: number): string {
   return `₩${n.toLocaleString("ko-KR")}`;
@@ -31,6 +33,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
   const [balances, setBalances] = useState<ReserveMap | null>(null);
   const [monthlyDeposits, setMonthlyDeposits] = useState<ReserveMap | null>(null);
   const [transactions, setTransactions] = useState<ReserveTransactionRow[]>([]);
+  const [incomeTaxBreakdown, setIncomeTaxBreakdown] = useState<IncomeTaxBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [settling, setSettling] = useState(false);
@@ -44,8 +47,8 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
   const [editMemo, setEditMemo] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  async function loadReserves(month: string) {
-    setLoading(true);
+  async function loadReserves(month: string, options?: { silent?: boolean }) {
+    if (!options?.silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/admin/reserves?month=${month}`);
@@ -54,6 +57,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
       setBalances(data.balances);
       setMonthlyDeposits(data.monthlyDeposits);
       setTransactions(data.transactions);
+      setIncomeTaxBreakdown(data.incomeTaxBreakdown ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "저수지 정보를 불러오지 못했어요.");
     } finally {
@@ -267,6 +271,13 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
                       {submittingWithdraw ? "처리 중..." : "차감 확정"}
                     </button>
                   </div>
+                )}
+                {option.value === "income_tax" && (
+                  <IncomeTaxDetail
+                    monthKey={monthKey}
+                    breakdown={incomeTaxBreakdown}
+                    onSaved={() => loadReserves(monthKey, { silent: true })}
+                  />
                 )}
               </div>
             );
