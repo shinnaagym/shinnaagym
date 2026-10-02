@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 34;
+const SCHEMA_VERSION = 35;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -749,6 +749,32 @@ function runFullMigration(): Promise<void> {
             -- 자유 입력, 여러 개 가능). 미리 정의된 항목과 달리 전용 컬럼을 두지 않고
             -- 배열 하나로 둔다 — 개수가 고정돼 있지 않기 때문이다.
             ALTER TABLE assessments ADD COLUMN IF NOT EXISTS custom_functional_tests JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+            -- 종합소득세 예비비를 "월 순이익의 15%"가 아니라 실제 사업소득금액
+            -- 산출 공식(총수입 - 필요경비 - 소득공제)으로 계산하기 위한 설정값.
+            -- 4대보험 요율 설정(insurance_settings)과 동일하게 단일 행(id=1
+            -- 고정)으로 둔다 — 대표가 가계부에서 언제든 고칠 수 있고, 이 행이
+            -- 없으면 lib/income-tax.ts의 DEFAULT_INCOME_TAX_SETTINGS를 쓴다.
+            CREATE TABLE IF NOT EXISTS income_tax_settings (
+              id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+              monthly_rent INTEGER NOT NULL,
+              monthly_utilities INTEGER NOT NULL,
+              monthly_supplies INTEGER NOT NULL,
+              monthly_marketing INTEGER NOT NULL,
+              card_fee_rate NUMERIC NOT NULL,
+              monthly_income_deduction INTEGER NOT NULL,
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
+            -- 자동 계산된 과세표준이 그 달 실제 상황과 안 맞을 때(일회성 지출 등),
+            -- 대표가 달마다 과세표준 값을 직접 덮어쓸 수 있게 한다. 값이 있으면
+            -- 자동 계산 대신 이 값을 15% 계산에 쓴다(참고용으로 자동 계산값도
+            -- 함께 보여줌).
+            CREATE TABLE IF NOT EXISTS income_tax_overrides (
+              year_month TEXT PRIMARY KEY,
+              taxable_income INTEGER NOT NULL,
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
             `,
           ),
           getPool().query(
@@ -1229,6 +1255,23 @@ export interface InsuranceSettingsRow {
   health_insurance_rate: number;
   long_term_care_rate: number;
   employment_insurance_rate: number;
+  updated_at: string;
+}
+
+export interface IncomeTaxSettingsRow {
+  id: number;
+  monthly_rent: number;
+  monthly_utilities: number;
+  monthly_supplies: number;
+  monthly_marketing: number;
+  card_fee_rate: number;
+  monthly_income_deduction: number;
+  updated_at: string;
+}
+
+export interface IncomeTaxOverrideRow {
+  year_month: string;
+  taxable_income: number;
   updated_at: string;
 }
 

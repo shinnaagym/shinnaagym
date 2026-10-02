@@ -7,6 +7,7 @@ import {
   listReserveTransactions,
   runMonthlySettlement,
 } from "@/lib/reserves";
+import { computeIncomeTaxBreakdown } from "@/lib/income-tax";
 
 async function requireLedgerAuth() {
   if (!(await isAdminAuthed())) {
@@ -28,12 +29,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "잘못된 월 형식입니다." }, { status: 400 });
   }
 
-  const [balances, monthlyDeposits, transactions] = await Promise.all([
+  const [balances, monthlyDeposits, transactions, incomeTaxBreakdown] = await Promise.all([
     getReserveBalances(),
     getMonthlyDeposits(month),
     listReserveTransactions(),
+    computeIncomeTaxBreakdown(month),
   ]);
-  return NextResponse.json({ balances, monthlyDeposits, transactions });
+  return NextResponse.json({ balances, monthlyDeposits, transactions, incomeTaxBreakdown });
 }
 
 /** "이번 달 정산" 버튼 — 그 달 매출·지출·급여·잔여 세션 가치를 기준으로
