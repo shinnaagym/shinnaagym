@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 35;
+const SCHEMA_VERSION = 36;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -322,14 +322,16 @@ function runFullMigration(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_expenses_year_month ON expenses(year_month);
 
+        -- 스케줄표가 쓰던 날짜 무관 공용 메모장. 지금은 날짜별 메모
+        -- (daily_schedule_memos)로 대체되어 화면에서 쓰지 않지만, 과거
+        -- 기록 보존을 위해 테이블은 지우지 않고 남겨둔다.
         CREATE TABLE IF NOT EXISTS schedule_memos (
           id SERIAL PRIMARY KEY,
           content TEXT NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
-        -- 설정 페이지 전용 메모장. 스케줄표 메모장(schedule_memos)과는 완전히
-        -- 분리된 목록이다.
+        -- 설정 페이지 전용 메모장. 위 schedule_memos와는 완전히 분리된 목록이다.
         CREATE TABLE IF NOT EXISTS settings_memos (
           id SERIAL PRIMARY KEY,
           content TEXT NOT NULL,
@@ -479,7 +481,9 @@ function runFullMigration(): Promise<void> {
 
         -- 저수지(세금·예비비) 관리용 적립/차감 통합 히스토리. reserve_type은
         -- lib/constants.ts의 RESERVE_TYPE_OPTIONS 값(vat/income_tax/severance/
-        -- withholding_tax/social_insurance/refund_defense/depreciation) 중 하나다.
+        -- withholding_tax/social_insurance/depreciation) 중 하나다(과거 기록에는
+        -- 더 이상 쓰지 않는 refund_defense 값도 남아있을 수 있다 — 삭제하지
+        -- 않고 그대로 두되, 대시보드·정산 계산에서는 제외한다).
         -- 한 저수지의 "누적 잔액"은 이 표에 쌓인 deposit 합계에서 withdrawal
         -- 합계를 뺀 값이고, "당월 적립액"은 year_month가 해당 월인 deposit
         -- 합계다 — 별도 잔액 컬럼을 두지 않고 항상 이 표에서 계산해, 잔액이
@@ -773,6 +777,16 @@ function runFullMigration(): Promise<void> {
             CREATE TABLE IF NOT EXISTS income_tax_overrides (
               year_month TEXT PRIMARY KEY,
               taxable_income INTEGER NOT NULL,
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
+            -- 주간 스케줄표에서 날짜 칸 바로 아래에 쓰는 날짜별 메모 한 줄.
+            -- 이 표가 생기기 전까지 쓰던 날짜 무관 공용 메모장(schedule_memos)은
+            -- 더 이상 화면에서 쓰지 않지만, 과거 기록 보존을 위해 테이블은
+            -- 지우지 않고 남겨둔다.
+            CREATE TABLE IF NOT EXISTS daily_schedule_memos (
+              date TEXT PRIMARY KEY,
+              content TEXT NOT NULL,
               updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
             `,

@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 }
 
 /** "이번 달 정산" 버튼 — 그 달 매출·지출·급여·잔여 세션 가치를 기준으로
-    7개 저수지의 당월 적립액을 재계산해 저장한다(멱등, 여러 번 눌러도 안전). */
+    저수지별 당월 적립액을 재계산해 저장한다(멱등, 여러 번 눌러도 안전). */
 export async function POST(req: NextRequest) {
   const authError = await requireLedgerAuth();
   if (authError) return authError;

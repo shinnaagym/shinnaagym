@@ -12,7 +12,7 @@ import {
   SHORTENED_LEAVE_DIRECTION_LABELS,
 } from "@/lib/constants";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
-import type { CoachRow, PtType, ScheduleMemoRow, SessionEntryType, SessionStatus } from "@/lib/db";
+import type { CoachRow, PtType, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { CoachLeaveEntry, CoachScheduleStats, CoachWorkingHours, MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
 
@@ -25,7 +25,6 @@ function formatLeaveBadge(l: CoachLeaveEntry): string {
   }
   return base;
 }
-import { MemoPad } from "../memo-pad";
 
 type SessionWithMember = {
   id: number;
@@ -56,6 +55,34 @@ function weekdayLabelForDateKey(key: string): string {
 /** "17:00" 또는(분이 있으면) "17:20"처럼, 세션의 시:분을 표시용으로 포맷한다. */
 function formatHourMinute(hour: number, minute: number): string {
   return `${hour}:${String(minute).padStart(2, "0")}`;
+}
+
+/** 주간 스케줄표에서 날짜 칸 바로 아래에 두는 메모 네모박스. 타이핑하는 동안은
+    로컬 값만 바꾸고, 포커스를 벗어날 때(blur)만 저장해 매 글자마다 요청을
+    보내지 않는다. */
+function DailyMemoBox({
+  date,
+  value,
+  onCommit,
+}: {
+  date: string;
+  value: string;
+  onCommit: (date: string, content: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  return (
+    <textarea
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== value) onCommit(date, draft);
+      }}
+      placeholder="메모"
+      rows={2}
+      className="w-full resize-none rounded-md border border-line/50 bg-white px-1.5 py-1 text-[10px] leading-tight outline-none focus:border-coral placeholder:text-ink/25"
+    />
+  );
 }
 
 function pad2(n: number): string {
@@ -328,7 +355,7 @@ export function ScheduleGrid({
   dayHours,
   holidayMap,
   coachStats,
-  initialMemos,
+  initialDailyMemos,
   dutyOverrides,
   coachWorkingHours,
   coachLeaves,
@@ -342,7 +369,8 @@ export function ScheduleGrid({
   dayHours: Record<string, DayHours>;
   holidayMap: Record<string, string>;
   coachStats: Record<number, CoachScheduleStats>;
-  initialMemos: ScheduleMemoRow[];
+  /** 날짜(YYYY-MM-DD)별 스케줄표 메모 한 줄 — 그 날짜 칸 바로 아래 네모박스에 쓴다. */
+  initialDailyMemos: Record<string, string>;
   /** 날짜(YYYY-MM-DD, 토요일만) -> 당직 코치. coachId가 null이면 그 토요일은
       당직자 없음(휴무)을 명시적으로 나타낸다. */
   dutyOverrides: Record<string, { coachId: number | null; coachName: string | null }>;
@@ -373,7 +401,19 @@ export function ScheduleGrid({
   const [dutyOverridesState, setDutyOverridesState] = useState(dutyOverrides);
   const [dutyEditDate, setDutyEditDate] = useState<{ date: string; weekday: number } | null>(null);
   const [coachFilter, setCoachFilter] = useState<number | "all">("all");
+  const [dailyMemos, setDailyMemos] = useState(initialDailyMemos);
   const allGridScrollRef = useRef<HTMLDivElement | null>(null);
+
+  /** 날짜 칸 아래 메모 네모박스에서 포커스를 벗어났을 때 호출 — 화면은 바로
+      바꾸고(낙관적 업데이트), 서버 저장은 비동기로 진행한다. */
+  const saveDailyMemo = useCallback((date: string, content: string) => {
+    setDailyMemos((prev) => ({ ...prev, [date]: content }));
+    fetch("/api/admin/daily-schedule-memos", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, content }),
+    }).catch(() => {});
+  }, []);
 
   // 주간/월간 보기 전환. 월간 보기는 이 상태가 바뀔 때만 해당 월의 일정을
   // 별도로 불러온다(기본 주간 보기는 기존처럼 서버에서 그 주 데이터만 받아와
@@ -1013,13 +1053,6 @@ export function ScheduleGrid({
         {viewMode === "week" && <p className="font-display text-lg">{formatWeekLabel(dateKeys)}</p>}
       </div>
 
-      <MemoPad
-        title="메모장"
-        initialMemos={initialMemos}
-        addUrl="/api/admin/schedule-memos"
-        itemUrlBase="/api/admin/schedule-memos"
-      />
-
       {/* 코치를 한 명만 선택하면 그 코치의 이번 주 전체를 한 번에 보여준다. */}
       {viewMode === "week" && (singleCoach ? (
         <>
@@ -1091,6 +1124,13 @@ export function ScheduleGrid({
                   </div>
                 );
               })}
+
+              <div className="border-b border-line/40 bg-bone/30" />
+              {dateKeys.map((d) => (
+                <div key={d} className="border-b border-line/40 px-1 py-1 bg-white">
+                  <DailyMemoBox date={d} value={dailyMemos[d] ?? ""} onCommit={saveDailyMemo} />
+                </div>
+              ))}
 
               {SCHEDULE_HOUR_ROWS.map((hour) => (
                 <Fragment key={hour}>
@@ -1230,6 +1270,17 @@ export function ScheduleGrid({
                   </div>
                 );
               })}
+
+              <div className="border-b border-line/40 bg-bone/30" />
+              {dateKeys.map((d) => (
+                <div
+                  key={d}
+                  style={{ gridColumn: `span ${nCoaches}` }}
+                  className="border-b border-l-2 border-ink/25 px-1 py-1 bg-white"
+                >
+                  <DailyMemoBox date={d} value={dailyMemos[d] ?? ""} onCommit={saveDailyMemo} />
+                </div>
+              ))}
 
               {nCoaches > 1 && (
                 <>
