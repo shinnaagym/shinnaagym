@@ -3,6 +3,7 @@ import Script from "next/script";
 import { IntroOverlay } from "@/app/components/IntroOverlay";
 import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
+import { FacilityGallery, type FacilityPhoto } from "@/app/components/FacilityGallery";
 import { GA_MEASUREMENT_ID } from "@/lib/analytics";
 
 const TRAINER_NAME = "신종수";
@@ -30,6 +31,16 @@ const TRAINER_EDUCATION = [
   "근골격계 및 스포츠 재활(Personal Physio) 교육 이수",
   "만성통증 중재 교육(Hello Pain) 이수",
   "근골격계 운동치료(EMP) 교육 이수",
+];
+
+// 보내주신 순서 그대로 나열 — 총 25장을 보내주시기로 해서 먼저 받은 5장만
+// 우선 반영했다. 나머지가 도착하면 이 배열 끝에 이어서 추가하면 된다.
+const FACILITY_PHOTOS: FacilityPhoto[] = [
+  { src: "/images/facility/facility-01.jpg", alt: "신나아짐 센터 내부 — 프리웨이트존과 러닝머신" },
+  { src: "/images/facility/facility-02.jpg", alt: "신나아짐 센터 내부 — 거울과 트레드밀" },
+  { src: "/images/facility/facility-03.jpg", alt: "신나아짐 센터 내부 — 상담 테이블과 운동 공간" },
+  { src: "/images/facility/facility-04.jpg", alt: "신나아짐 센터 내부 — 신종수 트레이너 자격증 전시" },
+  { src: "/images/facility/facility-05.jpg", alt: "신나아짐 센터 내부 — 라커룸" },
 ];
 
 const STUDIO_ADDRESS = "충청북도 청주시 흥덕구 서현로32 210,211호";
@@ -264,6 +275,19 @@ export default function Home() {
                   ))}
                 </div>
               </div>
+            </Reveal>
+          </div>
+        </section>
+
+        <section className="bg-[#EFE6D3]/40 px-6 py-20">
+          <div className="mx-auto max-w-[980px]">
+            <Reveal>
+              <h2 className="font-serif-display mb-10 text-center text-[32px] sm:text-[45px]">
+                시설 소개
+              </h2>
+            </Reveal>
+            <Reveal delayMs={100}>
+              <FacilityGallery photos={FACILITY_PHOTOS} />
             </Reveal>
           </div>
         </section>
