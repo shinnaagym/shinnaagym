@@ -34,7 +34,7 @@ const TRAINER_EDUCATION = [
 ];
 
 // 보내주신 순서 그대로 나열 — 총 25장을 보내주시기로 해서 지금까지 받은
-// 15장을 반영했다. 나머지가 도착하면 이 배열 끝에 이어서 추가하면 된다.
+// 20장을 반영했다. 나머지가 도착하면 이 배열 끝에 이어서 추가하면 된다.
 const FACILITY_PHOTOS: FacilityPhoto[] = [
   { src: "/images/facility/facility-01.jpg", alt: "신나아짐 센터 내부 — 프리웨이트존과 러닝머신" },
   { src: "/images/facility/facility-02.jpg", alt: "신나아짐 센터 내부 — 거울과 트레드밀" },
@@ -51,6 +51,11 @@ const FACILITY_PHOTOS: FacilityPhoto[] = [
   { src: "/images/facility/facility-13.jpg", alt: "신나아짐 센터 내부 — 케틀벨·샌드백존" },
   { src: "/images/facility/facility-14.jpg", alt: "신나아짐 센터 내부 — 벤치프레스존" },
   { src: "/images/facility/facility-15.jpg", alt: "신나아짐 센터 내부 — 샤워 부스" },
+  { src: "/images/facility/facility-16.jpg", alt: "신나아짐 센터 내부 — 트레드밀존 전경" },
+  { src: "/images/facility/facility-17.jpg", alt: "신나아짐 센터 내부 — 등 운동 머신과 라커룸" },
+  { src: "/images/facility/facility-18.jpg", alt: "신나아짐 센터 내부 — 허벅지 운동 머신" },
+  { src: "/images/facility/facility-19.jpg", alt: "신나아짐 센터 내부 — 펙플라이 머신" },
+  { src: "/images/facility/facility-20.jpg", alt: "신나아짐 센터 내부 — 레그 익스텐션 머신" },
 ];
 
 const STUDIO_ADDRESS = "충청북도 청주시 흥덕구 서현로32 210,211호";
