@@ -1413,6 +1413,8 @@ function ContractFieldsFieldset({
   onPurposeOtherChange,
   startDate,
   onStartDateChange,
+  endDate,
+  onEndDateChange,
   optionNote,
   onOptionNoteChange,
   privacyConsent,
@@ -1437,6 +1439,8 @@ function ContractFieldsFieldset({
   onPurposeOtherChange: (v: string) => void;
   startDate: string;
   onStartDateChange: (v: string) => void;
+  endDate: string;
+  onEndDateChange: (v: string) => void;
   optionNote: string;
   onOptionNoteChange: (v: string) => void;
   privacyConsent: boolean;
@@ -1532,13 +1536,22 @@ function ContractFieldsFieldset({
         </Field>
       )}
       <div className={showOptionNote ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : undefined}>
-        <Field label="운동 시작일">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => onStartDateChange(e.target.value)}
-            className="w-full min-w-0 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
-          />
+        <Field label="이용 일시">
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => onStartDateChange(e.target.value)}
+              className="w-full min-w-0 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+            <span className="shrink-0 text-ink/40">~</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => onEndDateChange(e.target.value)}
+              className="w-full min-w-0 rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </div>
         </Field>
         {showOptionNote && (
           <Field label="옵션">
@@ -1601,6 +1614,7 @@ function CreateMemberModal({
   const [purposeOther, setPurposeOther] = useState("");
   const [optionNote, setOptionNote] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [privacyConsent, setPrivacyConsent] = useState(false);
 
   // 고정 시간대 — 아직 회원이 만들어지기 전이라 바로 저장할 수 없으므로, 등록
@@ -1664,6 +1678,7 @@ function CreateMemberModal({
           purposeOther,
           optionNote,
           startDate,
+          endDate,
           privacyConsent,
           companionName: ptType === "2:1" ? companionName : "",
           companionPhone: ptType === "2:1" ? companionPhone : "",
@@ -1729,6 +1744,8 @@ function CreateMemberModal({
             onPurposeOtherChange={setPurposeOther}
             startDate={startDate}
             onStartDateChange={setStartDate}
+            endDate={endDate}
+            onEndDateChange={setEndDate}
             optionNote={optionNote}
             onOptionNoteChange={setOptionNote}
             privacyConsent={privacyConsent}
@@ -1955,6 +1972,7 @@ function WriteContractModal({
   const [purposeOther, setPurposeOther] = useState("");
   const [optionNote, setOptionNote] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [privacyConsent, setPrivacyConsent] = useState(false);
   const [companionName, setCompanionName] = useState("");
   const [companionPhone, setCompanionPhone] = useState("");
@@ -1987,6 +2005,7 @@ function WriteContractModal({
           purposeOther,
           optionNote,
           startDate,
+          endDate,
           privacyConsent,
           companionName,
           companionPhone,
@@ -2081,6 +2100,8 @@ function WriteContractModal({
           onPurposeOtherChange={setPurposeOther}
           startDate={startDate}
           onStartDateChange={setStartDate}
+          endDate={endDate}
+          onEndDateChange={setEndDate}
           optionNote={optionNote}
           onOptionNoteChange={setOptionNote}
           privacyConsent={privacyConsent}
@@ -2113,6 +2134,10 @@ function ContractViewModal({
     contract: ContractRow & { rrn_front: string; companion_rrn_front: string };
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingPeriod, setEditingPeriod] = useState(false);
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
+  const [savingPeriod, setSavingPeriod] = useState(false);
 
   function load() {
     fetch(`/api/admin/members/${memberId}/contract`)
@@ -2134,6 +2159,36 @@ function ContractViewModal({
     onClose();
   }
 
+  function startEditPeriod() {
+    if (!data) return;
+    setEditStart(data.contract.start_date);
+    setEditEnd(data.contract.end_date);
+    setEditingPeriod(true);
+  }
+
+  async function savePeriod() {
+    setSavingPeriod(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}/contract`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: editStart, endDate: editEnd }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(d.error ?? "저장에 실패했어요.");
+        return;
+      }
+      setData((prev) => (prev ? { ...prev, contract: { ...prev.contract, ...d.contract } } : prev));
+      setEditingPeriod(false);
+    } catch {
+      setError("네트워크 오류가 발생했어요.");
+    } finally {
+      setSavingPeriod(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-ink/40 px-4 overflow-y-auto py-8">
       <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl p-6 sm:p-10 my-auto">
@@ -2146,39 +2201,92 @@ function ContractViewModal({
         {error && <p className="text-sm text-coral">{error}</p>}
         {!data && !error && <p className="text-sm text-ink/50">불러오는 중...</p>}
         {data && (
-          <ContractDocument
-            memberName={data.member.name}
-            memberPhone={data.member.phone}
-            contract={data.contract}
-          >
-            {data.contract.signed_at ? (
-              <div className="rounded-2xl border border-sage/40 bg-sage/10 px-6 py-6">
-                <p className="font-display text-lg mb-3">회원 서명</p>
-                {data.contract.signature_data_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={data.contract.signature_data_url}
-                    alt="회원 서명"
-                    className="h-32 rounded-lg border border-line bg-white"
+          <>
+            <div className="mb-4 rounded-xl border border-line/60 bg-bone/20 px-4 py-3">
+              {editingPeriod ? (
+                <div>
+                  <p className="text-xs font-medium text-ink/60 mb-1.5">이용 일시 수정</p>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                    <input
+                      type="date"
+                      value={editStart}
+                      onChange={(e) => setEditStart(e.target.value)}
+                      className="rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-coral"
+                    />
+                    <span className="text-ink/40">~</span>
+                    <input
+                      type="date"
+                      value={editEnd}
+                      onChange={(e) => setEditEnd(e.target.value)}
+                      className="rounded-lg border border-line px-3 py-1.5 text-sm outline-none focus:border-coral"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={savePeriod}
+                      disabled={savingPeriod}
+                      className="rounded-full bg-ink text-white px-4 py-1.5 text-xs font-medium hover:bg-coral transition disabled:opacity-50"
+                    >
+                      {savingPeriod ? "저장 중..." : "저장"}
+                    </button>
+                    <button
+                      onClick={() => setEditingPeriod(false)}
+                      className="text-xs text-ink/50 hover:underline"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-ink/60">
+                    이용 일시: {data.contract.start_date && data.contract.end_date
+                      ? `${data.contract.start_date} ~ ${data.contract.end_date}`
+                      : data.contract.start_date || data.contract.end_date || "미입력"}
+                  </p>
+                  <button
+                    onClick={startEditPeriod}
+                    className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:bg-white transition"
+                  >
+                    수정
+                  </button>
+                </div>
+              )}
+            </div>
+            <ContractDocument
+              memberName={data.member.name}
+              memberPhone={data.member.phone}
+              contract={data.contract}
+            >
+              {data.contract.signed_at ? (
+                <div className="rounded-2xl border border-sage/40 bg-sage/10 px-6 py-6">
+                  <p className="font-display text-lg mb-3">회원 서명</p>
+                  {data.contract.signature_data_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={data.contract.signature_data_url}
+                      alt="회원 서명"
+                      className="h-32 rounded-lg border border-line bg-white"
+                    />
+                  )}
+                  <p className="text-xs text-ink/50 mt-2">
+                    {formatDateTime(data.contract.signed_at)} 서명 완료
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs text-ink/50 mb-3">
+                    아직 서명 전이에요. 회원이 매장에 방문했다면 아래에서 바로 서명받을 수
+                    있고, 회원 개인 페이지에서 직접 서명할 수도 있어요.
+                  </p>
+                  <SignaturePad
+                    signUrl={`/api/admin/members/${memberId}/contract/sign`}
+                    onSigned={handleSigned}
                   />
-                )}
-                <p className="text-xs text-ink/50 mt-2">
-                  {formatDateTime(data.contract.signed_at)} 서명 완료
-                </p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs text-ink/50 mb-3">
-                  아직 서명 전이에요. 회원이 매장에 방문했다면 아래에서 바로 서명받을 수
-                  있고, 회원 개인 페이지에서 직접 서명할 수도 있어요.
-                </p>
-                <SignaturePad
-                  signUrl={`/api/admin/members/${memberId}/contract/sign`}
-                  onSigned={handleSigned}
-                />
-              </div>
-            )}
-          </ContractDocument>
+                </div>
+              )}
+            </ContractDocument>
+          </>
         )}
       </div>
     </div>

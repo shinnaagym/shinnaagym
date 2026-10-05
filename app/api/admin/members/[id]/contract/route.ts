@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById, listPackages } from "@/lib/schedule";
-import { createContract, getLatestContractByMember } from "@/lib/contracts";
+import { createContract, getLatestContractByMember, updateContractUsagePeriod } from "@/lib/contracts";
 import { recordUndo } from "@/lib/undo";
 import { VISIT_CHANNEL_OPTIONS } from "@/lib/intake-questionnaire";
+import { isValidDateKey } from "@/lib/date";
 import type { VisitChannel } from "@/lib/db";
 
 const VALID_VISIT_CHANNELS: VisitChannel[] = [
@@ -78,6 +79,7 @@ export async function POST(
         purposeOther?: unknown;
         optionNote?: unknown;
         startDate?: unknown;
+        endDate?: unknown;
         privacyConsent?: unknown;
         companionName?: unknown;
         companionPhone?: unknown;
@@ -106,6 +108,7 @@ export async function POST(
   const purposeOther = typeof body?.purposeOther === "string" ? body.purposeOther.trim() : "";
   const optionNote = typeof body?.optionNote === "string" ? body.optionNote.trim() : "";
   const startDate = typeof body?.startDate === "string" ? body.startDate.trim() : "";
+  const endDate = typeof body?.endDate === "string" ? body.endDate.trim() : "";
   const privacyConsent = body?.privacyConsent === true;
   const companionName = typeof body?.companionName === "string" ? body.companionName.trim() : "";
   const companionPhone = typeof body?.companionPhone === "string" ? body.companionPhone.trim() : "";
@@ -131,6 +134,7 @@ export async function POST(
     purposeOther,
     optionNote,
     startDate,
+    endDate,
     privacyConsent,
     companionName,
     companionPhone,
@@ -144,4 +148,35 @@ export async function POST(
   ]);
 
   return NextResponse.json({ ok: true }, { status: 201 });
+}
+
+/** 이미 작성된 계약서의 "이용 일시"(시작일~종료일)만 고친다. */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!(await isAdminAuthed())) {
+    return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+  }
+  const { id } = await params;
+  const idNum = Number(id);
+  if (!Number.isInteger(idNum)) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+  const existing = await getLatestContractByMember(idNum);
+  if (!existing) {
+    return NextResponse.json({ error: "계약서가 없어요." }, { status: 404 });
+  }
+
+  const body = (await req.json().catch(() => null)) as
+    | { startDate?: unknown; endDate?: unknown }
+    | null;
+  const startDate = typeof body?.startDate === "string" ? body.startDate.trim() : "";
+  const endDate = typeof body?.endDate === "string" ? body.endDate.trim() : "";
+  if ((startDate && !isValidDateKey(startDate)) || (endDate && !isValidDateKey(endDate))) {
+    return NextResponse.json({ error: "날짜 형식이 올바르지 않아요." }, { status: 400 });
+  }
+
+  const contract = await updateContractUsagePeriod(existing.id, startDate, endDate);
+  return NextResponse.json({ contract });
 }
