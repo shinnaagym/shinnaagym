@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 38;
+const SCHEMA_VERSION = 37;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -237,7 +237,6 @@ function runFullMigration(): Promise<void> {
           purpose_other TEXT NOT NULL DEFAULT '',
           option_note TEXT NOT NULL DEFAULT '',
           start_date TEXT NOT NULL DEFAULT '',
-          end_date TEXT NOT NULL DEFAULT '',
           privacy_consent BOOLEAN NOT NULL DEFAULT false,
           signature_data_url TEXT,
           signed_at TIMESTAMPTZ,
@@ -794,11 +793,6 @@ function runFullMigration(): Promise<void> {
             -- PT 수업 전날 리마인드 문자를 보냈는지 기록 — 매일 도는 크론이 같은
             -- 수업에 중복으로 문자를 보내지 않도록 막는다. NULL이면 아직 안 보냄.
             ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
-
-            -- 계약서의 "이용 일시" 종료일 — 시작일(start_date)과 짝을 이룬다.
-            -- 약관에 있던 "10회-40일/20회-80일/30회-120일" 식 일괄 기간 규정 대신
-            -- 계약서마다 실제 이용 기간을 직접 적도록 바뀌었다.
-            ALTER TABLE contracts ADD COLUMN IF NOT EXISTS end_date TEXT NOT NULL DEFAULT '';
             `,
           ),
           getPool().query(
@@ -1019,7 +1013,6 @@ export interface ContractRow {
   purpose_other: string;
   option_note: string;
   start_date: string;
-  end_date: string;
   privacy_consent: boolean;
   /** 2:1 계약일 때 함께 등록하는 분의 이름. 별도 회원으로 등록되지 않고 계약서에만 기록된다. */
   companion_name: string;

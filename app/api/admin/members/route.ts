@@ -55,7 +55,6 @@ export async function POST(req: NextRequest) {
         purposeOther?: unknown;
         optionNote?: unknown;
         startDate?: unknown;
-        endDate?: unknown;
         privacyConsent?: unknown;
         companionName?: unknown;
         companionPhone?: unknown;
@@ -117,7 +116,6 @@ export async function POST(req: NextRequest) {
   const purposeOther = typeof body?.purposeOther === "string" ? body.purposeOther.trim() : "";
   const optionNote = typeof body?.optionNote === "string" ? body.optionNote.trim() : "";
   const startDate = typeof body?.startDate === "string" ? body.startDate.trim() : "";
-  const endDate = typeof body?.endDate === "string" ? body.endDate.trim() : "";
   const privacyConsent = body?.privacyConsent === true;
   const companionName = typeof body?.companionName === "string" ? body.companionName.trim() : "";
   const companionPhone = typeof body?.companionPhone === "string" ? body.companionPhone.trim() : "";
@@ -211,7 +209,6 @@ export async function POST(req: NextRequest) {
     purposeOther,
     optionNote,
     startDate,
-    endDate,
     privacyConsent,
     companionName,
     companionPhone,
