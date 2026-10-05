@@ -99,8 +99,8 @@ export async function sendTomorrowSessionReminders(): Promise<SendReminderSummar
   const targets = await getTomorrowPtSessionsNeedingReminder();
   let sent = 0;
   for (const target of targets) {
-    const ok = await sendSms(target.memberPhone, buildReminderMessage(target));
-    if (ok) {
+    const result = await sendSms(target.memberPhone, buildReminderMessage(target));
+    if (result.ok) {
       await markReminderSent(target.id);
       sent += 1;
     }

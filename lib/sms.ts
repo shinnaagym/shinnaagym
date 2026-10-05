@@ -17,14 +17,25 @@ function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
-export async function sendSms(to: string, text: string): Promise<boolean> {
+export interface SendSmsResult {
+  ok: boolean;
+  /** 실패 이유 — 관리자용 테스트 발송 화면에서 "뭐가 문제인지" 바로 보여주기 위함.
+      호출부에서 사용자에게 그대로 노출해도 괜찮은 수준의 메시지만 담는다. */
+  error?: string;
+}
+
+export async function sendSms(to: string, text: string): Promise<SendSmsResult> {
   const apiKey = process.env.SOLAPI_API_KEY;
   const apiSecret = process.env.SOLAPI_API_SECRET;
   const from = process.env.SOLAPI_SENDER_PHONE;
-  if (!apiKey || !apiSecret || !from) return false;
+  if (!apiKey || !apiSecret || !from) {
+    return { ok: false, error: "SOLAPI_API_KEY/SOLAPI_API_SECRET/SOLAPI_SENDER_PHONE 환경 변수가 설정되지 않았어요." };
+  }
 
   const toDigits = normalizePhone(to);
-  if (!toDigits) return false;
+  if (!toDigits) {
+    return { ok: false, error: "받는 사람 전화번호가 올바르지 않아요." };
+  }
 
   try {
     const res = await fetch("https://api.solapi.com/messages/v4/send", {
@@ -41,13 +52,21 @@ export async function sendSms(to: string, text: string): Promise<boolean> {
         },
       }),
     });
+    const body = await res.text().catch(() => "");
     if (!res.ok) {
-      console.error("솔라피 문자 발송 실패:", res.status, await res.text().catch(() => ""));
-      return false;
+      console.error("솔라피 문자 발송 실패:", res.status, body);
+      let reason = body;
+      try {
+        const parsed = JSON.parse(body) as { errorMessage?: string; message?: string };
+        reason = parsed.errorMessage ?? parsed.message ?? body;
+      } catch {
+        // body가 JSON이 아니면 그대로 둠
+      }
+      return { ok: false, error: `솔라피 오류(${res.status}): ${reason}` };
     }
-    return true;
+    return { ok: true };
   } catch (err) {
     console.error("솔라피 문자 발송 실패:", err);
-    return false;
+    return { ok: false, error: err instanceof Error ? err.message : "네트워크 오류가 발생했어요." };
   }
 }
