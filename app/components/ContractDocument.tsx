@@ -25,6 +25,12 @@ function formatWon(n: number): string {
   return `₩${n.toLocaleString("ko-KR")}`;
 }
 
+function formatUsagePeriod(startDate: string, endDate: string): string {
+  if (!startDate && !endDate) return "-";
+  if (startDate && endDate) return `${startDate} ~ ${endDate}`;
+  return startDate || endDate;
+}
+
 export interface ContractDocumentData {
   entry_type: ContractEntryType;
   pt_type: PtType;
@@ -40,6 +46,7 @@ export interface ContractDocumentData {
   purpose_other: string;
   option_note: string;
   start_date: string;
+  end_date: string;
   privacy_consent: boolean;
   companion_name: string;
   companion_phone: string;
@@ -156,8 +163,8 @@ export function ContractDocument({
               <p>{memberPhone || "-"}</p>
             </div>
             <div className="px-4 py-3">
-              <p className="text-xs text-ink/40 mb-0.5">운동 시작일</p>
-              <p>{contract.start_date || "-"}</p>
+              <p className="text-xs text-ink/40 mb-0.5">이용 일시</p>
+              <p>{formatUsagePeriod(contract.start_date, contract.end_date)}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 divide-x divide-line/60">
@@ -199,10 +206,6 @@ export function ContractDocument({
             <ul className="list-disc list-inside space-y-1">
               <li>레슨은 세션 단위로 진행되며, 레슨 시간은 50분입니다. (개인운동 영업시간 내 이용 가능)</li>
               <li>레슨 변경 및 취소 시에는 레슨 12시간 이전에만 가능합니다.</li>
-              <li>
-                레슨 기간은 10회-40일, 20회-80일, 30회-120일을 초과할 수 없으며, 기간 만료 시
-                자동 소멸됩니다.
-              </li>
             </ul>
           </div>
           <div>
