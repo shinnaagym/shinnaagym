@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 36;
+const SCHEMA_VERSION = 37;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -789,6 +789,10 @@ function runFullMigration(): Promise<void> {
               content TEXT NOT NULL,
               updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
+
+            -- PT 수업 전날 리마인드 문자를 보냈는지 기록 — 매일 도는 크론이 같은
+            -- 수업에 중복으로 문자를 보내지 않도록 막는다. NULL이면 아직 안 보냄.
+            ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
             `,
           ),
           getPool().query(
@@ -1223,6 +1227,7 @@ export interface ClassSessionRow {
   entry_type: SessionEntryType;
   pt_type: PtType;
   created_at: string;
+  reminder_sent_at: string | null;
 }
 
 export type NoticeCategory = "notice" | "event";
