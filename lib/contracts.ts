@@ -19,7 +19,6 @@ export interface CreateContractInput {
   purposeOther?: string;
   optionNote?: string;
   startDate?: string;
-  endDate?: string;
   privacyConsent?: boolean;
   /** 2:1 계약일 때 함께 등록하는 분의 정보(별도 회원으로는 등록되지 않음). */
   companionName?: string;
@@ -34,10 +33,10 @@ export async function createContract(input: CreateContractInput): Promise<Contra
     `INSERT INTO contracts (
        member_id, entry_type, pt_type, total_sessions, price, payment_method,
        rrn_front_encrypted, address, visit_channel, visit_channel_referrer_name,
-       visit_channel_other, purposes, purpose_other, option_note, start_date, end_date, privacy_consent,
+       visit_channel_other, purposes, purpose_other, option_note, start_date, privacy_consent,
        companion_name, companion_phone, companion_rrn_front_encrypted, companion_address,
        companion_privacy_consent
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
      RETURNING *`,
     [
       input.memberId,
@@ -55,7 +54,6 @@ export async function createContract(input: CreateContractInput): Promise<Contra
       input.purposeOther ?? "",
       input.optionNote ?? "",
       input.startDate ?? "",
-      input.endDate ?? "",
       input.privacyConsent ?? false,
       input.companionName ?? "",
       input.companionPhone ?? "",
@@ -110,20 +108,6 @@ export async function getLatestContractByMember(
     rrn_front: decryptText(row.rrn_front_encrypted),
     companion_rrn_front: decryptText(row.companion_rrn_front_encrypted),
   };
-}
-
-/** 계약서 작성 이후에도 "이용 일시"(시작일~종료일)만 따로 고칠 수 있게 한다 —
-    처음 작성할 때는 몰랐거나 나중에 변경된 실제 이용 기간을 바로잡는 용도. */
-export async function updateContractUsagePeriod(
-  id: number,
-  startDate: string,
-  endDate: string,
-): Promise<ContractRow> {
-  const result = await query<ContractRow>(
-    `UPDATE contracts SET start_date = $2, end_date = $3 WHERE id = $1 RETURNING *`,
-    [id, startDate, endDate],
-  );
-  return result.rows[0];
 }
 
 export async function signContract(id: number, signatureDataUrl: string): Promise<ContractRow> {
