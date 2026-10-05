@@ -22,6 +22,7 @@ import {
   type ShortenedLeaveDirection,
 } from "@/lib/constants";
 import { SyncDiagnostics } from "./sync-diagnostics";
+import { SmsTest } from "./sms-test";
 import { MemoPad } from "../memo-pad";
 import { NoticesView } from "../notices/notices-view";
 
@@ -1386,6 +1387,8 @@ export function SettingsView({
           </button>
         </div>
       </section>
+
+      <SmsTest />
 
       <SyncDiagnostics
         buildId={buildId}
