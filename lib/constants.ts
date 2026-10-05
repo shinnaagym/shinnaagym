@@ -5,6 +5,9 @@ export const BOOKING_WINDOW_DAYS = 90;
 // 오픈일 전에는 사전예약을 받지 않는다 — 이 날짜 이전은 달력에서 선택할 수 없다.
 export const BOOKING_START_DATE = "2026-09-28";
 
+// 랜딩 페이지 문의 전화번호와 동일 — PT 리마인드 문자 등에서도 재사용한다.
+export const STUDIO_PHONE = "010-2496-8088";
+
 // 취업규칙 제6조(단축근무 및 휴무)·제11조(경조사 지원) 기준 휴가 종류. 당직
 // 캘린더에서 코치별 휴가를 기록할 때 이 중 하나를 고른다. limitPeriod/
 // limitUnit/limitAmount와 noticeDays는 서버 검증(lib/schedule.ts
