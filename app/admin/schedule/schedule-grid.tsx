@@ -2505,6 +2505,8 @@ function EditSessionModal({
   const [moveHour, setMoveHour] = useState(session.session_hour);
   const [moveCoachId, setMoveCoachId] = useState(session.coach_id);
   const [memberSessions, setMemberSessions] = useState<SessionWithMember[] | null>(null);
+  const [selectedOtherIds, setSelectedOtherIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // PT 수업 칸을 열면, 그 회원이 다른 날짜·시간에도 예약이 잡혀 있는지 바로
   // 보이도록 예약 내역을 함께 불러온다.
@@ -2560,9 +2562,52 @@ function EditSessionModal({
     const res = await fetch(`/api/admin/sessions/${id}`, { method: "DELETE" });
     if (res.ok) {
       setMemberSessions((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+      setSelectedOtherIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       onChanged();
     }
   }
+
+  function toggleOtherSelected(id: number) {
+    setSelectedOtherIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDeleteOther() {
+    const ids = Array.from(selectedOtherIds);
+    if (ids.length === 0) return;
+    if (!confirm(`선택한 예약 ${ids.length}건을 삭제할까요?`)) return;
+    setBulkDeleting(true);
+    try {
+      const results = await Promise.all(
+        ids.map((id) => fetch(`/api/admin/sessions/${id}`, { method: "DELETE" })),
+      );
+      const deletedIds = new Set(ids.filter((_, i) => results[i].ok));
+      setMemberSessions((prev) => (prev ? prev.filter((s) => !deletedIds.has(s.id)) : prev));
+      setSelectedOtherIds((prev) => {
+        const next = new Set(prev);
+        deletedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      onChanged();
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  const otherUpcomingSessions =
+    memberSessions === null
+      ? null
+      : memberSessions
+          .filter((s) => s.id !== session.id && s.session_date >= koreaTodayKey())
+          .sort((a, b) => a.session_date.localeCompare(b.session_date) || a.session_hour - b.session_hour);
 
   if (isSimpleEntry(session)) {
     return (
@@ -2701,49 +2746,72 @@ function EditSessionModal({
 
         {session.entry_type === "session" && session.member_id !== null && (
           <div>
-            <p className="text-sm font-medium mb-1.5">예약 내역</p>
-            <div className="max-h-32 overflow-y-auto space-y-0.5 rounded-lg border border-line/50 px-2.5 py-2">
-              {memberSessions === null ? (
-                <p className="text-[11px] text-ink/40">불러오는 중...</p>
-              ) : (
-                (() => {
-                  const todayKey = koreaTodayKey();
-                  const others = memberSessions
-                    .filter((s) => s.id !== session.id && s.session_date >= todayKey)
-                    .sort(
-                      (a, b) =>
-                        a.session_date.localeCompare(b.session_date) || a.session_hour - b.session_hour,
-                    );
-                  if (others.length === 0) {
-                    return <p className="text-[11px] text-ink/40">앞으로 예정된 다른 예약이 없어요.</p>;
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-sm font-medium">예약 내역</p>
+              {otherUpcomingSessions !== null && otherUpcomingSessions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedOtherIds((prev) =>
+                      prev.size === otherUpcomingSessions.length
+                        ? new Set()
+                        : new Set(otherUpcomingSessions.map((s) => s.id)),
+                    )
                   }
-                  return others.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between text-[11px] text-ink/60">
-                      <span>
-                        {s.session_date}({weekdayLabelForDateKey(s.session_date)}){" "}
-                        {formatHourMinute(s.session_hour, s.session_minute)}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        {progressLabel(s) && <span className="text-ink/40">{progressLabel(s)}</span>}
-                        {STATUS_LABEL[s.status]}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteOther(
-                              s.id,
-                              `${s.session_date} ${formatHourMinute(s.session_hour, s.session_minute)}`,
-                            )
-                          }
-                          className="text-ink/40 hover:text-coral"
-                        >
-                          삭제
-                        </button>
-                      </span>
-                    </div>
-                  ));
-                })()
+                  className="text-[11px] text-ink/40 hover:text-coral"
+                >
+                  {selectedOtherIds.size === otherUpcomingSessions.length ? "전체 해제" : "전체 선택"}
+                </button>
               )}
             </div>
+            <div className="max-h-32 overflow-y-auto space-y-0.5 rounded-lg border border-line/50 px-2.5 py-2">
+              {otherUpcomingSessions === null ? (
+                <p className="text-[11px] text-ink/40">불러오는 중...</p>
+              ) : otherUpcomingSessions.length === 0 ? (
+                <p className="text-[11px] text-ink/40">앞으로 예정된 다른 예약이 없어요.</p>
+              ) : (
+                otherUpcomingSessions.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between text-[11px] text-ink/60">
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedOtherIds.has(s.id)}
+                        onChange={() => toggleOtherSelected(s.id)}
+                        className="accent-coral"
+                      />
+                      {s.session_date}({weekdayLabelForDateKey(s.session_date)}){" "}
+                      {formatHourMinute(s.session_hour, s.session_minute)}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      {progressLabel(s) && <span className="text-ink/40">{progressLabel(s)}</span>}
+                      {STATUS_LABEL[s.status]}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDeleteOther(
+                            s.id,
+                            `${s.session_date} ${formatHourMinute(s.session_hour, s.session_minute)}`,
+                          )
+                        }
+                        className="text-ink/40 hover:text-coral"
+                      >
+                        삭제
+                      </button>
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            {selectedOtherIds.size > 0 && (
+              <button
+                type="button"
+                disabled={bulkDeleting}
+                onClick={handleBulkDeleteOther}
+                className="mt-1.5 w-full rounded-lg border border-coral/40 text-coral py-1.5 text-xs font-medium hover:bg-coral/5 transition disabled:opacity-50"
+              >
+                {bulkDeleting ? "삭제 중..." : `선택 삭제 (${selectedOtherIds.size}건)`}
+              </button>
+            )}
           </div>
         )}
 
