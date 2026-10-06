@@ -78,6 +78,14 @@ export default async function EditPtLogPage({
               : null,
             done: e.done ?? false,
           })),
+          inbody: {
+            weight: ptLog.inbody_weight == null ? "" : String(ptLog.inbody_weight),
+            skeletalMuscleMass:
+              ptLog.inbody_skeletal_muscle_mass == null ? "" : String(ptLog.inbody_skeletal_muscle_mass),
+            bodyFatMass: ptLog.inbody_body_fat_mass == null ? "" : String(ptLog.inbody_body_fat_mass),
+            bodyFatPercentage:
+              ptLog.inbody_body_fat_percentage == null ? "" : String(ptLog.inbody_body_fat_percentage),
+          },
         }}
       />
     </div>

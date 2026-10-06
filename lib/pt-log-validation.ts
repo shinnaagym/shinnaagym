@@ -4,6 +4,7 @@ import {
   PT_LOG_CIRCUIT_TYPE_LABELS,
 } from "./constants";
 import type { ExercisePerformanceEntry, PtLogCircuit, PtLogExercise, PtLogSetGroup } from "./db";
+import type { InbodyInput } from "./pt-logs";
 
 const VALID_EQUIPMENT = new Set<string>(PT_LOG_EQUIPMENT_OPTIONS.map((o) => o.value));
 const VALID_CIRCUIT_TYPES = new Set<string>(PT_LOG_CIRCUIT_TYPE_OPTIONS.map((o) => o.value));
@@ -86,6 +87,21 @@ export function parseScale(raw: unknown): number | null {
   const n = Number(raw);
   if (!Number.isFinite(n)) return null;
   return Math.min(10, Math.max(0, Math.round(n)));
+}
+
+/** 인바디(체성분) 측정값 — 체중·골격근량·체지방량·체지방률만 받는다. 값이 전혀
+    없으면(전부 빈칸) null을 돌려줘 호출부가 DB에 그대로 NULL들을 넣게 한다. */
+export function parseInbody(raw: unknown): InbodyInput | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const weight = toNumberOrNull(obj.weight);
+  const skeletalMuscleMass = toNumberOrNull(obj.skeletalMuscleMass);
+  const bodyFatMass = toNumberOrNull(obj.bodyFatMass);
+  const bodyFatPercentage = toNumberOrNull(obj.bodyFatPercentage);
+  if (weight == null && skeletalMuscleMass == null && bodyFatMass == null && bodyFatPercentage == null) {
+    return null;
+  }
+  return { weight, skeletalMuscleMass, bodyFatMass, bodyFatPercentage };
 }
 
 /** PT 일지 작성 폼의 "그래프 기록" 체크박스로 넘어오는 운동 수행능력(e1RM) 항목.

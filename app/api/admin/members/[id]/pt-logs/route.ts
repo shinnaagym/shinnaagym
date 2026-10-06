@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { createPtLog, listPtLogsByMember } from "@/lib/pt-logs";
-import { parseExercises, parsePerformanceEntries, parseScale } from "@/lib/pt-log-validation";
+import { parseExercises, parseInbody, parsePerformanceEntries, parseScale } from "@/lib/pt-log-validation";
 import { createAssessment } from "@/lib/assessments";
 import { recordUndo, type UndoOp } from "@/lib/undo";
 import { koreaTodayKey } from "@/lib/date";
@@ -52,6 +52,7 @@ export async function POST(
   // PT 일지 작성 폼이 예전엔 이걸 별도 요청으로 평가 기록에 남겼는데, 2:1 짝
   // 동기화를 여기 한 곳에서만 처리하려고 같은 요청에 실어 받는다.
   const performanceEntries = parsePerformanceEntries(body?.performanceEntries);
+  const inbody = parseInbody(body?.inbody);
   // 2:1 짝 탭을 열어 독립적으로 고쳐뒀다면, 폼이 짝의 초안을 여기 실어 보낸다
   // — 있으면 짝의 PT 일지는 이 값으로 만들고, 없으면 아래에서 예전처럼 원본을
   // 그대로 복사한다.
@@ -62,6 +63,9 @@ export async function POST(
   const partnerPerformanceEntries = partnerOverride
     ? parsePerformanceEntries(partnerOverride.performanceEntries)
     : null;
+  // 인바디는 사람마다 체성분이 전혀 다르므로, 운동 기록과 달리 짝 탭에서
+  // 직접 입력하지 않았으면 복사하지 않고 비워둔다.
+  const partnerInbody = partnerOverride ? parseInbody(partnerOverride.inbody) : null;
 
   const ptLog = await createPtLog({
     memberId: idNum,
@@ -70,6 +74,7 @@ export async function POST(
     painScale,
     performanceScale: null,
     exercises,
+    inbody: inbody ?? undefined,
   });
 
   const ops: UndoOp[] = [{ op: "delete", table: "pt_logs", id: ptLog.id }];
@@ -108,6 +113,7 @@ export async function POST(
       painScale,
       performanceScale: null,
       exercises: partnerExercises ?? exercises,
+      inbody: partnerInbody ?? undefined,
     });
     ops.push({ op: "delete", table: "pt_logs", id: partnerPtLog.id });
 

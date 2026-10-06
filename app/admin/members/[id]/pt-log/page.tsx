@@ -9,6 +9,7 @@ import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { listGoalMemosByMember } from "@/lib/goal-memos";
 import { AssessmentPainChart } from "../assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
+import { InbodyChart } from "@/app/components/InbodyChart";
 import { ImprovementDirectionNote } from "../assessment/improvement-direction-note";
 import { PainTriggerSection } from "./pain-trigger-section";
 import { ExercisePerformanceSection } from "./exercise-performance-section";
@@ -189,6 +190,8 @@ export default async function PtLogHistoryPage({
       <ExercisePerformanceChart assessments={assessments} />
       <ExercisePerformanceSection memberId={idNum} pastExercises={pastExercises} />
 
+      <InbodyChart ptLogs={ptLogs} memberId={idNum} />
+
       {duoPartner && (
         <>
           <h2 className="font-display text-lg mb-3">📈 {duoPartner.name}님</h2>
@@ -197,6 +200,8 @@ export default async function PtLogHistoryPage({
 
           <ExercisePerformanceChart assessments={duoPartnerAssessments} />
           <ExercisePerformanceSection memberId={duoPartner.id} pastExercises={duoPartnerPastExercises} />
+
+          <InbodyChart ptLogs={duoPartnerPtLogs} memberId={duoPartner.id} />
         </>
       )}
     </div>

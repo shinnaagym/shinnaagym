@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 37;
+const SCHEMA_VERSION = 38;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -521,6 +521,10 @@ function runFullMigration(): Promise<void> {
           pain_scale INTEGER,
           performance_scale INTEGER,
           exercises JSONB NOT NULL DEFAULT '[]'::jsonb,
+          inbody_weight NUMERIC,
+          inbody_skeletal_muscle_mass NUMERIC,
+          inbody_body_fat_mass NUMERIC,
+          inbody_body_fat_percentage NUMERIC,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
         CREATE INDEX IF NOT EXISTS idx_pt_logs_member_id ON pt_logs(member_id);
@@ -793,6 +797,14 @@ function runFullMigration(): Promise<void> {
             -- PT 수업 전날 리마인드 문자를 보냈는지 기록 — 매일 도는 크론이 같은
             -- 수업에 중복으로 문자를 보내지 않도록 막는다. NULL이면 아직 안 보냄.
             ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ;
+
+            -- PT 일지에 인바디(체성분) 측정값을 함께 남길 수 있게 한다. 체중·
+            -- 골격근량·체지방량·체지방률 네 가지만 받아 운동 수행능력 그래프와
+            -- 같은 방식으로 날짜별 추이 그래프를 그린다.
+            ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS inbody_weight NUMERIC;
+            ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS inbody_skeletal_muscle_mass NUMERIC;
+            ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS inbody_body_fat_mass NUMERIC;
+            ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS inbody_body_fat_percentage NUMERIC;
             `,
           ),
           getPool().query(
@@ -1140,6 +1152,10 @@ export interface PtLogRow {
   pain_scale: number | null;
   performance_scale: number | null;
   exercises: PtLogExercise[];
+  inbody_weight: number | null;
+  inbody_skeletal_muscle_mass: number | null;
+  inbody_body_fat_mass: number | null;
+  inbody_body_fat_percentage: number | null;
   created_at: string;
 }
 
