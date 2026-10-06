@@ -240,13 +240,32 @@ export function InbodyChart({
       <div className="rounded-2xl border border-line/60 bg-white shadow-sm px-5 py-4 mb-4">
         <div className="flex items-center justify-between mb-2 gap-2">
           <p className="font-display text-base">인바디 그래프</p>
-          <DisclosureToggle
-            expanded={expanded}
-            onToggle={() => setExpanded((v) => !v)}
-            label={expanded ? "인바디 그래프 접기" : "인바디 그래프 펼치기"}
-          />
+          <div className="flex items-center gap-2">
+            {memberId != null && !showAddForm && expanded && (
+              <button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
+              >
+                + 기록추가
+              </button>
+            )}
+            <DisclosureToggle
+              expanded={expanded}
+              onToggle={() => setExpanded((v) => !v)}
+              label={expanded ? "인바디 그래프 접기" : "인바디 그래프 펼치기"}
+            />
+          </div>
         </div>
-        {expanded && <p className="text-sm text-ink/40 text-center py-6">아직 기록된 인바디가 없어요.</p>}
+        {expanded && (
+          <>
+            {memberId != null && showAddForm ? (
+              <QuickAddInbodyForm memberId={memberId} onDone={() => setShowAddForm(false)} />
+            ) : (
+              <p className="text-sm text-ink/40 text-center py-6">아직 기록된 인바디가 없어요.</p>
+            )}
+          </>
+        )}
       </div>
     );
   }
