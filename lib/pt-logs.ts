@@ -63,7 +63,20 @@ export interface UpdatePtLogInput {
   inbody?: InbodyInput;
 }
 
+/** 인바디는 PT 일지 작성 폼이 아니라 인바디 그래프의 "+ 기록추가"로만 남긴다
+    (별도의 독립된 PT 일지 행으로). 그래서 일반 PT 일지 수정(운동·메모·날짜)은
+    input.inbody를 아예 넘기지 않으며, 그 경우 인바디 컬럼은 손대지 않고 기존
+    값을 그대로 둔다 — 넘기지 않았다고 null로 지워버리면 안 된다. */
 export async function updatePtLog(id: number, input: UpdatePtLogInput): Promise<PtLogRow> {
+  if (input.inbody === undefined) {
+    const result = await query<PtLogRow>(
+      `UPDATE pt_logs SET log_date = $2, memo = $3, exercises = $4
+       WHERE id = $1
+       RETURNING *`,
+      [id, input.logDate, input.memo ?? "", JSON.stringify(input.exercises ?? [])],
+    );
+    return result.rows[0];
+  }
   const result = await query<PtLogRow>(
     `UPDATE pt_logs SET
        log_date = $2, memo = $3, exercises = $4,
@@ -76,10 +89,10 @@ export async function updatePtLog(id: number, input: UpdatePtLogInput): Promise<
       input.logDate,
       input.memo ?? "",
       JSON.stringify(input.exercises ?? []),
-      input.inbody?.weight ?? null,
-      input.inbody?.skeletalMuscleMass ?? null,
-      input.inbody?.bodyFatMass ?? null,
-      input.inbody?.bodyFatPercentage ?? null,
+      input.inbody.weight ?? null,
+      input.inbody.skeletalMuscleMass ?? null,
+      input.inbody.bodyFatMass ?? null,
+      input.inbody.bodyFatPercentage ?? null,
     ],
   );
   return result.rows[0];

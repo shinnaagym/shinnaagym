@@ -80,32 +80,10 @@ function emptyExercise(): ExerciseInput {
   };
 }
 
-interface InbodyFormInput {
-  weight: string;
-  skeletalMuscleMass: string;
-  bodyFatMass: string;
-  bodyFatPercentage: string;
-}
-
-function emptyInbody(): InbodyFormInput {
-  return { weight: "", skeletalMuscleMass: "", bodyFatMass: "", bodyFatPercentage: "" };
-}
-
-/** 빈칸은 null로, 숫자가 아닌 값도 null로 바꿔 저장용 인바디 객체를 만든다. */
-function buildInbodyPayload(inbody: InbodyFormInput) {
-  return {
-    weight: inbody.weight === "" ? null : Number(inbody.weight),
-    skeletalMuscleMass: inbody.skeletalMuscleMass === "" ? null : Number(inbody.skeletalMuscleMass),
-    bodyFatMass: inbody.bodyFatMass === "" ? null : Number(inbody.bodyFatMass),
-    bodyFatPercentage: inbody.bodyFatPercentage === "" ? null : Number(inbody.bodyFatPercentage),
-  };
-}
-
 export interface PtLogFormInitialData {
   logDate: string;
   memo: string;
   exercises: ExerciseInput[];
-  inbody?: InbodyFormInput;
 }
 
 /** 화면에 입력된 운동 목록을 저장용 형태로 정리하고, 체크해둔 세트를 운동
@@ -227,7 +205,6 @@ export function PtLogForm({
   const [exercises, setExercises] = useState<ExerciseInput[]>(
     () => initialData?.exercises ?? [emptyExercise()],
   );
-  const [inbody, setInbody] = useState<InbodyFormInput>(() => initialData?.inbody ?? emptyInbody());
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // 이름 입력 중 자동완성 목록을 띄울 운동의 인덱스. 한 번에 한 칸만 연다.
@@ -237,22 +214,17 @@ export function PtLogForm({
   // 그 탭으로 전환하는 순간) 지금 화면에 있는 값을 그대로 복사해 넣고, 그
   // 다음부터는 각 탭이 완전히 독립된 상태로 움직인다 — 한쪽 탭에서 고친 내용이
   // 다른 쪽 탭에는 절대 반영되지 않는다.
-  const draftsRef = useRef<Record<number, { memo: string; exercises: ExerciseInput[]; inbody: InbodyFormInput }>>(
-    {},
-  );
+  const draftsRef = useRef<Record<number, { memo: string; exercises: ExerciseInput[] }>>({});
 
   function switchActiveMember(targetId: number) {
     if (targetId === activeMemberId) return;
-    draftsRef.current[activeMemberId] = { memo, exercises, inbody };
+    draftsRef.current[activeMemberId] = { memo, exercises };
     if (!draftsRef.current[targetId]) {
-      // 인바디는 사람마다 체성분이 전혀 다르므로, 운동 기록과 달리 짝 탭으로
-      // 처음 전환할 때도 비워서 시작한다(복사하지 않음).
-      draftsRef.current[targetId] = { memo, exercises, inbody: emptyInbody() };
+      draftsRef.current[targetId] = { memo, exercises };
     }
     const target = draftsRef.current[targetId];
     setMemo(target.memo);
     setExercises(target.exercises);
-    setInbody(target.inbody);
     setActiveMemberId(targetId);
   }
 
@@ -340,9 +312,9 @@ export function PtLogForm({
     // 지금 화면(activeMemberId 탭)에 있는 값을 그 탭의 초안으로 먼저 저장해둔다
     // — 짝 탭으로 한 번도 전환하지 않고 바로 저장을 눌러도 draftsRef[memberId]가
     // 채워지도록 하기 위함.
-    draftsRef.current[activeMemberId] = { memo, exercises, inbody };
+    draftsRef.current[activeMemberId] = { memo, exercises };
 
-    const primaryDraft = draftsRef.current[memberId] ?? { memo, exercises, inbody };
+    const primaryDraft = draftsRef.current[memberId] ?? { memo, exercises };
     // 짝 탭을 실제로 열어봤을 때만(=독립적으로 고쳤을 수 있을 때만) 그 초안을
     // 함께 보낸다. 열어본 적이 없으면 서버가 예전처럼 primary 내용을 그대로
     // 복사한다.
@@ -380,7 +352,6 @@ export function PtLogForm({
           logDate,
           memo: primaryDraft.memo,
           exercises: primaryPayload.cleanedExercises,
-          ...(kind === "pt_log" ? { inbody: buildInbodyPayload(primaryDraft.inbody) } : {}),
           ...(!isEditing && primaryPayload.performanceEntries.length > 0
             ? { performanceEntries: primaryPayload.performanceEntries }
             : {}),
@@ -390,7 +361,6 @@ export function PtLogForm({
                   memo: partnerDraft.memo,
                   exercises: partnerPayload.cleanedExercises,
                   performanceEntries: partnerPayload.performanceEntries,
-                  inbody: buildInbodyPayload(partnerDraft.inbody),
                 },
               }
             : {}),
@@ -490,62 +460,6 @@ export function PtLogForm({
           </p>
         )}
       </div>
-
-      {kind === "pt_log" && (
-        <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-4">
-          <p className="text-sm font-medium mb-3">인바디 (선택)</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-ink/50 mb-1">체중 (kg)</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={inbody.weight}
-                onChange={(e) => setInbody((prev) => ({ ...prev, weight: e.target.value }))}
-                placeholder="예: 65.5"
-                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-ink/50 mb-1">골격근량 (kg)</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={inbody.skeletalMuscleMass}
-                onChange={(e) =>
-                  setInbody((prev) => ({ ...prev, skeletalMuscleMass: e.target.value }))
-                }
-                placeholder="예: 28.3"
-                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-ink/50 mb-1">체지방량 (kg)</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={inbody.bodyFatMass}
-                onChange={(e) => setInbody((prev) => ({ ...prev, bodyFatMass: e.target.value }))}
-                placeholder="예: 15.2"
-                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-ink/50 mb-1">체지방률 (%)</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={inbody.bodyFatPercentage}
-                onChange={(e) =>
-                  setInbody((prev) => ({ ...prev, bodyFatPercentage: e.target.value }))
-                }
-                placeholder="예: 23.1"
-                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {kind === "pt_log" && (
         <PainTriggerSection

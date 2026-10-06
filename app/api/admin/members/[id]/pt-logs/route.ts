@@ -63,9 +63,6 @@ export async function POST(
   const partnerPerformanceEntries = partnerOverride
     ? parsePerformanceEntries(partnerOverride.performanceEntries)
     : null;
-  // 인바디는 사람마다 체성분이 전혀 다르므로, 운동 기록과 달리 짝 탭에서
-  // 직접 입력하지 않았으면 복사하지 않고 비워둔다.
-  const partnerInbody = partnerOverride ? parseInbody(partnerOverride.inbody) : null;
 
   const ptLog = await createPtLog({
     memberId: idNum,
@@ -113,7 +110,6 @@ export async function POST(
       painScale,
       performanceScale: null,
       exercises: partnerExercises ?? exercises,
-      inbody: partnerInbody ?? undefined,
     });
     ops.push({ op: "delete", table: "pt_logs", id: partnerPtLog.id });
 
