@@ -18,7 +18,7 @@ export async function notifyNewReservation(data: ReservationNotification): Promi
   if (!endpoint) return;
 
   try {
-    await fetch(endpoint, {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -34,6 +34,15 @@ export async function notifyNewReservation(data: ReservationNotification): Promi
         예약일시: `${data.date} ${data.hour}:00 - ${data.hour + 1}:00`,
       }),
     });
+    // fetch는 429(요청 한도 초과)·410(폼 삭제/중지) 같은 HTTP 에러 상태에도 예외를
+    // 던지지 않고 그냥 응답을 반환한다. res.ok를 확인하지 않으면 Formspree가
+    // 거부해도 "성공"으로 착각해 아무 로그도 안 남고 메일만 조용히 안 가는
+    // 상황이 생긴다 — 응답 본문까지 로그에 남겨 Vercel 로그에서 바로 원인을
+    // 알 수 있게 한다.
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`Formspree 알림 전송 실패: ${res.status} ${res.statusText} — ${body}`);
+    }
   } catch (err) {
     console.error("Formspree 알림 전송 실패:", err);
   }
