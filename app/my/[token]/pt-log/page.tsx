@@ -5,6 +5,7 @@ import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember } from "@/lib/assessments";
 import { AssessmentPainChart } from "@/app/admin/members/[id]/assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
+import { InbodyChart } from "@/app/components/InbodyChart";
 import { PtLogList } from "@/app/admin/members/[id]/pt-log/pt-log-list";
 
 export default async function MyPtLogHistoryPage({
@@ -43,6 +44,7 @@ export default async function MyPtLogHistoryPage({
 
         <AssessmentPainChart assessments={assessments} />
         <ExercisePerformanceChart assessments={assessments} />
+        <InbodyChart ptLogs={ptLogs} />
 
         {duoPartner && (
           <>
@@ -52,6 +54,7 @@ export default async function MyPtLogHistoryPage({
             </div>
             <AssessmentPainChart assessments={duoPartnerAssessments} />
             <ExercisePerformanceChart assessments={duoPartnerAssessments} />
+            <InbodyChart ptLogs={duoPartnerPtLogs} />
           </>
         )}
 

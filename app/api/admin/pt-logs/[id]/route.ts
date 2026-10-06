@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { deletePtLog, getPtLogById, updatePtLog } from "@/lib/pt-logs";
-import { parseExercises } from "@/lib/pt-log-validation";
+import { parseExercises, parseInbody } from "@/lib/pt-log-validation";
 import { recordUndo } from "@/lib/undo";
 import { koreaTodayKey } from "@/lib/date";
 import type { PtLogRow } from "@/lib/db";
@@ -35,8 +35,9 @@ export async function PATCH(
     typeof body?.logDate === "string" && body.logDate ? body.logDate : koreaTodayKey();
   const memo = typeof body?.memo === "string" ? body.memo.trim() : "";
   const exercises = parseExercises(body?.exercises);
+  const inbody = parseInbody(body?.inbody);
 
-  const ptLog = await updatePtLog(idNum, { logDate, memo, exercises });
+  const ptLog = await updatePtLog(idNum, { logDate, memo, exercises, inbody: inbody ?? undefined });
 
   const { id: _prevId, ...prevRest } = ptLogRowForSql(existing);
   await recordUndo("PT 일지 수정", [
