@@ -11,7 +11,7 @@ Next.js(App Router) + Postgres로 만들어졌고, Vercel에 배포하는 것을
   오늘 날짜의 지난 시간은 자동으로 마감 처리되어 선택할 수 없습니다. 동시에 두 명이 같은
   시간을 예약하는 것은 DB의 `UNIQUE(reservation_date, reservation_hour)` 제약으로 막습니다.
 - 관리자 페이지(`/admin`): 비밀번호로 로그인 후 전체 예약 목록 확인 및 취소(삭제) 가능.
-  기본 비밀번호는 `951105`이며, `ADMIN_PASSWORD` 환경변수로 바꿀 수 있습니다.
+  기본 비밀번호는 `shin`이며, `ADMIN_PASSWORD` 환경변수로 바꿀 수 있습니다.
 - 예약 알림: `FORMSPREE_ENDPOINT`를 설정하면 새 예약이 접수될 때마다 Formspree를 통해
   연결된 Gmail로 알림 메일이 발송됩니다.
 
@@ -33,7 +33,7 @@ npm run dev
    설정됩니다. (테이블은 앱이 처음 DB에 접근할 때 자동으로 생성되므로 별도 마이그레이션이
    필요 없습니다.)
 3. 프로젝트 **Settings → Environment Variables**에서 아래 값을 추가합니다.
-   - `ADMIN_PASSWORD` — 관리자 비밀번호 (기본값 `951105`. 다른 값으로 바꾸고 싶다면 설정)
+   - `ADMIN_PASSWORD` — 관리자 비밀번호 (기본값 `shin`. 다른 값으로 바꾸고 싶다면 설정)
    - `ADMIN_SESSION_SECRET` — 임의의 긴 무작위 문자열(32자 이상 추천). 관리자 로그인
      세션 쿠키에 서명할 때 사용합니다. 예: `openssl rand -hex 32` 로 생성 가능.
    - `FORMSPREE_ENDPOINT` — (선택) 예약 알림 메일을 받고 싶다면 설정. 아래 "예약 알림 메일
@@ -45,7 +45,7 @@ npm run dev
 | 변수 | 필수 | 설명 |
 | --- | --- | --- |
 | `POSTGRES_URL` | 예 | Postgres 연결 문자열. Vercel Storage에서 Postgres를 연결하면 자동으로 설정됩니다. 로컬 개발 시 직접 채워주세요. |
-| `ADMIN_PASSWORD` | 아니오 | 관리자 로그인 비밀번호. 기본값은 `951105`입니다. |
+| `ADMIN_PASSWORD` | 아니오 | 관리자 로그인 비밀번호. 기본값은 `shin`입니다. |
 | `ADMIN_SESSION_SECRET` | 배포 시 권장 | 관리자 세션 쿠키 서명용 비밀 키. 설정하지 않으면 개발용 기본값이 쓰이므로, 운영 배포 전에는 꼭 설정해주세요. |
 | `FORMSPREE_ENDPOINT` | 아니오 | Formspree 폼 엔드포인트(`https://formspree.io/f/xxxxxxxx`). 설정하면 새 예약마다 이메일 알림을 보냅니다. |
 | `NEXT_PUBLIC_GA_ID` | 아니오 | Google Analytics(GA4) 측정 ID(`G-XXXXXXXXXX`). 설정하면 사전예약 랜딩 페이지에서 방문·예약 퍼널 이벤트를 전송합니다. |
