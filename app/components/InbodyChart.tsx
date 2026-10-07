@@ -478,15 +478,27 @@ export function InbodyChart({
                   {s.values.map(
                     (v, i) =>
                       v != null && (
-                        <circle
-                          key={i}
-                          cx={xAt(i)}
-                          cy={yPixels[si][i]}
-                          r={4}
-                          fill={s.def.color}
-                          stroke="#ffffff"
-                          strokeWidth={2}
-                        />
+                        <g key={i}>
+                          <circle
+                            cx={xAt(i)}
+                            cy={yPixels[si][i]}
+                            r={4}
+                            fill={s.def.color}
+                            stroke="#ffffff"
+                            strokeWidth={2}
+                          />
+                          <text
+                            x={xAt(i)}
+                            y={yPixels[si][i] - 8}
+                            textAnchor="middle"
+                            fontSize={9}
+                            fontWeight={600}
+                            fill={s.def.color}
+                          >
+                            {v}
+                            {s.def.unit}
+                          </text>
+                        </g>
                       ),
                   )}
                 </g>
