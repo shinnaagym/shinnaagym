@@ -180,7 +180,14 @@ export default async function PtLogHistoryPage({
 
       <ImprovementDirectionNote memberId={idNum} initialValue={member.improvement_direction} />
 
-      <ConsultationNote memberId={idNum} initialValue={member.consultation_note} />
+      {/* 아직 이 화면에서 따로 저장한 적 없으면(consultation_note가 비어있으면),
+          초진 문진표의 "상담 내용 · 서술"(pain_moi)을 그대로 가져와 처음 보여준다.
+          한 번이라도 저장하면 그 뒤로는 독립된 값이라, 문진표를 나중에 고쳐도
+          여기엔 자동으로 반영되지 않는다. */}
+      <ConsultationNote
+        memberId={idNum}
+        initialValue={member.consultation_note || intake?.pain_moi || ""}
+      />
 
       {/* 통증 척도·운동수행 능력 그래프는 평가 기록(평가지)과 같은 데이터를
           쓴다 — PT 일지에서 기록해도, 평가 기록 화면에서 기록해도 같은
