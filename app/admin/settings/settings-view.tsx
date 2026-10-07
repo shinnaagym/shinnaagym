@@ -58,9 +58,9 @@ export interface CoachWorkingHours {
   saturdayEnd: number;
 }
 
-/** 코치별 근무시간 설정은 이제 요일별 커스텀 대신 오전조/오후조 중 하나를 고르는
-    방식이다. 토요일 값은 더 이상 이 화면에서 쓰이지 않지만(당직 캘린더가 대신함)
-    스키마상 NOT NULL이라 9~15시로 채워 둔다. */
+/** "오전조 전체 적용"/"오후조 전체 적용" 버튼은 월~금 다섯 요일 모두를 한 번에
+    같은 값으로 맞추는 빠른 단축키다. 토요일 값은 더 이상 이 화면에서 쓰이지
+    않지만(당직 캘린더가 대신함) 스키마상 NOT NULL이라 9~15시로 채워 둔다. */
 const SHIFT_PRESETS = {
   morning: {
     label: "오전조 (9~17시)",
@@ -73,6 +73,24 @@ const SHIFT_PRESETS = {
 } as const satisfies Record<string, { label: string; hours: CoachWorkingHours }>;
 
 type ShiftKey = keyof typeof SHIFT_PRESETS;
+
+// 요일 하나를 고를 때는 오전/오후 조 대신 "전체"(스튜디오 영업시간 9~22시
+// 그대로, 즉 그 요일은 제한 없음)도 고를 수 있다.
+const DAY_SHIFT_HOURS = {
+  full: [9, 22],
+  morning: [9, 17],
+  afternoon: [14, 22],
+} as const satisfies Record<string, [number, number]>;
+
+type DayShiftKey = keyof typeof DAY_SHIFT_HOURS;
+
+const DAY_SHIFT_LABELS: Record<DayShiftKey, string> = {
+  full: "전체",
+  morning: "오전",
+  afternoon: "오후",
+};
+
+const WEEKDAY_SHIFT_LABELS = ["월", "화", "수", "목", "금"];
 
 function detectShift(hours: CoachWorkingHours | undefined): ShiftKey | null {
   if (!hours) return null;
@@ -88,9 +106,19 @@ function detectShift(hours: CoachWorkingHours | undefined): ShiftKey | null {
   return null;
 }
 
+function detectDayShift(start: number, end: number): DayShiftKey {
+  for (const key of Object.keys(DAY_SHIFT_HOURS) as DayShiftKey[]) {
+    const [s, e] = DAY_SHIFT_HOURS[key];
+    if (s === start && e === end) return key;
+  }
+  return "full";
+}
+
 /** 코치 한 명의 근무 조(오전/오후)를 고르는 위젯. 클릭하는 즉시 저장된다.
     코치 관리 섹션의 코치별 행 안에 인라인으로 들어가므로 이름은 표시하지
-    않는다. */
+    않는다. 위쪽은 월~금 전체를 한 번에 맞추는 단축 버튼, 아래쪽은 요일마다
+    따로 고를 수 있는 선택지다(예: 월·수·금은 오전, 화·목은 오후). saved가
+    없으면(코치가 아직 근무시간 제한이 없는 상태) 모든 요일이 "전체"로 보인다. */
 function ShiftPresetPicker({
   saved,
   onSelect,
@@ -101,35 +129,70 @@ function ShiftPresetPicker({
   onClear: () => void;
 }) {
   const current = detectShift(saved);
+  const weekdayStarts = saved?.weekdayStarts ?? Array(5).fill(DAY_SHIFT_HOURS.full[0]);
+  const weekdayEnds = saved?.weekdayEnds ?? Array(5).fill(DAY_SHIFT_HOURS.full[1]);
+  const saturdayStart = saved?.saturdayStart ?? SHIFT_PRESETS.morning.hours.saturdayStart;
+  const saturdayEnd = saved?.saturdayEnd ?? SHIFT_PRESETS.morning.hours.saturdayEnd;
+
+  function setDay(index: number, key: DayShiftKey) {
+    const [start, end] = DAY_SHIFT_HOURS[key];
+    const nextStarts = [...weekdayStarts];
+    const nextEnds = [...weekdayEnds];
+    nextStarts[index] = start;
+    nextEnds[index] = end;
+    onSelect({ weekdayStarts: nextStarts, weekdayEnds: nextEnds, saturdayStart, saturdayEnd });
+  }
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] text-ink/40">근무 조</span>
-      <div className="flex gap-1.5 flex-wrap">
-        {(Object.keys(SHIFT_PRESETS) as ShiftKey[]).map((key) => (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] text-ink/40">근무 조(전체 적용)</span>
+        <div className="flex gap-1.5 flex-wrap">
+          {(Object.keys(SHIFT_PRESETS) as ShiftKey[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSelect(SHIFT_PRESETS[key].hours)}
+              className={[
+                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
+                current === key
+                  ? "bg-ink text-white border-ink"
+                  : "border-line text-ink/60 hover:bg-bone",
+              ].join(" ")}
+            >
+              {SHIFT_PRESETS[key].label}
+            </button>
+          ))}
+        </div>
+        {saved && (
           <button
-            key={key}
             type="button"
-            onClick={() => onSelect(SHIFT_PRESETS[key].hours)}
-            className={[
-              "rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
-              current === key
-                ? "bg-ink text-white border-ink"
-                : "border-line text-ink/60 hover:bg-bone",
-            ].join(" ")}
+            onClick={onClear}
+            className="text-[11px] text-ink/40 hover:text-coral"
           >
-            {SHIFT_PRESETS[key].label}
+            제한 없음으로 초기화
           </button>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap pl-0.5">
+        <span className="text-[11px] text-ink/40">요일별</span>
+        {WEEKDAY_SHIFT_LABELS.map((label, i) => (
+          <label key={i} className="flex items-center gap-1 text-[11px] text-ink/50">
+            {label}
+            <select
+              value={detectDayShift(weekdayStarts[i], weekdayEnds[i])}
+              onChange={(e) => setDay(i, e.target.value as DayShiftKey)}
+              className="rounded-md border border-line bg-white px-1 py-0.5 text-[11px] outline-none focus:border-coral"
+            >
+              {(Object.keys(DAY_SHIFT_HOURS) as DayShiftKey[]).map((key) => (
+                <option key={key} value={key}>
+                  {DAY_SHIFT_LABELS[key]}
+                </option>
+              ))}
+            </select>
+          </label>
         ))}
       </div>
-      {saved && (
-        <button
-          type="button"
-          onClick={onClear}
-          className="text-[11px] text-ink/40 hover:text-coral"
-        >
-          제한 없음으로 초기화
-        </button>
-      )}
     </div>
   );
 }
