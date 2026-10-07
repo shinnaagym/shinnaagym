@@ -37,7 +37,22 @@ const LEAVE_RULE_GROUPS = Array.from(new Set(LEAVE_TYPE_OPTIONS.map((o) => o.rul
 const CYCLE_LABELS: Record<RecurringEventCycle, string> = {
   monthly: "매달",
   quarterly: "분기(3·6·9·12월)",
+  weekly: "매주",
+  biweekly: "격주",
 };
+
+const WEEKLY_CYCLES = new Set<RecurringEventCycle>(["weekly", "biweekly"]);
+
+// 정기 일정의 요일(매주/격주 전용)은 1=월 ~ 5=금만 고를 수 있다 — 토·일요일을
+// 고르면 날짜 계산 로직이 항상 다음 평일로 밀어버려 "매주 토요일"처럼 의도한
+// 요일에 전혀 반영되지 않으므로 아예 선택지에서 뺀다.
+const RECURRING_WEEKDAY_OPTIONS = [
+  { value: 1, label: "월" },
+  { value: 2, label: "화" },
+  { value: 3, label: "수" },
+  { value: 4, label: "목" },
+  { value: 5, label: "금" },
+];
 
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   regular: "정직원",
@@ -896,6 +911,7 @@ export function SettingsView({
   const [newEventName, setNewEventName] = useState("");
   const [newEventCycle, setNewEventCycle] = useState<RecurringEventCycle>("monthly");
   const [newEventDay, setNewEventDay] = useState(1);
+  const [newEventDayOfWeek, setNewEventDayOfWeek] = useState(1);
   const [newEventStartHour, setNewEventStartHour] = useState(12);
   const [newEventEndHour, setNewEventEndHour] = useState(14);
   const [error, setError] = useState<string | null>(null);
@@ -1045,7 +1061,9 @@ export function SettingsView({
       body: JSON.stringify({
         name: newEventName.trim(),
         cycle: newEventCycle,
-        dayOfMonth: newEventDay,
+        ...(WEEKLY_CYCLES.has(newEventCycle)
+          ? { dayOfWeek: newEventDayOfWeek }
+          : { dayOfMonth: newEventDay }),
         startHour: newEventStartHour,
         endHour: newEventEndHour,
       }),
@@ -1059,6 +1077,7 @@ export function SettingsView({
     setNewEventName("");
     setNewEventCycle("monthly");
     setNewEventDay(1);
+    setNewEventDayOfWeek(1);
     setNewEventStartHour(12);
     setNewEventEndHour(14);
   }
@@ -1069,6 +1088,7 @@ export function SettingsView({
       name: string;
       cycle: RecurringEventCycle;
       dayOfMonth: number;
+      dayOfWeek: number;
       startHour: number;
       endHour: number;
       enabled: boolean;
@@ -1082,6 +1102,7 @@ export function SettingsView({
               ...(patch.name !== undefined && { name: patch.name }),
               ...(patch.cycle !== undefined && { cycle: patch.cycle }),
               ...(patch.dayOfMonth !== undefined && { day_of_month: patch.dayOfMonth }),
+              ...(patch.dayOfWeek !== undefined && { day_of_week: patch.dayOfWeek }),
               ...(patch.startHour !== undefined && { start_hour: patch.startHour }),
               ...(patch.endHour !== undefined && { end_hour: patch.endHour }),
               ...(patch.enabled !== undefined && { enabled: patch.enabled }),
@@ -1294,10 +1315,11 @@ export function SettingsView({
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">정기 일정</h2>
         <p className="text-xs text-ink/50 mb-4">
-          매달 또는 분기(3·6·9·12월)마다 같은 날짜·시간에 반복되는 일정이에요. 등록하면
-          재직 중인 코치 전원의 스케줄표에 자동으로 잡혀 그 시간엔 다른 예약을 받을 수
-          없어요. 날짜가 토·일요일이거나 공휴일 관리에 등록된 날이면 자동으로 그다음
-          평일로 미뤄져요(대체공휴일도 공휴일 관리에 등록해두면 함께 반영돼요).
+          매주·격주·매달 또는 분기(3·6·9·12월)마다 반복되는 일정이에요. 매주/격주는
+          날짜 대신 요일(월~금)을 고르고, 격주는 등록한 날부터 2주에 한 번 돌아와요.
+          등록하면 재직 중인 코치 전원의 스케줄표에 자동으로 잡혀 그 시간엔 다른 예약을
+          받을 수 없어요. 날짜가 토·일요일이거나 공휴일 관리에 등록된 날이면 자동으로
+          그다음 평일로 미뤄져요(대체공휴일도 공휴일 관리에 등록해두면 함께 반영돼요).
         </p>
         <div className="divide-y divide-line/50">
           {recurringEvents.map((ev) => (
@@ -1312,9 +1334,16 @@ export function SettingsView({
               />
               <select
                 value={ev.cycle}
-                onChange={(e) =>
-                  patchRecurringEvent(ev.id, { cycle: e.target.value as RecurringEventCycle })
-                }
+                onChange={(e) => {
+                  const cycle = e.target.value as RecurringEventCycle;
+                  // 매달/분기 ↔ 매주/격주로 전환하면 이전엔 쓰지 않던 요일/날짜
+                  // 값이 비어 있을 수 있어, 전환 즉시 기본값을 함께 채워 보낸다.
+                  if (WEEKLY_CYCLES.has(cycle)) {
+                    patchRecurringEvent(ev.id, { cycle, dayOfWeek: ev.day_of_week ?? 1 });
+                  } else {
+                    patchRecurringEvent(ev.id, { cycle });
+                  }
+                }}
                 className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
               >
                 {(Object.keys(CYCLE_LABELS) as RecurringEventCycle[]).map((cycle) => (
@@ -1323,23 +1352,37 @@ export function SettingsView({
                   </option>
                 ))}
               </select>
-              <span className="flex items-center gap-1 text-xs text-ink/60">
-                매
-                <input
-                  type="number"
-                  min={1}
-                  max={28}
-                  value={ev.day_of_month}
-                  onChange={(e) => {
-                    const day = Number(e.target.value);
-                    if (Number.isInteger(day) && day >= 1 && day <= 28) {
-                      patchRecurringEvent(ev.id, { dayOfMonth: day });
-                    }
-                  }}
-                  className="w-12 rounded-lg border border-line px-1.5 py-1.5 text-xs text-center outline-none focus:border-coral"
-                />
-                일
-              </span>
+              {WEEKLY_CYCLES.has(ev.cycle) ? (
+                <select
+                  value={ev.day_of_week ?? 1}
+                  onChange={(e) => patchRecurringEvent(ev.id, { dayOfWeek: Number(e.target.value) })}
+                  className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                >
+                  {RECURRING_WEEKDAY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}요일
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="flex items-center gap-1 text-xs text-ink/60">
+                  매
+                  <input
+                    type="number"
+                    min={1}
+                    max={28}
+                    value={ev.day_of_month}
+                    onChange={(e) => {
+                      const day = Number(e.target.value);
+                      if (Number.isInteger(day) && day >= 1 && day <= 28) {
+                        patchRecurringEvent(ev.id, { dayOfMonth: day });
+                      }
+                    }}
+                    className="w-12 rounded-lg border border-line px-1.5 py-1.5 text-xs text-center outline-none focus:border-coral"
+                  />
+                  일
+                </span>
+              )}
               <span className="flex items-center gap-1 text-xs text-ink/60">
                 <select
                   value={ev.start_hour}
@@ -1405,18 +1448,32 @@ export function SettingsView({
               </option>
             ))}
           </select>
-          <span className="flex items-center gap-1 text-sm text-ink/60">
-            매
-            <input
-              type="number"
-              min={1}
-              max={28}
-              value={newEventDay}
-              onChange={(e) => setNewEventDay(Number(e.target.value))}
-              className="w-14 rounded-lg border border-line px-2 py-2 text-sm text-center outline-none focus:border-coral"
-            />
-            일
-          </span>
+          {WEEKLY_CYCLES.has(newEventCycle) ? (
+            <select
+              value={newEventDayOfWeek}
+              onChange={(e) => setNewEventDayOfWeek(Number(e.target.value))}
+              className="rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral"
+            >
+              {RECURRING_WEEKDAY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}요일
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="flex items-center gap-1 text-sm text-ink/60">
+              매
+              <input
+                type="number"
+                min={1}
+                max={28}
+                value={newEventDay}
+                onChange={(e) => setNewEventDay(Number(e.target.value))}
+                className="w-14 rounded-lg border border-line px-2 py-2 text-sm text-center outline-none focus:border-coral"
+              />
+              일
+            </span>
+          )}
           <span className="flex items-center gap-1 text-sm text-ink/60">
             <select
               value={newEventStartHour}
