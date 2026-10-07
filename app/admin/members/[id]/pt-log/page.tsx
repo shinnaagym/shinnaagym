@@ -11,6 +11,7 @@ import { AssessmentPainChart } from "../assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { InbodyChart } from "@/app/components/InbodyChart";
 import { ImprovementDirectionNote } from "../assessment/improvement-direction-note";
+import { ConsultationNote } from "../assessment/consultation-note";
 import { PainTriggerSection } from "./pain-trigger-section";
 import { ExercisePerformanceSection } from "./exercise-performance-section";
 import { PtLogList } from "./pt-log-list";
@@ -178,6 +179,8 @@ export default async function PtLogHistoryPage({
       </div>
 
       <ImprovementDirectionNote memberId={idNum} initialValue={member.improvement_direction} />
+
+      <ConsultationNote memberId={idNum} initialValue={member.consultation_note} />
 
       {/* 통증 척도·운동수행 능력 그래프는 평가 기록(평가지)과 같은 데이터를
           쓴다 — PT 일지에서 기록해도, 평가 기록 화면에서 기록해도 같은

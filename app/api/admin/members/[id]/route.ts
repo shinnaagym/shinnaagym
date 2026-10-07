@@ -121,6 +121,7 @@ export async function PATCH(
         followupStatus?: unknown;
         followupMemo?: unknown;
         improvementDirection?: unknown;
+        consultationNote?: unknown;
         status?: unknown;
       }
     | null;
@@ -150,6 +151,8 @@ export async function PATCH(
     typeof body.followupMemo === "string" ? body.followupMemo.trim() : undefined;
   const improvementDirection =
     typeof body.improvementDirection === "string" ? body.improvementDirection.trim() : undefined;
+  const consultationNote =
+    typeof body.consultationNote === "string" ? body.consultationNote.trim() : undefined;
   const status =
     body.status === "active" || body.status === "inactive"
       ? (body.status as MemberStatus)
@@ -171,6 +174,7 @@ export async function PATCH(
     followupStatus,
     followupMemo,
     improvementDirection,
+    consultationNote,
     status,
   });
 
@@ -188,6 +192,7 @@ export async function PATCH(
   }
   if (followupMemo !== undefined) prevValues.followup_memo = before.followup_memo;
   if (improvementDirection !== undefined) prevValues.improvement_direction = before.improvement_direction;
+  if (consultationNote !== undefined) prevValues.consultation_note = before.consultation_note;
   if (status !== undefined) prevValues.status = before.status;
 
   if (Object.keys(prevValues).length > 0) {
