@@ -8,7 +8,8 @@ import {
 import { recordUndo } from "@/lib/undo";
 import type { RecurringEventCycle } from "@/lib/db";
 
-const VALID_CYCLES: RecurringEventCycle[] = ["monthly", "quarterly"];
+const VALID_CYCLES: RecurringEventCycle[] = ["monthly", "quarterly", "weekly", "biweekly"];
+const WEEKLY_CYCLES = new Set<RecurringEventCycle>(["weekly", "biweekly"]);
 
 function parseInput(body: unknown): RecurringEventInput | null {
   const b = body as
@@ -16,6 +17,7 @@ function parseInput(body: unknown): RecurringEventInput | null {
         name?: unknown;
         cycle?: unknown;
         dayOfMonth?: unknown;
+        dayOfWeek?: unknown;
         startHour?: unknown;
         endHour?: unknown;
       }
@@ -24,16 +26,12 @@ function parseInput(body: unknown): RecurringEventInput | null {
   const cycle = typeof b?.cycle === "string" && VALID_CYCLES.includes(b.cycle as RecurringEventCycle)
     ? (b.cycle as RecurringEventCycle)
     : null;
-  const dayOfMonth = typeof b?.dayOfMonth === "number" ? b.dayOfMonth : NaN;
   const startHour = typeof b?.startHour === "number" ? b.startHour : NaN;
   const endHour = typeof b?.endHour === "number" ? b.endHour : NaN;
 
   if (
     !name ||
     !cycle ||
-    !Number.isInteger(dayOfMonth) ||
-    dayOfMonth < 1 ||
-    dayOfMonth > 28 ||
     !Number.isInteger(startHour) ||
     !Number.isInteger(endHour) ||
     startHour < 0 ||
@@ -42,6 +40,15 @@ function parseInput(body: unknown): RecurringEventInput | null {
   ) {
     return null;
   }
+
+  if (WEEKLY_CYCLES.has(cycle)) {
+    const dayOfWeek = typeof b?.dayOfWeek === "number" ? b.dayOfWeek : NaN;
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 1 || dayOfWeek > 5) return null;
+    return { name, cycle, dayOfMonth: 1, dayOfWeek, startHour, endHour };
+  }
+
+  const dayOfMonth = typeof b?.dayOfMonth === "number" ? b.dayOfMonth : NaN;
+  if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 28) return null;
   return { name, cycle, dayOfMonth, startHour, endHour };
 }
 

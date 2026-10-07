@@ -5,7 +5,7 @@ import { query } from "@/lib/db";
 import { recordUndo } from "@/lib/undo";
 import type { RecurringEventCycle, RecurringEventRow } from "@/lib/db";
 
-const VALID_CYCLES: RecurringEventCycle[] = ["monthly", "quarterly"];
+const VALID_CYCLES: RecurringEventCycle[] = ["monthly", "quarterly", "weekly", "biweekly"];
 
 export async function PATCH(
   req: NextRequest,
@@ -31,6 +31,7 @@ export async function PATCH(
         name?: unknown;
         cycle?: unknown;
         dayOfMonth?: unknown;
+        dayOfWeek?: unknown;
         startHour?: unknown;
         endHour?: unknown;
         enabled?: unknown;
@@ -55,6 +56,12 @@ export async function PATCH(
       return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
     }
     patch.dayOfMonth = body.dayOfMonth;
+  }
+  if (body?.dayOfWeek !== undefined) {
+    if (typeof body.dayOfWeek !== "number" || !Number.isInteger(body.dayOfWeek) || body.dayOfWeek < 1 || body.dayOfWeek > 5) {
+      return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+    }
+    patch.dayOfWeek = body.dayOfWeek;
   }
   const nextStartHour =
     typeof body?.startHour === "number" ? body.startHour : before.start_hour;
@@ -89,6 +96,7 @@ export async function PATCH(
         name: before.name,
         cycle: before.cycle,
         day_of_month: before.day_of_month,
+        day_of_week: before.day_of_week,
         start_hour: before.start_hour,
         end_hour: before.end_hour,
         enabled: before.enabled,

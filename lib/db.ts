@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 39;
+const SCHEMA_VERSION = 40;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -348,14 +348,16 @@ function runFullMigration(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_goal_memos_member_id ON goal_memos(member_id);
 
-        -- 매달/분기마다 반복되는 정기 일정(스터디, 독서 모임 등). cycle이
+        -- 매달/분기/매주/격주마다 반복되는 정기 일정(스터디, 독서 모임 등). cycle이
         -- 'monthly'면 매달, 'quarterly'면 3·6·9·12월에 day_of_month일 발생하고,
-        -- 그 날짜가 주말이거나 공휴일이면 스케줄표 생성 시점에 다음 평일로 미뤄진다.
+        -- 'weekly'/'biweekly'면 day_of_week(1=월~5=금) 요일에 발생한다. 그 날짜가
+        -- 주말이거나 공휴일이면 스케줄표 생성 시점에 다음 평일로 미뤄진다.
         CREATE TABLE IF NOT EXISTS recurring_events (
           id SERIAL PRIMARY KEY,
           name TEXT NOT NULL,
           cycle TEXT NOT NULL DEFAULT 'monthly',
           day_of_month INTEGER NOT NULL DEFAULT 1,
+          day_of_week SMALLINT,
           start_hour INTEGER NOT NULL,
           end_hour INTEGER NOT NULL,
           enabled BOOLEAN NOT NULL DEFAULT true,
@@ -805,6 +807,10 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS inbody_skeletal_muscle_mass NUMERIC;
             ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS inbody_body_fat_mass NUMERIC;
             ALTER TABLE pt_logs ADD COLUMN IF NOT EXISTS inbody_body_fat_percentage NUMERIC;
+
+            -- 정기 일정에 "매주"/"격주" 주기를 추가하면서, 그 경우에 쓸 요일(월=1~
+            -- 금=5)을 저장할 컬럼이 필요해졌다. 매달/분기 일정은 계속 day_of_month를 쓴다.
+            ALTER TABLE recurring_events ADD COLUMN IF NOT EXISTS day_of_week SMALLINT;
             `,
           ),
           getPool().query(
@@ -1341,13 +1347,15 @@ export interface GoalMemoRow {
   created_at: string;
 }
 
-export type RecurringEventCycle = "monthly" | "quarterly";
+export type RecurringEventCycle = "monthly" | "quarterly" | "weekly" | "biweekly";
 
 export interface RecurringEventRow {
   id: number;
   name: string;
   cycle: RecurringEventCycle;
   day_of_month: number;
+  /** cycle이 'weekly'/'biweekly'일 때만 쓴다. 1=월 ~ 5=금(주말은 고를 수 없음). */
+  day_of_week: number | null;
   start_hour: number;
   end_hour: number;
   enabled: boolean;
