@@ -73,7 +73,7 @@ function parseSessionToken(token: string | undefined | null): string | null {
 }
 
 export function checkAdminPassword(candidate: string): boolean {
-  const expected = process.env.ADMIN_PASSWORD || "951105";
+  const expected = process.env.ADMIN_PASSWORD || "shin";
   const a = Buffer.from(candidate);
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
