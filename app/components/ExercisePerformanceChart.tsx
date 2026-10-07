@@ -522,15 +522,26 @@ export function ExercisePerformanceChart({
               {s.values.map(
                 (v, i) =>
                   v != null && (
-                    <circle
-                      key={i}
-                      cx={xAt(i)}
-                      cy={yPixels[si][i]}
-                      r={radiusForRpe(v.rpe)}
-                      fill={s.color}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                    />
+                    <g key={i}>
+                      <circle
+                        cx={xAt(i)}
+                        cy={yPixels[si][i]}
+                        r={radiusForRpe(v.rpe)}
+                        fill={s.color}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                      />
+                      <text
+                        x={xAt(i)}
+                        y={yPixels[si][i] - radiusForRpe(v.rpe) - 4}
+                        textAnchor="middle"
+                        fontSize={9}
+                        fontWeight={600}
+                        fill={s.color}
+                      >
+                        {v.e1rm}
+                      </text>
+                    </g>
                   ),
               )}
             </g>

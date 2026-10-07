@@ -590,15 +590,26 @@ export function AssessmentPainChart({
               {s.values.map(
                 (v, i) =>
                   v != null && (
-                    <circle
-                      key={`${s.key}-pt-${i}`}
-                      cx={xAt(i)}
-                      cy={yPixels[si][i]}
-                      r={4}
-                      fill={s.color}
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                    />
+                    <g key={`${s.key}-pt-${i}`}>
+                      <circle
+                        cx={xAt(i)}
+                        cy={yPixels[si][i]}
+                        r={4}
+                        fill={s.color}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                      />
+                      <text
+                        x={xAt(i)}
+                        y={yPixels[si][i] - 8}
+                        textAnchor="middle"
+                        fontSize={9}
+                        fontWeight={600}
+                        fill={s.color}
+                      >
+                        {v}
+                      </text>
+                    </g>
                   ),
               )}
             </g>
