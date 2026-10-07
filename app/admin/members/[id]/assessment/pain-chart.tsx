@@ -13,7 +13,7 @@ const WIDTH = 640;
 const HEIGHT = 640;
 const PAD_LEFT = 28;
 const PAD_RIGHT = 16;
-const PAD_TOP = 16;
+const PAD_TOP = 28;
 const PAD_BOTTOM = 28;
 // 같은 날짜에 여러 동작의 점수가 정확히 겹칠 때 서로 구분되도록 주는 픽셀 단위 간격.
 const OVERLAP_JITTER_PX = 4;
@@ -601,11 +601,14 @@ export function AssessmentPainChart({
                       />
                       <text
                         x={xAt(i)}
-                        y={yPixels[si][i] - 8}
+                        y={yPixels[si][i] - 11}
                         textAnchor="middle"
-                        fontSize={9}
-                        fontWeight={600}
+                        fontSize={15}
+                        fontWeight={700}
                         fill={s.color}
+                        stroke="#ffffff"
+                        strokeWidth={3}
+                        paintOrder="stroke"
                       >
                         {v}
                       </text>

@@ -12,7 +12,7 @@ const WIDTH = 640;
 const HEIGHT = 640;
 const PAD_LEFT = 36;
 const PAD_RIGHT = 16;
-const PAD_TOP = 16;
+const PAD_TOP = 28;
 const PAD_BOTTOM = 28;
 // 같은 날짜에 두 지표 값이 정확히 겹칠 때 서로 구분되도록 주는 픽셀 단위 간격.
 const OVERLAP_JITTER_PX = 4;
@@ -489,11 +489,14 @@ export function InbodyChart({
                           />
                           <text
                             x={xAt(i)}
-                            y={yPixels[si][i] - 8}
+                            y={yPixels[si][i] - 11}
                             textAnchor="middle"
-                            fontSize={9}
-                            fontWeight={600}
+                            fontSize={15}
+                            fontWeight={700}
                             fill={s.def.color}
+                            stroke="#ffffff"
+                            strokeWidth={3}
+                            paintOrder="stroke"
                           >
                             {v}
                             {s.def.unit}
