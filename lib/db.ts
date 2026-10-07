@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 40;
+const SCHEMA_VERSION = 41;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -811,6 +811,10 @@ function runFullMigration(): Promise<void> {
             -- 정기 일정에 "매주"/"격주" 주기를 추가하면서, 그 경우에 쓸 요일(월=1~
             -- 금=5)을 저장할 컬럼이 필요해졌다. 매달/분기 일정은 계속 day_of_month를 쓴다.
             ALTER TABLE recurring_events ADD COLUMN IF NOT EXISTS day_of_week SMALLINT;
+
+            -- PT 일지 화면의 "나아지는 방향(DP)"처럼, 회원마다 하나씩 최신 내용만
+            -- 저장하는 상담 내용 메모.
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS consultation_note TEXT NOT NULL DEFAULT '';
             `,
           ),
           getPool().query(
@@ -961,6 +965,7 @@ export interface MemberRow {
   followup_memo: string;
   followup_updated_at: string | null;
   improvement_direction: string;
+  consultation_note: string;
   status: MemberStatus;
   token: string;
   created_at: string;

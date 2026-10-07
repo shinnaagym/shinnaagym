@@ -313,6 +313,7 @@ export interface MemberInput {
   followupStatus?: string;
   followupMemo?: string;
   improvementDirection?: string;
+  consultationNote?: string;
   /** true면 결제 전 상담 단계로만 만들어, 회원 관리 목록에는 보이지 않는다. */
   isLead?: boolean;
 }
@@ -388,6 +389,10 @@ export async function updateMember(
   if (input.improvementDirection !== undefined) {
     fields.push(`improvement_direction = $${++i}`);
     values.push(input.improvementDirection);
+  }
+  if (input.consultationNote !== undefined) {
+    fields.push(`consultation_note = $${++i}`);
+    values.push(input.consultationNote);
   }
   if (input.status !== undefined) {
     fields.push(`status = $${++i}`);
