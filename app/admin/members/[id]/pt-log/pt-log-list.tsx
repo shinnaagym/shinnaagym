@@ -13,8 +13,8 @@ import { DeletePtLogButton } from "@/app/components/DeletePtLogButton";
 import type { PtLogExercise } from "@/lib/db";
 
 /** PtLogRow(PT 일지)·PersonalExerciseRow(개인 운동) 둘 다 이 모양을 만족해서,
-    이 목록 컴포넌트는 두 타입 어디에나 그대로 쓸 수 있다. pain_scale은 PT
-    일지에만 있어 선택 필드로 둔다. */
+    이 목록 컴포넌트는 두 타입 어디에나 그대로 쓸 수 있다. pain_scale·인바디는
+    PT 일지에만 있어 선택 필드로 둔다. */
 export interface PtLogListRow {
   id: number;
   member_id: number;
@@ -23,6 +23,22 @@ export interface PtLogListRow {
   created_at: string;
   exercises: PtLogExercise[];
   pain_scale?: number | null;
+  inbody_weight?: number | null;
+  inbody_skeletal_muscle_mass?: number | null;
+  inbody_body_fat_mass?: number | null;
+  inbody_body_fat_percentage?: number | null;
+}
+
+/** 인바디 그래프의 "+ 기록추가"로 운동 없이 인바디만 남긴 PT 일지는 메모·운동이
+    전부 비어 있어 목록에서 완전히 빈 칸처럼 보인다 — 코치가 중복/오류로
+    착각하지 않도록 기록된 값을 한 줄 요약으로 보여준다. */
+function inbodySummary(log: PtLogListRow): string {
+  const parts: string[] = [];
+  if (log.inbody_weight != null) parts.push(`체중 ${log.inbody_weight}kg`);
+  if (log.inbody_skeletal_muscle_mass != null) parts.push(`골격근량 ${log.inbody_skeletal_muscle_mass}kg`);
+  if (log.inbody_body_fat_mass != null) parts.push(`체지방량 ${log.inbody_body_fat_mass}kg`);
+  if (log.inbody_body_fat_percentage != null) parts.push(`체지방률 ${log.inbody_body_fat_percentage}%`);
+  return parts.join(", ");
 }
 
 function formatDateTime(iso: string): string {
@@ -154,6 +170,7 @@ export function PtLogList({
           {filtered.map((log) => {
             const editHref = `${editHrefBase ?? `/admin/members/${log.member_id}/pt-log`}/${log.id}/edit`;
             const deleteEndpoint = `${deleteEndpointBase}/${log.id}`;
+            const inbodyLine = inbodySummary(log);
             return (
             <li
               key={log.id}
@@ -166,11 +183,13 @@ export function PtLogList({
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium">{log.log_date || formatDateTime(log.created_at)}</p>
-                  {(log.pain_scale != null || log.memo) && (
+                  {(log.pain_scale != null || log.memo || inbodyLine) && (
                     <p className="text-xs text-ink/50 mt-0.5">
                       {log.pain_scale != null && `통증 ${log.pain_scale}/10`}
                       {log.pain_scale != null && log.memo && " · "}
                       {log.memo}
+                      {(log.pain_scale != null || log.memo) && inbodyLine && " · "}
+                      {inbodyLine && `인바디 ${inbodyLine}`}
                     </p>
                   )}
                 </div>
