@@ -904,6 +904,7 @@ export function MembersView({
               : coaches.find((c) => c.id === coachFilter)?.name ?? null
         }
         onChanged={refresh}
+        onSelectMember={setDetailId}
       />
 
       {showCreate && (
@@ -958,6 +959,7 @@ function FixedSlotSchedule({
   coachFilter,
   coachName,
   onChanged,
+  onSelectMember,
 }: {
   fixedSlots: FixedSlotWithMember[];
   members: MemberWithProgress[];
@@ -965,6 +967,9 @@ function FixedSlotSchedule({
   coachFilter: number | "all" | "unassigned";
   coachName: string | null;
   onChanged: () => void;
+  /** 배지의 이름을 누르면 그 회원의 상세 정보로 바로 이동한다(칸을 누르면 열리는
+      배정 변경 피커와는 별개 동작이라 클릭 이벤트가 칸까지 전파되지 않게 막는다). */
+  onSelectMember: (memberId: number) => void;
 }) {
   // 코치별 색상은 전체 코치 목록 기준 순서로 고정해, 스케줄표와도 같은 코치가
   // 항상 같은 색을 쓰도록 한다(스케줄표의 코치 색상 팔레트와 동일한 로직).
@@ -985,11 +990,19 @@ function FixedSlotSchedule({
   }, [fixedSlots, coachFilter]);
 
   const byCell = useMemo(() => {
-    const map = new Map<string, Array<{ name: string; coachId: number | null; slotType: FixedSlotType }>>();
+    const map = new Map<
+      string,
+      Array<{ memberId: number; name: string; coachId: number | null; slotType: FixedSlotType }>
+    >();
     for (const slot of scopedSlots) {
       const key = `${slot.weekday}-${slot.hour}`;
       const entries = map.get(key) ?? [];
-      entries.push({ name: slot.member_name, coachId: slot.member_coach_id, slotType: slot.slot_type });
+      entries.push({
+        memberId: slot.member_id,
+        name: slot.member_name,
+        coachId: slot.member_coach_id,
+        slotType: slot.slot_type,
+      });
       map.set(key, entries);
     }
     return map;
@@ -1175,12 +1188,20 @@ function FixedSlotSchedule({
                                   ? `border border-dashed ${coachStyle.border} ${coachStyle.headerText} bg-white`
                                   : "border border-dashed border-line text-ink/60 bg-white";
                             return (
-                              <span
+                              <button
                                 key={`${entry.name}-${i}`}
-                                className={["rounded-full px-1.5 py-0.5 whitespace-nowrap", pillClass].join(" ")}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSelectMember(entry.memberId);
+                                }}
+                                className={[
+                                  "rounded-full px-1.5 py-0.5 whitespace-nowrap hover:opacity-70 transition",
+                                  pillClass,
+                                ].join(" ")}
                               >
                                 {entry.name}
-                              </span>
+                              </button>
                             );
                           })}
                         </div>
