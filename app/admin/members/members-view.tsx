@@ -1028,6 +1028,11 @@ function FixedSlotSchedule({
   const [flexibleHours, setFlexibleHours] = useState<Set<number>>(new Set());
   const [pickerSaving, setPickerSaving] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
+  // 드래그 중임을 눈에 보이게 표시하기 위한 상태 — 끌고 있는 배지는 흐리게,
+  // 지금 올려놓은 칸은 테두리로 강조한다. 브라우저 기본 드래그 고스트만으로는
+  // 잘 안 보인다는 피드백이 있어 추가했다.
+  const [draggingSlotId, setDraggingSlotId] = useState<number | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
   function openPicker(weekday: number, hour: number) {
     setPickerCell({ weekday, hour });
@@ -1105,6 +1110,8 @@ function FixedSlotSchedule({
       배정을 그 요일·시간으로 바로 옮긴다. */
   async function handleCellDrop(e: React.DragEvent, weekday: number, hour: number) {
     e.preventDefault();
+    setDraggingSlotId(null);
+    setDragOverKey(null);
     let slotId: number | null = null;
     try {
       const parsed = JSON.parse(e.dataTransfer.getData("text/plain")) as { slotId?: unknown };
@@ -1179,13 +1186,26 @@ function FixedSlotSchedule({
                   // 몇 명이 겹치든 충돌로 세지 않는다.
                   const fixedCount = entries.filter((e) => e.slotType === "fixed").length;
                   const over = coachFilter !== "all" && fixedCount > FIXED_SLOT_CAPACITY;
+                  const cellKey = `${weekday}-${hour}`;
+                  const isDragOver = dragOverKey === cellKey;
                   return (
                     <td
                       key={weekday}
                       onClick={() => openPicker(weekday, hour)}
-                      onDragOver={(e) => e.preventDefault()}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragOverKey !== cellKey) setDragOverKey(cellKey);
+                      }}
+                      onDragLeave={(e) => {
+                        if (dragOverKey === cellKey && !e.currentTarget.contains(e.relatedTarget as Node)) {
+                          setDragOverKey(null);
+                        }
+                      }}
                       onDrop={(e) => handleCellDrop(e, weekday, hour)}
-                      className="px-3 py-2.5 align-top cursor-pointer hover:bg-bone/50 transition"
+                      className={[
+                        "px-3 py-2.5 align-top cursor-pointer transition",
+                        isDragOver ? "bg-coral/15 ring-2 ring-inset ring-coral" : "hover:bg-bone/50",
+                      ].join(" ")}
                     >
                       {entries.length > 0 && (
                         <div
@@ -1216,11 +1236,17 @@ function FixedSlotSchedule({
                                 type="button"
                                 draggable
                                 onDragStart={(e) => {
+                                  setDraggingSlotId(entry.id);
                                   e.dataTransfer.setData("text/plain", JSON.stringify({ slotId: entry.id }));
                                   e.dataTransfer.effectAllowed = "move";
                                 }}
+                                onDragEnd={() => {
+                                  setDraggingSlotId(null);
+                                  setDragOverKey(null);
+                                }}
                                 className={[
-                                  "rounded-full px-1.5 py-0.5 whitespace-nowrap cursor-grab active:cursor-grabbing transition",
+                                  "rounded-full px-1.5 py-0.5 whitespace-nowrap select-none cursor-grab active:cursor-grabbing transition",
+                                  draggingSlotId === entry.id ? "opacity-30" : "",
                                   pillClass,
                                 ].join(" ")}
                               >
