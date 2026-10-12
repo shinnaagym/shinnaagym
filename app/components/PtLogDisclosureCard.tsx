@@ -16,6 +16,9 @@ export function PtLogDisclosureCard({
 }) {
   const [expanded, setExpanded] = useState(false);
 
+  // 지난 PT 일지가 없으면 빈 카드를 보여줄 필요가 없다.
+  if (ptLogs.length === 0) return null;
+
   return (
     <div className="rounded-2xl border border-line bg-white px-6 py-5 mb-4">
       <div className="flex items-center justify-between gap-2">
