@@ -20,6 +20,7 @@ function parseInput(body: unknown): RecurringEventInput | null {
         dayOfWeek?: unknown;
         startHour?: unknown;
         endHour?: unknown;
+        asMemo?: unknown;
       }
     | null;
   const name = typeof b?.name === "string" ? b.name.trim() : "";
@@ -28,6 +29,7 @@ function parseInput(body: unknown): RecurringEventInput | null {
     : null;
   const startHour = typeof b?.startHour === "number" ? b.startHour : NaN;
   const endHour = typeof b?.endHour === "number" ? b.endHour : NaN;
+  const asMemo = b?.asMemo === true;
 
   if (
     !name ||
@@ -44,12 +46,12 @@ function parseInput(body: unknown): RecurringEventInput | null {
   if (WEEKLY_CYCLES.has(cycle)) {
     const dayOfWeek = typeof b?.dayOfWeek === "number" ? b.dayOfWeek : NaN;
     if (!Number.isInteger(dayOfWeek) || dayOfWeek < 1 || dayOfWeek > 5) return null;
-    return { name, cycle, dayOfMonth: 1, dayOfWeek, startHour, endHour };
+    return { name, cycle, dayOfMonth: 1, dayOfWeek, startHour, endHour, asMemo };
   }
 
   const dayOfMonth = typeof b?.dayOfMonth === "number" ? b.dayOfMonth : NaN;
   if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 28) return null;
-  return { name, cycle, dayOfMonth, startHour, endHour };
+  return { name, cycle, dayOfMonth, startHour, endHour, asMemo };
 }
 
 export async function GET() {
