@@ -904,7 +904,6 @@ export function MembersView({
               : coaches.find((c) => c.id === coachFilter)?.name ?? null
         }
         onChanged={refresh}
-        onSelectMember={setDetailId}
       />
 
       {showCreate && (
@@ -959,7 +958,6 @@ function FixedSlotSchedule({
   coachFilter,
   coachName,
   onChanged,
-  onSelectMember,
 }: {
   fixedSlots: FixedSlotWithMember[];
   members: MemberWithProgress[];
@@ -967,9 +965,6 @@ function FixedSlotSchedule({
   coachFilter: number | "all" | "unassigned";
   coachName: string | null;
   onChanged: () => void;
-  /** 배지의 이름을 누르면 그 회원의 상세 정보로 바로 이동한다(칸을 누르면 열리는
-      배정 변경 피커와는 별개 동작이라 클릭 이벤트가 칸까지 전파되지 않게 막는다). */
-  onSelectMember: (memberId: number) => void;
 }) {
   // 코치별 색상은 전체 코치 목록 기준 순서로 고정해, 스케줄표와도 같은 코치가
   // 항상 같은 색을 쓰도록 한다(스케줄표의 코치 색상 팔레트와 동일한 로직).
@@ -992,12 +987,13 @@ function FixedSlotSchedule({
   const byCell = useMemo(() => {
     const map = new Map<
       string,
-      Array<{ memberId: number; name: string; coachId: number | null; slotType: FixedSlotType }>
+      Array<{ id: number; memberId: number; name: string; coachId: number | null; slotType: FixedSlotType }>
     >();
     for (const slot of scopedSlots) {
       const key = `${slot.weekday}-${slot.hour}`;
       const entries = map.get(key) ?? [];
       entries.push({
+        id: slot.id,
         memberId: slot.member_id,
         name: slot.member_name,
         coachId: slot.member_coach_id,
@@ -1105,6 +1101,31 @@ function FixedSlotSchedule({
     }
   }
 
+  /** 이름 배지를 다른 칸으로 드래그해서 놓으면, 삭제 후 다시 추가하지 않고 같은
+      배정을 그 요일·시간으로 바로 옮긴다. */
+  async function handleCellDrop(e: React.DragEvent, weekday: number, hour: number) {
+    e.preventDefault();
+    let slotId: number | null = null;
+    try {
+      const parsed = JSON.parse(e.dataTransfer.getData("text/plain")) as { slotId?: unknown };
+      if (Number.isInteger(parsed.slotId)) slotId = parsed.slotId as number;
+    } catch {
+      slotId = null;
+    }
+    if (slotId == null) return;
+    const res = await fetch(`/api/admin/fixed-slots/${slotId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekday, hour }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error ?? "이동 중 오류가 발생했습니다.");
+      return;
+    }
+    onChanged();
+  }
+
   return (
     <div className="mt-10">
       <div className="flex items-center gap-2 mb-1">
@@ -1162,6 +1183,8 @@ function FixedSlotSchedule({
                     <td
                       key={weekday}
                       onClick={() => openPicker(weekday, hour)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => handleCellDrop(e, weekday, hour)}
                       className="px-3 py-2.5 align-top cursor-pointer hover:bg-bone/50 transition"
                     >
                       {entries.length > 0 && (
@@ -1191,12 +1214,13 @@ function FixedSlotSchedule({
                               <button
                                 key={`${entry.name}-${i}`}
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onSelectMember(entry.memberId);
+                                draggable
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData("text/plain", JSON.stringify({ slotId: entry.id }));
+                                  e.dataTransfer.effectAllowed = "move";
                                 }}
                                 className={[
-                                  "rounded-full px-1.5 py-0.5 whitespace-nowrap hover:opacity-70 transition",
+                                  "rounded-full px-1.5 py-0.5 whitespace-nowrap cursor-grab active:cursor-grabbing transition",
                                   pillClass,
                                 ].join(" ")}
                               >

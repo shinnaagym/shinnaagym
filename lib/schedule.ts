@@ -584,6 +584,55 @@ export async function removeFixedSlot(id: number): Promise<void> {
   await query(`DELETE FROM fixed_slots WHERE id = $1`, [id]);
 }
 
+/** "고정 회원 시간표"에서 배지를 다른 칸으로 드래그해 놓았을 때, 같은 배정을
+    새 요일·시간으로 옮긴다(회원·slotType은 그대로 유지). addFixedSlotWithBackfill과
+    같은 충돌 규칙(같은 코치의 "고정" 배정끼리만 막음)을 그대로 적용한다. */
+export async function moveFixedSlot(
+  id: number,
+  weekday: number,
+  hour: number,
+): Promise<FixedSlotRow> {
+  const existing = (await query<FixedSlotRow>(`SELECT * FROM fixed_slots WHERE id = $1`, [id])).rows[0];
+  if (!existing) {
+    throw new Error("고정 시간대를 찾을 수 없습니다.");
+  }
+  if (existing.weekday === weekday && existing.hour === hour) {
+    return existing;
+  }
+
+  // 같은 회원이 이동하려는 칸에 이미 다른 배정(고정이든 다른 가능한 시간이든)을
+  // 갖고 있으면 (member_id, weekday, hour) 고유 제약에 걸리므로 미리 막는다.
+  const ownConflict = await query<{ id: number }>(
+    `SELECT id FROM fixed_slots WHERE member_id = $1 AND weekday = $2 AND hour = $3 AND id <> $4`,
+    [existing.member_id, weekday, hour, id],
+  );
+  if (ownConflict.rows.length > 0) {
+    throw new Error("이미 그 시간대에 이 회원의 다른 배정이 있어요.");
+  }
+
+  if (existing.slot_type === "fixed") {
+    const member = await getMemberById(existing.member_id);
+    if (member?.coach_id) {
+      const conflict = await query<{ member_name: string }>(
+        `SELECT m.name as member_name FROM fixed_slots f
+         JOIN members m ON m.id = f.member_id
+         WHERE m.coach_id = $1 AND f.weekday = $2 AND f.hour = $3 AND f.member_id <> $4
+           AND f.slot_type = 'fixed'`,
+        [member.coach_id, weekday, hour, existing.member_id],
+      );
+      if (conflict.rows.length > 0) {
+        throw new Error(`이미 이 시간대에 ${conflict.rows[0].member_name} 회원이 배정되어 있어요.`);
+      }
+    }
+  }
+
+  const result = await query<FixedSlotRow>(
+    `UPDATE fixed_slots SET weekday = $1, hour = $2 WHERE id = $3 RETURNING *`,
+    [weekday, hour, id],
+  );
+  return result.rows[0];
+}
+
 /** 회원 삭제(소프트 삭제) 시 이 회원의 고정 시간대 배정을 모두 지운다. */
 export async function deleteFixedSlotsByMember(memberId: number): Promise<void> {
   await query(`DELETE FROM fixed_slots WHERE member_id = $1`, [memberId]);
