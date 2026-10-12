@@ -74,6 +74,10 @@ function DailyMemoBox({
 }) {
   const items = parseDailyMemoItems(value);
   const [draft, setDraft] = useState("");
+  // 항목 텍스트를 누르면 그 자리에서 바로 고칠 수 있게 — 지금 고치고 있는
+  // 항목의 인덱스와, 입력 중인 내용을 따로 들고 있는다.
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
 
   function commitItems(next: DailyMemoItem[]) {
     onCommit(date, serializeDailyMemoItems(next));
@@ -94,10 +98,27 @@ function DailyMemoBox({
     setDraft("");
   }
 
+  function startEditing(index: number) {
+    setEditingIndex(index);
+    setEditDraft(items[index].text);
+  }
+
+  // 비워서 저장하면 그 항목을 지운 것으로 취급한다.
+  function commitEdit(index: number) {
+    setEditingIndex(null);
+    const text = editDraft.trim();
+    if (!text) {
+      removeItem(index);
+      return;
+    }
+    if (text === items[index].text) return;
+    commitItems(items.map((it, i) => (i === index ? { ...it, text } : it)));
+  }
+
   return (
     <div className="space-y-0.5">
       {items.map((item, i) => (
-        <label
+        <div
           key={i}
           className="group flex items-start gap-1 rounded px-0.5 py-0.5 text-[10px] leading-tight hover:bg-bone/60"
         >
@@ -107,14 +128,34 @@ function DailyMemoBox({
             onChange={() => toggleItem(i)}
             className="mt-[1.5px] h-2.5 w-2.5 shrink-0 accent-coral"
           />
-          <span
-            className={[
-              "min-w-0 flex-1 break-words",
-              item.done ? "text-ink/30 line-through" : "text-ink/80",
-            ].join(" ")}
-          >
-            {item.text}
-          </span>
+          {editingIndex === i ? (
+            <input
+              autoFocus
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitEdit(i);
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setEditingIndex(null);
+                }
+              }}
+              onBlur={() => commitEdit(i)}
+              className="min-w-0 flex-1 rounded border border-coral px-1 py-0 text-[10px] leading-tight outline-none"
+            />
+          ) : (
+            <span
+              onClick={() => startEditing(i)}
+              className={[
+                "min-w-0 flex-1 cursor-text break-words",
+                item.done ? "text-ink/30 line-through" : "text-ink/80",
+              ].join(" ")}
+            >
+              {item.text}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => removeItem(i)}
@@ -123,7 +164,7 @@ function DailyMemoBox({
           >
             ×
           </button>
-        </label>
+        </div>
       ))}
       <input
         value={draft}
