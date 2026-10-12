@@ -35,6 +35,7 @@ export async function PATCH(
         startHour?: unknown;
         endHour?: unknown;
         enabled?: unknown;
+        asMemo?: unknown;
       }
     | null;
 
@@ -85,6 +86,12 @@ export async function PATCH(
     }
     patch.enabled = body.enabled;
   }
+  if (body?.asMemo !== undefined) {
+    if (typeof body.asMemo !== "boolean") {
+      return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+    }
+    patch.asMemo = body.asMemo;
+  }
 
   await updateRecurringEvent(idNum, patch);
   await recordUndo(`${before.name} 정기 일정 수정`, [
@@ -100,6 +107,7 @@ export async function PATCH(
         start_hour: before.start_hour,
         end_hour: before.end_hour,
         enabled: before.enabled,
+        as_memo: before.as_memo,
       },
     },
   ]);

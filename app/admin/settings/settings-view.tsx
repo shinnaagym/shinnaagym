@@ -914,6 +914,7 @@ export function SettingsView({
   const [newEventDayOfWeek, setNewEventDayOfWeek] = useState(1);
   const [newEventStartHour, setNewEventStartHour] = useState(12);
   const [newEventEndHour, setNewEventEndHour] = useState(14);
+  const [newEventAsMemo, setNewEventAsMemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function saveCoachWorkingHours(coachId: number, hours: CoachWorkingHours) {
@@ -1066,6 +1067,7 @@ export function SettingsView({
           : { dayOfMonth: newEventDay }),
         startHour: newEventStartHour,
         endHour: newEventEndHour,
+        asMemo: newEventAsMemo,
       }),
     });
     const data = await res.json();
@@ -1080,6 +1082,7 @@ export function SettingsView({
     setNewEventDayOfWeek(1);
     setNewEventStartHour(12);
     setNewEventEndHour(14);
+    setNewEventAsMemo(false);
   }
 
   async function patchRecurringEvent(
@@ -1092,6 +1095,7 @@ export function SettingsView({
       startHour: number;
       endHour: number;
       enabled: boolean;
+      asMemo: boolean;
     }>,
   ) {
     setRecurringEvents((prev) =>
@@ -1106,6 +1110,7 @@ export function SettingsView({
               ...(patch.startHour !== undefined && { start_hour: patch.startHour }),
               ...(patch.endHour !== undefined && { end_hour: patch.endHour }),
               ...(patch.enabled !== undefined && { enabled: patch.enabled }),
+              ...(patch.asMemo !== undefined && { as_memo: patch.asMemo }),
             }
           : e,
       ),
@@ -1317,9 +1322,11 @@ export function SettingsView({
         <p className="text-xs text-ink/50 mb-4">
           매주·격주·매달 또는 분기(3·6·9·12월)마다 반복되는 일정이에요. 매주/격주는
           날짜 대신 요일(월~금)을 고르고, 격주는 등록한 날부터 2주에 한 번 돌아와요.
-          등록하면 재직 중인 코치 전원의 스케줄표에 자동으로 잡혀 그 시간엔 다른 예약을
-          받을 수 없어요. 날짜가 토·일요일이거나 공휴일 관리에 등록된 날이면 자동으로
-          그다음 평일로 미뤄져요(대체공휴일도 공휴일 관리에 등록해두면 함께 반영돼요).
+          기본값은 재직 중인 코치 전원의 스케줄표 시간 칸에 자동으로 잡혀 그 시간엔
+          다른 예약을 받을 수 없게 막는 방식이고, &quot;메모&quot;를 체크하면 시간을
+          막지 않고 그 날짜의 요일별 메모장에 이름만 한 줄 표시돼요. 날짜가 토·일요일이거나
+          공휴일 관리에 등록된 날이면 자동으로 그다음 평일로 미뤄져요(대체공휴일도
+          공휴일 관리에 등록해두면 함께 반영돼요).
         </p>
         <div className="divide-y divide-line/50">
           {recurringEvents.map((ev) => (
@@ -1410,6 +1417,17 @@ export function SettingsView({
                   ))}
                 </select>
               </span>
+              <label
+                className="flex items-center gap-1 text-xs text-ink/60"
+                title="체크하면 스케줄표 시간 칸을 막는 대신, 그 날짜의 요일별 메모장에 이름만 한 줄 표시돼요."
+              >
+                <input
+                  type="checkbox"
+                  checked={ev.as_memo}
+                  onChange={(e) => patchRecurringEvent(ev.id, { asMemo: e.target.checked })}
+                />
+                메모
+              </label>
               <label className="flex items-center gap-1 text-xs text-ink/60">
                 <input
                   type="checkbox"
@@ -1499,6 +1517,17 @@ export function SettingsView({
               ))}
             </select>
           </span>
+          <label
+            className="flex items-center gap-1 text-sm text-ink/60"
+            title="체크하면 스케줄표 시간 칸을 막는 대신, 그 날짜의 요일별 메모장에 이름만 한 줄 표시돼요."
+          >
+            <input
+              type="checkbox"
+              checked={newEventAsMemo}
+              onChange={(e) => setNewEventAsMemo(e.target.checked)}
+            />
+            메모
+          </label>
           <button
             onClick={addRecurringEvent}
             className="shrink-0 whitespace-nowrap rounded-full bg-ink text-white px-4 py-2 text-sm hover:bg-coral transition"

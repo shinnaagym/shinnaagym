@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 41;
+const SCHEMA_VERSION = 42;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -361,6 +361,9 @@ function runFullMigration(): Promise<void> {
           start_hour INTEGER NOT NULL,
           end_hour INTEGER NOT NULL,
           enabled BOOLEAN NOT NULL DEFAULT true,
+          -- true면 스케줄표 시간 칸을 막는 "개인 일정" 대신, 그 날짜의 요일별
+          -- 메모장(daily_schedule_memos)에 이름이 한 줄로만 적힌다.
+          as_memo BOOLEAN NOT NULL DEFAULT false,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
@@ -815,6 +818,10 @@ function runFullMigration(): Promise<void> {
             -- PT 일지 화면의 "나아지는 방향(DP)"처럼, 회원마다 하나씩 최신 내용만
             -- 저장하는 상담 내용 메모.
             ALTER TABLE members ADD COLUMN IF NOT EXISTS consultation_note TEXT NOT NULL DEFAULT '';
+
+            -- 정기 일정을 스케줄표 시간 칸(개인 일정) 대신 요일별 메모장에만
+            -- 표시할지 고르는 옵션.
+            ALTER TABLE recurring_events ADD COLUMN IF NOT EXISTS as_memo BOOLEAN NOT NULL DEFAULT false;
             `,
           ),
           getPool().query(
@@ -1364,5 +1371,7 @@ export interface RecurringEventRow {
   start_hour: number;
   end_hour: number;
   enabled: boolean;
+  /** true면 스케줄표 개인 일정 대신 요일별 메모장에 이름 한 줄로만 표시된다. */
+  as_memo: boolean;
   created_at: string;
 }

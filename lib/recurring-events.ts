@@ -3,6 +3,7 @@ import { query } from "./db";
 import type { HolidayRow, RecurringEventCycle, RecurringEventRow } from "./db";
 import { addDaysToKey, addMonthsToKey, koreaCurrentMonthKey } from "./date";
 import { listCoaches } from "./schedule";
+import { getDailyScheduleMemos, setDailyScheduleMemo } from "./daily-schedule-memos";
 
 /** 'monthly'/'quarterly'가 발생하는 월(1~12). 'weekly'/'biweekly'는 달과 무관하게
     매주/격주로 발생해 여기 포함되지 않는다(ensureRecurringEventSessions에서 따로 다룸). */
@@ -47,14 +48,17 @@ export interface RecurringEventInput {
   dayOfWeek?: number | null;
   startHour: number;
   endHour: number;
+  /** true면 스케줄표 시간 칸(개인 일정) 대신 그 날짜의 요일별 메모장에 이름
+      한 줄로만 표시한다. */
+  asMemo?: boolean;
 }
 
 export async function createRecurringEvent(
   input: RecurringEventInput,
 ): Promise<RecurringEventRow> {
   const result = await query<RecurringEventRow>(
-    `INSERT INTO recurring_events (name, cycle, day_of_month, day_of_week, start_hour, end_hour)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    `INSERT INTO recurring_events (name, cycle, day_of_month, day_of_week, start_hour, end_hour, as_memo)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
     [
       input.name,
       input.cycle,
@@ -62,6 +66,7 @@ export async function createRecurringEvent(
       input.dayOfWeek ?? null,
       input.startHour,
       input.endHour,
+      input.asMemo ?? false,
     ],
   );
   revalidateTag("recurring-events", { expire: 0 });
@@ -103,6 +108,10 @@ export async function updateRecurringEvent(
   if (patch.enabled !== undefined) {
     fields.push(`enabled = $${++i}`);
     values.push(patch.enabled);
+  }
+  if (patch.asMemo !== undefined) {
+    fields.push(`as_memo = $${++i}`);
+    values.push(patch.asMemo);
   }
   if (fields.length === 0) return;
 
@@ -176,11 +185,13 @@ function occurrencesInMonth(
 }
 
 /**
- * 활성화된 정기 일정(스터디/독서 모임 등)의 이번 달·다음 달 발생일을 계산해,
- * 아직 스케줄표에 없으면 재직 중인 코치 전원의 해당 시간대를 "개인 일정"
- * 메모 항목으로 채워 넣어 실제로 예약을 막는다. 이미 그 코치·시간대에 다른
- * 일정이 있으면(예: 관리자가 수동으로 지운 뒤 다른 예약을 잡은 경우) 건드리지
- * 않고 건너뛴다. 스케줄표 조회 시점마다 가볍게 호출된다.
+ * 활성화된 정기 일정(스터디/독서 모임 등)의 이번 달·다음 달 발생일을 계산해
+ * 반영한다. as_memo가 false면(기본) 재직 중인 코치 전원의 해당 시간대를
+ * "개인 일정" 메모 항목으로 채워 넣어 실제로 예약을 막고, true면 시간 칸 대신
+ * 그 날짜의 요일별 메모장(daily_schedule_memos)에 이름을 한 줄만 추가한다.
+ * 이미 그 코치·시간대에 다른 일정이 있으면(예: 관리자가 수동으로 지운 뒤
+ * 다른 예약을 잡은 경우) 건드리지 않고 건너뛴다. 스케줄표 조회 시점마다
+ * 가볍게 호출된다.
  */
 export async function ensureRecurringEventSessions(): Promise<void> {
   const events = (await listRecurringEvents()).filter((e) => e.enabled);
@@ -209,6 +220,10 @@ export async function ensureRecurringEventSessions(): Promise<void> {
   // 보낸다(달×일정 개수만큼 순차 왕복하던 것을 최대 2번의 왕복으로 줄임).
   const losers: { event: RecurringEventRow; occurrenceDate: string }[] = [];
   const winners: { event: RecurringEventRow; occurrenceDate: string }[] = [];
+  // 메모형 일정은 시간 칸을 두고 경쟁하지 않는다 — 텍스트 한 줄일 뿐이라 같은
+  // 날짜에 여러 메모형 일정이 겹쳐도 문제없으므로, 승자/패자 판정 없이 계산된
+  // 발생일 전부를 그대로 쓴다.
+  const memoOccurrences: { event: RecurringEventRow; occurrenceDate: string }[] = [];
 
   for (const monthKey of monthKeys) {
     const month = Number(monthKey.slice(5, 7));
@@ -216,32 +231,35 @@ export async function ensureRecurringEventSessions(): Promise<void> {
     // 이 달에 실제로 발생하는 모든 (일정, 날짜) 쌍을 먼저 모은다. monthly/
     // quarterly는 달마다 한 번, weekly/biweekly는 달마다 여러 번(최대 5번) 나올
     // 수 있다.
-    const occurrences: { event: RecurringEventRow; occurrenceDate: string }[] = [];
+    const scheduleOccurrences: { event: RecurringEventRow; occurrenceDate: string }[] = [];
     for (const event of events) {
-      if (event.cycle === "monthly" || event.cycle === "quarterly") {
-        if (!CYCLE_MONTHS[event.cycle].includes(month)) continue;
-        occurrences.push({
-          event,
-          occurrenceDate: computeOccurrenceDate(monthKey, event.day_of_month, holidaySet),
-        });
-      } else {
-        for (const occurrenceDate of occurrencesInMonth(monthKey, event, holidaySet)) {
-          occurrences.push({ event, occurrenceDate });
+      const dates =
+        event.cycle === "monthly" || event.cycle === "quarterly"
+          ? CYCLE_MONTHS[event.cycle].includes(month)
+            ? [computeOccurrenceDate(monthKey, event.day_of_month, holidaySet)]
+            : []
+          : occurrencesInMonth(monthKey, event, holidaySet);
+
+      for (const occurrenceDate of dates) {
+        if (event.as_memo) {
+          memoOccurrences.push({ event, occurrenceDate });
+        } else {
+          scheduleOccurrences.push({ event, occurrenceDate });
         }
       }
     }
 
-    // 같은 날짜에 서로 다른 일정이 겹치면(예: 매달 반복과 분기 반복이 3·6·9·12월에
-    // 겹치는 경우) 더 드문 주기가 우선한다.
+    // 같은 날짜에 서로 다른 시간 칸 일정이 겹치면(예: 매달 반복과 분기 반복이
+    // 3·6·9·12월에 겹치는 경우) 더 드문 주기가 우선한다.
     const winnerByDate = new Map<string, RecurringEventRow>();
-    for (const { event, occurrenceDate } of occurrences) {
+    for (const { event, occurrenceDate } of scheduleOccurrences) {
       const current = winnerByDate.get(occurrenceDate);
       if (!current || CYCLE_PRIORITY[event.cycle] > CYCLE_PRIORITY[current.cycle]) {
         winnerByDate.set(occurrenceDate, event);
       }
     }
 
-    for (const { event, occurrenceDate } of occurrences) {
+    for (const { event, occurrenceDate } of scheduleOccurrences) {
       if (winnerByDate.get(occurrenceDate)?.id === event.id) {
         winners.push({ event, occurrenceDate });
       } else {
@@ -272,4 +290,30 @@ export async function ensureRecurringEventSessions(): Promise<void> {
       ),
     ),
   );
+
+  if (memoOccurrences.length > 0) {
+    const memoDates = Array.from(new Set(memoOccurrences.map((m) => m.occurrenceDate)));
+    const existingMemos = await getDailyScheduleMemos(memoDates);
+    const linesByDate = new Map<string, string[]>();
+    for (const date of memoDates) {
+      linesByDate.set(
+        date,
+        (existingMemos[date] ?? "")
+          .split("\n")
+          .map((l) => l.trim())
+          .filter((l) => l.length > 0),
+      );
+    }
+    // 이미 같은 이름의 줄이 있으면 중복 추가하지 않고, 관리자가 직접 적어둔
+    // 다른 줄은 그대로 둔다.
+    for (const { event, occurrenceDate } of memoOccurrences) {
+      const lines = linesByDate.get(occurrenceDate)!;
+      if (!lines.includes(event.name)) lines.push(event.name);
+    }
+    await Promise.all(
+      Array.from(linesByDate.entries())
+        .filter(([date, lines]) => lines.join("\n") !== (existingMemos[date] ?? ""))
+        .map(([date, lines]) => setDailyScheduleMemo(date, lines.join("\n"))),
+    );
+  }
 }
