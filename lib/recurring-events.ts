@@ -4,6 +4,7 @@ import type { HolidayRow, RecurringEventCycle, RecurringEventRow } from "./db";
 import { addDaysToKey, addMonthsToKey, koreaCurrentMonthKey } from "./date";
 import { listCoaches } from "./schedule";
 import { getDailyScheduleMemos, setDailyScheduleMemo } from "./daily-schedule-memos";
+import { dailyMemoLineText } from "./daily-memo-checklist";
 
 /** 'monthly'/'quarterly'가 발생하는 월(1~12). 'weekly'/'biweekly'는 달과 무관하게
     매주/격주로 발생해 여기 포함되지 않는다(ensureRecurringEventSessions에서 따로 다룸). */
@@ -304,11 +305,11 @@ export async function ensureRecurringEventSessions(): Promise<void> {
           .filter((l) => l.length > 0),
       );
     }
-    // 이미 같은 이름의 줄이 있으면 중복 추가하지 않고, 관리자가 직접 적어둔
-    // 다른 줄은 그대로 둔다.
+    // 이미 같은 이름의 줄이 있으면(체크 여부·체크박스 표시 유무와 무관하게)
+    // 중복 추가하지 않고, 관리자가 직접 적어둔 다른 줄은 그대로 둔다.
     for (const { event, occurrenceDate } of memoOccurrences) {
       const lines = linesByDate.get(occurrenceDate)!;
-      if (!lines.includes(event.name)) lines.push(event.name);
+      if (!lines.some((l) => dailyMemoLineText(l) === event.name)) lines.push(event.name);
     }
     await Promise.all(
       Array.from(linesByDate.entries())

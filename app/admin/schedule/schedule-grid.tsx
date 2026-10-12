@@ -15,6 +15,7 @@ import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import type { CoachRow, PtType, SessionEntryType, SessionStatus } from "@/lib/db";
 import type { CoachLeaveEntry, CoachScheduleStats, CoachWorkingHours, MemberWithProgress } from "@/lib/schedule";
 import type { DayHours } from "@/lib/constants";
+import { parseDailyMemoItems, serializeDailyMemoItems, type DailyMemoItem } from "@/lib/daily-memo-checklist";
 
 /** 휴가 표시 문구. 단축근무는 "단축근무(출근 지연 2h)"처럼 방향·시간을 덧붙인다. */
 function formatLeaveBadge(l: CoachLeaveEntry): string {
@@ -57,9 +58,11 @@ function formatHourMinute(hour: number, minute: number): string {
   return `${hour}:${String(minute).padStart(2, "0")}`;
 }
 
-/** 주간 스케줄표에서 날짜 칸 바로 아래에 두는 메모 네모박스. 타이핑하는 동안은
-    로컬 값만 바꾸고, 포커스를 벗어날 때(blur)만 저장해 매 글자마다 요청을
-    보내지 않는다. */
+/** 주간 스케줄표에서 날짜 칸 바로 아래에 두는 메모 네모박스 — 체크리스트
+    형태로 쓴다. 항목을 누르면 바로 체크/해제되고, 입력칸에 적고 Enter를
+    누르거나 포커스를 벗어나면 새 항목으로 추가된다. 체크박스 표시가 없는
+    옛 메모 줄(이 기능이 생기기 전에 적어둔 것·정기 일정이 자동으로 추가한
+    것)도 그냥 미완료 항목으로 보여준다. */
 function DailyMemoBox({
   date,
   value,
@@ -69,19 +72,73 @@ function DailyMemoBox({
   value: string;
   onCommit: (date: string, content: string) => void;
 }) {
-  const [draft, setDraft] = useState(value);
+  const items = parseDailyMemoItems(value);
+  const [draft, setDraft] = useState("");
+
+  function commitItems(next: DailyMemoItem[]) {
+    onCommit(date, serializeDailyMemoItems(next));
+  }
+
+  function toggleItem(index: number) {
+    commitItems(items.map((it, i) => (i === index ? { ...it, done: !it.done } : it)));
+  }
+
+  function removeItem(index: number) {
+    commitItems(items.filter((_, i) => i !== index));
+  }
+
+  function addItem() {
+    const text = draft.trim();
+    if (!text) return;
+    commitItems([...items, { text, done: false }]);
+    setDraft("");
+  }
 
   return (
-    <textarea
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        if (draft !== value) onCommit(date, draft);
-      }}
-      placeholder="메모"
-      rows={2}
-      className="w-full resize-none rounded-md border border-line/50 bg-white px-1.5 py-1 text-[10px] leading-tight outline-none focus:border-coral placeholder:text-ink/25"
-    />
+    <div className="space-y-0.5">
+      {items.map((item, i) => (
+        <label
+          key={i}
+          className="group flex items-start gap-1 rounded px-0.5 py-0.5 text-[10px] leading-tight hover:bg-bone/60"
+        >
+          <input
+            type="checkbox"
+            checked={item.done}
+            onChange={() => toggleItem(i)}
+            className="mt-[1.5px] h-2.5 w-2.5 shrink-0 accent-coral"
+          />
+          <span
+            className={[
+              "min-w-0 flex-1 break-words",
+              item.done ? "text-ink/30 line-through" : "text-ink/80",
+            ].join(" ")}
+          >
+            {item.text}
+          </span>
+          <button
+            type="button"
+            onClick={() => removeItem(i)}
+            aria-label="메모 삭제"
+            className="shrink-0 text-ink/20 opacity-0 transition hover:text-coral group-hover:opacity-100"
+          >
+            ×
+          </button>
+        </label>
+      ))}
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            addItem();
+          }
+        }}
+        onBlur={addItem}
+        placeholder="+ 메모 추가"
+        className="w-full rounded-md border border-line/50 bg-white px-1.5 py-1 text-[10px] leading-tight outline-none focus:border-coral placeholder:text-ink/25"
+      />
+    </div>
   );
 }
 
