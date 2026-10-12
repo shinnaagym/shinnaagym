@@ -51,6 +51,7 @@ export default async function EditPtLogPage({
         pastExerciseGroups={pastExerciseGroups(ptLogs.filter((l) => l.id !== logIdNum))}
         pastCircuitEntries={pastCircuitEntries(ptLogs.filter((l) => l.id !== logIdNum))}
         painTriggerPastNotes={{ [idNum]: pastPainTriggerNotes }}
+        pastPtLogs={{ [idNum]: ptLogs.filter((l) => l.id !== logIdNum) }}
         initialData={{
           logDate: ptLog.log_date,
           memo: ptLog.memo,

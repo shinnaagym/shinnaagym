@@ -21,7 +21,7 @@ import { koreaTodayKey } from "@/lib/date";
 import { AssessmentPainChart } from "@/app/admin/members/[id]/assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { InbodyChart } from "@/app/components/InbodyChart";
-import { PtLogDisclosureCard } from "./pt-log-disclosure-card";
+import { PtLogDisclosureCard } from "@/app/components/PtLogDisclosureCard";
 
 // 담당 코치의 개인 연락처가 등록되지 않은 경우를 위한 기본(스튜디오) 문의 번호.
 const DEFAULT_STUDIO_PHONE = "010-2496-8088";

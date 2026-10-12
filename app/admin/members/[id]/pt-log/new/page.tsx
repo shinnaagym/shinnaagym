@@ -39,7 +39,9 @@ export default async function NewPtLogPage({
     notFound();
   }
   const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
-  const duoPartnerAssessments = duoPartner ? await listAssessmentsByMember(duoPartner.id) : [];
+  const [duoPartnerAssessments, duoPartnerPtLogs] = duoPartner
+    ? await Promise.all([listAssessmentsByMember(duoPartner.id), listPtLogsByMember(duoPartner.id)])
+    : [[], []];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -53,6 +55,10 @@ export default async function NewPtLogPage({
         painTriggerPastNotes={{
           [idNum]: pastPainTriggerNotes(assessments),
           ...(duoPartner ? { [duoPartner.id]: pastPainTriggerNotes(duoPartnerAssessments) } : {}),
+        }}
+        pastPtLogs={{
+          [idNum]: ptLogs,
+          ...(duoPartner ? { [duoPartner.id]: duoPartnerPtLogs } : {}),
         }}
       />
     </div>
