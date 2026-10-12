@@ -467,9 +467,14 @@ export function PtLogForm({
         )}
       </div>
 
-      {kind === "pt_log" && (pastPtLogs[activeMemberId]?.length ?? 0) > 0 && (
+      {/* 아래 두 섹션은 탭 전환(짝 PT) 시 activeMemberId가 바뀔 때마다 완전히
+          새로 펼침 상태를 초기화하려고 key를 쓴다. 형제 엘리먼트끼리 key 값이
+          겹치면(예: 둘 다 그냥 activeMemberId만 쓰면) 탭을 왔다갔다 할 때마다
+          이전 카드가 사라지지 않고 계속 쌓이는 렌더링 버그가 있었다 — 각자
+          다른 접두사를 붙여 key가 겹치지 않게 한다. */}
+      {kind === "pt_log" && (
         <PtLogDisclosureCard
-          key={activeMemberId}
+          key={`disclosure-${activeMemberId}`}
           title={`🏋️ ${activeMemberName}님의 이전 PT 일지`}
           ptLogs={pastPtLogs[activeMemberId] ?? []}
         />
@@ -477,7 +482,7 @@ export function PtLogForm({
 
       {kind === "pt_log" && (
         <PainTriggerSection
-          key={activeMemberId}
+          key={`pain-trigger-${activeMemberId}`}
           memberId={activeMemberId}
           pastNotes={painTriggerPastNotes[activeMemberId] ?? []}
         />
