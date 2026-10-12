@@ -12,7 +12,8 @@ import {
 } from "@/lib/constants";
 import { pastExerciseGroupKey, type PastCircuitEntry } from "./past-exercise-names";
 import { PainTriggerSection } from "./pain-trigger-section";
-import type { PtLogSetGroup } from "@/lib/db";
+import { PtLogDisclosureCard } from "@/app/components/PtLogDisclosureCard";
+import type { PtLogRow, PtLogSetGroup } from "@/lib/db";
 
 interface SetGroupInput {
   weight: string;
@@ -164,6 +165,7 @@ export function PtLogForm({
   authToken,
   duoPartner = null,
   painTriggerPastNotes = {},
+  pastPtLogs = {},
 }: {
   memberId: number;
   memberName: string;
@@ -193,6 +195,10 @@ export function PtLogForm({
   /** 회원 id -> 그 회원이 과거에 남긴 통증 유발 동작 메모 목록. "통증 유발 동작
       기록" 섹션의 자동완성용. kind가 "pt_log"일 때만 그 섹션을 보여준다. */
   painTriggerPastNotes?: Record<number, string[]>;
+  /** 회원 id -> 그 회원의 지난 PT 일지 목록. "이전 PT 일지" 섹션에서 기본적으로
+      접힌 채로 보여주고, 펼쳤을 때만 내역을 렌더링한다. kind가 "pt_log"일 때만
+      보여준다. */
+  pastPtLogs?: Record<number, PtLogRow[]>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -460,6 +466,14 @@ export function PtLogForm({
           </p>
         )}
       </div>
+
+      {kind === "pt_log" && (pastPtLogs[activeMemberId]?.length ?? 0) > 0 && (
+        <PtLogDisclosureCard
+          key={activeMemberId}
+          title={`🏋️ ${activeMemberName}님의 이전 PT 일지`}
+          ptLogs={pastPtLogs[activeMemberId] ?? []}
+        />
+      )}
 
       {kind === "pt_log" && (
         <PainTriggerSection
