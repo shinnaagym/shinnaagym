@@ -37,6 +37,13 @@ export async function sendSms(to: string, text: string): Promise<SendSmsResult> 
     return { ok: false, error: "받는 사람 전화번호가 올바르지 않아요." };
   }
 
+  // 90바이트를 넘으면 솔라피가 장문(LMS)으로 자동 전환해 보내는데, 제목(subject)을
+  // 안 넘기면 본문 앞부분을 잘라 만든 제목이 "[Web발신]" 표시 없이 먼저 붙고, 그
+  // 뒤에 "[Web발신]"과 함께 본문 전체가 다시 와서 — 문자가 앞부분이 잘린 채 한 번,
+  // 전체가 또 한 번, 총 두 번 겹쳐 오는 것처럼 보이는 문제가 있었다. 장문일 때만
+  // 짧은 제목을 직접 지정해 이 자동 생성을 막는다.
+  const isLong = Buffer.byteLength(text, "utf8") > 90;
+
   try {
     const res = await fetch("https://api.solapi.com/messages/v4/send", {
       method: "POST",
@@ -49,6 +56,7 @@ export async function sendSms(to: string, text: string): Promise<SendSmsResult> 
           to: toDigits,
           from: normalizePhone(from),
           text,
+          ...(isLong ? { subject: "신나아짐", autoTypeDetect: true } : {}),
         },
       }),
     });
