@@ -1,16 +1,8 @@
 import { query } from "./db";
 import type { SessionEntryType } from "./db";
-import { addDaysToKey, koreaTodayKey } from "./date";
+import { addDaysToKey, formatAmPmHourMinute, formatHourMinute, koreaTodayKey, weekdayLabelForDateKey } from "./date";
 import { STUDIO_PHONE } from "./constants";
 import { sendSms } from "./sms";
-
-const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
-
-function weekdayLabelForDateKey(key: string): string {
-  const [y, m, d] = key.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return WEEKDAY_LABELS[(dt.getUTCDay() + 6) % 7];
-}
 
 interface ReminderTarget {
   id: number;
@@ -66,17 +58,6 @@ async function getTomorrowReminderTargets(): Promise<ReminderTarget[]> {
     sessionHour: r.session_hour,
     sessionMinute: r.session_minute,
   }));
-}
-
-function formatHourMinute(hour: number, minute: number): string {
-  return minute > 0 ? `${hour}시${minute}분` : `${hour}시`;
-}
-
-/** "오후 2시"처럼 오전/오후를 붙인 12시간제 표기 — 상담 리마인드 문구에 쓴다. */
-function formatAmPmHourMinute(hour: number, minute: number): string {
-  const period = hour < 12 ? "오전" : "오후";
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return minute > 0 ? `${period} ${h12}시${minute}분` : `${period} ${h12}시`;
 }
 
 // SMS(단문)는 90바이트(EUC-KR 기준, 한글 1자=2바이트)를 넘으면 자동으로 더

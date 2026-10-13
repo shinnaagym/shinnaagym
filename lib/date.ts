@@ -98,3 +98,23 @@ export function isWithinBookingWindow(key: string): boolean {
   const maxDate = addDaysToKey(BOOKING_START_DATE, BOOKING_WINDOW_DAYS);
   return key >= minDate && key <= maxDate;
 }
+
+const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+
+/** "YYYY-MM-DD" 키의 요일 한 글자(월~일)를 반환한다. */
+export function weekdayLabelForDateKey(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return WEEKDAY_LABELS[(dt.getUTCDay() + 6) % 7];
+}
+
+export function formatHourMinute(hour: number, minute: number): string {
+  return minute > 0 ? `${hour}시${minute}분` : `${hour}시`;
+}
+
+/** "오후 2시"처럼 오전/오후를 붙인 12시간제 표기 — 문자 안내 문구에 쓴다. */
+export function formatAmPmHourMinute(hour: number, minute: number): string {
+  const period = hour < 12 ? "오전" : "오후";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return minute > 0 ? `${period} ${h12}시${minute}분` : `${period} ${h12}시`;
+}

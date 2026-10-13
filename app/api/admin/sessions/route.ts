@@ -8,6 +8,7 @@ import {
 } from "@/lib/schedule";
 import { isValidDateKey } from "@/lib/date";
 import { recordUndo } from "@/lib/undo";
+import { sendConsultationConfirmationSms } from "@/lib/consultation-confirmation";
 import type { PtType, SessionEntryType } from "@/lib/db";
 
 const VALID_ENTRY_TYPES: SessionEntryType[] = ["session", "consultation", "memo", "blocked"];
@@ -108,6 +109,18 @@ export async function POST(req: NextRequest) {
     await recordUndo(`${who} ${date} ${hour}시 예약`, [
       { op: "delete", table: "class_sessions", id: session.id },
     ]);
+
+    // 스케줄표에서 관리자가 직접 상담을 등록한 경우도, 사전예약 폼으로 들어온
+    // 경우와 마찬가지로 등록 즉시 안내 문자를 보낸다.
+    if (entryType === "consultation" && member) {
+      await sendConsultationConfirmationSms({
+        memberName: member.name,
+        phone: member.phone,
+        date,
+        hour,
+        minute,
+      });
+    }
 
     return NextResponse.json({ session }, { status: 201 });
   } catch (err: unknown) {
