@@ -5,6 +5,7 @@ import { isWithinBookingWindow, koreaCurrentHour, koreaTodayKey } from "@/lib/da
 import { getTakenSlots } from "@/lib/reservations";
 import { notifyNewReservation } from "@/lib/notify";
 import { linkPreReservationToSchedule, listHolidays } from "@/lib/schedule";
+import { sendConsultationConfirmationSms } from "@/lib/consultation-confirmation";
 
 const PURPOSE_VALUES = new Set(PURPOSE_OPTIONS.map((option) => option.value));
 const PHONE_PATTERN = /^[0-9-+ ]{9,20}$/;
@@ -135,6 +136,12 @@ export async function POST(req: NextRequest) {
       phone: phone.trim(),
       purposes,
       purposeNote: purposeNote.trim(),
+      date: row.reservation_date,
+      hour: row.reservation_hour,
+    });
+    await sendConsultationConfirmationSms({
+      memberName: name.trim(),
+      phone: phone.trim(),
       date: row.reservation_date,
       hour: row.reservation_hour,
     });
