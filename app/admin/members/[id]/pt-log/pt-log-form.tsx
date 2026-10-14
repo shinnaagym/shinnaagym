@@ -13,7 +13,8 @@ import {
 import { pastExerciseGroupKey, type PastCircuitEntry } from "./past-exercise-names";
 import { PainTriggerSection } from "./pain-trigger-section";
 import { PtLogDisclosureCard } from "@/app/components/PtLogDisclosureCard";
-import type { PtLogRow, PtLogSetGroup } from "@/lib/db";
+import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
+import type { AssessmentRow, PtLogRow, PtLogSetGroup } from "@/lib/db";
 
 interface SetGroupInput {
   weight: string;
@@ -166,6 +167,7 @@ export function PtLogForm({
   duoPartner = null,
   painTriggerPastNotes = {},
   pastPtLogs = {},
+  assessments = {},
 }: {
   memberId: number;
   memberName: string;
@@ -199,6 +201,9 @@ export function PtLogForm({
       접힌 채로 보여주고, 펼쳤을 때만 내역을 렌더링한다. kind가 "pt_log"일 때만
       보여준다. */
   pastPtLogs?: Record<number, PtLogRow[]>;
+  /** 회원 id -> 그 회원의 평가 기록. "운동 수행능력 그래프"에서 기본적으로 접힌
+      채로 보여주고, 펼쳤을 때만 그래프를 그린다. kind가 "pt_log"일 때만 보여준다. */
+  assessments?: Record<number, AssessmentRow[]>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -467,9 +472,9 @@ export function PtLogForm({
         )}
       </div>
 
-      {/* 아래 두 섹션은 탭 전환(짝 PT) 시 activeMemberId가 바뀔 때마다 완전히
+      {/* 아래 세 섹션은 탭 전환(짝 PT) 시 activeMemberId가 바뀔 때마다 완전히
           새로 펼침 상태를 초기화하려고 key를 쓴다. 형제 엘리먼트끼리 key 값이
-          겹치면(예: 둘 다 그냥 activeMemberId만 쓰면) 탭을 왔다갔다 할 때마다
+          겹치면(예: 전부 그냥 activeMemberId만 쓰면) 탭을 왔다갔다 할 때마다
           이전 카드가 사라지지 않고 계속 쌓이는 렌더링 버그가 있었다 — 각자
           다른 접두사를 붙여 key가 겹치지 않게 한다. */}
       {kind === "pt_log" && (
@@ -485,6 +490,14 @@ export function PtLogForm({
           key={`pain-trigger-${activeMemberId}`}
           memberId={activeMemberId}
           pastNotes={painTriggerPastNotes[activeMemberId] ?? []}
+        />
+      )}
+
+      {kind === "pt_log" && (
+        <ExercisePerformanceChart
+          key={`performance-chart-${activeMemberId}`}
+          memberId={activeMemberId}
+          assessments={assessments[activeMemberId] ?? []}
         />
       )}
 
