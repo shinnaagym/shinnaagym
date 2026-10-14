@@ -60,6 +60,10 @@ export default async function NewPtLogPage({
           [idNum]: ptLogs,
           ...(duoPartner ? { [duoPartner.id]: duoPartnerPtLogs } : {}),
         }}
+        assessments={{
+          [idNum]: assessments,
+          ...(duoPartner ? { [duoPartner.id]: duoPartnerAssessments } : {}),
+        }}
       />
     </div>
   );
