@@ -43,11 +43,13 @@ import {
   inputClass,
   type PainTriggerFormEntry,
 } from "@/app/components/AssessmentEntryRows";
+import { InbodyChart } from "@/app/components/InbodyChart";
 import type {
   AssessmentMovements,
   CustomFunctionalTestEntry,
   ExercisePerformanceEntry,
   PainTriggerEntry,
+  PtLogRow,
 } from "@/lib/db";
 
 interface MovementEntry {
@@ -315,6 +317,7 @@ export function AssessmentForm({
   memberName,
   pastPainTriggerNotes,
   pastExercises,
+  ptLogs = [],
   assessmentId,
   initialData,
 }: {
@@ -322,6 +325,9 @@ export function AssessmentForm({
   memberName: string;
   pastPainTriggerNotes: string[];
   pastExercises: string[];
+  /** 인바디 그래프·빠른 기록 추가에 쓴다. PT 일지에 함께 기록된 체성분 값을
+      그대로 보여준다(평가지 자체에는 인바디 컬럼이 없음). */
+  ptLogs?: PtLogRow[];
   assessmentId?: number;
   initialData?: AssessmentInitialData;
 }) {
@@ -755,6 +761,8 @@ export function AssessmentForm({
           </button>
         </div>
       </Accordion>
+
+      <InbodyChart ptLogs={ptLogs} memberId={memberId} />
 
       <div className="rounded-2xl border border-line bg-white px-5 py-5 mt-3 mb-8">
         <h2 className="font-display text-lg mb-3">통증 유발 동작</h2>

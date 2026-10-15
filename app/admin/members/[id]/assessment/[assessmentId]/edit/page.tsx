@@ -6,6 +6,7 @@ import {
   getPainTriggerEntries,
   listAssessmentsByMember,
 } from "@/lib/assessments";
+import { listPtLogsByMember } from "@/lib/pt-logs";
 import { AssessmentForm } from "../../assessment-form";
 
 export default async function EditAssessmentPage({
@@ -22,10 +23,11 @@ export default async function EditAssessmentPage({
   if (!Number.isInteger(idNum) || !Number.isInteger(assessmentIdNum)) {
     notFound();
   }
-  const [member, assessment, pastAssessments] = await Promise.all([
+  const [member, assessment, pastAssessments, ptLogs] = await Promise.all([
     getMemberById(idNum),
     getAssessmentById(assessmentIdNum),
     listAssessmentsByMember(idNum),
+    listPtLogsByMember(idNum),
   ]);
   if (!member) {
     notFound();
@@ -57,6 +59,7 @@ export default async function EditAssessmentPage({
         memberName={member.name}
         pastPainTriggerNotes={pastPainTriggerNotes}
         pastExercises={pastExercises}
+        ptLogs={ptLogs}
         assessmentId={assessmentIdNum}
         initialData={{
           evaluatorName: assessment.evaluator_name,
