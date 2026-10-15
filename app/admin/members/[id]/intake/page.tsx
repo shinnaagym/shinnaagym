@@ -43,7 +43,7 @@ export default async function IntakeQuestionnairePage({
         exercisePurposeOther: intake.exercise_purpose_other,
         stanceLeg: intake.stance_leg,
         legCross: intake.leg_cross,
-        sleepPosition: intake.sleep_position,
+        sleepPositions: intake.sleep_positions,
         frequentMovement: intake.frequent_movement,
         sleepHours: intake.sleep_hours,
         sleepQuality: intake.sleep_quality,

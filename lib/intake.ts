@@ -14,7 +14,7 @@ export interface UpsertIntakeQuestionnaireInput {
   exercisePurposeOther: string;
   stanceLeg: string;
   legCross: string;
-  sleepPosition: string;
+  sleepPositions: string[];
   frequentMovement: string;
   sleepHours: number | null;
   sleepQuality: string;
@@ -124,7 +124,7 @@ export async function upsertIntakeQuestionnaire(
        member_id, intake_name, age, phone, visit_channel, visit_channel_referrer_name,
        visit_channel_other,
        exercise_purposes, exercise_purpose_other,
-       stance_leg, leg_cross, sleep_position, frequent_movement,
+       stance_leg, leg_cross, sleep_positions, frequent_movement,
        sleep_hours, sleep_quality, stress_level, drinking, smoking, other_notes,
        pain_onset_period, pain_onset_type, pain_moi, pain_movements,
        pain_cycle_situation, pain_cycle_morning, pain_cycle_noon, pain_cycle_evening, pain_cycle_night,
@@ -151,7 +151,7 @@ export async function upsertIntakeQuestionnaire(
        exercise_purpose_other = EXCLUDED.exercise_purpose_other,
        stance_leg = EXCLUDED.stance_leg,
        leg_cross = EXCLUDED.leg_cross,
-       sleep_position = EXCLUDED.sleep_position,
+       sleep_positions = EXCLUDED.sleep_positions,
        frequent_movement = EXCLUDED.frequent_movement,
        sleep_hours = EXCLUDED.sleep_hours,
        sleep_quality = EXCLUDED.sleep_quality,
@@ -205,7 +205,7 @@ export async function upsertIntakeQuestionnaire(
       input.exercisePurposeOther,
       input.stanceLeg,
       input.legCross,
-      input.sleepPosition,
+      JSON.stringify(input.sleepPositions),
       input.frequentMovement,
       input.sleepHours,
       input.sleepQuality,

@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 42;
+const SCHEMA_VERSION = 43;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -257,6 +257,7 @@ function runFullMigration(): Promise<void> {
           stance_leg TEXT NOT NULL DEFAULT '',
           leg_cross TEXT NOT NULL DEFAULT '',
           sleep_position TEXT NOT NULL DEFAULT '',
+          sleep_positions JSONB NOT NULL DEFAULT '[]'::jsonb,
           frequent_movement TEXT NOT NULL DEFAULT '',
           sleep_hours NUMERIC,
           sleep_quality TEXT NOT NULL DEFAULT '',
@@ -822,6 +823,13 @@ function runFullMigration(): Promise<void> {
             -- 정기 일정을 스케줄표 시간 칸(개인 일정) 대신 요일별 메모장에만
             -- 표시할지 고르는 옵션.
             ALTER TABLE recurring_events ADD COLUMN IF NOT EXISTS as_memo BOOLEAN NOT NULL DEFAULT false;
+
+            -- "자는 자세"를 중복 선택할 수 있게 바꾸면서 생긴 컬럼. 기존
+            -- sleep_position(단일 값) 컬럼은 과거 기록 보존을 위해 남겨두고,
+            -- 이미 값이 있던 행은 그 값을 배열의 첫 항목으로 그대로 옮겨온다.
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS sleep_positions JSONB NOT NULL DEFAULT '[]'::jsonb;
+            UPDATE intake_questionnaires SET sleep_positions = to_jsonb(ARRAY[sleep_position])
+              WHERE sleep_position <> '' AND sleep_positions = '[]'::jsonb;
             `,
           ),
           getPool().query(
@@ -1202,6 +1210,7 @@ export interface IntakeQuestionnaireRow {
   stance_leg: string;
   leg_cross: string;
   sleep_position: string;
+  sleep_positions: string[];
   frequent_movement: string;
   sleep_hours: number | null;
   sleep_quality: string;
