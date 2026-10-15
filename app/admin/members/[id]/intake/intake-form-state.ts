@@ -11,7 +11,7 @@ export interface IntakeFormState {
   exercisePurposeOther: string;
   stanceLeg: string;
   legCross: string;
-  sleepPosition: string;
+  sleepPositions: string[];
   frequentMovement: string;
   sleepHours: number | null;
   sleepQuality: string;
@@ -71,7 +71,7 @@ export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
   exercisePurposeOther: "",
   stanceLeg: "",
   legCross: "",
-  sleepPosition: "",
+  sleepPositions: [],
   frequentMovement: "",
   sleepHours: null,
   sleepQuality: "",

@@ -83,6 +83,35 @@ function RadioPills({
   );
 }
 
+/** RadioPills와 달리 여러 개를 동시에 선택할 수 있다(눌러서 토글). */
+function CheckboxPills({
+  options,
+  values,
+  onChange,
+}: {
+  options: readonly { value: string; label: string }[];
+  values: string[];
+  onChange: (v: string[]) => void;
+}) {
+  function toggle(v: string) {
+    onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => toggle(opt.value)}
+          className={pillClass(values.includes(opt.value))}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function NrsPills({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -617,10 +646,10 @@ export function IntakeForm({
           <RadioPills options={LEG_CROSS_OPTIONS} value={form.legCross} onChange={(v) => patch({ legCross: v })} />
         </Field>
         <Field label="자는 자세">
-          <RadioPills
+          <CheckboxPills
             options={SLEEP_POSITION_OPTIONS}
-            value={form.sleepPosition}
-            onChange={(v) => patch({ sleepPosition: v })}
+            values={form.sleepPositions}
+            onChange={(v) => patch({ sleepPositions: v })}
           />
         </Field>
         <Field label="자주 하는 동작">

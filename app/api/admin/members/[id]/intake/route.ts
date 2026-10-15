@@ -12,13 +12,15 @@ import { koreaTodayKey } from "@/lib/date";
 import { recordUndo, type UndoOp } from "@/lib/undo";
 import type { IntakeQuestionnaireRow } from "@/lib/db";
 
-// pain_movements/pain_characteristics는 JSONB 배열 컬럼이라, pg가 JS 배열을
-// Postgres 네이티브 배열로 오인하지 않도록 직접 JSON.stringify해서 넘긴다.
+// pain_movements/pain_characteristics/sleep_positions는 JSONB 배열 컬럼이라,
+// pg가 JS 배열을 Postgres 네이티브 배열로 오인하지 않도록 직접
+// JSON.stringify해서 넘긴다.
 function intakeRowForSql(row: IntakeQuestionnaireRow): Record<string, unknown> {
   return {
     ...row,
     pain_movements: JSON.stringify(row.pain_movements),
     pain_characteristics: JSON.stringify(row.pain_characteristics),
+    sleep_positions: JSON.stringify(row.sleep_positions),
   };
 }
 

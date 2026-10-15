@@ -186,6 +186,83 @@ function YbtDirectionInputs({
   );
 }
 
+const BALANCE_UNSTABLE_OPTIONS = [
+  { value: "right", label: "오른쪽" },
+  { value: "left", label: "왼쪽" },
+] as const;
+
+// YBT와 같은 방식 — "밸런스(한 발 서기)"는 별도 컬럼 없이 기존 balance_note
+// 안에 "[불안정: 오른쪽, 왼쪽] " 접두사로 구조화된 값을 함께 넣어둔다.
+const BALANCE_NOTE_PATTERN = /^\[불안정: ([^\]]*)\]\s*/;
+
+function parseBalanceNote(note: string): { unstableSides: string[]; text: string } {
+  const match = note.match(BALANCE_NOTE_PATTERN);
+  if (!match) return { unstableSides: [], text: note };
+  const labels = match[1]
+    ? match[1]
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  const sides = BALANCE_UNSTABLE_OPTIONS.filter((o) => labels.includes(o.label)).map((o) => o.value);
+  return { unstableSides: sides, text: note.slice(match[0].length) };
+}
+
+function formatBalanceNote(unstableSides: string[], text: string): string {
+  if (unstableSides.length === 0) return text;
+  const labels = BALANCE_UNSTABLE_OPTIONS.filter((o) => unstableSides.includes(o.value)).map((o) => o.label);
+  return `[불안정: ${labels.join(", ")}] ${text}`;
+}
+
+function BalanceInstabilityInputs({
+  note,
+  onChange,
+}: {
+  note: string;
+  onChange: (note: string) => void;
+}) {
+  const { unstableSides, text } = parseBalanceNote(note);
+
+  function toggleSide(value: string) {
+    const next = unstableSides.includes(value)
+      ? unstableSides.filter((v) => v !== value)
+      : [...unstableSides, value];
+    onChange(formatBalanceNote(next, text));
+  }
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <p className="text-xs text-ink/50 mb-1">불안정</p>
+        <div className="flex flex-wrap gap-1.5">
+          {BALANCE_UNSTABLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => toggleSide(opt.value)}
+              className={[
+                "rounded-full px-3 py-1.5 text-xs font-medium transition border",
+                unstableSides.includes(opt.value)
+                  ? "bg-coral text-white border-coral"
+                  : "border-line text-ink/60 hover:bg-bone",
+              ].join(" ")}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => onChange(formatBalanceNote(unstableSides, e.target.value))}
+        rows={2}
+        placeholder="관찰 소견"
+        className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral resize-none"
+      />
+    </div>
+  );
+}
+
 const MovementRow = memo(function MovementRow({
   movement,
   entry,
@@ -724,6 +801,11 @@ export function AssessmentForm({
                 <YbtDirectionInputs
                   note={functionalNotes.ybt}
                   onChange={(note) => setFunctionalNotes((prev) => ({ ...prev, ybt: note }))}
+                />
+              ) : test.key === "balance" ? (
+                <BalanceInstabilityInputs
+                  note={functionalNotes.balance}
+                  onChange={(note) => setFunctionalNotes((prev) => ({ ...prev, balance: note }))}
                 />
               ) : (
                 <textarea

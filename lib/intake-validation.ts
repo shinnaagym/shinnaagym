@@ -27,7 +27,7 @@ function optionValues(options: readonly { value: string }[]): Set<string> {
 
 const VALID_STANCE_LEG = optionValues(STANCE_LEG_OPTIONS);
 const VALID_LEG_CROSS = optionValues(LEG_CROSS_OPTIONS);
-const VALID_SLEEP_POSITION = optionValues(SLEEP_POSITION_OPTIONS);
+const VALID_SLEEP_POSITION_VALUES = new Set<string>(SLEEP_POSITION_OPTIONS.map((o) => o.value));
 const VALID_SLEEP_QUALITY = optionValues(SLEEP_QUALITY_OPTIONS);
 const VALID_STRESS_LEVEL = optionValues(STRESS_LEVEL_OPTIONS);
 const VALID_PAIN_ONSET_TYPE = optionValues(PAIN_ONSET_TYPE_OPTIONS);
@@ -68,6 +68,11 @@ function characteristics(raw: unknown): string[] {
 function exercisePurposes(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((v): v is string => typeof v === "string" && VALID_EXERCISE_PURPOSE_KEYS.has(v));
+}
+
+function sleepPositions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string" && VALID_SLEEP_POSITION_VALUES.has(v));
 }
 
 /** PROM 문항 답변 맵 공통 검증: 알려진 문항 key만, 해당 문항의 옵션 value 범위 내 숫자만 허용. */
@@ -118,7 +123,7 @@ export interface ParsedIntakeInput {
   exercisePurposeOther: string;
   stanceLeg: string;
   legCross: string;
-  sleepPosition: string;
+  sleepPositions: string[];
   frequentMovement: string;
   sleepHours: number | null;
   sleepQuality: string;
@@ -172,7 +177,7 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     exercisePurposeOther: str(body?.exercisePurposeOther),
     stanceLeg: enumVal(body?.stanceLeg, VALID_STANCE_LEG),
     legCross: enumVal(body?.legCross, VALID_LEG_CROSS),
-    sleepPosition: enumVal(body?.sleepPosition, VALID_SLEEP_POSITION),
+    sleepPositions: sleepPositions(body?.sleepPositions),
     frequentMovement: str(body?.frequentMovement),
     sleepHours: sleepHours(body?.sleepHours),
     sleepQuality: enumVal(body?.sleepQuality, VALID_SLEEP_QUALITY),

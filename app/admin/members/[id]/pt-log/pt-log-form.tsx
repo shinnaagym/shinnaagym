@@ -220,6 +220,10 @@ export function PtLogForm({
   const [submitting, setSubmitting] = useState(false);
   // 이름 입력 중 자동완성 목록을 띄울 운동의 인덱스. 한 번에 한 칸만 연다.
   const [suggestIndex, setSuggestIndex] = useState<number | null>(null);
+  // 운동 카드를 드래그로 재정렬할 때 — 끌고 있는 카드는 흐리게, 지금 올려놓은
+  // 카드는 테두리로 강조해서 드래그가 실제로 진행되고 있는지 보이게 한다.
+  const [draggingExerciseIndex, setDraggingExerciseIndex] = useState<number | null>(null);
+  const [dragOverExerciseIndex, setDragOverExerciseIndex] = useState<number | null>(null);
 
   // 2:1 짝 탭별로 독립된 초안을 보관한다. 어떤 회원의 탭에도 아직 없으면(=처음
   // 그 탭으로 전환하는 순간) 지금 화면에 있는 값을 그대로 복사해 넣고, 그
@@ -294,15 +298,22 @@ export function PtLogForm({
     setExercises((prev) => prev.filter((_, i) => i !== index));
   }
 
-  /** 운동 카드의 순서를 한 칸 위(-1) 또는 아래(+1)로 옮긴다. */
-  function moveExercise(index: number, direction: -1 | 1) {
+  /** 운동 카드를 드래그해서 fromIndex 자리의 카드를 toIndex 위치로 옮긴다. */
+  function moveExercise(fromIndex: number, toIndex: number) {
     setExercises((prev) => {
-      const target = index + direction;
-      if (target < 0 || target >= prev.length) return prev;
+      if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= prev.length) return prev;
       const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
       return next;
     });
+  }
+
+  function handleExerciseDrop(e: React.DragEvent, toIndex: number) {
+    e.preventDefault();
+    setDragOverExerciseIndex(null);
+    if (draggingExerciseIndex != null) moveExercise(draggingExerciseIndex, toIndex);
+    setDraggingExerciseIndex(null);
   }
 
   function addGroup(exIndex: number) {
@@ -503,28 +514,44 @@ export function PtLogForm({
 
       <div className="space-y-3 mb-4">
         {exercises.map((ex, exIndex) => (
-          <div key={exIndex} className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4">
+          <div
+            key={exIndex}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (draggingExerciseIndex != null && dragOverExerciseIndex !== exIndex) {
+                setDragOverExerciseIndex(exIndex);
+              }
+            }}
+            onDragLeave={(e) => {
+              if (dragOverExerciseIndex === exIndex && !e.currentTarget.contains(e.relatedTarget as Node)) {
+                setDragOverExerciseIndex(null);
+              }
+            }}
+            onDrop={(e) => handleExerciseDrop(e, exIndex)}
+            className={[
+              "rounded-2xl bg-white border shadow-sm px-5 py-4 transition",
+              dragOverExerciseIndex === exIndex ? "border-coral ring-2 ring-coral/30 bg-coral/5" : "border-line/60",
+              draggingExerciseIndex === exIndex ? "opacity-30" : "",
+            ].join(" ")}
+          >
             <div className="flex items-center mb-3 gap-2">
-              <div className="flex flex-col shrink-0">
-                <button
-                  type="button"
-                  onClick={() => moveExercise(exIndex, -1)}
-                  disabled={exIndex === 0}
-                  className="leading-none px-1 text-ink/40 hover:text-coral disabled:opacity-20 disabled:hover:text-ink/40"
-                  aria-label="운동 순서 위로 이동"
-                >
-                  ▲
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveExercise(exIndex, 1)}
-                  disabled={exIndex === exercises.length - 1}
-                  className="leading-none px-1 text-ink/40 hover:text-coral disabled:opacity-20 disabled:hover:text-ink/40"
-                  aria-label="운동 순서 아래로 이동"
-                >
-                  ▼
-                </button>
-              </div>
+              <button
+                type="button"
+                draggable
+                onDragStart={(e) => {
+                  setDraggingExerciseIndex(exIndex);
+                  e.dataTransfer.setData("text/plain", String(exIndex));
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragEnd={() => {
+                  setDraggingExerciseIndex(null);
+                  setDragOverExerciseIndex(null);
+                }}
+                className="shrink-0 cursor-grab select-none px-1 text-ink/40 hover:text-coral active:cursor-grabbing"
+                aria-label="드래그해서 운동 순서 변경"
+              >
+                ⠿
+              </button>
               <select
                 value={ex.equipment}
                 onChange={(e) => updateExerciseNameOrEquipment(exIndex, { equipment: e.target.value })}

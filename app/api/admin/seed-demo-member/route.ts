@@ -434,7 +434,7 @@ async function handle(req: NextRequest) {
       member_id, intake_name, age, phone,
       visit_channel, visit_channel_referrer_name, visit_channel_other,
       exercise_purposes, exercise_purpose_other,
-      stance_leg, leg_cross, sleep_position, frequent_movement,
+      stance_leg, leg_cross, sleep_positions, frequent_movement,
       sleep_hours, sleep_quality, stress_level, drinking, smoking, other_notes,
       pain_onset_period, pain_onset_type, pain_moi, pain_movements,
       pain_cycle_situation, pain_cycle_morning, pain_cycle_noon, pain_cycle_evening, pain_cycle_night,
@@ -459,7 +459,7 @@ async function handle(req: NextRequest) {
       memberId, "홍길동", 50, "010-2222-9090",
       "referral", "정미숙", "",
       ["rehab", "strength"], "",
-      "right", "left", "supine", "사무직, 하루 대부분 좌식 근무",
+      "right", "left", JSON.stringify(["supine"]), "사무직, 하루 대부분 좌식 근무",
       6.5, "normal", "normal", true, false, "무릎 외 특이 병력 없음. 혈압·혈당 정상.",
       "6개월 전", "chronic", "특별한 외상 없이 서서히 시작됨",
       JSON.stringify([

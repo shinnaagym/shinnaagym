@@ -64,6 +64,11 @@ function labelsOf(options: readonly { key: string; label: string }[], keys: stri
   return keys.map((k) => keyLabelOf(options, k)).join(", ");
 }
 
+function valueLabelsOf(options: readonly { value: string; label: string }[], values: string[]): string {
+  if (values.length === 0) return "-";
+  return values.map((v) => labelOf(options, v)).join(", ");
+}
+
 function cycleDirectionLabel(value: string): string {
   if (value === "up") return "▲ 심해짐";
   if (value === "down") return "▼ 나아짐";
@@ -235,7 +240,7 @@ export function IntakeDocument({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="짝다리">{labelOf(STANCE_LEG_OPTIONS, intake.stance_leg)}</Field>
           <Field label="다리꼬기">{labelOf(LEG_CROSS_OPTIONS, intake.leg_cross)}</Field>
-          <Field label="자는 자세">{labelOf(SLEEP_POSITION_OPTIONS, intake.sleep_position)}</Field>
+          <Field label="자는 자세">{valueLabelsOf(SLEEP_POSITION_OPTIONS, intake.sleep_positions)}</Field>
           <Field label="수면 시간">
             {intake.sleep_hours != null ? `${intake.sleep_hours}시간` : "-"}
           </Field>
