@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { listPtLogsByMember } from "@/lib/pt-logs";
 import { AssessmentForm } from "../assessment-form";
 
 export default async function NewAssessmentPage({
@@ -17,9 +18,10 @@ export default async function NewAssessmentPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const [member, pastAssessments] = await Promise.all([
+  const [member, pastAssessments, ptLogs] = await Promise.all([
     getMemberById(idNum),
     listAssessmentsByMember(idNum),
+    listPtLogsByMember(idNum),
   ]);
   if (!member) {
     notFound();
@@ -48,6 +50,7 @@ export default async function NewAssessmentPage({
         memberName={member.name}
         pastPainTriggerNotes={pastPainTriggerNotes}
         pastExercises={pastExercises}
+        ptLogs={ptLogs}
       />
     </div>
   );

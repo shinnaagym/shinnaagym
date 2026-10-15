@@ -1010,12 +1010,18 @@ function FixedSlotSchedule({
   const allByCell = useMemo(() => {
     const map = new Map<
       string,
-      Array<{ id: number; memberId: number; name: string; slotType: FixedSlotType }>
+      Array<{ id: number; memberId: number; name: string; coachId: number | null; slotType: FixedSlotType }>
     >();
     for (const slot of fixedSlots) {
       const key = `${slot.weekday}-${slot.hour}`;
       const entries = map.get(key) ?? [];
-      entries.push({ id: slot.id, memberId: slot.member_id, name: slot.member_name, slotType: slot.slot_type });
+      entries.push({
+        id: slot.id,
+        memberId: slot.member_id,
+        name: slot.member_name,
+        coachId: slot.member_coach_id,
+        slotType: slot.slot_type,
+      });
       map.set(key, entries);
     }
     return map;
@@ -1269,7 +1275,14 @@ function FixedSlotSchedule({
       {pickerCell &&
         (() => {
           const key = `${pickerCell.weekday}-${pickerCell.hour}`;
-          const current = allByCell.get(key) ?? [];
+          // "전체" 보기가 아니면, 지금 보고 있는 코치가 담당하지 않는 다른 코치의
+          // 배정은 이 피커에 보이지 않게 한다("고정" 충돌 규칙 자체가 코치별로
+          // 따로 적용되니, 다른 코치 배정은 여기서 신경 쓸 필요가 없다).
+          const current = (allByCell.get(key) ?? []).filter((entry) => {
+            if (coachFilter === "unassigned") return entry.coachId === null;
+            if (coachFilter === "all") return true;
+            return entry.coachId === coachFilter;
+          });
           const availableMembers = members
             .filter((m) => m.status === "active" && !m.is_lead)
             .filter((m) => {
