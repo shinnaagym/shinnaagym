@@ -3,6 +3,7 @@ import { isAdminAuthed } from "@/lib/auth";
 import {
   createRecurringEvent,
   listRecurringEvents,
+  WEEK_OF_MONTH_LAST,
   type RecurringEventInput,
 } from "@/lib/recurring-events";
 import { recordUndo } from "@/lib/undo";
@@ -18,6 +19,7 @@ function parseInput(body: unknown): RecurringEventInput | null {
         cycle?: unknown;
         dayOfMonth?: unknown;
         dayOfWeek?: unknown;
+        weekOfMonth?: unknown;
         startHour?: unknown;
         endHour?: unknown;
         asMemo?: unknown;
@@ -47,6 +49,17 @@ function parseInput(body: unknown): RecurringEventInput | null {
     const dayOfWeek = typeof b?.dayOfWeek === "number" ? b.dayOfWeek : NaN;
     if (!Number.isInteger(dayOfWeek) || dayOfWeek < 1 || dayOfWeek > 5) return null;
     return { name, cycle, dayOfMonth: 1, dayOfWeek, startHour, endHour, asMemo };
+  }
+
+  // 매달/분기는 "N째주 요일"(weekOfMonth가 있으면) 또는 날짜(dayOfMonth) 둘 중
+  // 하나로 발생일을 정한다. 토요일(6)까지 고를 수 있다 — 매주/격주와 달리
+  // 토요일은 밀리지 않고 그대로 쓰이기 때문.
+  if (b?.weekOfMonth !== undefined && b?.weekOfMonth !== null) {
+    const weekOfMonth = typeof b.weekOfMonth === "number" ? b.weekOfMonth : NaN;
+    const dayOfWeek = typeof b?.dayOfWeek === "number" ? b.dayOfWeek : NaN;
+    if (!Number.isInteger(weekOfMonth) || weekOfMonth < 1 || weekOfMonth > WEEK_OF_MONTH_LAST) return null;
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 1 || dayOfWeek > 6) return null;
+    return { name, cycle, dayOfMonth: 1, dayOfWeek, weekOfMonth, startHour, endHour, asMemo };
   }
 
   const dayOfMonth = typeof b?.dayOfMonth === "number" ? b.dayOfMonth : NaN;

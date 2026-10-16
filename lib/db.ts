@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 43;
+const SCHEMA_VERSION = 44;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -350,15 +350,21 @@ function runFullMigration(): Promise<void> {
         CREATE INDEX IF NOT EXISTS idx_goal_memos_member_id ON goal_memos(member_id);
 
         -- 매달/분기/매주/격주마다 반복되는 정기 일정(스터디, 독서 모임 등). cycle이
-        -- 'monthly'면 매달, 'quarterly'면 3·6·9·12월에 day_of_month일 발생하고,
-        -- 'weekly'/'biweekly'면 day_of_week(1=월~5=금) 요일에 발생한다. 그 날짜가
-        -- 주말이거나 공휴일이면 스케줄표 생성 시점에 다음 평일로 미뤄진다.
+        -- 'monthly'면 매달, 'quarterly'면 3·6·9·12월에 발생하고, 'weekly'/
+        -- 'biweekly'면 day_of_week(1=월~5=금) 요일에 발생한다. 'monthly'/
+        -- 'quarterly'는 기본적으로 day_of_month(날짜)를 쓰지만, week_of_month가
+        -- 채워져 있으면 대신 "그 달의 day_of_week 요일 중 week_of_month번째"
+        -- (1~4, 5=마지막) 패턴으로 계산한다(예: 첫째주 수요일). 그렇게 계산된
+        -- 날짜가 일요일이거나 공휴일이면 다음 평일로 미뤄지지만, 토요일은 정식
+        -- 영업일이라 밀리지 않는다 — day_of_month 모드는 토요일도 포함해 주말이면
+        -- 그대로 다음 평일로 미뤄진다(기존 동작 그대로).
         CREATE TABLE IF NOT EXISTS recurring_events (
           id SERIAL PRIMARY KEY,
           name TEXT NOT NULL,
           cycle TEXT NOT NULL DEFAULT 'monthly',
           day_of_month INTEGER NOT NULL DEFAULT 1,
           day_of_week SMALLINT,
+          week_of_month SMALLINT,
           start_hour INTEGER NOT NULL,
           end_hour INTEGER NOT NULL,
           enabled BOOLEAN NOT NULL DEFAULT true,
@@ -830,6 +836,11 @@ function runFullMigration(): Promise<void> {
             ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS sleep_positions JSONB NOT NULL DEFAULT '[]'::jsonb;
             UPDATE intake_questionnaires SET sleep_positions = to_jsonb(ARRAY[sleep_position])
               WHERE sleep_position <> '' AND sleep_positions = '[]'::jsonb;
+
+            -- 정기 일정의 매달/분기 주기에도 "N째주 요일"(예: 첫째주 수요일) 패턴을
+            -- 쓸 수 있게 한다. NULL이면 기존처럼 day_of_month(날짜)를 쓰고, 1~4면
+            -- 그 달의 day_of_week 요일 중 N번째, 5면 마지막 occurrence를 쓴다.
+            ALTER TABLE recurring_events ADD COLUMN IF NOT EXISTS week_of_month SMALLINT;
             `,
           ),
           getPool().query(
@@ -1375,8 +1386,13 @@ export interface RecurringEventRow {
   name: string;
   cycle: RecurringEventCycle;
   day_of_month: number;
-  /** cycle이 'weekly'/'biweekly'일 때만 쓴다. 1=월 ~ 5=금(주말은 고를 수 없음). */
+  /** cycle이 'weekly'/'biweekly'일 때는 1=월~5=금(주말은 고를 수 없음). cycle이
+      'monthly'/'quarterly'이고 week_of_month가 채워져 있을 때는 1=월~6=토(토요일도
+      가능 — 정식 영업일이라). */
   day_of_week: number | null;
+  /** cycle이 'monthly'/'quarterly'일 때만 의미가 있다. null이면 day_of_month(날짜)
+      기준, 1~4면 그 달의 day_of_week 요일 중 N번째, 5면 마지막 occurrence. */
+  week_of_month: number | null;
   start_hour: number;
   end_hour: number;
   enabled: boolean;

@@ -54,6 +54,19 @@ const RECURRING_WEEKDAY_OPTIONS = [
   { value: 5, label: "금" },
 ];
 
+// 매달/분기의 "N째주 요일" 패턴(예: 첫째주 수요일)은 매주/격주와 달리 토요일도
+// 고를 수 있다 — 스튜디오가 토요일엔 당직 코치가 9~15시로 정식 운영하는 영업일
+// 이라, 토요일로 계산된 날짜는 평일로 밀리지 않고 그대로 쓰인다.
+const RECURRING_WEEKDAY_OPTIONS_WITH_SAT = [...RECURRING_WEEKDAY_OPTIONS, { value: 6, label: "토" }];
+
+const WEEK_OF_MONTH_OPTIONS = [
+  { value: 1, label: "첫째주" },
+  { value: 2, label: "둘째주" },
+  { value: 3, label: "셋째주" },
+  { value: 4, label: "넷째주" },
+  { value: 5, label: "마지막주" },
+];
+
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   regular: "정직원",
   freelancer: "프리랜서",
@@ -912,6 +925,9 @@ export function SettingsView({
   const [newEventCycle, setNewEventCycle] = useState<RecurringEventCycle>("monthly");
   const [newEventDay, setNewEventDay] = useState(1);
   const [newEventDayOfWeek, setNewEventDayOfWeek] = useState(1);
+  // null이면 매달/분기 일정을 날짜(newEventDay)로, 숫자면 "N째주 요일"
+  // (이 값 + newEventDayOfWeek)로 만든다. 매주/격주에서는 쓰지 않는다.
+  const [newEventWeekOfMonth, setNewEventWeekOfMonth] = useState<number | null>(null);
   const [newEventStartHour, setNewEventStartHour] = useState(12);
   const [newEventEndHour, setNewEventEndHour] = useState(14);
   const [newEventAsMemo, setNewEventAsMemo] = useState(false);
@@ -1064,7 +1080,9 @@ export function SettingsView({
         cycle: newEventCycle,
         ...(WEEKLY_CYCLES.has(newEventCycle)
           ? { dayOfWeek: newEventDayOfWeek }
-          : { dayOfMonth: newEventDay }),
+          : newEventWeekOfMonth != null
+            ? { weekOfMonth: newEventWeekOfMonth, dayOfWeek: newEventDayOfWeek }
+            : { dayOfMonth: newEventDay }),
         startHour: newEventStartHour,
         endHour: newEventEndHour,
         asMemo: newEventAsMemo,
@@ -1080,6 +1098,7 @@ export function SettingsView({
     setNewEventCycle("monthly");
     setNewEventDay(1);
     setNewEventDayOfWeek(1);
+    setNewEventWeekOfMonth(null);
     setNewEventStartHour(12);
     setNewEventEndHour(14);
     setNewEventAsMemo(false);
@@ -1092,6 +1111,7 @@ export function SettingsView({
       cycle: RecurringEventCycle;
       dayOfMonth: number;
       dayOfWeek: number;
+      weekOfMonth: number | null;
       startHour: number;
       endHour: number;
       enabled: boolean;
@@ -1107,6 +1127,7 @@ export function SettingsView({
               ...(patch.cycle !== undefined && { cycle: patch.cycle }),
               ...(patch.dayOfMonth !== undefined && { day_of_month: patch.dayOfMonth }),
               ...(patch.dayOfWeek !== undefined && { day_of_week: patch.dayOfWeek }),
+              ...(patch.weekOfMonth !== undefined && { week_of_month: patch.weekOfMonth }),
               ...(patch.startHour !== undefined && { start_hour: patch.startHour }),
               ...(patch.endHour !== undefined && { end_hour: patch.endHour }),
               ...(patch.enabled !== undefined && { enabled: patch.enabled }),
@@ -1322,11 +1343,15 @@ export function SettingsView({
         <p className="text-xs text-ink/50 mb-4">
           매주·격주·매달 또는 분기(3·6·9·12월)마다 반복되는 일정이에요. 매주/격주는
           날짜 대신 요일(월~금)을 고르고, 격주는 등록한 날부터 2주에 한 번 돌아와요.
-          기본값은 재직 중인 코치 전원의 스케줄표 시간 칸에 자동으로 잡혀 그 시간엔
-          다른 예약을 받을 수 없게 막는 방식이고, &quot;메모&quot;를 체크하면 시간을
-          막지 않고 그 날짜의 요일별 메모장에 이름만 한 줄 표시돼요. 날짜가 토·일요일이거나
+          매달/분기는 날짜 대신 &quot;N째주 요일&quot;(예: 첫째주 수요일, 마지막주
+          금요일)로도 고를 수 있고, 이때는 토요일도 선택할 수 있어요. 기본값은 재직
+          중인 코치 전원의 스케줄표 시간 칸에 자동으로 잡혀 그 시간엔 다른 예약을
+          받을 수 없게 막는 방식이고, &quot;메모&quot;를 체크하면 시간을 막지 않고
+          그 날짜의 요일별 메모장에 이름만 한 줄 표시돼요. 날짜가 일요일이거나
           공휴일 관리에 등록된 날이면 자동으로 그다음 평일로 미뤄져요(대체공휴일도
-          공휴일 관리에 등록해두면 함께 반영돼요).
+          공휴일 관리에 등록해두면 함께 반영돼요). 매주/격주 요일이나 날짜(숫자)
+          방식의 매달/분기 일정은 토요일도 똑같이 미뤄지고, &quot;N째주 요일&quot;
+          방식에서 고른 토요일만 예외로 그대로 쓰여요.
         </p>
         <div className="divide-y divide-line/50">
           {recurringEvents.map((ev) => (
@@ -1345,8 +1370,11 @@ export function SettingsView({
                   const cycle = e.target.value as RecurringEventCycle;
                   // 매달/분기 ↔ 매주/격주로 전환하면 이전엔 쓰지 않던 요일/날짜
                   // 값이 비어 있을 수 있어, 전환 즉시 기본값을 함께 채워 보낸다.
+                  // 매주/격주는 요일을 1~5(월~금)만 받으므로, 매달/분기의 "N째주
+                  // 요일"에서 토요일(6)을 쓰던 상태로 전환하면 1로 되돌린다.
                   if (WEEKLY_CYCLES.has(cycle)) {
-                    patchRecurringEvent(ev.id, { cycle, dayOfWeek: ev.day_of_week ?? 1 });
+                    const dayOfWeek = ev.day_of_week != null && ev.day_of_week <= 5 ? ev.day_of_week : 1;
+                    patchRecurringEvent(ev.id, { cycle, dayOfWeek, weekOfMonth: null });
                   } else {
                     patchRecurringEvent(ev.id, { cycle });
                   }
@@ -1372,23 +1400,69 @@ export function SettingsView({
                   ))}
                 </select>
               ) : (
-                <span className="flex items-center gap-1 text-xs text-ink/60">
-                  매
-                  <input
-                    type="number"
-                    min={1}
-                    max={28}
-                    value={ev.day_of_month}
+                <>
+                  <select
+                    value={ev.week_of_month != null ? "weekday" : "date"}
                     onChange={(e) => {
-                      const day = Number(e.target.value);
-                      if (Number.isInteger(day) && day >= 1 && day <= 28) {
-                        patchRecurringEvent(ev.id, { dayOfMonth: day });
+                      if (e.target.value === "weekday") {
+                        patchRecurringEvent(ev.id, {
+                          weekOfMonth: ev.week_of_month ?? 1,
+                          dayOfWeek: ev.day_of_week ?? 1,
+                        });
+                      } else {
+                        patchRecurringEvent(ev.id, { weekOfMonth: null });
                       }
                     }}
-                    className="w-12 rounded-lg border border-line px-1.5 py-1.5 text-xs text-center outline-none focus:border-coral"
-                  />
-                  일
-                </span>
+                    className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                  >
+                    <option value="date">날짜</option>
+                    <option value="weekday">요일</option>
+                  </select>
+                  {ev.week_of_month != null ? (
+                    <>
+                      <select
+                        value={ev.week_of_month}
+                        onChange={(e) => patchRecurringEvent(ev.id, { weekOfMonth: Number(e.target.value) })}
+                        className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                      >
+                        {WEEK_OF_MONTH_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={ev.day_of_week ?? 1}
+                        onChange={(e) => patchRecurringEvent(ev.id, { dayOfWeek: Number(e.target.value) })}
+                        className="rounded-lg border border-line px-2 py-1.5 text-xs outline-none focus:border-coral"
+                      >
+                        {RECURRING_WEEKDAY_OPTIONS_WITH_SAT.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}요일
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-ink/60">
+                      매
+                      <input
+                        type="number"
+                        min={1}
+                        max={28}
+                        value={ev.day_of_month}
+                        onChange={(e) => {
+                          const day = Number(e.target.value);
+                          if (Number.isInteger(day) && day >= 1 && day <= 28) {
+                            patchRecurringEvent(ev.id, { dayOfMonth: day });
+                          }
+                        }}
+                        className="w-12 rounded-lg border border-line px-1.5 py-1.5 text-xs text-center outline-none focus:border-coral"
+                      />
+                      일
+                    </span>
+                  )}
+                </>
               )}
               <span className="flex items-center gap-1 text-xs text-ink/60">
                 <select
@@ -1457,7 +1531,14 @@ export function SettingsView({
           />
           <select
             value={newEventCycle}
-            onChange={(e) => setNewEventCycle(e.target.value as RecurringEventCycle)}
+            onChange={(e) => {
+              const cycle = e.target.value as RecurringEventCycle;
+              setNewEventCycle(cycle);
+              if (WEEKLY_CYCLES.has(cycle)) {
+                setNewEventWeekOfMonth(null);
+                if (newEventDayOfWeek > 5) setNewEventDayOfWeek(1);
+              }
+            }}
             className="rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral"
           >
             {(Object.keys(CYCLE_LABELS) as RecurringEventCycle[]).map((cycle) => (
@@ -1479,18 +1560,55 @@ export function SettingsView({
               ))}
             </select>
           ) : (
-            <span className="flex items-center gap-1 text-sm text-ink/60">
-              매
-              <input
-                type="number"
-                min={1}
-                max={28}
-                value={newEventDay}
-                onChange={(e) => setNewEventDay(Number(e.target.value))}
-                className="w-14 rounded-lg border border-line px-2 py-2 text-sm text-center outline-none focus:border-coral"
-              />
-              일
-            </span>
+            <>
+              <select
+                value={newEventWeekOfMonth != null ? "weekday" : "date"}
+                onChange={(e) => setNewEventWeekOfMonth(e.target.value === "weekday" ? 1 : null)}
+                className="rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral"
+              >
+                <option value="date">날짜</option>
+                <option value="weekday">요일</option>
+              </select>
+              {newEventWeekOfMonth != null ? (
+                <>
+                  <select
+                    value={newEventWeekOfMonth}
+                    onChange={(e) => setNewEventWeekOfMonth(Number(e.target.value))}
+                    className="rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral"
+                  >
+                    {WEEK_OF_MONTH_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={newEventDayOfWeek}
+                    onChange={(e) => setNewEventDayOfWeek(Number(e.target.value))}
+                    className="rounded-lg border border-line px-2.5 py-2 text-sm outline-none focus:border-coral"
+                  >
+                    {RECURRING_WEEKDAY_OPTIONS_WITH_SAT.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}요일
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : (
+                <span className="flex items-center gap-1 text-sm text-ink/60">
+                  매
+                  <input
+                    type="number"
+                    min={1}
+                    max={28}
+                    value={newEventDay}
+                    onChange={(e) => setNewEventDay(Number(e.target.value))}
+                    className="w-14 rounded-lg border border-line px-2 py-2 text-sm text-center outline-none focus:border-coral"
+                  />
+                  일
+                </span>
+              )}
+            </>
           )}
           <span className="flex items-center gap-1 text-sm text-ink/60">
             <select
