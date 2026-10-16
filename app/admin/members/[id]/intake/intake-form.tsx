@@ -44,6 +44,8 @@ import {
 } from "@/lib/performance-criteria";
 import type { PainMovementEntry } from "@/lib/db";
 import { EMPTY_INTAKE_FORM_STATE, EMPTY_PAIN_MOVEMENT, type IntakeFormState } from "./intake-form-state";
+import { useDraftAutosave, usePendingDraft, clearDraft } from "@/lib/use-draft-autosave";
+import { DraftRestoreBanner } from "@/app/components/DraftRestoreBanner";
 
 export type { IntakeFormState } from "./intake-form-state";
 
@@ -277,6 +279,18 @@ export function IntakeForm({
   );
   const [openProm, setOpenProm] = useState<Set<string>>(new Set());
 
+  const draftKey = `shinna-draft:intake:${memberId}`;
+  const { pendingDraft, resolved: draftResolved, resolve: resolveDraft, discard: discardDraft } =
+    usePendingDraft<IntakeFormState>(draftKey);
+  useDraftAutosave(draftKey, form, draftResolved);
+
+  function restoreDraft() {
+    if (!pendingDraft) return;
+    setForm(pendingDraft);
+    setSelectedRegions(initialRegionsFromAnswers(pendingDraft));
+    resolveDraft();
+  }
+
   function patch(p: Partial<IntakeFormState>) {
     setSaved(false);
     setForm((prev) => ({ ...prev, ...p }));
@@ -394,6 +408,7 @@ export function IntakeForm({
         setError(data.error ?? "저장에 실패했어요.");
         return;
       }
+      clearDraft(draftKey);
       setSaved(true);
       router.back();
     } catch {
@@ -414,6 +429,8 @@ export function IntakeForm({
           )}
         </div>
       </div>
+
+      {pendingDraft && <DraftRestoreBanner onRestore={restoreDraft} onDiscard={discardDraft} />}
 
       <div className="rounded-2xl border border-coral/30 bg-coral/5 px-5 py-4 text-xs text-ink/60 leading-relaxed mb-6">
         <p className="font-medium text-ink mb-1">민감정보 처리 안내</p>

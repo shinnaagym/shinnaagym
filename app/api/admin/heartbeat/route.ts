@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionDeviceId } from "@/lib/auth";
+import { getSessionDeviceId, setAdminSessionCookie } from "@/lib/auth";
 import { BUILD_ID } from "@/lib/build-info";
 import { isDeviceRevoked, touchDeviceHeartbeat } from "@/lib/devices";
 
@@ -15,6 +15,15 @@ export async function GET(req: NextRequest) {
   const clientVersion = req.nextUrl.searchParams.get("v") ?? "";
   await touchDeviceHeartbeat(deviceId, clientVersion);
   const revoked = await isDeviceRevoked(deviceId);
+
+  // 관리자 페이지를 계속 켜둔 채(백그라운드 포함) 쓰는 동안은 세션이 만료 시각과
+  // 무관하게 계속 연장되도록, 아직 로그아웃당하지 않은 요청마다 세션 쿠키를
+  // 새 만료 시각으로 다시 발급한다. 이게 없으면 로그인 후 정확히 12시간이
+  // 지나는 순간, PT 일지 등 긴 문서를 한창 작성 중이어도 갑자기 세션이 끊겨
+  // 저장이 실패한다.
+  if (!revoked) {
+    await setAdminSessionCookie(deviceId);
+  }
 
   return NextResponse.json({
     revoked,

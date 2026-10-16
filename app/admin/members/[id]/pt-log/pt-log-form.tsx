@@ -14,7 +14,16 @@ import { pastExerciseGroupKey, type PastCircuitEntry } from "./past-exercise-nam
 import { PainTriggerSection } from "./pain-trigger-section";
 import { PtLogDisclosureCard } from "@/app/components/PtLogDisclosureCard";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
+import { useDraftAutosave, usePendingDraft, clearDraft } from "@/lib/use-draft-autosave";
+import { DraftRestoreBanner } from "@/app/components/DraftRestoreBanner";
 import type { AssessmentRow, PtLogRow, PtLogSetGroup } from "@/lib/db";
+
+interface PtLogDraftData {
+  logDate: string;
+  memo: string;
+  exercises: ExerciseInput[];
+  activeMemberId: number;
+}
 
 interface SetGroupInput {
   weight: string;
@@ -243,6 +252,28 @@ export function PtLogForm({
     setActiveMemberId(targetId);
   }
 
+  // 2:1 짝 탭 중 지금 보고 있는 탭의 내용만 임시저장한다(draftsRef에 들어있는
+  // 반대쪽 탭 초안까지는 다루지 않음 — 렌더링 중에 ref를 읽을 수 없는 제약도 있고,
+  // 흔치 않은 경우라 복잡도를 늘릴 만큼 가치가 크지 않다).
+  const localDraftKey = `shinna-draft:pt-log:${kind}:${authToken ? "self" : "admin"}:${memberId}:${ptLogId ?? "new"}`;
+  const localDraftSnapshot: PtLogDraftData = { logDate, memo, exercises, activeMemberId };
+  const {
+    pendingDraft: pendingLocalDraft,
+    resolved: localDraftResolved,
+    resolve: resolveLocalDraft,
+    discard: discardLocalDraft,
+  } = usePendingDraft<PtLogDraftData>(localDraftKey);
+  useDraftAutosave(localDraftKey, localDraftSnapshot, localDraftResolved);
+
+  function restoreLocalDraft() {
+    if (!pendingLocalDraft) return;
+    setLogDate(pendingLocalDraft.logDate);
+    setMemo(pendingLocalDraft.memo);
+    setExercises(pendingLocalDraft.exercises);
+    setActiveMemberId(pendingLocalDraft.activeMemberId);
+    resolveLocalDraft();
+  }
+
   function updateExercise(index: number, patch: Partial<ExerciseInput>) {
     setExercises((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
   }
@@ -403,6 +434,7 @@ export function PtLogForm({
           }),
         });
       }
+      clearDraft(localDraftKey);
       const redirectHref = authToken
         ? `/my/${authToken}/personal-exercise`
         : `/admin/members/${activeMemberId}/pt-log`;
@@ -417,6 +449,9 @@ export function PtLogForm({
 
   return (
     <div>
+      {pendingLocalDraft && (
+        <DraftRestoreBanner onRestore={restoreLocalDraft} onDiscard={discardLocalDraft} />
+      )}
       {duoPartner && !isEditing && (
         <div className="flex items-center gap-2 mb-4">
           <button
