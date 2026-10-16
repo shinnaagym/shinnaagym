@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
-import { deleteRecurringEvent, updateRecurringEvent } from "@/lib/recurring-events";
+import { deleteRecurringEvent, updateRecurringEvent, WEEK_OF_MONTH_LAST } from "@/lib/recurring-events";
 import { query } from "@/lib/db";
 import { recordUndo } from "@/lib/undo";
 import type { RecurringEventCycle, RecurringEventRow } from "@/lib/db";
 
 const VALID_CYCLES: RecurringEventCycle[] = ["monthly", "quarterly", "weekly", "biweekly"];
+const WEEKLY_CYCLES = new Set<RecurringEventCycle>(["weekly", "biweekly"]);
 
 export async function PATCH(
   req: NextRequest,
@@ -32,6 +33,7 @@ export async function PATCH(
         cycle?: unknown;
         dayOfMonth?: unknown;
         dayOfWeek?: unknown;
+        weekOfMonth?: unknown;
         startHour?: unknown;
         endHour?: unknown;
         enabled?: unknown;
@@ -59,10 +61,33 @@ export async function PATCH(
     patch.dayOfMonth = body.dayOfMonth;
   }
   if (body?.dayOfWeek !== undefined) {
-    if (typeof body.dayOfWeek !== "number" || !Number.isInteger(body.dayOfWeek) || body.dayOfWeek < 1 || body.dayOfWeek > 5) {
+    // 매주/격주는 토요일을 고르면 항상 다음 평일로 밀려 의미가 없어 1~5(월~금)만
+    // 허용하고, 매달/분기의 "N째주 요일" 패턴은 토요일도 그대로 쓰이므로 1~6까지
+    // 허용한다. cycle을 함께 바꾸는 요청이면 바뀐 cycle 기준으로 판단한다.
+    const effectiveCycle = patch.cycle ?? before.cycle;
+    const maxDayOfWeek = WEEKLY_CYCLES.has(effectiveCycle) ? 5 : 6;
+    if (
+      typeof body.dayOfWeek !== "number" ||
+      !Number.isInteger(body.dayOfWeek) ||
+      body.dayOfWeek < 1 ||
+      body.dayOfWeek > maxDayOfWeek
+    ) {
       return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
     }
     patch.dayOfWeek = body.dayOfWeek;
+  }
+  if (body?.weekOfMonth !== undefined) {
+    if (body.weekOfMonth !== null) {
+      if (
+        typeof body.weekOfMonth !== "number" ||
+        !Number.isInteger(body.weekOfMonth) ||
+        body.weekOfMonth < 1 ||
+        body.weekOfMonth > WEEK_OF_MONTH_LAST
+      ) {
+        return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+      }
+    }
+    patch.weekOfMonth = body.weekOfMonth as number | null;
   }
   const nextStartHour =
     typeof body?.startHour === "number" ? body.startHour : before.start_hour;
@@ -104,6 +129,7 @@ export async function PATCH(
         cycle: before.cycle,
         day_of_month: before.day_of_month,
         day_of_week: before.day_of_week,
+        week_of_month: before.week_of_month,
         start_hour: before.start_hour,
         end_hour: before.end_hour,
         enabled: before.enabled,

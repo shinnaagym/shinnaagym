@@ -41,12 +41,21 @@ export const listRecurringEvents = unstable_cache(
   { tags: ["recurring-events"], revalidate: 300 },
 );
 
+/** week_of_month에 이 값을 쓰면 "마지막주"를 뜻한다(그 달에 해당 요일이 4번
+    있든 5번 있든 항상 가장 마지막 occurrence). */
+export const WEEK_OF_MONTH_LAST = 5;
+
 export interface RecurringEventInput {
   name: string;
   cycle: RecurringEventCycle;
   dayOfMonth: number;
-  /** cycle이 'weekly'/'biweekly'일 때만 보낸다. */
+  /** cycle이 'weekly'/'biweekly'일 때, 또는 'monthly'/'quarterly'이면서
+      weekOfMonth도 함께 보낼 때 쓴다. */
   dayOfWeek?: number | null;
+  /** cycle이 'monthly'/'quarterly'일 때만 보낸다. 채워지면 dayOfMonth 대신
+      "그 달의 dayOfWeek 요일 중 N번째"(1~4, WEEK_OF_MONTH_LAST=마지막) 패턴으로
+      계산한다. */
+  weekOfMonth?: number | null;
   startHour: number;
   endHour: number;
   /** true면 스케줄표 시간 칸(개인 일정) 대신 그 날짜의 요일별 메모장에 이름
@@ -58,13 +67,14 @@ export async function createRecurringEvent(
   input: RecurringEventInput,
 ): Promise<RecurringEventRow> {
   const result = await query<RecurringEventRow>(
-    `INSERT INTO recurring_events (name, cycle, day_of_month, day_of_week, start_hour, end_hour, as_memo)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    `INSERT INTO recurring_events (name, cycle, day_of_month, day_of_week, week_of_month, start_hour, end_hour, as_memo)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
     [
       input.name,
       input.cycle,
       input.dayOfMonth,
       input.dayOfWeek ?? null,
+      input.weekOfMonth ?? null,
       input.startHour,
       input.endHour,
       input.asMemo ?? false,
@@ -97,6 +107,10 @@ export async function updateRecurringEvent(
   if (patch.dayOfWeek !== undefined) {
     fields.push(`day_of_week = $${++i}`);
     values.push(patch.dayOfWeek);
+  }
+  if (patch.weekOfMonth !== undefined) {
+    fields.push(`week_of_month = $${++i}`);
+    values.push(patch.weekOfMonth);
   }
   if (patch.startHour !== undefined) {
     fields.push(`start_hour = $${++i}`);
@@ -154,6 +168,40 @@ export function computeOccurrenceDate(
   holidaySet: Set<string>,
 ): string {
   return pushPastWeekendsAndHolidays(`${monthKey}-${String(dayOfMonth).padStart(2, "0")}`, holidaySet);
+}
+
+/** 일요일이거나 공휴일 관리에 등록된 날이면 다음 날로 계속 미룬 실제 발생일.
+    pushPastWeekendsAndHolidays와 달리 토요일은 건너뛰지 않는다 — "N째주 요일"
+    패턴에서 고른 요일이 토요일이면, 토요일은 당직 코치가 운영하는 정식 영업일이라
+    평일로 밀지 않고 그대로 쓴다. */
+function pushPastSundaysAndHolidays(date: string, holidaySet: Set<string>): string {
+  let d = date;
+  while (weekdayOfKey(d) === 0 || holidaySet.has(d)) {
+    d = addDaysToKey(d, 1);
+  }
+  return d;
+}
+
+/** monthKey(YYYY-MM) 안에서 요일이 dayOfWeek인 날짜들 중 weekOfMonth번째
+    (1~4) 또는 마지막(WEEK_OF_MONTH_LAST)에 해당하는 날짜. 일요일/공휴일이면
+    다음 날로 민다(토요일은 그대로 둔다). 예: weekOfMonth=1, dayOfWeek=3이면
+    "그 달의 첫째주 수요일". */
+export function computeNthWeekdayOccurrence(
+  monthKey: string,
+  dayOfWeek: number,
+  weekOfMonth: number,
+  holidaySet: Set<string>,
+): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const matches: string[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${monthKey}-${String(d).padStart(2, "0")}`;
+    if (weekdayOfKey(key) === dayOfWeek) matches.push(key);
+  }
+  const index = weekOfMonth === WEEK_OF_MONTH_LAST ? matches.length - 1 : weekOfMonth - 1;
+  const chosen = matches[Math.min(Math.max(index, 0), matches.length - 1)];
+  return pushPastSundaysAndHolidays(chosen, holidaySet);
 }
 
 /** monthKey(YYYY-MM) 안에서 'weekly'/'biweekly' 정기 일정이 실제 발생하는 날짜들.
@@ -237,7 +285,11 @@ export async function ensureRecurringEventSessions(): Promise<void> {
       const dates =
         event.cycle === "monthly" || event.cycle === "quarterly"
           ? CYCLE_MONTHS[event.cycle].includes(month)
-            ? [computeOccurrenceDate(monthKey, event.day_of_month, holidaySet)]
+            ? [
+                event.week_of_month != null && event.day_of_week != null
+                  ? computeNthWeekdayOccurrence(monthKey, event.day_of_week, event.week_of_month, holidaySet)
+                  : computeOccurrenceDate(monthKey, event.day_of_month, holidaySet),
+              ]
             : []
           : occurrencesInMonth(monthKey, event, holidaySet);
 
