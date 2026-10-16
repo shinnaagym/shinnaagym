@@ -44,6 +44,8 @@ import {
   type PainTriggerFormEntry,
 } from "@/app/components/AssessmentEntryRows";
 import { InbodyChart } from "@/app/components/InbodyChart";
+import { useDraftAutosave, usePendingDraft, clearDraft } from "@/lib/use-draft-autosave";
+import { DraftRestoreBanner } from "@/app/components/DraftRestoreBanner";
 import type {
   AssessmentMovements,
   CustomFunctionalTestEntry,
@@ -79,6 +81,30 @@ const EMPTY_FUNCTIONAL_NOTES: Record<FunctionalTestKey, string> = {
   balance: "",
   ybt: "",
 };
+
+/** 로컬 임시저장용 — 접기/펼치기 같은 UI 상태(openRegions 등)는 제외하고,
+    서버에 실제로 저장되는 값만 모은다. */
+interface AssessmentDraftData {
+  evaluatorName: string;
+  evaluatedAt: string;
+  movements: Record<string, MovementEntry>;
+  functionalNotes: Record<FunctionalTestKey, string>;
+  painTriggers: PainTriggerFormEntry[];
+  exercisePerformance: ExercisePerformanceEntry[];
+  customFunctionalTests: CustomFunctionalTestEntry[];
+  odiAnswers: Record<string, number>;
+  ndiAnswers: Record<string, number>;
+  quickdashAnswers: Record<string, number>;
+  koos12Answers: Record<string, number>;
+  faamAdlAnswers: Record<string, number>;
+  faamSportsAnswers: Record<string, number>;
+  functionalTestPainFree: Record<string, boolean>;
+  hopTestLsi: number | null;
+  cmjLsi: number | null;
+  hamstringLsi: number | null;
+  asymptomaticLoadingWeeks: number | null;
+  startbackAnswers: Record<string, number>;
+}
 
 // YBT(Y-Balance Test)는 다른 기능적 검사와 달리 자유 서술이 아니라 지지하는
 // 다리(좌/우)별로 방향별 도달 거리(cm) 3개씩, 총 6개를 기록한다(검사 자체가
@@ -485,6 +511,56 @@ export function AssessmentForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const draftKey = `shinna-draft:assessment:${memberId}:${assessmentId ?? "new"}`;
+  const draftSnapshot: AssessmentDraftData = {
+    evaluatorName,
+    evaluatedAt,
+    movements,
+    functionalNotes,
+    painTriggers,
+    exercisePerformance,
+    customFunctionalTests,
+    odiAnswers,
+    ndiAnswers,
+    quickdashAnswers,
+    koos12Answers,
+    faamAdlAnswers,
+    faamSportsAnswers,
+    functionalTestPainFree,
+    hopTestLsi,
+    cmjLsi,
+    hamstringLsi,
+    asymptomaticLoadingWeeks,
+    startbackAnswers,
+  };
+  const { pendingDraft, resolved: draftResolved, resolve: resolveDraft, discard: discardDraft } =
+    usePendingDraft<AssessmentDraftData>(draftKey);
+  useDraftAutosave(draftKey, draftSnapshot, draftResolved);
+
+  function restoreDraft() {
+    if (!pendingDraft) return;
+    setEvaluatorName(pendingDraft.evaluatorName);
+    setEvaluatedAt(pendingDraft.evaluatedAt);
+    setMovements(pendingDraft.movements);
+    setFunctionalNotes(pendingDraft.functionalNotes);
+    setPainTriggers(pendingDraft.painTriggers);
+    setExercisePerformance(pendingDraft.exercisePerformance);
+    setCustomFunctionalTests(pendingDraft.customFunctionalTests);
+    setOdiAnswers(pendingDraft.odiAnswers);
+    setNdiAnswers(pendingDraft.ndiAnswers);
+    setQuickdashAnswers(pendingDraft.quickdashAnswers);
+    setKoos12Answers(pendingDraft.koos12Answers);
+    setFaamAdlAnswers(pendingDraft.faamAdlAnswers);
+    setFaamSportsAnswers(pendingDraft.faamSportsAnswers);
+    setFunctionalTestPainFree(pendingDraft.functionalTestPainFree);
+    setHopTestLsi(pendingDraft.hopTestLsi);
+    setCmjLsi(pendingDraft.cmjLsi);
+    setHamstringLsi(pendingDraft.hamstringLsi);
+    setAsymptomaticLoadingWeeks(pendingDraft.asymptomaticLoadingWeeks);
+    setStartbackAnswers(pendingDraft.startbackAnswers);
+    resolveDraft();
+  }
+
   const toggleExtra = useCallback((key: string) => {
     setOpenExtra((prev) => {
       const next = new Set(prev);
@@ -688,6 +764,7 @@ export function AssessmentForm({
         setError(data.error ?? "저장에 실패했어요.");
         return;
       }
+      clearDraft(draftKey);
       router.push(
         isEditing
           ? `/admin/members/${memberId}/assessment/${assessmentId}`
@@ -724,6 +801,8 @@ export function AssessmentForm({
           </button>
         </div>
       </div>
+
+      {pendingDraft && <DraftRestoreBanner onRestore={restoreDraft} onDiscard={discardDraft} />}
 
       <div className="rounded-2xl border border-line bg-white px-5 py-4 mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
