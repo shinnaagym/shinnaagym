@@ -78,7 +78,7 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
 // import하면 번들이 깨지므로, 타입만 이 파일에 그대로 복제해 둔다.
 // weekdayStarts/weekdayEnds는 5개 배열(0=월 ~ 4=금)이지만, 이 화면에서는 오전조/오후조
 // 프리셋으로만 저장해 다섯 값이 항상 같다. 토요일 값(saturdayStart/End)은 더 이상 이
-// 화면에서 편집하지 않는다 — 토요일 근무는 아래 당직 캘린더에서 9~15시 고정으로 배정된다.
+// 화면에서 편집하지 않는다 — 토요일·공휴일 근무는 아래 당직 캘린더에서 9~15시 고정으로 배정된다.
 export interface CoachWorkingHours {
   weekdayStarts: number[];
   weekdayEnds: number[];
@@ -500,11 +500,12 @@ function DayDetailModal({
   );
 }
 
-/** 토요일마다 당직 코치를 배정하고, 코치별 휴가·홍보 포스팅 기록을 함께 관리하는
-    월별 캘린더. 스케줄표의 "수업 불가" 표시(휴가)도 함께 보여줘 당직 배정할 때
-    참고할 수 있게 한다. */
+/** 토요일·공휴일마다 당직 코치를 배정하고, 코치별 휴가·홍보 포스팅 기록을
+    함께 관리하는 월별 캘린더. 스케줄표의 "수업 불가" 표시(휴가)도 함께
+    보여줘 당직 배정할 때 참고할 수 있게 한다. */
 function DutyCalendar({
   coaches,
+  holidays,
   initialMonth,
   initialOverrides,
   initialBlockedDays,
@@ -513,6 +514,8 @@ function DutyCalendar({
   initialPromoPosts,
 }: {
   coaches: CoachRow[];
+  /** 당직 배정 가능한 날짜(토요일 외)를 가리기 위한 공휴일 목록. */
+  holidays: HolidayRow[];
   initialMonth: string;
   initialOverrides: DutyOverrideMap;
   initialBlockedDays: BlockedDayMap;
@@ -520,6 +523,7 @@ function DutyCalendar({
   initialLeaveYearCounts: LeaveYearCounts;
   initialPromoPosts: PromoPostMap;
 }) {
+  const holidaySet = useMemo(() => new Set(holidays.map((h) => h.holiday_date)), [holidays]);
   const [month, setMonth] = useState(initialMonth);
   const [overrides, setOverrides] = useState<DutyOverrideMap>(initialOverrides);
   const [blockedDays, setBlockedDays] = useState<BlockedDayMap>(initialBlockedDays);
@@ -549,7 +553,7 @@ function DutyCalendar({
     }
   }
 
-  async function assignSaturday(date: string, coachId: number | null | undefined) {
+  async function assignDuty(date: string, coachId: number | null | undefined) {
     const prevOverrides = overrides;
     const coach = typeof coachId === "number" ? coaches.find((c) => c.id === coachId) : null;
     setOverrides((prev) => {
@@ -689,6 +693,8 @@ function DutyCalendar({
         ))}
         {days.map((d) => {
           const isSaturday = calendarWeekdayOf(d) === 5;
+          const isHoliday = holidaySet.has(d);
+          const isDutyDay = isSaturday || isHoliday;
           const dayNum = Number(d.split("-")[2]);
           const duty = overrides[d];
           const blockedToday = blockedDays[d] ?? [];
@@ -699,16 +705,19 @@ function DutyCalendar({
               key={d}
               className={[
                 "rounded-lg border p-1.5 min-h-[62px] flex flex-col gap-1",
-                isSaturday ? "border-coral/30 bg-coral/[0.03]" : "border-line/50",
+                isDutyDay ? "border-coral/30 bg-coral/[0.03]" : "border-line/50",
               ].join(" ")}
             >
-              <span className="text-[11px] text-ink/50">{dayNum}</span>
-              {isSaturday && (
+              <span className="text-[11px] text-ink/50">
+                {dayNum}
+                {isHoliday && !isSaturday && <span className="text-coral ml-0.5">공휴일</span>}
+              </span>
+              {isDutyDay && (
                 <select
                   value={duty?.coachId ?? ""}
                   onChange={(e) => {
                     const v = e.target.value;
-                    assignSaturday(d, v === "" ? undefined : Number(v));
+                    assignDuty(d, v === "" ? undefined : Number(v));
                   }}
                   className="w-full min-w-0 rounded border border-line/70 bg-white px-1 py-0.5 text-[10px] outline-none focus:border-coral"
                 >
@@ -1164,7 +1173,7 @@ export function SettingsView({
           즉시 스케줄표에 컬럼이 생깁니다. 근무 조(오전조 9~17시 · 오후조 14~22시)를
           지정하면 스케줄표에서 그 시간 외 칸이 회색으로 표시돼요(예약 자체가 막히진
           않아요). 지정하지 않으면 스튜디오 영업시간 전체가 근무시간으로 취급되고,
-          토요일 근무는 아래 당직 캘린더에서 별도로 배정합니다.
+          토요일·공휴일 근무는 아래 당직 캘린더에서 별도로 배정합니다.
         </p>
         <div className="divide-y divide-line/50">
           {visibleCoaches.map((c) => (
@@ -1275,13 +1284,17 @@ export function SettingsView({
       <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">당직 · 휴가 · 홍보 포스팅 캘린더</h2>
         <p className="text-xs text-ink/50 mb-4">
-          토요일마다 당직 코치 한 명을 배정하세요(9~15시 고정 근무). 날짜 칸의
-          &quot;+ 기록&quot;을 누르면 코치별 휴가(단축근무 · 휴무 · 연속 휴가 · 병가 ·
-          생일휴가)와 정직원의 블로그·인스타그램 홍보 포스팅(2주 1회) 기록을 남길
-          수 있어요 — 당직 배정 시 참고하세요.
+          토요일과 공휴일(아래 공휴일 관리에 등록된 날)마다 당직 코치 한 명을
+          배정하세요(9~15시 고정 근무). 같은 코치가 한 달에 두 번째 이상 당직을
+          서면 그날 수업 전체가 급여 계산에서 시간외수당 대상으로 자동 반영돼요
+          — 1회차까지는 정직원 역할이에요. 날짜 칸의 &quot;+ 기록&quot;을 누르면
+          코치별 휴가(단축근무 · 휴무 · 연속 휴가 · 병가 · 생일휴가)와 정직원의
+          블로그·인스타그램 홍보 포스팅(2주 1회) 기록을 남길 수 있어요 — 당직
+          배정 시 참고하세요.
         </p>
         <DutyCalendar
           coaches={coaches.filter((c) => c.active)}
+          holidays={holidays}
           initialMonth={initialDutyMonth}
           initialOverrides={initialDutyOverrides}
           initialBlockedDays={initialBlockedDays}

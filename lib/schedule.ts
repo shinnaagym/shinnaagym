@@ -140,9 +140,10 @@ export async function getDutyOverridesForMonth(
 }
 
 /** coachId가 undefined면 이 날짜의 당직 지정을 지운다. null이면 "이 날짜는
-    당직자 없음"을 명시적으로 저장한다. 실제 코치를 배정할 때는 토요일인지,
-    그 코치가 같은 달에 이미 다른 토요일 당직을 서고 있지 않은지 검증한다
-    (코치별 월 1회 한정). */
+    당직자 없음"을 명시적으로 저장한다. 실제 코치를 배정할 때는 토요일 또는
+    등록된 공휴일인지만 검증한다 — 같은 코치가 한 달에 몇 번 당직을 서는지는
+    막지 않는다(급여 계산에서 월 1회까지는 정직원 역할로, 2회부터는 시간외수당
+    대상으로 자동 반영된다. lib/payroll.ts 참고). */
 export async function setDutyOverride(
   date: string,
   coachId: number | null | undefined,
@@ -161,7 +162,10 @@ export async function setDutyOverride(
   }
   const jsWeekday = new Date(`${date}T00:00:00Z`).getUTCDay();
   if (jsWeekday !== 6) {
-    throw new DutyAssignmentError("당직은 토요일에만 배정할 수 있어요.");
+    const holidayCheck = await query(`SELECT 1 FROM holidays WHERE holiday_date = $1`, [date]);
+    if (holidayCheck.rows.length === 0) {
+      throw new DutyAssignmentError("당직은 토요일 또는 공휴일에만 배정할 수 있어요.");
+    }
   }
   await query(
     `INSERT INTO duty_overrides (override_date, coach_id) VALUES ($1, $2)
