@@ -5,17 +5,51 @@ import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { flaggedMovementSummaries } from "@/lib/assessment-movements";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { listGoalMemosByMember } from "@/lib/goal-memos";
 import { AssessmentPainChart } from "../assessment/pain-chart";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { InbodyChart } from "@/app/components/InbodyChart";
+import { AssessmentSummaryCard, type AssessmentSummaryItem } from "@/app/components/AssessmentSummaryCard";
 import { ImprovementDirectionNote } from "../assessment/improvement-direction-note";
 import { ConsultationNote } from "../assessment/consultation-note";
 import { PainTriggerSection } from "./pain-trigger-section";
 import { ExercisePerformanceSection } from "./exercise-performance-section";
 import { PtLogList } from "./pt-log-list";
 import { MemoPad } from "../../../memo-pad";
+import type { AssessmentRow } from "@/lib/db";
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+/** assessment/page.tsx의 평가지 목록 요약과 같은 규칙(날짜·담당자·최고 통증·
+    체크된 동작·통증 유발 동작·운동 수행능력)으로, AssessmentSummaryCard가
+    그대로 받아 그릴 수 있는 형태로 정리한다. */
+function buildAssessmentSummaryItems(assessments: AssessmentRow[]): AssessmentSummaryItem[] {
+  return assessments.map((a) => {
+    const painTriggers = getPainTriggerEntries(a);
+    const maxPain = painTriggers.reduce<number | null>(
+      (max, e) => (e.painScale != null && (max == null || e.painScale > max) ? e.painScale : max),
+      null,
+    );
+    return {
+      id: a.id,
+      dateLabel: a.evaluated_at || formatDateTime(a.created_at),
+      evaluatorName: a.evaluator_name,
+      maxPain,
+      flaggedLines: flaggedMovementSummaries(a.movements),
+      painTriggerLines: painTriggers.map(
+        (entry) => `통증 유발 동작 — ${entry.note || "-"}${entry.painScale != null ? ` · ${entry.painScale}/10` : ""}`,
+      ),
+      exercisePerformanceLines: a.exercise_performance.map(
+        (entry) => `운동 수행능력 — ${entry.exercise || "-"}${entry.note ? ` · ${entry.note}` : ""}`,
+      ),
+    };
+  });
+}
 
 export default async function PtLogHistoryPage({
   params,
@@ -85,6 +119,9 @@ export default async function PtLogHistoryPage({
         .filter((exercise) => exercise.length > 0),
     ),
   );
+
+  const assessmentSummaryItems = buildAssessmentSummaryItems(assessments);
+  const duoPartnerAssessmentSummaryItems = buildAssessmentSummaryItems(duoPartnerAssessments);
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -188,6 +225,22 @@ export default async function PtLogHistoryPage({
         memberId={idNum}
         initialValue={member.consultation_note || intake?.pain_moi || ""}
       />
+
+      {/* 상담내용 바로 아래에, 그동안 작성한 평가지를 날짜별로 정리해 보여준다
+          (기본은 접혀 있고 펼치면 각 평가지의 통증·동작 체크·운동 수행능력
+          요약이 최신순으로 나온다). */}
+      <AssessmentSummaryCard
+        memberId={idNum}
+        items={assessmentSummaryItems}
+        title={duoPartner ? `📋 ${member.name}님 평가지 기록` : "📋 평가지 기록"}
+      />
+      {duoPartner && (
+        <AssessmentSummaryCard
+          memberId={duoPartner.id}
+          items={duoPartnerAssessmentSummaryItems}
+          title={`📋 ${duoPartner.name}님 평가지 기록`}
+        />
+      )}
 
       {/* 통증 척도·운동수행 능력 그래프는 평가 기록(평가지)과 같은 데이터를
           쓴다 — PT 일지에서 기록해도, 평가 기록 화면에서 기록해도 같은
