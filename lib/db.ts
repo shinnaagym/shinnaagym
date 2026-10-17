@@ -418,11 +418,13 @@ function runFullMigration(): Promise<void> {
           PRIMARY KEY (ip, scope)
         );
 
-        -- 토요일 당직(그날 근무하는 코치) 지정. 토요일은 코치별 근무시간 대신
-        -- 당직 코치 한 명만 9~15시로 근무하는 방식이라, 날짜별로 당직자를
-        -- 기록한다. coach_id가 NULL이면 "이 토요일은 당직자 없음(휴무)"을
-        -- 명시적으로 나타낸다. 같은 코치가 한 달에 두 번 이상 당직을 서지
-        -- 않도록 setDutyOverride에서 검증한다(lib/schedule.ts).
+        -- 토요일·공휴일 당직(그날 근무하는 코치) 지정. 두 날 모두 코치별
+        -- 근무시간 대신 당직 코치 한 명만 9~15시로 근무하는 방식이라,
+        -- 날짜별로 당직자를 기록한다. coach_id가 NULL이면 "이 날은 당직자
+        -- 없음(휴무)"을 명시적으로 나타낸다. 같은 코치가 한 달에 몇 번
+        -- 당직을 서는지는 막지 않는다 — 월 1회까지는 정직원 역할(수당
+        -- 없음), 2회부터는 그날 수업 전체가 시간외수당 대상이 되도록
+        -- 급여 계산(lib/payroll.ts)에서 자동으로 반영한다.
         CREATE TABLE IF NOT EXISTS duty_overrides (
           override_date TEXT PRIMARY KEY,
           coach_id INTEGER REFERENCES coaches(id) ON DELETE CASCADE

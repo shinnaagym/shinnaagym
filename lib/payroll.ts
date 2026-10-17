@@ -3,7 +3,12 @@ import type { EmploymentType, InsuranceSettingsRow, PayrollRecordRow } from "./d
 import type { PayrollResult, ReferralEntry, SessionRecord } from "./payroll/calculate";
 import { DEFAULT_INSURANCE_RATES, type InsuranceRates } from "./payroll/config";
 import { koreaTodayKey } from "./date";
-import { getCoachWorkingHours, type CoachWorkingHours } from "./schedule";
+import {
+  getCoachWorkingHours,
+  getDutyOverridesForMonth,
+  listHolidays,
+  type CoachWorkingHours,
+} from "./schedule";
 
 export type { ReferralEntry, ReferralPaymentMethod } from "./payroll/calculate";
 export type { InsuranceRates } from "./payroll/config";
@@ -27,11 +32,12 @@ function weekdayOfDateKey(key: string): number {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
-/** 그 수업 시각이 코치의 등록된 근무시간(오전조/오후조) 밖이면 true. 코치가
-    coach_working_hours에 행이 없으면(근무시간 제한 없음) 항상 false — "시간외"
-    개념 자체가 없는 코치다. 일요일은 스튜디오가 쉬는 날이라 세션이 생길 일이
-    없지만, 혹시 있더라도 등록된 근무시간이 없어 안전하게 false로 처리한다. */
-function isOutsideWorkingHours(
+/** 평일(토요일·공휴일이 아닌 날)에, 그 수업 시각이 코치의 등록된 근무시간
+    (오전조/오후조) 밖이면 true. 코치가 coach_working_hours에 행이 없으면
+    (근무시간 제한 없음) 항상 false — "시간외" 개념 자체가 없는 코치다.
+    일요일은 스튜디오가 쉬는 날이라 세션이 생길 일이 없지만, 혹시 있더라도
+    등록된 근무시간이 없어 안전하게 false로 처리한다. */
+function isOutsideWeekdayWorkingHours(
   dateKey: string,
   hour: number,
   hours: CoachWorkingHours | undefined,
@@ -39,9 +45,6 @@ function isOutsideWorkingHours(
   if (!hours) return false;
   const weekday = weekdayOfDateKey(dateKey);
   if (weekday === 0) return false;
-  if (weekday === 6) {
-    return hour < hours.saturdayStart || hour >= hours.saturdayEnd;
-  }
   const weekdayIndex = weekday - 1; // 1(월)~5(금) -> 0~4
   return hour < hours.weekdayStarts[weekdayIndex] || hour >= hours.weekdayEnds[weekdayIndex];
 }
@@ -54,7 +57,7 @@ export async function getCoachSessionCountsForMonth(
   coachId: number,
   yearMonth: string,
 ): Promise<CoachMonthSessionCounts> {
-  const [result, workingHoursByCoach] = await Promise.all([
+  const [result, workingHoursByCoach, dutyOverridesByDate, allHolidays] = await Promise.all([
     query<{ pt_type: "1:1" | "2:1"; session_date: string; session_hour: number }>(
       `SELECT pt_type, session_date, session_hour
        FROM class_sessions
@@ -66,8 +69,42 @@ export async function getCoachSessionCountsForMonth(
       [coachId, yearMonth, koreaTodayKey()],
     ),
     getCoachWorkingHours(),
+    getDutyOverridesForMonth(yearMonth),
+    listHolidays(),
   ]);
   const workingHours = workingHoursByCoach[coachId];
+  const holidayDatesThisMonth = new Set(
+    allHolidays.filter((h) => h.holiday_date.slice(0, 7) === yearMonth).map((h) => h.holiday_date),
+  );
+
+  /** 토요일이거나 등록된 공휴일이면 "당직제" 날짜 — 근무시간 범위 대신
+      당직 배정 기준으로 시간외 여부를 가린다. */
+  function isDutyDay(dateKey: string): boolean {
+    return weekdayOfDateKey(dateKey) === 6 || holidayDatesThisMonth.has(dateKey);
+  }
+
+  // 이 코치가 이번 달 공식 당직자로 배정된 토요일/공휴일 날짜를 날짜순으로
+  // 모아 몇 번째 당직인지(1부터) 매긴다. 1번째는 정직원 역할이라 시간외수당이
+  // 없고, 2번째부터는 그날 수업 전체가 시간외수당 대상이다.
+  const thisCoachDutyDates = Object.entries(dutyOverridesByDate)
+    .filter(([date, o]) => o.coachId === coachId && isDutyDay(date))
+    .map(([date]) => date)
+    .sort();
+  const dutyRankByDate = new Map(thisCoachDutyDates.map((date, i) => [date, i + 1]));
+
+  /** 토요일/공휴일은 당직 배정 기준, 그 외 평일은 등록된 근무시간(오전조/
+      오후조) 기준으로 시간외 여부를 가린다. 당직일인데 이 코치가 그날 공식
+      당직자가 아니면(다른 코치가 당직이거나 당직자가 아예 없으면) 무조건
+      시간외로 본다 — 당직 로테이션 밖에서 한 수업이라 그 자체가 추가 근무다. */
+  function isOvertimeSession(dateKey: string, hour: number): boolean {
+    if (isDutyDay(dateKey)) {
+      const assignedCoachId = dutyOverridesByDate[dateKey]?.coachId ?? null;
+      if (assignedCoachId !== coachId) return true;
+      return (dutyRankByDate.get(dateKey) ?? 1) >= 2;
+    }
+    return isOutsideWeekdayWorkingHours(dateKey, hour, workingHours);
+  }
+
   let sessionCount1on1 = 0;
   let sessionCount2on1 = 0;
   const sessionDates1on1: string[] = [];
@@ -85,7 +122,7 @@ export async function getCoachSessionCountsForMonth(
       ptType: row.pt_type,
       date: row.session_date,
       hour: row.session_hour,
-      isOvertimeHour: isOutsideWorkingHours(row.session_date, row.session_hour, workingHours),
+      isOvertimeHour: isOvertimeSession(row.session_date, row.session_hour),
     });
   }
   return { sessionCount1on1, sessionCount2on1, sessionDates1on1, sessions };
