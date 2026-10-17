@@ -452,7 +452,7 @@ export function ScheduleGrid({
   initialSessions,
   dayHours,
   holidayMap,
-  coachStats,
+  coachStats: initialCoachStats,
   initialDailyMemos,
   dutyOverrides,
   coachWorkingHours,
@@ -480,6 +480,10 @@ export function ScheduleGrid({
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
+  // 노쇼 처리/기록 삭제 같은 빠른 동작(quickPatch/quickDelete) 뒤에도 KPI
+  // 카드(이번 달 노쇼 등)가 서버 최초 렌더 시점 값에 멈춰 있지 않도록,
+  // refreshSessions에서 세션 목록과 함께 다시 불러온다.
+  const [coachStats, setCoachStats] = useState(initialCoachStats);
   const [loading, setLoading] = useState(false);
   const [createTarget, setCreateTarget] = useState<{
     date: string;
@@ -734,10 +738,20 @@ export function ScheduleGrid({
 
   async function refreshSessions() {
     const weekEnd = dateKeys[dateKeys.length - 1];
-    const res = await fetch(`/api/admin/sessions?from=${weekStart}&to=${weekEnd}`);
-    if (res.ok) {
-      const data = await res.json();
+    const monthKey = weekStart.slice(0, 7);
+    const [sessionsRes, statsRes] = await Promise.all([
+      fetch(`/api/admin/sessions?from=${weekStart}&to=${weekEnd}`),
+      fetch(
+        `/api/admin/schedule/stats?monthKey=${monthKey}&weekStart=${weekStart}&weekEnd=${weekEnd}`,
+      ),
+    ]);
+    if (sessionsRes.ok) {
+      const data = await sessionsRes.json();
       setSessions(data.sessions ?? []);
+    }
+    if (statsRes.ok) {
+      const data = await statsRes.json();
+      setCoachStats(data.stats ?? {});
     }
   }
 
