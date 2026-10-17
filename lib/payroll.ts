@@ -1,8 +1,9 @@
 import { query } from "./db";
 import type { EmploymentType, InsuranceSettingsRow, PayrollRecordRow } from "./db";
-import type { PayrollResult, ReferralEntry } from "./payroll/calculate";
+import type { PayrollResult, ReferralEntry, SessionRecord } from "./payroll/calculate";
 import { DEFAULT_INSURANCE_RATES, type InsuranceRates } from "./payroll/config";
 import { koreaTodayKey } from "./date";
+import { getCoachWorkingHours, type CoachWorkingHours } from "./schedule";
 
 export type { ReferralEntry, ReferralPaymentMethod } from "./payroll/calculate";
 export type { InsuranceRates } from "./payroll/config";
@@ -15,6 +16,34 @@ export interface CoachMonthSessionCounts {
       수 있도록 calculatePayroll에 그대로 넘겨준다(lib/payroll/calculate.ts
       참고). 2:1은 근속과 무관한 고정 단가라 날짜 목록이 필요 없다. */
   sessionDates1on1: string[];
+  /** 이번 정산월에 진행한 1:1+2:1 수업 전체(시간외 여부 포함) 목록. 시간외수당
+      계산에 그대로 넘겨준다(lib/payroll/calculate.ts의 calculatePayroll 참고). */
+  sessions: SessionRecord[];
+}
+
+/** "YYYY-MM-DD"의 요일(0=일 ... 6=토)을 반환한다. */
+function weekdayOfDateKey(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** 그 수업 시각이 코치의 등록된 근무시간(오전조/오후조) 밖이면 true. 코치가
+    coach_working_hours에 행이 없으면(근무시간 제한 없음) 항상 false — "시간외"
+    개념 자체가 없는 코치다. 일요일은 스튜디오가 쉬는 날이라 세션이 생길 일이
+    없지만, 혹시 있더라도 등록된 근무시간이 없어 안전하게 false로 처리한다. */
+function isOutsideWorkingHours(
+  dateKey: string,
+  hour: number,
+  hours: CoachWorkingHours | undefined,
+): boolean {
+  if (!hours) return false;
+  const weekday = weekdayOfDateKey(dateKey);
+  if (weekday === 0) return false;
+  if (weekday === 6) {
+    return hour < hours.saturdayStart || hour >= hours.saturdayEnd;
+  }
+  const weekdayIndex = weekday - 1; // 1(월)~5(금) -> 0~4
+  return hour < hours.weekdayStarts[weekdayIndex] || hour >= hours.weekdayEnds[weekdayIndex];
 }
 
 /** 코치 한 명의 특정 정산월(1:1/2:1) 진행 수업 횟수와 1:1 수업의 실제
@@ -25,28 +54,41 @@ export async function getCoachSessionCountsForMonth(
   coachId: number,
   yearMonth: string,
 ): Promise<CoachMonthSessionCounts> {
-  const result = await query<{ pt_type: "1:1" | "2:1"; session_date: string }>(
-    `SELECT pt_type, session_date
-     FROM class_sessions
-     WHERE coach_id = $1
-       AND entry_type = 'session'
-       AND status <> 'cancelled'
-       AND LEFT(session_date, 7) = $2
-       AND session_date <= $3`,
-    [coachId, yearMonth, koreaTodayKey()],
-  );
+  const [result, workingHoursByCoach] = await Promise.all([
+    query<{ pt_type: "1:1" | "2:1"; session_date: string; session_hour: number }>(
+      `SELECT pt_type, session_date, session_hour
+       FROM class_sessions
+       WHERE coach_id = $1
+         AND entry_type = 'session'
+         AND status <> 'cancelled'
+         AND LEFT(session_date, 7) = $2
+         AND session_date <= $3`,
+      [coachId, yearMonth, koreaTodayKey()],
+    ),
+    getCoachWorkingHours(),
+  ]);
+  const workingHours = workingHoursByCoach[coachId];
   let sessionCount1on1 = 0;
   let sessionCount2on1 = 0;
   const sessionDates1on1: string[] = [];
+  const sessions: SessionRecord[] = [];
   for (const row of result.rows) {
     if (row.pt_type === "1:1") {
       sessionCount1on1++;
       sessionDates1on1.push(row.session_date);
     } else if (row.pt_type === "2:1") {
       sessionCount2on1++;
+    } else {
+      continue;
     }
+    sessions.push({
+      ptType: row.pt_type,
+      date: row.session_date,
+      hour: row.session_hour,
+      isOvertimeHour: isOutsideWorkingHours(row.session_date, row.session_hour, workingHours),
+    });
   }
-  return { sessionCount1on1, sessionCount2on1, sessionDates1on1 };
+  return { sessionCount1on1, sessionCount2on1, sessionDates1on1, sessions };
 }
 
 export interface SavePayrollRecordInput {

@@ -11,6 +11,7 @@ import {
 } from "./calculate.ts";
 import {
   DEFAULT_INSURANCE_RATES,
+  OVERTIME_RATE,
   REGULAR_MANDATORY_SESSIONS,
   REGULAR_RATE_1ON1,
   REGULAR_RATE_2ON1,
@@ -550,4 +551,165 @@ test("세션 날짜 정밀 계산: 근속 시뮬레이션(tenureBucketOverride)�
   // 오버라이드로 "1년 미만"을 강제했으니, 날짜상 전부 기념일 이후라도
   // 30,000원 하나로 계산돼야 한다.
   assert.equal(result.lessonFee1on1, 10 * REGULAR_RATE_1ON1["under1"]);
+});
+
+test("정직원 1:1 수업료 단가: 1년 이상 2년 미만 31,000원, 2년 이상 32,000원, 1년 미만은 그대로 30,000원", () => {
+  assert.equal(REGULAR_RATE_1ON1.under1, 30_000);
+  assert.equal(REGULAR_RATE_1ON1["1to2"], 31_000);
+  assert.equal(REGULAR_RATE_1ON1.over2, 32_000);
+});
+
+function overtimeSession(
+  ptType: "1:1" | "2:1",
+  date: string,
+  hour: number,
+  isOvertimeHour: boolean,
+) {
+  return { ptType, date, hour, isOvertimeHour };
+}
+
+test("시간외수당: 의무수업(60회) 범위 안의 수업은 시간외 시간대여도 수당 없음", () => {
+  // 60회 전부 시간외 시간대(isOvertimeHour: true)로 했더라도, 초과분이
+  // 전혀 없으므로(총 60회 = 의무수업 60회) 시간외수당은 0이어야 한다.
+  const sessions = Array.from({ length: 60 }, (_, i) =>
+    overtimeSession("1:1", "2027-10-01", i, true),
+  );
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-01-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 60,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessions,
+  });
+  assert.equal(result.overtimeSessionCount, 0);
+  assert.equal(result.overtimeFeeAmount, 0);
+});
+
+test("시간외수당: 의무수업 초과분 중 시간외 시간대인 수업만 단가의 10%가 가산됨", () => {
+  // 의무수업 60회(시간외 여부 무관) + 초과 5회(그중 3회만 시간외 시간대).
+  const mandatory = Array.from({ length: 60 }, (_, i) =>
+    overtimeSession("1:1", "2027-10-01", i, false),
+  );
+  const excess = [
+    overtimeSession("1:1", "2027-10-02", 0, true),
+    overtimeSession("1:1", "2027-10-02", 1, true),
+    overtimeSession("1:1", "2027-10-02", 2, true),
+    overtimeSession("1:1", "2027-10-02", 3, false),
+    overtimeSession("1:1", "2027-10-02", 4, false),
+  ];
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2027-09-01", // 정산월(2027-10) 기준 근속 1년 미만 -> 단가 30,000원
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 65,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessions: [...mandatory, ...excess],
+  });
+  assert.equal(result.overtimeSessionCount, 3);
+  assert.equal(result.overtimeFeeAmount, Math.round(3 * REGULAR_RATE_1ON1.under1 * OVERTIME_RATE));
+});
+
+test("시간외수당: 2:1 초과 수업은 2:1 고정 단가 기준으로 10% 가산됨", () => {
+  const mandatory = Array.from({ length: 60 }, (_, i) =>
+    overtimeSession("1:1", "2027-10-01", i, false),
+  );
+  const excess2on1 = overtimeSession("2:1", "2027-10-02", 0, true);
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-01-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 60,
+    sessionCount2on1: 1,
+    referralSupplyAmount: 0,
+    sessions: [...mandatory, excess2on1],
+  });
+  assert.equal(result.overtimeSessionCount, 1);
+  assert.equal(result.overtimeFeeAmount, Math.round(REGULAR_RATE_2ON1 * OVERTIME_RATE));
+});
+
+test("시간외수당: sessions 길이가 전체 수업 횟수와 다르면(수동 보정) 0으로 처리됨", () => {
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-01-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 65, // 관리자가 손으로 고쳤다고 가정
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessions: [overtimeSession("1:1", "2027-10-02", 0, true)], // 길이 불일치
+  });
+  assert.equal(result.overtimeSessionCount, 0);
+  assert.equal(result.overtimeFeeAmount, 0);
+});
+
+test("시간외수당: 근속 시뮬레이션(tenureBucketOverride)에서는 항상 0으로 계산됨", () => {
+  const mandatory = Array.from({ length: 60 }, (_, i) =>
+    overtimeSession("1:1", "2027-10-01", i, false),
+  );
+  const excess = overtimeSession("1:1", "2027-10-02", 0, true);
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-01-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 61,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessions: [...mandatory, excess],
+    tenureBucketOverride: "over2",
+  });
+  assert.equal(result.overtimeSessionCount, 0);
+  assert.equal(result.overtimeFeeAmount, 0);
+});
+
+test("시간외수당: 프리랜서는 의무수업이 없어(0회) 첫 수업부터 시간외 시간대면 수당 대상", () => {
+  const result = calculatePayroll({
+    employmentType: "freelancer",
+    hiredAt: "2026-01-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 1,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessions: [overtimeSession("1:1", "2027-10-02", 10, true)],
+  });
+  assert.equal(result.overtimeSessionCount, 1);
+  assert.equal(
+    result.overtimeFeeAmount,
+    Math.round(FREELANCER_RATE_1ON1[tenureBucket("2026-01-01", "2027-10-02")] * OVERTIME_RATE),
+  );
+});
+
+test("시간외수당은 총지급액(grossPay)에 포함됨", () => {
+  const mandatory = Array.from({ length: 60 }, (_, i) =>
+    overtimeSession("1:1", "2027-10-01", i, false),
+  );
+  const excess = overtimeSession("1:1", "2027-10-02", 0, true);
+  const withOvertime = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-01-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 61,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    sessions: [...mandatory, excess],
+  });
+  const withoutOvertime = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2026-01-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 61,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  assert.ok(withOvertime.overtimeFeeAmount > 0);
+  assert.equal(withOvertime.grossPay, withoutOvertime.grossPay + withOvertime.overtimeFeeAmount);
 });

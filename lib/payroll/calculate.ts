@@ -4,6 +4,7 @@
 import {
   DEFAULT_INSURANCE_RATES,
   FREELANCER_WITHHOLDING_RATE,
+  OVERTIME_RATE,
   REFERRAL_INCENTIVE_RATE,
   REGULAR_BASE_SALARY,
   REGULAR_MANDATORY_SESSIONS,
@@ -149,6 +150,18 @@ export function allocateExcessSessions(
     : { excess1on1: excessSecond, excess2on1: excessFirst, excessTotal };
 }
 
+/** 시간외수당 계산에 쓰는 세션 한 건. isOvertimeHour는 그 수업의 시각이
+    코치의 등록된 근무시간(오전조/오후조, coach_working_hours) 밖이면 true다
+    (근무시간 제한이 없는 코치는 호출자가 항상 false로 채운다). 실제로 그
+    수업이 시간외수당 대상인지(의무수업 초과분인지)는 calculatePayroll이
+    sessions 전체를 날짜·시각 순으로 정렬해 판단한다. */
+export interface SessionRecord {
+  ptType: "1:1" | "2:1";
+  date: string; // YYYY-MM-DD
+  hour: number;
+  isOvertimeHour: boolean;
+}
+
 export interface PayrollInput {
   employmentType: EmploymentType;
   hiredAt: string; // YYYY-MM-DD
@@ -167,6 +180,16 @@ export interface PayrollInput {
    * 필요 없다.
    */
   sessionDates1on1?: string[];
+  /**
+   * 이번 정산월에 진행한 1:1+2:1 수업 전체(날짜·시각·시간외 여부 포함) 목록.
+   * 길이가 sessionCount1on1 + sessionCount2on1과 정확히 같을 때만 시간외수당을
+   * 계산한다(길이가 다르면 — 관리자가 횟수를 손으로 고친 경우 등 — 시간외수당은
+   * 0으로 처리). "의무수업은 이번 달 먼저 진행한 수업부터 채워지고 그 이후
+   * (가장 최근) 진행분이 초과분"이라는 기존 가정과 똑같이, 날짜·시각 순으로
+   * 정렬했을 때 의무수업(mandatorySessions) 번째를 넘는 수업 중 isOvertimeHour가
+   * true인 것만 시간외수당(그 수업 단가의 OVERTIME_RATE) 대상이다.
+   */
+  sessions?: SessionRecord[];
   /** 소개 결제 내역을 computeReferralSupplyAmount()로 환산한 공급가액 합계. */
   referralSupplyAmount: number;
   allocationOrder?: AllocationOrder;
@@ -215,6 +238,11 @@ export interface PayrollResult {
   lessonFeeTotal: number;
   teamLeadAllowance: number;
   referralIncentive: number;
+  /** 의무수업 초과분 중 시간외(코치의 등록된 근무시간 밖) 수업 횟수. sessions를
+      주지 않았거나 길이가 안 맞으면(시간외수당 계산을 못 하면) 0. */
+  overtimeSessionCount: number;
+  /** overtimeSessionCount에 대응하는 시간외수당 합계(각 수업 단가 × OVERTIME_RATE). */
+  overtimeFeeAmount: number;
   grossPay: number;
   taxableAmount: number;
   deductions: PayrollDeductions;
@@ -266,6 +294,37 @@ function lessonFee1on1ByDate(
   return total;
 }
 
+/**
+ * 시간외수당 대상 수업 횟수·금액을 계산한다. "의무수업은 이번 달 먼저 진행한
+ * 수업부터 채워지고 그 이후(가장 최근) 진행분이 초과분"이라는 lessonFee1on1ByDate와
+ * 같은 가정을, 1:1/2:1을 합친 전체 수업에 그대로 적용한다 — 날짜·시각 오름차순
+ * 정렬 후 앞쪽 mandatorySessions개는 시간외 시간대에 했더라도 의무수업 범위
+ * 안이라 수당이 없고, 그 뒤(mandatorySessions번째 이후)부터는 초과 수업이라
+ * isOvertimeHour가 true인 것만 그 수업 단가의 OVERTIME_RATE만큼 더해진다.
+ */
+function computeOvertimeFee(
+  sessions: SessionRecord[],
+  mandatorySessions: number,
+  employmentType: EmploymentType,
+  hiredAt: string,
+): { overtimeSessionCount: number; overtimeFeeAmount: number } {
+  const sorted = [...sessions].sort((a, b) =>
+    a.date === b.date ? a.hour - b.hour : a.date < b.date ? -1 : 1,
+  );
+  let overtimeSessionCount = 0;
+  let overtimeFeeAmount = 0;
+  sorted.forEach((session, index) => {
+    if (index < mandatorySessions || !session.isOvertimeHour) return;
+    const rate =
+      session.ptType === "1:1"
+        ? rate1on1For(employmentType, tenureBucket(hiredAt, session.date))
+        : rate2on1For(employmentType);
+    overtimeSessionCount += 1;
+    overtimeFeeAmount += rate * OVERTIME_RATE;
+  });
+  return { overtimeSessionCount, overtimeFeeAmount };
+}
+
 export function calculatePayroll(input: PayrollInput): PayrollResult {
   const {
     employmentType,
@@ -302,6 +361,8 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
       lessonFeeTotal: 0,
       teamLeadAllowance: 0,
       referralIncentive: 0,
+      overtimeSessionCount: 0,
+      overtimeFeeAmount: 0,
       grossPay: 0,
       taxableAmount: 0,
       deductions: {
@@ -350,13 +411,30 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const lessonFee2on1 = round(excess2on1 * rate2on1);
   const lessonFeeTotal = lessonFee1on1 + lessonFee2on1;
 
+  // 시간외수당도 세션 날짜 정밀 계산과 같은 이유로, 시뮬레이션 모드가 아니고
+  // 세션 목록 길이가 전체 수업 횟수와 정확히 일치할 때만 계산한다(관리자가
+  // 횟수를 손으로 고치면 — 길이가 안 맞으니 — 0으로 처리).
+  const canUseOvertime =
+    !input.tenureBucketOverride &&
+    input.sessions !== undefined &&
+    input.sessions.length === sessionCount1on1 + sessionCount2on1;
+  const { overtimeSessionCount, overtimeFeeAmount } = canUseOvertime
+    ? computeOvertimeFee(input.sessions!, mandatorySessions, employmentType, hiredAt)
+    : { overtimeSessionCount: 0, overtimeFeeAmount: 0 };
+  const roundedOvertimeFeeAmount = round(overtimeFeeAmount);
+
   const baseSalary = isRegularPayScale(employmentType) ? REGULAR_BASE_SALARY : 0;
   const mealAllowance = isRegularPayScale(employmentType) ? REGULAR_MEAL_ALLOWANCE : 0;
   const teamLeadAllowance = isTeamLead ? REGULAR_TEAM_LEAD_ALLOWANCE : 0;
   const referralIncentive = round(Math.max(0, referralSupplyAmount) * REFERRAL_INCENTIVE_RATE);
 
   const grossPay =
-    baseSalary + mealAllowance + lessonFeeTotal + teamLeadAllowance + referralIncentive;
+    baseSalary +
+    mealAllowance +
+    lessonFeeTotal +
+    teamLeadAllowance +
+    referralIncentive +
+    roundedOvertimeFeeAmount;
 
   let deductions: PayrollDeductions;
   let taxableAmount: number;
@@ -428,6 +506,8 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     lessonFeeTotal,
     teamLeadAllowance,
     referralIncentive,
+    overtimeSessionCount,
+    overtimeFeeAmount: roundedOvertimeFeeAmount,
     grossPay,
     taxableAmount,
     deductions,

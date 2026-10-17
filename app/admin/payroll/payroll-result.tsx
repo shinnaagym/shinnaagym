@@ -60,6 +60,7 @@ export function PayComposition({ result }: { result: PayrollResult }) {
     { label: "수업료(2:1)", value: result.lessonFee2on1 },
     { label: "팀장수당", value: result.teamLeadAllowance },
     { label: "소개 인센티브", value: result.referralIncentive },
+    { label: "시간외수당", value: result.overtimeFeeAmount },
   ].filter((s) => s.value > 0);
 
   if (segments.length === 0) {
@@ -243,6 +244,10 @@ export function PayrollSpecCard({
         <SpecRow label="수업료(2:1)" value={result.lessonFee2on1} />
         <SpecRow label="팀장수당" value={result.teamLeadAllowance} />
         <SpecRow label="소개 인센티브(부가세 제외 5%)" value={result.referralIncentive} />
+        <SpecRow
+          label={`시간외수당(시간외수업 ${result.overtimeSessionCount}회 × 10%)`}
+          value={result.overtimeFeeAmount}
+        />
         <SpecRow label="총지급액" value={result.grossPay} emphasis />
       </div>
 
