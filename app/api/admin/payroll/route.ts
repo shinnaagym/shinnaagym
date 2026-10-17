@@ -7,10 +7,29 @@ import {
   computeReferralSupplyAmount,
   type AllocationOrder,
   type ReferralPaymentMethod,
+  type SessionRecord,
 } from "@/lib/payroll/calculate";
 import type { EmploymentType } from "@/lib/db";
 
 const VALID_REFERRAL_PAYMENT_METHODS: ReferralPaymentMethod[] = ["card", "transfer"];
+
+/** 시간외수당 계산용 세션 전체 목록. 형식이 안 맞는 값이 섞여 있으면 통째로
+    무시해(undefined 반환), calculatePayroll이 (길이가 전체 수업 횟수와 안
+    맞으니) 시간외수당을 0으로 안전하게 처리하도록 한다. */
+function parseSessions(value: unknown): SessionRecord[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const sessions: SessionRecord[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) return undefined;
+    const o = item as Record<string, unknown>;
+    if (o.ptType !== "1:1" && o.ptType !== "2:1") return undefined;
+    if (typeof o.date !== "string" || !isValidDateKey(o.date)) return undefined;
+    if (typeof o.hour !== "number" || !Number.isInteger(o.hour)) return undefined;
+    if (typeof o.isOvertimeHour !== "boolean") return undefined;
+    sessions.push({ ptType: o.ptType, date: o.date, hour: o.hour, isOvertimeHour: o.isOvertimeHour });
+  }
+  return sessions;
+}
 
 function parseReferralEntries(value: unknown): ReferralEntry[] | null {
   if (!Array.isArray(value)) return null;
@@ -84,6 +103,7 @@ export async function POST(req: NextRequest) {
         sessionCount1on1?: unknown;
         sessionCount2on1?: unknown;
         sessionDates1on1?: unknown;
+        sessions?: unknown;
         referralEntries?: unknown;
         allocationOrder?: unknown;
         declaredMonthlyCompensation?: unknown;
@@ -115,6 +135,7 @@ export async function POST(req: NextRequest) {
     body.sessionDates1on1.every((d) => typeof d === "string" && isValidDateKey(d))
       ? (body.sessionDates1on1 as string[])
       : undefined;
+  const sessions = parseSessions(body?.sessions);
   const referralEntries =
     body?.referralEntries === undefined ? [] : parseReferralEntries(body.referralEntries);
   // 화면 표시·이력 보관용 원 결제금액 합계(결제 수단 무관). 실제 인센티브 계산은
@@ -160,6 +181,7 @@ export async function POST(req: NextRequest) {
     sessionCount1on1,
     sessionCount2on1,
     sessionDates1on1,
+    sessions,
     referralSupplyAmount: computeReferralSupplyAmount(referralEntries ?? []),
     allocationOrder,
     insuranceRates,

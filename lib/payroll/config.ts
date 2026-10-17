@@ -27,14 +27,22 @@ export const REGULAR_MANDATORY_SESSIONS = 60; // 의무수업 횟수(기본급�
 
 export const REGULAR_RATE_1ON1: Record<TenureBucket, number> = {
   under1: 30_000,
-  "1to2": 32_000,
-  over2: 34_000,
+  "1to2": 31_000,
+  over2: 32_000,
 };
 // 2:1 수업은 근속에 따른 단가 인상이 없음(고정 단가).
 export const REGULAR_RATE_2ON1 = 40_000;
 
 // 팀장수당: 정직원 팀장에게 급여에 고정 금액을 별도로 추가 지급.
 export const REGULAR_TEAM_LEAD_ALLOWANCE = 200_000;
+
+// 시간외수당: 코치의 등록된 근무시간(오전조/오후조, coach_working_hours)
+// 밖에서 진행한 수업에 그 수업의 수업료 단가(1:1은 근속별 단가, 2:1은 고정
+// 단가)의 10%를 추가로 지급한다. 단, 의무수업(REGULAR_MANDATORY_SESSIONS)
+// 횟수를 넘긴 수업(초과 수업)에 대해서만 적용되고, 의무수업 범위 안에서는
+// 시간외 시간대에 수업을 했더라도 시간외수당이 붙지 않는다(lib/payroll/
+// calculate.ts의 calculatePayroll 참고).
+export const OVERTIME_RATE = 0.1;
 
 // ── 프리랜서 ─────────────────────────────────────────────
 // 기본급·식대·의무수업 없음: 진행한 수업 전체가 수업료 대상.

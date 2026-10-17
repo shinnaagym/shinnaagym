@@ -9,6 +9,7 @@ import {
   type AllocationOrder,
   type PayrollInput,
   type ReferralPaymentMethod,
+  type SessionRecord,
 } from "@/lib/payroll/calculate";
 import { PrintButton } from "@/app/components/PrintButton";
 import { PayrollResultCards } from "./payroll-result";
@@ -59,6 +60,10 @@ export function PayrollView({
   // 계산용). sessionCount1on1을 직접 손으로 고치면 이 목록과 개수가 어긋나
   // calculatePayroll이 자동으로 정밀 계산을 건너뛰고 기존 방식으로 돌아간다.
   const [sessionDates1on1, setSessionDates1on1] = useState<string[]>([]);
+  // 자동으로 불러온 수업 전체(1:1+2:1) 목록(시간외수당 계산용). 위와 같은
+  // 이유로, sessionCount1on1/2on1을 직접 손으로 고치면 길이가 어긋나
+  // calculatePayroll이 시간외수당을 0으로 처리한다.
+  const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [referralEntries, setReferralEntries] = useState<
     Array<{ note: string; amount: string; paymentMethod: ReferralPaymentMethod }>
   >([{ note: "", amount: "", paymentMethod: "card" }]);
@@ -102,6 +107,7 @@ export function PayrollView({
     // 코치를 바꾸면 이전 코치의 1:1 수업 날짜 목록을 즉시 비워, 아직 새
     // 목록을 불러오기 전 잠깐 동안 엉뚱한 날짜가 쓰이지 않게 한다.
     setSessionDates1on1([]);
+    setSessions([]);
   }
 
   // 코치+정산월이 정해지면 그 달 진행 수업 횟수를 자동으로 불러온다(수동 보정 가능).
@@ -120,6 +126,7 @@ export function PayrollView({
         setSessionCount1on1(String(data.sessionCount1on1 ?? 0));
         setSessionCount2on1(String(data.sessionCount2on1 ?? 0));
         setSessionDates1on1(Array.isArray(data.sessionDates1on1) ? data.sessionDates1on1 : []);
+        setSessions(Array.isArray(data.sessions) ? data.sessions : []);
       } finally {
         if (!cancelled) setLoadingCounts(false);
       }
@@ -170,6 +177,7 @@ export function PayrollView({
       sessionCount1on1: Number(sessionCount1on1) || 0,
       sessionCount2on1: Number(sessionCount2on1) || 0,
       sessionDates1on1,
+      sessions,
       referralSupplyAmount,
       allocationOrder,
       insuranceRates,
@@ -183,6 +191,7 @@ export function PayrollView({
       sessionCount1on1,
       sessionCount2on1,
       sessionDates1on1,
+      sessions,
       referralSupplyAmount,
       allocationOrder,
       insuranceRates,
