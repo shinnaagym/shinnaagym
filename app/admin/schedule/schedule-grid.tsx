@@ -755,6 +755,30 @@ export function ScheduleGrid({
     }
   }
 
+  // 홈 화면에 추가한 모바일 PWA는 아이콘을 다시 눌러 돌아와도 iOS/일부
+  // 브라우저가 새로고침 없이 떠나기 전 화면을 그대로 보여준다. 그 사이
+  // 다른 기기(PC 등)에서 일정·메모를 바꿨다면 화면이 낡은 상태로 남아있게
+  // 되므로, 탭/화면이 다시 보이게 될 때마다 최신 데이터를 다시 받아온다.
+  useEffect(() => {
+    function refreshOnVisible() {
+      if (document.visibilityState !== "visible") return;
+      refreshSessions();
+      if (viewMode === "month") loadMonthData();
+    }
+    document.addEventListener("visibilitychange", refreshOnVisible);
+    window.addEventListener("pageshow", refreshOnVisible);
+    window.addEventListener("focus", refreshOnVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshOnVisible);
+      window.removeEventListener("pageshow", refreshOnVisible);
+      window.removeEventListener("focus", refreshOnVisible);
+    };
+    // refreshSessions는 매 렌더마다 새로 만들어지는 함수라 deps에 넣으면
+    // 리스너를 불필요하게 매번 다시 등록하게 된다. weekStart/dateKeys가
+    // 바뀔 때만 다시 구독하면 되므로 의도적으로 생략한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStart, dateKeys, viewMode, loadMonthData]);
+
   /** 일정 칸을 오른쪽 클릭(또는 길게 눌러)하면 종류별 자주 쓰는 동작만 모은
       빠른 메뉴를 띄운다. PT 수업·상담은 복사/노쇼/취소/삭제, 개인 일정은
       복사/완료 처리/삭제, 수업 불가는 복사/삭제만 지원한다. */
