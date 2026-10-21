@@ -1,9 +1,10 @@
 import { query } from "./db";
-import type { ReserveTransactionRow, ReserveTransactionSource } from "./db";
+import type { PayrollRecordRow, ReserveTransactionRow, ReserveTransactionSource } from "./db";
 import { RESERVE_TYPE_OPTIONS, type ReserveType } from "./constants";
 import { getPaymentTotalsForMonth, listExpensesByMonth } from "./expenses";
 import { listPayrollRecords } from "./payroll";
 import type { PayrollResult } from "./payroll/calculate";
+import { isRegularPayScale } from "./payroll/config";
 import { computeIncomeTaxBreakdown, type IncomeTaxBreakdown } from "./income-tax";
 
 const VAT_RATE = 0.1; // 부가가치세: 카드 매출의 10%
@@ -12,6 +13,15 @@ const DEPRECIATION_RATE = 0.05; // 감가상각비: 매출의 5%
 
 function round(n: number): number {
   return Math.round(n);
+}
+
+/** 퇴직금 예비비 산정 기준 급여 합계. 팀장(team_lead)은 급여 규칙상 정직원과
+    완전히 동일하므로(isRegularPayScale) 정직원과 똑같이 포함한다 — 프리랜서는
+    퇴직금 대상이 아니라 제외. */
+function sumRegularPayScaleGross(payrollRecords: PayrollRecordRow[]): number {
+  return payrollRecords
+    .filter((r) => isRegularPayScale(r.employment_type))
+    .reduce((sum, r) => sum + (r.result as PayrollResult).grossPay, 0);
 }
 
 /** 저수지 계산에는 항상 RESERVE_TYPE_OPTIONS 전부를 다루고, 데이터가 없는
@@ -160,6 +170,8 @@ export interface MonthlySettlementResult {
   revenue: number;
   expenseTotal: number;
   netProfit: number;
+  /** 정직원+팀장(퇴직금 대상, isRegularPayScale) 급여 총지급액 합계. 프리랜서는
+      퇴직금 대상이 아니라 제외. */
   regularPayrollGross: number;
   socialInsuranceTotal: number;
   remainingSessionValue: number;
@@ -186,13 +198,10 @@ export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySe
   const expenseTotal = expenses.reduce((sum, e) => sum + e.amount * e.quantity, 0);
   const netProfit = revenue - expenseTotal;
 
-  let regularPayrollGross = 0;
+  const regularPayrollGross = sumRegularPayScaleGross(payrollRecords);
   let socialInsuranceTotal = 0;
   for (const record of payrollRecords) {
     const result = record.result as PayrollResult;
-    if (record.employment_type === "regular") {
-      regularPayrollGross += result.grossPay;
-    }
     socialInsuranceTotal +=
       result.deductions.nationalPension +
       result.deductions.healthInsurance +
@@ -233,5 +242,59 @@ export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySe
     remainingSessionValue,
     incomeTaxBreakdown,
     deposits,
+  };
+}
+
+export interface OwnerProfitEstimate {
+  /** 매출(부가가치세 제외). */
+  revenueExVat: number;
+  /** 월세·관리비·소모품·마케팅비·카드 수수료 합계(급여 제외 운영비). */
+  operatingExpense: number;
+  /** 그 달 전 직원(정직원·팀장·프리랜서) 급여 총지급액 합계. */
+  payrollTotal: number;
+  /** 사업소득(세전) = 매출(VAT 제외) − 운영비 − 전 직원 급여. */
+  businessIncome: number;
+  /** 종합소득세 예비비(이번 달분, computeIncomeTaxBreakdown과 동일 기준). */
+  incomeTaxReserve: number;
+  /** 퇴직금 예비비(이번 달분, isRegularPayScale 급여 × SEVERANCE_RATE). */
+  severanceReserve: number;
+  /** 감가상각비 예비비(이번 달분, 매출 × DEPRECIATION_RATE). */
+  depreciationReserve: number;
+  /** 대표가 실제로 가져갈 수 있는 예상 월순수익 = 사업소득 − 종합소득세·퇴직금·
+      감가상각비 예비비. 부가가치세는 이미 매출에서 제외됐고, 4대보험(직원
+      부담분)은 이미 급여 총지급액 안에 포함돼 있어 따로 빼지 않는다(중복
+      차감 방지). */
+  expectedOwnerProfit: number;
+}
+
+/** "대표가 받는 예상 월순수익" — 가계부 대시보드에 상시 표시한다. "이번 달
+    정산" 버튼을 누르지 않아도 항상 그 달 최신 매출·지출·급여 데이터로
+    즉시 계산한다(저장된 저수지 적립 내역에 의존하지 않음 — 매번 "정산"을
+    눌러야만 최신값이 보이는 혼란을 피하기 위함). computeIncomeTaxBreakdown과
+    runMonthlySettlement이 쓰는 것과 동일한 요율·계산식을 그대로 재사용해,
+    화면에 보이는 다른 숫자들과 항상 일치한다. */
+export async function computeExpectedOwnerProfit(yearMonth: string): Promise<OwnerProfitEstimate> {
+  const [breakdown, paymentTotals, payrollRecords] = await Promise.all([
+    computeIncomeTaxBreakdown(yearMonth),
+    getPaymentTotalsForMonth(yearMonth),
+    listPayrollRecords({ yearMonth }),
+  ]);
+
+  const revenue = paymentTotals.card + paymentTotals.transfer;
+  const operatingExpense = breakdown.totalExpense - breakdown.payroll;
+  const severanceReserve = round(sumRegularPayScaleGross(payrollRecords) * SEVERANCE_RATE);
+  const depreciationReserve = round(revenue * DEPRECIATION_RATE);
+  const expectedOwnerProfit =
+    breakdown.businessIncome - breakdown.reserveAmount - severanceReserve - depreciationReserve;
+
+  return {
+    revenueExVat: breakdown.revenueExVat,
+    operatingExpense,
+    payrollTotal: breakdown.payroll,
+    businessIncome: breakdown.businessIncome,
+    incomeTaxReserve: breakdown.reserveAmount,
+    severanceReserve,
+    depreciationReserve,
+    expectedOwnerProfit,
   };
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed, isLedgerAuthed } from "@/lib/auth";
 import { isValidMonthKey } from "@/lib/date";
 import {
+  computeExpectedOwnerProfit,
   getMonthlyDeposits,
   getReserveBalances,
   listReserveTransactions,
@@ -29,13 +30,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "잘못된 월 형식입니다." }, { status: 400 });
   }
 
-  const [balances, monthlyDeposits, transactions, incomeTaxBreakdown] = await Promise.all([
-    getReserveBalances(),
-    getMonthlyDeposits(month),
-    listReserveTransactions(),
-    computeIncomeTaxBreakdown(month),
-  ]);
-  return NextResponse.json({ balances, monthlyDeposits, transactions, incomeTaxBreakdown });
+  const [balances, monthlyDeposits, transactions, incomeTaxBreakdown, ownerProfitEstimate] =
+    await Promise.all([
+      getReserveBalances(),
+      getMonthlyDeposits(month),
+      listReserveTransactions(),
+      computeIncomeTaxBreakdown(month),
+      computeExpectedOwnerProfit(month),
+    ]);
+  return NextResponse.json({
+    balances,
+    monthlyDeposits,
+    transactions,
+    incomeTaxBreakdown,
+    ownerProfitEstimate,
+  });
 }
 
 /** "이번 달 정산" 버튼 — 그 달 매출·지출·급여·잔여 세션 가치를 기준으로
