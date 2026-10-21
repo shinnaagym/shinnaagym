@@ -7,7 +7,7 @@
 // 급여를 지급하지 않는 분류용 값으로, 계산 결과는 항상 0으로 고정한다.
 export type EmploymentType = "regular" | "freelancer" | "team_lead" | "owner";
 
-/** 정직원과 동일한 급여 규칙(기본급/식대/의무수업/4대보험/퇴직금)을 쓰는 유형인지. */
+/** 정직원과 동일한 급여 규칙(기본급/의무수업/4대보험/퇴직금)을 쓰는 유형인지. */
 export function isRegularPayScale(employmentType: EmploymentType): boolean {
   return employmentType === "regular" || employmentType === "team_lead";
 }
@@ -21,8 +21,13 @@ export const TENURE_BUCKET_LABEL: Record<TenureBucket, string> = {
 };
 
 // ── 정직원 ──────────────────────────────────────────────
-export const REGULAR_BASE_SALARY = 1_800_000;
-export const REGULAR_MEAL_ALLOWANCE = 200_000; // 비과세
+export const REGULAR_BASE_SALARY = 2_000_000;
+// 식대(비과세)는 폐지되고 기본급에 통합됐다. 0으로 유지하는 이유는, 이
+// 상수를 지우면 PayrollResult.mealAllowance/관련 UI(SpecRow·PayComposition
+// 등)까지 함께 걷어내야 해서다 — 0이면 그 항목들이 자동으로 표시에서
+// 빠지므로(값 0은 숨김) 과거 저장된 급여 이력(식대가 있던 시절의 결과)은
+// 그대로 보존하면서 새 계산에서만 식대가 사라진다.
+export const REGULAR_MEAL_ALLOWANCE = 0;
 export const REGULAR_MANDATORY_SESSIONS = 60; // 의무수업 횟수(기본급에 포함)
 
 export const REGULAR_RATE_1ON1: Record<TenureBucket, number> = {
@@ -45,7 +50,7 @@ export const REGULAR_TEAM_LEAD_ALLOWANCE = 200_000;
 export const OVERTIME_RATE = 0.1;
 
 // ── 프리랜서 ─────────────────────────────────────────────
-// 기본급·식대·의무수업 없음: 진행한 수업 전체가 수업료 대상.
+// 기본급·의무수업 없음: 진행한 수업 전체가 수업료 대상.
 export const FREELANCER_RATE_1ON1: Record<TenureBucket, number> = {
   under1: 32_000,
   "1to2": 33_000,

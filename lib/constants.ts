@@ -146,7 +146,6 @@ export const RESERVE_TYPE_OPTIONS = [
   { value: "vat", label: "부가가치세", rateDescription: "카드 매출의 10%" },
   { value: "income_tax", label: "종합소득세 예비비", rateDescription: "과세표준의 15%" },
   { value: "severance", label: "퇴직금 예비비", rateDescription: "정직원 급여의 8.33%" },
-  { value: "withholding_tax", label: "원천세", rateDescription: "당월 발생액" },
   { value: "social_insurance", label: "4대보험", rateDescription: "당월 발생액" },
   { value: "depreciation", label: "감가상각비", rateDescription: "매출의 5%" },
 ] as const;

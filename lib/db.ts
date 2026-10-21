@@ -495,8 +495,8 @@ function runFullMigration(): Promise<void> {
 
         -- 저수지(세금·예비비) 관리용 적립/차감 통합 히스토리. reserve_type은
         -- lib/constants.ts의 RESERVE_TYPE_OPTIONS 값(vat/income_tax/severance/
-        -- withholding_tax/social_insurance/depreciation) 중 하나다(과거 기록에는
-        -- 더 이상 쓰지 않는 refund_defense 값도 남아있을 수 있다 — 삭제하지
+        -- social_insurance/depreciation) 중 하나다(과거 기록에는 더 이상 쓰지
+        -- 않는 refund_defense·withholding_tax 값도 남아있을 수 있다 — 삭제하지
         -- 않고 그대로 두되, 대시보드·정산 계산에서는 제외한다).
         -- 한 저수지의 "누적 잔액"은 이 표에 쌓인 deposit 합계에서 withdrawal
         -- 합계를 뺀 값이고, "당월 적립액"은 year_month가 해당 월인 deposit
