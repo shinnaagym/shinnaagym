@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { RESERVE_TYPE_LABELS, RESERVE_TYPE_OPTIONS, type ReserveType } from "@/lib/constants";
 import type { ReserveTransactionRow } from "@/lib/db";
-import type { MonthlySettlementResult } from "@/lib/reserves";
+import type { MonthlySettlementResult, OwnerProfitEstimate } from "@/lib/reserves";
 import type { IncomeTaxBreakdown } from "@/lib/income-tax";
 import { IncomeTaxDetail } from "./income-tax-detail";
 
@@ -34,6 +34,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
   const [monthlyDeposits, setMonthlyDeposits] = useState<ReserveMap | null>(null);
   const [transactions, setTransactions] = useState<ReserveTransactionRow[]>([]);
   const [incomeTaxBreakdown, setIncomeTaxBreakdown] = useState<IncomeTaxBreakdown | null>(null);
+  const [ownerProfitEstimate, setOwnerProfitEstimate] = useState<OwnerProfitEstimate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [settling, setSettling] = useState(false);
@@ -59,6 +60,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
       setMonthlyDeposits(data.monthlyDeposits);
       setTransactions(data.transactions);
       setIncomeTaxBreakdown(data.incomeTaxBreakdown ?? null);
+      setOwnerProfitEstimate(data.ownerProfitEstimate ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "저수지 정보를 불러오지 못했어요.");
     } finally {
@@ -190,6 +192,52 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
         적립액을 새로 계산해 덮어쓸 뿐, 직접 기록한 적립·차감은 건드리지 않아요.
       </p>
 
+      {ownerProfitEstimate && (
+        <div className="rounded-xl border border-coral/30 bg-coral/5 px-5 py-4 mb-4">
+          <div className="flex items-center justify-between flex-wrap gap-1 mb-2">
+            <span className="text-sm font-medium">예상 월순수익(대표 실수령 추정)</span>
+            <span className="text-xl font-semibold text-coral">
+              {formatWon(ownerProfitEstimate.expectedOwnerProfit)}
+            </span>
+          </div>
+          <div className="text-xs text-ink/50 space-y-0.5">
+            <div className="flex items-center justify-between">
+              <span>매출(부가세 제외)</span>
+              <span>{formatWon(ownerProfitEstimate.revenueExVat)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>운영비(월세·관리비·소모품·마케팅·카드수수료)</span>
+              <span>-{formatWon(ownerProfitEstimate.operatingExpense)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>직원 급여 총지급액</span>
+              <span>-{formatWon(ownerProfitEstimate.payrollTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between font-medium text-ink/70 pt-1 mt-0.5 border-t border-coral/20">
+              <span>사업소득(세전)</span>
+              <span>{formatWon(ownerProfitEstimate.businessIncome)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>종합소득세 예비비</span>
+              <span>-{formatWon(ownerProfitEstimate.incomeTaxReserve)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>퇴직금 예비비</span>
+              <span>-{formatWon(ownerProfitEstimate.severanceReserve)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>감가상각비 예비비</span>
+              <span>-{formatWon(ownerProfitEstimate.depreciationReserve)}</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-ink/40 mt-2">
+            부가가치세는 이미 매출에서 제외됐고, 4대보험(직원 부담분)은 급여 총지급액 안에
+            포함돼 있어 따로 빼지 않았어요. &quot;{formatMonthLabel(monthKey)} 정산&quot; 버튼을
+            누르지 않아도 이번 달 최신 데이터로 항상 계산돼요.
+          </p>
+        </div>
+      )}
+
       {totalBalance !== null && (
         <div className="rounded-xl bg-ink text-white px-5 py-4 mb-4 flex items-center justify-between">
           <span className="text-sm text-white/70">저수지 전체 누적 잔액</span>
@@ -209,7 +257,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
             순이익 {formatWon(lastSettlement.netProfit)}
           </p>
           <p>
-            정직원 급여 합계 {formatWon(lastSettlement.regularPayrollGross)} · 잔여 세션 가치{" "}
+            정직원+팀장 급여 합계 {formatWon(lastSettlement.regularPayrollGross)} · 잔여 세션 가치{" "}
             {formatWon(lastSettlement.remainingSessionValue)}
           </p>
         </div>
