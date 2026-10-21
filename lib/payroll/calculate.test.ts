@@ -713,3 +713,58 @@ test("시간외수당은 총지급액(grossPay)에 포함됨", () => {
   assert.ok(withOvertime.overtimeFeeAmount > 0);
   assert.equal(withOvertime.grossPay, withoutOvertime.grossPay + withOvertime.overtimeFeeAmount);
 });
+
+test("원천세(withholdingIncomeTax)를 입력하면 공제·실지급액에 반영됨", () => {
+  const withoutTax = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2024-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  const withTax = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2024-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    withholdingIncomeTax: 50_000,
+  });
+  assert.equal(withTax.deductions.incomeTax, 50_000);
+  assert.equal(withTax.deductions.totalDeduction, withoutTax.deductions.totalDeduction + 50_000);
+  assert.equal(withTax.netPay, withoutTax.netPay - 50_000);
+  // 총지급액(grossPay)은 원천세와 무관 — 공제 전 금액이라 그대로 유지돼야 함.
+  assert.equal(withTax.grossPay, withoutTax.grossPay);
+});
+
+test("원천세를 입력하지 않으면(undefined) 0으로 처리됨", () => {
+  const result = calculatePayroll({
+    employmentType: "team_lead",
+    hiredAt: "2024-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  assert.equal(result.deductions.incomeTax, 0);
+});
+
+test("프리랜서는 원천세 입력값이 있어도 무시됨(이미 3.3% 원천징수가 그 역할)", () => {
+  const result = calculatePayroll({
+    employmentType: "freelancer",
+    hiredAt: "2024-01-01",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 10,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    withholdingIncomeTax: 50_000,
+  });
+  assert.equal(result.deductions.incomeTax, 0);
+  assert.equal(result.netPay, result.grossPay - result.deductions.freelancerWithholding);
+});

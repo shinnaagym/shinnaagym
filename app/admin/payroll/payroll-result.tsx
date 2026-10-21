@@ -1,7 +1,7 @@
 import type { EmploymentType } from "@/lib/db";
 import type { ReferralEntry, ReferralPaymentMethod } from "@/lib/payroll";
 import type { PayrollResult } from "@/lib/payroll/calculate";
-import { DEFAULT_INSURANCE_RATES } from "@/lib/payroll/config";
+import { DEFAULT_INSURANCE_RATES, isRegularPayScale } from "@/lib/payroll/config";
 
 function formatWon(n: number): string {
   return `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -269,7 +269,7 @@ export function PayrollSpecCard({
       )}
 
       <div className="text-sm divide-y divide-line/40 mt-3 pt-3 border-t border-line/60">
-        {result.employmentType === "regular" && (
+        {isRegularPayScale(result.employmentType) && (
           <div className="flex items-center justify-between py-1 text-ink/50">
             <span>
               보수월액(
@@ -278,7 +278,7 @@ export function PayrollSpecCard({
             <span>{formatWon(insuranceBaseAmount)}</span>
           </div>
         )}
-        {result.employmentType === "regular" ? (
+        {isRegularPayScale(result.employmentType) ? (
           <>
             <SpecRow
               label={`국민연금(${formatPercent(ratesUsed.nationalPensionRate)})`}
@@ -296,6 +296,7 @@ export function PayrollSpecCard({
               value={result.deductions.employmentInsurance}
               negative
             />
+            <SpecRow label="원천세(근로소득세+지방소득세)" value={result.deductions.incomeTax} negative />
           </>
         ) : (
           <SpecRow label="원천징수(3.3%)" value={result.deductions.freelancerWithholding} negative />
@@ -303,9 +304,10 @@ export function PayrollSpecCard({
         <SpecRow label="실지급액" value={result.netPay} emphasis />
       </div>
 
-      {result.employmentType === "regular" && (
+      {isRegularPayScale(result.employmentType) && (
         <p className="text-xs text-ink/40 mt-3">
-          * 근로소득세는 간이세액표 기준 계산이 필요해 이 화면에서는 제외했어요(소득세 별도).
+          * 원천세는 국세청 근로소득 간이세액표 기준으로 매달 직접 조회해 입력한 금액이에요(자동
+          계산 아님). 입력하지 않으면 0으로 계산돼요.
         </p>
       )}
 
@@ -316,7 +318,7 @@ export function PayrollSpecCard({
         </p>
       )}
 
-      {result.employmentType === "regular" &&
+      {isRegularPayScale(result.employmentType) &&
         (insuranceBaseSource === "declared" ? (
           <p className="text-xs text-ink/40 mt-2">
             * 보수월액(고지 예정액)을 직접 입력해 그 금액 기준으로 4대보험을 계산했어요. 국민연금은
