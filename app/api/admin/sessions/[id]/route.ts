@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
 import { deleteSession, updateSession } from "@/lib/schedule";
+import { skipRecurringOccurrence } from "@/lib/recurring-events";
 import { isValidDateKey } from "@/lib/date";
 import { query } from "@/lib/db";
 import { recordUndo } from "@/lib/undo";
@@ -117,6 +118,11 @@ export async function DELETE(
     await recordUndo(`${before.session_date} ${before.session_hour}시 일정 삭제`, [
       { op: "insert", table: "class_sessions", data: before },
     ]);
+    // 정기 일정이 채워 넣은 메모 칸이었다면, 다음 스케줄표 조회 때
+    // ensureRecurringEventSessions가 이 자리를 다시 채우지 않도록 기록한다.
+    if (before.entry_type === "memo") {
+      await skipRecurringOccurrence(before.memo, before.session_date, before.coach_id);
+    }
   }
   return NextResponse.json({ ok: true });
 }

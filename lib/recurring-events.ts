@@ -239,8 +239,10 @@ function occurrencesInMonth(
  * "개인 일정" 메모 항목으로 채워 넣어 실제로 예약을 막고, true면 시간 칸 대신
  * 그 날짜의 요일별 메모장(daily_schedule_memos)에 이름을 한 줄만 추가한다.
  * 이미 그 코치·시간대에 다른 일정이 있으면(예: 관리자가 수동으로 지운 뒤
- * 다른 예약을 잡은 경우) 건드리지 않고 건너뛴다. 스케줄표 조회 시점마다
- * 가볍게 호출된다.
+ * 다른 예약을 잡은 경우) 건드리지 않고 건너뛴다. 관리자가 아무것도 다시
+ * 채우지 않고 그냥 지우기만 한 경우에는(=칸이 비어있음) recurring_event_skips에
+ * 기록된 "건너뛸 발생"이 없는지 확인해, 있으면 그 날짜·코치만 다시 채우지
+ * 않는다(skipRecurringOccurrence 참고). 스케줄표 조회 시점마다 가볍게 호출된다.
  */
 export async function ensureRecurringEventSessions(): Promise<void> {
   const events = (await listRecurringEvents()).filter((e) => e.enabled);
@@ -249,12 +251,18 @@ export async function ensureRecurringEventSessions(): Promise<void> {
   const currentMonth = koreaCurrentMonthKey();
   const monthKeys = [currentMonth, addMonthsToKey(currentMonth, 1)];
 
-  const [holidaysResult, coaches] = await Promise.all([
+  const [holidaysResult, coaches, skipsResult] = await Promise.all([
     query<HolidayRow>(`SELECT * FROM holidays`),
     listCoaches(true),
+    query<{ event_id: number; occurrence_date: string; coach_id: number }>(
+      `SELECT event_id, occurrence_date, coach_id FROM recurring_event_skips`,
+    ),
   ]);
   if (coaches.length === 0) return;
   const holidaySet = new Set(holidaysResult.rows.map((h) => h.holiday_date));
+  const skipSet = new Set(
+    skipsResult.rows.map((r) => `${r.event_id}:${r.occurrence_date}:${r.coach_id}`),
+  );
 
   const coachIds = coaches.map((c) => c.id);
   const hoursOf = (event: RecurringEventRow) =>
@@ -333,15 +341,19 @@ export async function ensureRecurringEventSessions(): Promise<void> {
   );
 
   await Promise.all(
-    winners.map(({ event, occurrenceDate }) =>
-      query(
+    winners.map(({ event, occurrenceDate }) => {
+      const allowedCoachIds = coachIds.filter(
+        (coachId) => !skipSet.has(`${event.id}:${occurrenceDate}:${coachId}`),
+      );
+      if (allowedCoachIds.length === 0) return Promise.resolve();
+      return query(
         `INSERT INTO class_sessions (coach_id, session_date, session_hour, memo, entry_type)
          SELECT c, $2::text, h, $4::text, 'memo'
          FROM unnest($1::int[]) AS c, unnest($3::int[]) AS h
          ON CONFLICT (coach_id, session_date, session_hour) DO NOTHING`,
-        [coachIds, occurrenceDate, hoursOf(event), event.name],
-      ),
-    ),
+        [allowedCoachIds, occurrenceDate, hoursOf(event), event.name],
+      );
+    }),
   );
 
   if (memoOccurrences.length > 0) {
@@ -369,4 +381,33 @@ export async function ensureRecurringEventSessions(): Promise<void> {
         .map(([date, lines]) => setDailyScheduleMemo(date, lines.join("\n"))),
     );
   }
+}
+
+/**
+ * 정기 일정이 자동으로 채워 넣은 메모 칸(entry_type='memo', memo === 정기
+ * 일정 이름)을 관리자가 지웠을 때 호출한다. 지워진 메모 텍스트와 이름이
+ * 같은 활성 정기 일정이 있으면, 그 날짜·코치 조합을 "건너뛸 발생"으로
+ * 기록해 다음 ensureRecurringEventSessions 실행에서 자리가 다시 채워지지
+ * 않게 한다. 일치하는 정기 일정이 없으면(관리자가 직접 적은 일반 메모)
+ * 아무 일도 하지 않는다.
+ */
+export async function skipRecurringOccurrence(
+  memoText: string,
+  occurrenceDate: string,
+  coachId: number,
+): Promise<void> {
+  const { rows } = await query<{ id: number }>(
+    `SELECT id FROM recurring_events WHERE enabled AND as_memo = false AND name = $1`,
+    [memoText],
+  );
+  await Promise.all(
+    rows.map((row) =>
+      query(
+        `INSERT INTO recurring_event_skips (event_id, occurrence_date, coach_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (event_id, occurrence_date, coach_id) DO NOTHING`,
+        [row.id, occurrenceDate, coachId],
+      ),
+    ),
+  );
 }

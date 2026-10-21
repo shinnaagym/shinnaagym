@@ -110,7 +110,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 44;
+const SCHEMA_VERSION = 45;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -843,6 +843,20 @@ function runFullMigration(): Promise<void> {
             -- 쓸 수 있게 한다. NULL이면 기존처럼 day_of_month(날짜)를 쓰고, 1~4면
             -- 그 달의 day_of_week 요일 중 N번째, 5면 마지막 occurrence를 쓴다.
             ALTER TABLE recurring_events ADD COLUMN IF NOT EXISTS week_of_month SMALLINT;
+
+            -- 정기 일정이 자동으로 채워 넣은 메모 칸(예: "청소")을 관리자가 특정
+            -- 날짜·코치에서만 삭제했을 때, ensureRecurringEventSessions가 다음
+            -- 실행에서 그 자리를 다시 채우지 않도록 "건너뛸 발생"을 기록한다.
+            -- 정기 일정 자체는 그대로 켜져 있어 다른 날짜·다른 코치의 발생에는
+            -- 영향이 없다.
+            CREATE TABLE IF NOT EXISTS recurring_event_skips (
+              id SERIAL PRIMARY KEY,
+              event_id INTEGER NOT NULL REFERENCES recurring_events(id) ON DELETE CASCADE,
+              occurrence_date TEXT NOT NULL,
+              coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+              UNIQUE (event_id, occurrence_date, coach_id)
+            );
             `,
           ),
           getPool().query(
