@@ -11,6 +11,7 @@ import {
   type ReferralPaymentMethod,
   type SessionRecord,
 } from "@/lib/payroll/calculate";
+import { isRegularPayScale } from "@/lib/payroll/config";
 import { PrintButton } from "@/app/components/PrintButton";
 import { PayrollResultCards } from "./payroll-result";
 import { PayrollHistory } from "./payroll-history";
@@ -83,6 +84,11 @@ export function PayrollView({
   const [savingDeclaredComp, setSavingDeclaredComp] = useState(false);
   const [declaredCompMessage, setDeclaredCompMessage] = useState<string | null>(null);
 
+  // 정직원/팀장의 그 달 원천세(근로소득세+지방소득세). 국세청 근로소득 간이세액표가
+  // 급여·부양가족 수에 따라 달라지는 조견표라 자동 계산하지 않고, 관리자가 그 표에서
+  // 조회한 금액을 달마다 직접 입력한다(직원별로 저장해두지 않음).
+  const [withholdingIncomeTax, setWithholdingIncomeTax] = useState("");
+
   const selectedCoach = useMemo(
     () =>
       coachSelection && coachSelection !== "manual"
@@ -108,6 +114,9 @@ export function PayrollView({
     // 목록을 불러오기 전 잠깐 동안 엉뚱한 날짜가 쓰이지 않게 한다.
     setSessionDates1on1([]);
     setSessions([]);
+    // 원천세도 직원마다·달마다 다른 금액이라 자동으로 넘어오면 안 돼서,
+    // 코치를 바꾸면 이전 직원 값이 남아있지 않게 비운다.
+    setWithholdingIncomeTax("");
   }
 
   // 코치+정산월이 정해지면 그 달 진행 수업 횟수를 자동으로 불러온다(수동 보정 가능).
@@ -167,6 +176,7 @@ export function PayrollView({
   const declaredMonthlyCompensationValue = declaredMonthlyCompensation.trim()
     ? Number(declaredMonthlyCompensation) || null
     : null;
+  const withholdingIncomeTaxValue = Math.max(0, Number(withholdingIncomeTax) || 0);
 
   const baseInput: PayrollInput = useMemo(
     () => ({
@@ -182,6 +192,7 @@ export function PayrollView({
       allocationOrder,
       insuranceRates,
       declaredMonthlyCompensation: declaredMonthlyCompensationValue,
+      withholdingIncomeTax: withholdingIncomeTaxValue,
     }),
     [
       employmentType,
@@ -196,6 +207,7 @@ export function PayrollView({
       allocationOrder,
       insuranceRates,
       declaredMonthlyCompensationValue,
+      withholdingIncomeTaxValue,
     ],
   );
 
@@ -472,6 +484,29 @@ export function PayrollView({
                   쓰고, 비워두면 지금처럼 당월 급여 기준으로 계산해요.
                 </p>
               </div>
+              {isRegularPayScale(employmentType) && (
+                <div className="col-span-full">
+                  <label className="block text-xs text-ink/50 mb-1">
+                    원천세(근로소득세+지방소득세, 선택)
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={withholdingIncomeTax}
+                      onChange={(e) => setWithholdingIncomeTax(e.target.value)}
+                      placeholder="비워두면 0으로 계산"
+                      className="w-56 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                    />
+                    <span className="text-sm text-ink/40 shrink-0">원</span>
+                  </div>
+                  <p className="text-[11px] text-ink/40 mt-1">
+                    국세청 홈택스 &ldquo;근로소득 간이세액표&rdquo;에서 이 달 급여·부양가족 수 기준으로 조회한
+                    금액을 그대로 입력하세요(부양가족 수에 따라 달라져 자동 계산하지 않아요).
+                    실지급액에서 차감돼요.
+                  </p>
+                </div>
+              )}
               <div className="col-span-full">
                 <label className="block text-xs text-ink/50 mb-1">
                   소개 결제 내역 (여러 건 추가 가능, 결제 수단별로 부가세 처리가 달라요)

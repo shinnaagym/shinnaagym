@@ -209,6 +209,15 @@ export interface PayrollInput {
    * 여전히 상한액을 적용).
    */
   declaredMonthlyCompensation?: number | null;
+  /**
+   * 정직원/팀장의 그 달 원천세(근로소득세+지방소득세) 금액. 관리자가 국세청
+   * "근로소득 간이세액표"에서 그 달 급여·부양가족 수 기준으로 직접 조회한
+   * 금액을 입력한다(자동 계산하지 않음). 비워두면(undefined/0 이하) 0으로
+   * 처리한다. 대표가 부담하는 게 아니라 직원 급여에서 차감해 대신 납부하는
+   * 금액이라 totalDeduction·netPay에 그대로 반영된다. 프리랜서는 이미
+   * FREELANCER_WITHHOLDING_RATE(3.3%)가 원천세 역할을 해 이 필드를 쓰지 않는다.
+   */
+  withholdingIncomeTax?: number;
 }
 
 export interface PayrollDeductions {
@@ -216,6 +225,11 @@ export interface PayrollDeductions {
   healthInsurance: number;
   longTermCare: number;
   employmentInsurance: number;
+  /** 정직원/팀장의 근로소득세+지방소득세(원천세). 국세청 "근로소득 간이세액표"가
+      부양가족 수에 따라 달라지는 조견표라 자동 계산하지 않고, 매달 그 표에서
+      직접 조회한 금액을 관리자가 입력한 값을 그대로 쓴다(PayrollInput.
+      withholdingIncomeTax). 입력하지 않으면 0. */
+  incomeTax: number;
   freelancerWithholding: number;
   totalDeduction: number;
 }
@@ -370,6 +384,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
         healthInsurance: 0,
         longTermCare: 0,
         employmentInsurance: 0,
+        incomeTax: 0,
         freelancerWithholding: 0,
         totalDeduction: 0,
       },
@@ -458,13 +473,15 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     const healthInsurance = round(insuranceBaseAmount * rates.healthInsuranceRate);
     const longTermCare = round(healthInsurance * rates.longTermCareRateOfHealthInsurance);
     const employmentInsurance = round(insuranceBaseAmount * rates.employmentInsuranceRate);
+    const incomeTax = Math.max(0, round(input.withholdingIncomeTax ?? 0));
     deductions = {
       nationalPension,
       healthInsurance,
       longTermCare,
       employmentInsurance,
+      incomeTax,
       freelancerWithholding: 0,
-      totalDeduction: nationalPension + healthInsurance + longTermCare + employmentInsurance,
+      totalDeduction: nationalPension + healthInsurance + longTermCare + employmentInsurance + incomeTax,
     };
   } else {
     taxableAmount = grossPay;
@@ -476,6 +493,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
       healthInsurance: 0,
       longTermCare: 0,
       employmentInsurance: 0,
+      incomeTax: 0,
       freelancerWithholding,
       totalDeduction: freelancerWithholding,
     };

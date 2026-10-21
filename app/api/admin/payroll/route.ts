@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
         referralEntries?: unknown;
         allocationOrder?: unknown;
         declaredMonthlyCompensation?: unknown;
+        withholdingIncomeTax?: unknown;
       }
     | null;
 
@@ -154,6 +155,12 @@ export async function POST(req: NextRequest) {
     body.declaredMonthlyCompensation > 0
       ? body.declaredMonthlyCompensation
       : null;
+  const withholdingIncomeTax =
+    typeof body?.withholdingIncomeTax === "number" &&
+    Number.isFinite(body.withholdingIncomeTax) &&
+    body.withholdingIncomeTax > 0
+      ? body.withholdingIncomeTax
+      : undefined;
 
   if (
     !employeeName ||
@@ -186,6 +193,7 @@ export async function POST(req: NextRequest) {
     allocationOrder,
     insuranceRates,
     declaredMonthlyCompensation,
+    withholdingIncomeTax,
   });
 
   const record = await savePayrollRecord({
