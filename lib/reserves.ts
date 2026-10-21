@@ -161,7 +161,6 @@ export interface MonthlySettlementResult {
   expenseTotal: number;
   netProfit: number;
   regularPayrollGross: number;
-  withholdingTotal: number;
   socialInsuranceTotal: number;
   remainingSessionValue: number;
   incomeTaxBreakdown: IncomeTaxBreakdown;
@@ -188,14 +187,12 @@ export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySe
   const netProfit = revenue - expenseTotal;
 
   let regularPayrollGross = 0;
-  let withholdingTotal = 0;
   let socialInsuranceTotal = 0;
   for (const record of payrollRecords) {
     const result = record.result as PayrollResult;
     if (record.employment_type === "regular") {
       regularPayrollGross += result.grossPay;
     }
-    withholdingTotal += result.deductions.freelancerWithholding;
     socialInsuranceTotal +=
       result.deductions.nationalPension +
       result.deductions.healthInsurance +
@@ -207,7 +204,6 @@ export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySe
     vat: round(paymentTotals.card * VAT_RATE),
     income_tax: incomeTaxBreakdown.reserveAmount,
     severance: round(regularPayrollGross * SEVERANCE_RATE),
-    withholding_tax: round(withholdingTotal),
     social_insurance: round(socialInsuranceTotal),
     depreciation: round(revenue * DEPRECIATION_RATE),
   };
@@ -233,7 +229,6 @@ export async function runMonthlySettlement(yearMonth: string): Promise<MonthlySe
     expenseTotal,
     netProfit,
     regularPayrollGross,
-    withholdingTotal,
     socialInsuranceTotal,
     remainingSessionValue,
     incomeTaxBreakdown,
