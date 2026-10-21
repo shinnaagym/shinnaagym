@@ -1,8 +1,8 @@
 import { query } from "./db";
-import type { EmploymentType, InsuranceSettingsRow, PayrollRecordRow } from "./db";
+import type { EmploymentType, InsuranceSettingsRow, PayrollRecordRow, PaymentMethod } from "./db";
 import type { PayrollResult, ReferralEntry, SessionRecord } from "./payroll/calculate";
 import { DEFAULT_INSURANCE_RATES, type InsuranceRates } from "./payroll/config";
-import { koreaTodayKey } from "./date";
+import { koreaTodayKey, monthKeyRange } from "./date";
 import {
   getCoachWorkingHours,
   getDutyOverridesForMonth,
@@ -126,6 +126,47 @@ export async function getCoachSessionCountsForMonth(
     });
   }
   return { sessionCount1on1, sessionCount2on1, sessionDates1on1, sessions };
+}
+
+/** 회원 등록 화면의 "소개해주신 분"(members.referrer, 자유 텍스트)에 이
+    코치 이름을 적어둔 회원이 그 정산월에 구매한 패키지를, 급여 계산의
+    "소개 결제 내역" 초안으로 자동 매칭한다. referrer는 자유 텍스트라
+    오매칭을 막기 위해 앞뒤 공백·대소문자 차이만 무시하고 코치 이름과
+    정확히 일치할 때만 매칭한다(부분 일치는 하지 않음). 어디까지나 화면에
+    미리 채워주는 초안일 뿐이라, 관리자가 그대로 저장하거나 지우고 손으로
+    고칠 수 있다 — 저장된 급여 이력에는 그 시점에 실제로 확정한 내역만
+    남는다. */
+export async function getAutoReferralEntries(
+  coachId: number,
+  yearMonth: string,
+): Promise<ReferralEntry[]> {
+  const [monthStart, monthEnd] = monthKeyRange(yearMonth);
+  const coachResult = await query<{ name: string }>(`SELECT name FROM coaches WHERE id = $1`, [
+    coachId,
+  ]);
+  const coachName = coachResult.rows[0]?.name?.trim();
+  if (!coachName) return [];
+
+  const result = await query<{
+    member_name: string;
+    price: number;
+    payment_method: PaymentMethod;
+  }>(
+    `SELECT m.name as member_name, p.price, p.payment_method
+     FROM packages p
+     JOIN members m ON m.id = p.member_id
+     WHERE p.purchased_at >= $1 AND p.purchased_at < $2
+       AND m.referrer <> ''
+       AND TRIM(LOWER(m.referrer)) = TRIM(LOWER($3))
+     ORDER BY p.purchased_at ASC`,
+    [monthStart, monthEnd, coachName],
+  );
+
+  return result.rows.map((row) => ({
+    note: `${row.member_name} 소개`,
+    amount: row.price,
+    paymentMethod: row.payment_method,
+  }));
 }
 
 export interface SavePayrollRecordInput {
