@@ -874,18 +874,34 @@ function runFullMigration(): Promise<void> {
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
-      // pg는 세미콜론으로 여러 문장을 이어붙인 쿼리를 실행하면 문장별 결과를
-      // 담은 배열을 반환한다(마지막 문장의 .rows가 바로 나오지 않는다), 그래서
-      // 결과값(rows)이 필요한 SELECT는 별도 호출로 분리한다.
-      await getPool().query(`
-        CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER NOT NULL DEFAULT 0);
-        INSERT INTO schema_migrations (version)
-          SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM schema_migrations);
-      `);
-      const { rows } = await getPool().query<{ version: number }>(
-        `SELECT version FROM schema_migrations LIMIT 1`,
-      );
-      const currentVersion = rows[0]?.version ?? 0;
+      // 콜드 스타트마다(서버리스 인스턴스가 새로 뜰 때마다) 이 함수가 다시
+      // 실행되고, 이 DB 왕복은 매 요청의 모든 query() 호출보다 먼저 끝나야
+      // 해서 체감 로딩 지연에 그대로 더해진다. schema_migrations 테이블은
+      // 최초 배포 이후로는 거의 항상 이미 존재하므로, "테이블이 있다고
+      // 가정하고 버전만 SELECT"를 먼저 시도해(왕복 1번) 그 흔한 경우를
+      // 빠르게 처리하고, 테이블이 아직 없는 아주 드문 경우(완전히 새 DB)에만
+      // CREATE TABLE까지 가는 더 느린 경로(왕복 2번)로 떨어진다 — 이전엔
+      // 매번 CREATE TABLE IF NOT EXISTS부터 시작해 항상 왕복 2번을 썼다.
+      let currentVersion: number;
+      try {
+        const { rows } = await getPool().query<{ version: number }>(
+          `SELECT version FROM schema_migrations LIMIT 1`,
+        );
+        currentVersion = rows[0]?.version ?? 0;
+        if (rows.length === 0) {
+          await getPool().query(
+            `INSERT INTO schema_migrations (version) SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM schema_migrations)`,
+          );
+        }
+      } catch {
+        // 테이블 자체가 없는 경우(42P01) — 최초 1회(완전히 새 DB)만 여기로 온다.
+        await getPool().query(`
+          CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER NOT NULL DEFAULT 0);
+          INSERT INTO schema_migrations (version)
+            SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM schema_migrations);
+        `);
+        currentVersion = 0;
+      }
       if (currentVersion >= SCHEMA_VERSION) return;
 
       await runFullMigration();
