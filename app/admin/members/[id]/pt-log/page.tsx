@@ -78,14 +78,19 @@ export default async function PtLogHistoryPage({
 
   // 2:1 PT 짝이 있으면, 같은 페이지에서 두 회원의 PT 일지·그래프를 나란히 볼 수
   // 있게 짝 회원의 기록도 함께 불러온다(회원용 예약 페이지와 동일한 구성).
-  const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
-  const [duoPartnerPtLogs, duoPartnerAssessments, duoPartnerPersonalExercises] = duoPartner
-    ? await Promise.all([
-        listPtLogsByMember(duoPartner.id),
-        listAssessmentsByMember(duoPartner.id),
-        listPersonalExercisesByMember(duoPartner.id),
-      ])
-    : [[], [], []];
+  // 짝 회원 조회와 그 기록 조회가 서로 의존하지 않는다 — duo_partner_id를
+  // 이미 알고 있으니 getMemberById를 기다렸다가 그 결과로 나머지 3개를
+  // 또 기다리는(왕복 2번) 대신, 4개를 한꺼번에 병렬로 날린다(왕복 1번).
+  const duoPartnerId = member.duo_partner_id;
+  const [duoPartner, duoPartnerPtLogs, duoPartnerAssessments, duoPartnerPersonalExercises] =
+    duoPartnerId != null
+      ? await Promise.all([
+          getMemberById(duoPartnerId),
+          listPtLogsByMember(duoPartnerId),
+          listAssessmentsByMember(duoPartnerId),
+          listPersonalExercisesByMember(duoPartnerId),
+        ])
+      : [null, [], [], []];
 
   const pastPainTriggerNotes = Array.from(
     new Set(
