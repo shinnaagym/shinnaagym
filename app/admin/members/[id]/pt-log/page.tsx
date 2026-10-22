@@ -4,7 +4,7 @@ import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
-import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { listAssessmentsByMember, getPainTriggerEntries, pastPainTriggerNotes } from "@/lib/assessments";
 import { flaggedMovementSummaries } from "@/lib/assessment-movements";
 import { getIntakeQuestionnaireByMember } from "@/lib/intake";
 import { listGoalMemosByMember } from "@/lib/goal-memos";
@@ -92,14 +92,7 @@ export default async function PtLogHistoryPage({
         ])
       : [null, [], [], []];
 
-  const pastPainTriggerNotes = Array.from(
-    new Set(
-      assessments
-        .flatMap((a) => getPainTriggerEntries(a))
-        .map((e) => e.note)
-        .filter((note) => note.length > 0),
-    ),
-  );
+  const memberPastPainTriggerNotes = pastPainTriggerNotes(assessments);
   const pastExercises = Array.from(
     new Set(
       assessments
@@ -108,14 +101,7 @@ export default async function PtLogHistoryPage({
         .filter((exercise) => exercise.length > 0),
     ),
   );
-  const duoPartnerPastPainTriggerNotes = Array.from(
-    new Set(
-      duoPartnerAssessments
-        .flatMap((a) => getPainTriggerEntries(a))
-        .map((e) => e.note)
-        .filter((note) => note.length > 0),
-    ),
-  );
+  const duoPartnerPastPainTriggerNotes = pastPainTriggerNotes(duoPartnerAssessments);
   const duoPartnerPastExercises = Array.from(
     new Set(
       duoPartnerAssessments
@@ -253,7 +239,7 @@ export default async function PtLogHistoryPage({
           폼과 같은 입력 섹션을 그래프 바로 아래에 항상 띄워둔다. */}
       {duoPartner && <h2 className="font-display text-lg mb-3">📈 {member.name}님</h2>}
       <AssessmentPainChart assessments={assessments} />
-      <PainTriggerSection memberId={idNum} pastNotes={pastPainTriggerNotes} />
+      <PainTriggerSection memberId={idNum} pastNotes={memberPastPainTriggerNotes} />
 
       <ExercisePerformanceChart assessments={assessments} />
       <ExercisePerformanceSection memberId={idNum} pastExercises={pastExercises} />

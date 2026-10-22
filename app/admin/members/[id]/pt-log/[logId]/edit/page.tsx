@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { getMemberById, hasSessionInRange } from "@/lib/schedule";
+import { computeMemberProgress, getMemberById, hasSessionInRange } from "@/lib/schedule";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { getPtLogById, listPtLogsByMember } from "@/lib/pt-logs";
-import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { listAssessmentsByMember, pastPainTriggerNotes } from "@/lib/assessments";
 import { PtLogForm } from "../../pt-log-form";
 import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../../past-exercise-names";
 
@@ -26,12 +26,13 @@ export default async function EditPtLogPage({
   const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
   const nextWeekSunday = addDaysToKey(nextWeekMonday, 6);
 
-  const [member, ptLog, ptLogs, assessments, hasNextWeekSession] = await Promise.all([
+  const [member, ptLog, ptLogs, assessments, hasNextWeekSession, progress] = await Promise.all([
     getMemberById(idNum),
     getPtLogById(logIdNum),
     listPtLogsByMember(idNum),
     listAssessmentsByMember(idNum),
     hasSessionInRange(idNum, nextWeekMonday, nextWeekSunday),
+    computeMemberProgress(idNum),
   ]);
   if (!member) {
     notFound();
@@ -39,14 +40,6 @@ export default async function EditPtLogPage({
   if (!ptLog || ptLog.member_id !== idNum) {
     notFound();
   }
-  const pastPainTriggerNotes = Array.from(
-    new Set(
-      assessments
-        .flatMap((a) => getPainTriggerEntries(a))
-        .map((e) => e.note)
-        .filter((note) => note.length > 0),
-    ),
-  );
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -57,10 +50,11 @@ export default async function EditPtLogPage({
         pastExercises={pastExerciseNames(ptLogs, assessments)}
         pastExerciseGroups={pastExerciseGroups(ptLogs.filter((l) => l.id !== logIdNum))}
         pastCircuitEntries={pastCircuitEntries(ptLogs.filter((l) => l.id !== logIdNum))}
-        painTriggerPastNotes={{ [idNum]: pastPainTriggerNotes }}
+        painTriggerPastNotes={{ [idNum]: pastPainTriggerNotes(assessments) }}
         pastPtLogs={{ [idNum]: ptLogs.filter((l) => l.id !== logIdNum) }}
         assessments={{ [idNum]: assessments }}
         hasNextWeekSession={{ [idNum]: hasNextWeekSession }}
+        memberProgress={{ [idNum]: progress }}
         initialData={{
           logDate: ptLog.log_date,
           memo: ptLog.memo,

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
-import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { listAssessmentsByMember, pastPainTriggerNotes } from "@/lib/assessments";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { AssessmentForm } from "../assessment-form";
 
@@ -26,14 +26,6 @@ export default async function NewAssessmentPage({
   if (!member) {
     notFound();
   }
-  const pastPainTriggerNotes = Array.from(
-    new Set(
-      pastAssessments
-        .flatMap((a) => getPainTriggerEntries(a))
-        .map((e) => e.note)
-        .filter((note) => note.length > 0),
-    ),
-  );
   const pastExercises = Array.from(
     new Set(
       pastAssessments
@@ -48,7 +40,7 @@ export default async function NewAssessmentPage({
       <AssessmentForm
         memberId={idNum}
         memberName={member.name}
-        pastPainTriggerNotes={pastPainTriggerNotes}
+        pastPainTriggerNotes={pastPainTriggerNotes(pastAssessments)}
         pastExercises={pastExercises}
         ptLogs={ptLogs}
       />

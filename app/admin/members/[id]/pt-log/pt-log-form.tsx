@@ -18,6 +18,7 @@ import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceCh
 import { useDraftAutosave, usePendingDraft, clearDraft } from "@/lib/use-draft-autosave";
 import { DraftRestoreBanner } from "@/app/components/DraftRestoreBanner";
 import type { AssessmentRow, PtLogRow, PtLogSetGroup } from "@/lib/db";
+import type { MemberProgress } from "@/lib/schedule";
 
 interface PtLogDraftData {
   logDate: string;
@@ -179,6 +180,7 @@ export function PtLogForm({
   pastPtLogs = {},
   assessments = {},
   hasNextWeekSession = {},
+  memberProgress = {},
 }: {
   memberId: number;
   memberName: string;
@@ -219,6 +221,10 @@ export function PtLogForm({
       회원 목록의 "다음주 수업 예약" 체크 표시와 같은 기준이다. kind가
       "pt_log"일 때만 제목 옆에 보여준다. */
   hasNextWeekSession?: Record<number, boolean>;
+  /** 회원 id -> 지금까지 구매한 총 세션 수 대비 진행한(지난) 세션 수(예:
+      "4 / 30"). 회원 개인 페이지(/my/[token])와 같은 기준(computeMemberProgress).
+      kind가 "pt_log"일 때만 제목 옆에 보여준다. */
+  memberProgress?: Record<number, MemberProgress>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -497,18 +503,25 @@ export function PtLogForm({
           {activeMemberName}님의 {isEditing ? `${kindLabel} 수정` : `새 ${kindLabel}`}
         </h1>
         {kind === "pt_log" && (
-          <div className="flex items-center gap-1.5 text-xs shrink-0">
-            <span
-              className={[
-                "flex h-4 w-4 items-center justify-center rounded border",
-                hasNextWeekSession[activeMemberId]
-                  ? "border-sage bg-sage text-white"
-                  : "border-line text-transparent",
-              ].join(" ")}
-            >
-              ✓
-            </span>
-            <span className="text-ink/50">다음주 수업 예약</span>
+          <div className="flex items-center gap-3 text-xs shrink-0">
+            {memberProgress[activeMemberId] && memberProgress[activeMemberId].totalSessions > 0 && (
+              <span className="text-ink/50">
+                PT {memberProgress[activeMemberId].doneCount} / {memberProgress[activeMemberId].totalSessions}
+              </span>
+            )}
+            <div className="flex items-center gap-1.5">
+              <span
+                className={[
+                  "flex h-4 w-4 items-center justify-center rounded border",
+                  hasNextWeekSession[activeMemberId]
+                    ? "border-sage bg-sage text-white"
+                    : "border-line text-transparent",
+                ].join(" ")}
+              >
+                ✓
+              </span>
+              <span className="text-ink/50">다음주 수업 예약</span>
+            </div>
           </div>
         )}
       </div>
