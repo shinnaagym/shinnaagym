@@ -12,6 +12,7 @@ import {
 } from "@/lib/constants";
 import { pastExerciseGroupKey, type PastCircuitEntry } from "./past-exercise-names";
 import { PainTriggerSection } from "./pain-trigger-section";
+import { AssessmentPainChart } from "../assessment/pain-chart";
 import { PtLogDisclosureCard } from "@/app/components/PtLogDisclosureCard";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
 import { useDraftAutosave, usePendingDraft, clearDraft } from "@/lib/use-draft-autosave";
@@ -528,6 +529,13 @@ export function PtLogForm({
           key={`disclosure-${activeMemberId}`}
           title={`🏋️ ${activeMemberName}님의 이전 PT 일지`}
           ptLogs={pastPtLogs[activeMemberId] ?? []}
+        />
+      )}
+
+      {kind === "pt_log" && (
+        <AssessmentPainChart
+          key={`pain-chart-${activeMemberId}`}
+          assessments={assessments[activeMemberId] ?? []}
         />
       )}
 
