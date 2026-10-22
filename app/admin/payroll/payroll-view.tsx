@@ -117,15 +117,9 @@ export function PayrollView({
     // 원천세도 직원마다·달마다 다른 금액이라 자동으로 넘어오면 안 돼서,
     // 코치를 바꾸면 이전 직원 값이 남아있지 않게 비운다.
     setWithholdingIncomeTax("");
-    // 소개 결제 내역도 코치가 바뀌는 순간 즉시 비워, 아직 새로 불러오기
-    // 전까지 이전 코치의 자동 감지 내역이 잠깐이라도 남아있지 않게 한다.
-    setReferralEntries([{ note: "", amount: "", paymentMethod: "card" }]);
   }
 
-  // 코치+정산월이 정해지면 그 달 진행 수업 횟수와, 회원 등록 화면의 "소개해주신
-  // 분"에 이 코치 이름이 적힌 회원의 그 달 패키지 구매 내역(소개 결제 내역
-  // 초안)을 함께 자동으로 불러온다(둘 다 수동 보정 가능 — 소개 결제 내역은
-  // 자동 매칭일 뿐이라 그대로 두거나 지우고 손으로 고칠 수 있다).
+  // 코치+정산월이 정해지면 그 달 진행 수업 횟수를 자동으로 불러온다(수동 보정 가능).
   useEffect(() => {
     if (!selectedCoach || !yearMonth) return;
     const coachId = selectedCoach.id;
@@ -133,32 +127,15 @@ export function PayrollView({
     async function loadSessionCounts() {
       setLoadingCounts(true);
       try {
-        const [countsRes, referralRes] = await Promise.all([
-          fetch(`/api/admin/payroll/session-counts?coachId=${coachId}&yearMonth=${yearMonth}`),
-          fetch(`/api/admin/payroll/referral-entries?coachId=${coachId}&yearMonth=${yearMonth}`),
-        ]);
-        const data = countsRes.ok ? await countsRes.json() : null;
-        if (!cancelled && data) {
-          setSessionCount1on1(String(data.sessionCount1on1 ?? 0));
-          setSessionCount2on1(String(data.sessionCount2on1 ?? 0));
-          setSessionDates1on1(Array.isArray(data.sessionDates1on1) ? data.sessionDates1on1 : []);
-          setSessions(Array.isArray(data.sessions) ? data.sessions : []);
-        }
-        const referralData = referralRes.ok ? await referralRes.json() : null;
-        if (!cancelled) {
-          const entries = Array.isArray(referralData?.entries) ? referralData.entries : [];
-          setReferralEntries(
-            entries.length > 0
-              ? entries.map(
-                  (e: { note: string; amount: number; paymentMethod: ReferralPaymentMethod }) => ({
-                    note: e.note,
-                    amount: String(e.amount),
-                    paymentMethod: e.paymentMethod,
-                  }),
-                )
-              : [{ note: "", amount: "", paymentMethod: "card" }],
-          );
-        }
+        const res = await fetch(
+          `/api/admin/payroll/session-counts?coachId=${coachId}&yearMonth=${yearMonth}`,
+        );
+        const data = res.ok ? await res.json() : null;
+        if (cancelled || !data) return;
+        setSessionCount1on1(String(data.sessionCount1on1 ?? 0));
+        setSessionCount2on1(String(data.sessionCount2on1 ?? 0));
+        setSessionDates1on1(Array.isArray(data.sessionDates1on1) ? data.sessionDates1on1 : []);
+        setSessions(Array.isArray(data.sessions) ? data.sessions : []);
       } finally {
         if (!cancelled) setLoadingCounts(false);
       }
@@ -534,11 +511,6 @@ export function PayrollView({
                 <label className="block text-xs text-ink/50 mb-1">
                   소개 결제 내역 (여러 건 추가 가능, 결제 수단별로 부가세 처리가 달라요)
                 </label>
-                <p className="text-[11px] text-ink/40 mb-1.5">
-                  회원 등록 화면의 &quot;소개해주신 분&quot;에 이 코치 이름을 적어둔 회원이 이 달
-                  구매한 패키지를 자동으로 찾아 채워뒀어요. 틀리거나 빠진 내역은 직접 고치거나
-                  지우고 다시 추가하세요.
-                </p>
                 <div className="space-y-2">
                   {referralEntries.map((entry, i) => (
                     <div key={i} className="flex flex-wrap items-center gap-2">
