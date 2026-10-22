@@ -1,22 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { getMemberById, hasSessionInRange } from "@/lib/schedule";
+import { computeMemberProgress, getMemberById, hasSessionInRange } from "@/lib/schedule";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { listPtLogsByMember } from "@/lib/pt-logs";
-import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
+import { listAssessmentsByMember, pastPainTriggerNotes } from "@/lib/assessments";
 import { PtLogForm } from "../pt-log-form";
 import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../past-exercise-names";
-
-function pastPainTriggerNotes(assessments: Awaited<ReturnType<typeof listAssessmentsByMember>>): string[] {
-  return Array.from(
-    new Set(
-      assessments
-        .flatMap((a) => getPainTriggerEntries(a))
-        .map((e) => e.note)
-        .filter((note) => note.length > 0),
-    ),
-  );
-}
 
 export default async function NewPtLogPage({
   params,
@@ -37,27 +26,29 @@ export default async function NewPtLogPage({
   const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
   const nextWeekSunday = addDaysToKey(nextWeekMonday, 6);
 
-  const [member, ptLogs, assessments, hasNextWeekSession] = await Promise.all([
+  const [member, ptLogs, assessments, hasNextWeekSession, progress] = await Promise.all([
     getMemberById(idNum),
     listPtLogsByMember(idNum),
     listAssessmentsByMember(idNum),
     hasSessionInRange(idNum, nextWeekMonday, nextWeekSunday),
+    computeMemberProgress(idNum),
   ]);
   if (!member) {
     notFound();
   }
   // 짝 회원 조회와 그 데이터 조회가 서로 의존하지 않아(duo_partner_id를 이미
-  // 알고 있음), 넷 다 한꺼번에 병렬로 날린다.
+  // 알고 있음), 한꺼번에 병렬로 날린다.
   const duoPartnerId = member.duo_partner_id;
-  const [duoPartner, duoPartnerAssessments, duoPartnerPtLogs, duoPartnerHasNextWeekSession] =
+  const [duoPartner, duoPartnerAssessments, duoPartnerPtLogs, duoPartnerHasNextWeekSession, duoPartnerProgress] =
     duoPartnerId != null
       ? await Promise.all([
           getMemberById(duoPartnerId),
           listAssessmentsByMember(duoPartnerId),
           listPtLogsByMember(duoPartnerId),
           hasSessionInRange(duoPartnerId, nextWeekMonday, nextWeekSunday),
+          computeMemberProgress(duoPartnerId),
         ])
-      : [null, [], [], false];
+      : [null, [], [], false, null];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -83,6 +74,10 @@ export default async function NewPtLogPage({
         hasNextWeekSession={{
           [idNum]: hasNextWeekSession,
           ...(duoPartner ? { [duoPartner.id]: duoPartnerHasNextWeekSession } : {}),
+        }}
+        memberProgress={{
+          [idNum]: progress,
+          ...(duoPartner && duoPartnerProgress ? { [duoPartner.id]: duoPartnerProgress } : {}),
         }}
       />
     </div>

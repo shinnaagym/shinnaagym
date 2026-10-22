@@ -6,6 +6,7 @@ import type {
   ExercisePerformanceEntry,
   PainTriggerEntry,
 } from "./db";
+import { movementLabelWithRegion } from "./assessment-movements";
 
 export interface CreateAssessmentInput {
   memberId: number;
@@ -231,4 +232,35 @@ export function getPainTriggerEntries(assessment: AssessmentRow): PainTriggerEnt
     return [{ note: assessment.pain_trigger_note, painScale: assessment.pain_scale }];
   }
   return [];
+}
+
+/**
+ * "통증 유발 동작 기록"(자유 텍스트)의 자동완성 목록. 그동안 자유 텍스트로
+ * 적은 통증 유발 동작 문구뿐 아니라, 체형 평가(movements)에서 통증 점수가
+ * 기록된 동작의 라벨(예: "(요추) 측면 글라이딩(우측) · 능동")도 함께
+ * 포함한다 — 통증 척도 그래프(AssessmentPainChart)에 선으로 나타나는
+ * 동작은 전부 다음 기록 때 과거 문구로 바로 고를 수 있어야 하기 때문이다
+ * (이전엔 자유 텍스트 문구만 들어가 있어, 체형 평가에서만 기록한 동작은
+ * 과거 문구 목록에 전혀 안 보이는 누락이 있었다). 최근에 작성한 평가부터
+ * 훑으므로(assessments가 created_at DESC로 정렬돼 들어온다는 전제),
+ * 결과도 최근 문구가 먼저 온다.
+ */
+export function pastPainTriggerNotes(assessments: AssessmentRow[]): string[] {
+  const seen = new Set<string>();
+  const notes: string[] = [];
+  function add(label: string) {
+    if (!label || seen.has(label)) return;
+    seen.add(label);
+    notes.push(label);
+  }
+  for (const a of assessments) {
+    for (const entry of getPainTriggerEntries(a)) {
+      add(entry.note);
+    }
+    for (const [movementId, entry] of Object.entries(a.movements)) {
+      if (entry.painPassive) add(`${movementLabelWithRegion(movementId)} · 수동`);
+      if (entry.painActive) add(`${movementLabelWithRegion(movementId)} · 능동`);
+    }
+  }
+  return notes;
 }

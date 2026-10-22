@@ -5,6 +5,7 @@ import {
   getAssessmentById,
   getPainTriggerEntries,
   listAssessmentsByMember,
+  pastPainTriggerNotes,
 } from "@/lib/assessments";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { AssessmentForm } from "../../assessment-form";
@@ -35,14 +36,6 @@ export default async function EditAssessmentPage({
   if (!assessment || assessment.member_id !== idNum) {
     notFound();
   }
-  const pastPainTriggerNotes = Array.from(
-    new Set(
-      pastAssessments
-        .flatMap((a) => getPainTriggerEntries(a))
-        .map((e) => e.note)
-        .filter((note) => note.length > 0),
-    ),
-  );
   const pastExercises = Array.from(
     new Set(
       pastAssessments
@@ -57,7 +50,7 @@ export default async function EditAssessmentPage({
       <AssessmentForm
         memberId={idNum}
         memberName={member.name}
-        pastPainTriggerNotes={pastPainTriggerNotes}
+        pastPainTriggerNotes={pastPainTriggerNotes(pastAssessments)}
         pastExercises={pastExercises}
         ptLogs={ptLogs}
         assessmentId={assessmentIdNum}
