@@ -178,6 +178,7 @@ export function PtLogForm({
   painTriggerPastNotes = {},
   pastPtLogs = {},
   assessments = {},
+  hasNextWeekSession = {},
 }: {
   memberId: number;
   memberName: string;
@@ -214,6 +215,10 @@ export function PtLogForm({
   /** 회원 id -> 그 회원의 평가 기록. "운동 수행능력 그래프"에서 기본적으로 접힌
       채로 보여주고, 펼쳤을 때만 그래프를 그린다. kind가 "pt_log"일 때만 보여준다. */
   assessments?: Record<number, AssessmentRow[]>;
+  /** 회원 id -> 그 회원이 다음주(월~일)에 취소되지 않은 수업이 잡혀있는지.
+      회원 목록의 "다음주 수업 예약" 체크 표시와 같은 기준이다. kind가
+      "pt_log"일 때만 제목 옆에 보여준다. */
+  hasNextWeekSession?: Record<number, boolean>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -487,9 +492,26 @@ export function PtLogForm({
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">
         {kind === "personal_exercise" ? "Personal Exercise" : "PT Log"}
       </p>
-      <h1 className="font-display text-2xl mb-6">
-        {activeMemberName}님의 {isEditing ? `${kindLabel} 수정` : `새 ${kindLabel}`}
-      </h1>
+      <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+        <h1 className="font-display text-2xl">
+          {activeMemberName}님의 {isEditing ? `${kindLabel} 수정` : `새 ${kindLabel}`}
+        </h1>
+        {kind === "pt_log" && (
+          <div className="flex items-center gap-1.5 text-xs shrink-0">
+            <span
+              className={[
+                "flex h-4 w-4 items-center justify-center rounded border",
+                hasNextWeekSession[activeMemberId]
+                  ? "border-sage bg-sage text-white"
+                  : "border-line text-transparent",
+              ].join(" ")}
+            >
+              ✓
+            </span>
+            <span className="text-ink/50">다음주 수업 예약</span>
+          </div>
+        )}
+      </div>
 
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-4 space-y-4">
         <div>

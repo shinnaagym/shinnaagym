@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { getMemberById } from "@/lib/schedule";
+import { getMemberById, hasSessionInRange } from "@/lib/schedule";
+import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { getPtLogById, listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { PtLogForm } from "../../pt-log-form";
@@ -20,11 +21,17 @@ export default async function EditPtLogPage({
   if (!Number.isInteger(idNum) || !Number.isInteger(logIdNum)) {
     notFound();
   }
-  const [member, ptLog, ptLogs, assessments] = await Promise.all([
+  // "다음주 수업 예약" 체크 표시용 날짜 범위 — 회원 목록 화면과 같은 기준.
+  const thisWeekMonday = mondayOfWeek(koreaTodayKey());
+  const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
+  const nextWeekSunday = addDaysToKey(nextWeekMonday, 6);
+
+  const [member, ptLog, ptLogs, assessments, hasNextWeekSession] = await Promise.all([
     getMemberById(idNum),
     getPtLogById(logIdNum),
     listPtLogsByMember(idNum),
     listAssessmentsByMember(idNum),
+    hasSessionInRange(idNum, nextWeekMonday, nextWeekSunday),
   ]);
   if (!member) {
     notFound();
@@ -53,6 +60,7 @@ export default async function EditPtLogPage({
         painTriggerPastNotes={{ [idNum]: pastPainTriggerNotes }}
         pastPtLogs={{ [idNum]: ptLogs.filter((l) => l.id !== logIdNum) }}
         assessments={{ [idNum]: assessments }}
+        hasNextWeekSession={{ [idNum]: hasNextWeekSession }}
         initialData={{
           logDate: ptLog.log_date,
           memo: ptLog.memo,
