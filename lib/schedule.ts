@@ -699,6 +699,25 @@ export async function getMemberById(id: number): Promise<MemberRow | null> {
   return result.rows[0] ?? null;
 }
 
+/** 그 회원이 주어진 날짜 범위(보통 "다음주" 월~일)에 취소되지 않은 수업이
+    잡혀있는지. PT 일지 작성 화면에서 "다음주 수업 예약됐는지" 체크 표시에
+    쓴다(회원 목록의 "다음주 수업 예약" 표시와 같은 기준). */
+export async function hasSessionInRange(
+  memberId: number,
+  fromKey: string,
+  toKey: string,
+): Promise<boolean> {
+  const result = await query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM class_sessions
+       WHERE entry_type = 'session' AND status <> 'cancelled'
+         AND member_id = $1 AND session_date >= $2 AND session_date <= $3
+     ) as exists`,
+    [memberId, fromKey, toKey],
+  );
+  return result.rows[0]?.exists ?? false;
+}
+
 export async function getMemberByToken(token: string): Promise<MemberRow | null> {
   const result = await query<MemberRow>(
     `SELECT * FROM members WHERE token = $1 AND deleted_at IS NULL`,

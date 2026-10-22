@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { getMemberById } from "@/lib/schedule";
+import { getMemberById, hasSessionInRange } from "@/lib/schedule";
+import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, getPainTriggerEntries } from "@/lib/assessments";
 import { PtLogForm } from "../pt-log-form";
@@ -30,18 +31,33 @@ export default async function NewPtLogPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
-  const [member, ptLogs, assessments] = await Promise.all([
+  // "다음주 수업 예약" 체크 표시용 날짜 범위 — 회원 목록 화면과 같은 기준
+  // (이번주 월요일 + 7일 ~ 그 주 일요일).
+  const thisWeekMonday = mondayOfWeek(koreaTodayKey());
+  const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
+  const nextWeekSunday = addDaysToKey(nextWeekMonday, 6);
+
+  const [member, ptLogs, assessments, hasNextWeekSession] = await Promise.all([
     getMemberById(idNum),
     listPtLogsByMember(idNum),
     listAssessmentsByMember(idNum),
+    hasSessionInRange(idNum, nextWeekMonday, nextWeekSunday),
   ]);
   if (!member) {
     notFound();
   }
-  const duoPartner = member.duo_partner_id != null ? await getMemberById(member.duo_partner_id) : null;
-  const [duoPartnerAssessments, duoPartnerPtLogs] = duoPartner
-    ? await Promise.all([listAssessmentsByMember(duoPartner.id), listPtLogsByMember(duoPartner.id)])
-    : [[], []];
+  // 짝 회원 조회와 그 데이터 조회가 서로 의존하지 않아(duo_partner_id를 이미
+  // 알고 있음), 넷 다 한꺼번에 병렬로 날린다.
+  const duoPartnerId = member.duo_partner_id;
+  const [duoPartner, duoPartnerAssessments, duoPartnerPtLogs, duoPartnerHasNextWeekSession] =
+    duoPartnerId != null
+      ? await Promise.all([
+          getMemberById(duoPartnerId),
+          listAssessmentsByMember(duoPartnerId),
+          listPtLogsByMember(duoPartnerId),
+          hasSessionInRange(duoPartnerId, nextWeekMonday, nextWeekSunday),
+        ])
+      : [null, [], [], false];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -63,6 +79,10 @@ export default async function NewPtLogPage({
         assessments={{
           [idNum]: assessments,
           ...(duoPartner ? { [duoPartner.id]: duoPartnerAssessments } : {}),
+        }}
+        hasNextWeekSession={{
+          [idNum]: hasNextWeekSession,
+          ...(duoPartner ? { [duoPartner.id]: duoPartnerHasNextWeekSession } : {}),
         }}
       />
     </div>
