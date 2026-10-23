@@ -3023,9 +3023,12 @@ function MemberDetailModal({
         latestPackage={latestPackage}
         onClose={() => setShowWriteContract(false)}
         onCreated={() => {
-          setShowWriteContract(false);
-          onChanged();
-          setShowContractView(true);
+          // onChanged(=refresh)가 전체 페이지를 새로고침하기 때문에, 그 직후
+          // setShowContractView(true)를 호출해도 리로드로 상태가 날아가 계약서
+          // 서명 화면이 자동으로 열리지 않았다. 신규 회원 등록 흐름과 똑같이
+          // URL에 contract=1을 실어 이동시켜, 새로고침된 페이지가 처음부터
+          // initialShowContractView=true로 열리게 한다.
+          window.location.href = `/admin/members?open=${memberId}&contract=1`;
         }}
       />
     )}
