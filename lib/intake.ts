@@ -87,24 +87,45 @@ export async function listIntakeMemberTimestamps(): Promise<Map<number, string>>
 }
 
 /**
- * 해당 월(YYYY-MM)에 처음 문진표를 작성한(=상담하러 온) 회원들의 방문 경로별
+ * 해당 월(YYYY-MM)에 처음 방문 경로가 기록된(=상담하러 온) 회원들의 방문 경로별
  * 인원수. 대시보드의 월별 방문 경로 통계용. 방문 경로가 "기타"이면서 자유
  * 입력 텍스트가 있으면, 그 텍스트 자체를 키로 묶어 새 카테고리처럼 집계한다
  * (예: 기타에 "엘베"라고 적으면 "엘베"라는 항목으로 카운트됨).
+ *
+ * 초진 문진표와 신규 계약서 양쪽에 방문 경로가 남을 수 있어, 회원별로 문진표
+ * 기록을 우선 사용하고 문진표가 없거나 비어 있으면 가장 이른 신규 계약서
+ * 기록으로 대체한다(이중 집계 방지).
  */
 export async function getVisitChannelCountsForMonth(
   yearMonth: string,
 ): Promise<Record<string, number>> {
   const [monthStart, monthEnd] = monthKeyRange(yearMonth);
   const result = await query<{ channel_key: string; count: string }>(
-    `SELECT
+    `WITH earliest_new_contract AS (
+       SELECT DISTINCT ON (member_id)
+         member_id, visit_channel, visit_channel_other, created_at
+       FROM contracts
+       WHERE entry_type = 'new' AND visit_channel <> ''
+       ORDER BY member_id, created_at ASC
+     ),
+     member_visit AS (
+       SELECT
+         CASE WHEN iq.visit_channel <> '' THEN iq.visit_channel ELSE enc.visit_channel END AS visit_channel,
+         CASE WHEN iq.visit_channel <> '' THEN iq.visit_channel_other ELSE enc.visit_channel_other END AS visit_channel_other,
+         CASE WHEN iq.visit_channel <> '' THEN iq.created_at ELSE enc.created_at END AS effective_created_at
+       FROM members m
+       LEFT JOIN intake_questionnaires iq ON iq.member_id = m.id
+       LEFT JOIN earliest_new_contract enc ON enc.member_id = m.id
+     )
+     SELECT
        CASE
          WHEN visit_channel = 'other' AND trim(visit_channel_other) <> '' THEN trim(visit_channel_other)
          ELSE visit_channel
        END AS channel_key,
        COUNT(*) as count
-     FROM intake_questionnaires
-     WHERE created_at >= $1 AND created_at < $2
+     FROM member_visit
+     WHERE visit_channel IS NOT NULL AND visit_channel <> ''
+       AND effective_created_at >= $1 AND effective_created_at < $2
      GROUP BY channel_key`,
     [monthStart, monthEnd],
   );
