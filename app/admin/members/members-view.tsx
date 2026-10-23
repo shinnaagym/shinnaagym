@@ -529,23 +529,30 @@ export function MembersView({
   }, [filtered, sortKey, sortDir]);
 
   /** 초진/재등록, 그리고 그중 소개로 온 회원 수를 따로 집계한다(현재 필터 적용 목록 기준).
-      초=현재 패키지가 첫 패키지, 재=재등록(2번째 이상 패키지), 소개(초)/소개(재)=그중 소개(referrer)로 온 경우. */
+      초=현재 패키지가 첫 패키지이면서 소개가 아닌 경우, 재=재등록(2번째 이상 패키지)이면서
+      소개가 아닌 경우, 소개(초)/소개(재)=그중 소개(referrer)로 온 경우 — 넷은 서로 겹치지
+      않아 다 더하면 총 인원수와 같다(소개(초)가 초 안에도 같이 잡히던 이전 집계 방식과
+      다름). */
   const typeStats = useMemo(() => {
+    let total = 0;
     let first = 0;
     let renewal = 0;
     let referralFirst = 0;
     let referralRenewal = 0;
     for (const m of filtered) {
       if (m.total_sessions <= 0) continue;
+      total += 1;
       const isFirst = m.package_count < 2;
-      if (isFirst) first += 1;
-      else renewal += 1;
       if (m.referrer) {
         if (isFirst) referralFirst += 1;
         else referralRenewal += 1;
+      } else if (isFirst) {
+        first += 1;
+      } else {
+        renewal += 1;
       }
     }
-    return { first, renewal, referralFirst, referralRenewal };
+    return { total, first, renewal, referralFirst, referralRenewal };
   }, [filtered]);
 
   async function refresh() {
@@ -555,6 +562,9 @@ export function MembersView({
   return (
     <div>
       <div className="flex items-center gap-3 flex-wrap mb-3 text-xs">
+        <span className="rounded-full bg-ink/10 text-ink px-3 py-1 font-medium">
+          총 {typeStats.total}명
+        </span>
         <span className="rounded-full bg-coral/10 text-coral px-3 py-1 font-medium">
           초 {typeStats.first}명
         </span>
