@@ -86,10 +86,15 @@ export async function setCoachDeclaredMonthlyCompensation(
 }
 
 /** 코치별 담당 활성 회원 수 (퇴사 처리 전 경고용). */
+/** 회원 관리 화면의 필터 목록(members-view.tsx의 filtered)과 같은 기준으로
+    센다 — 상담 단계(is_lead) 회원, 삭제된 회원은 빼고, 2:1 짝은 한 쌍을
+    한 명으로만(먼저 등록된 쪽만) 센다. 코치 관리 화면의 "담당 N명"이 회원
+    관리 화면의 실제 활성 인원수와 항상 일치하게 하기 위함. */
 export async function getActiveMemberCountsByCoach(): Promise<Record<number, number>> {
   const result = await query<{ coach_id: number; count: string }>(
     `SELECT coach_id, COUNT(*) as count FROM members
-     WHERE coach_id IS NOT NULL AND status = 'active'
+     WHERE coach_id IS NOT NULL AND status = 'active' AND is_lead = false AND deleted_at IS NULL
+       AND (duo_partner_id IS NULL OR duo_partner_id > id)
      GROUP BY coach_id`,
   );
   return Object.fromEntries(result.rows.map((r) => [r.coach_id, Number(r.count)]));
