@@ -734,11 +734,12 @@ export function AssessmentPainChart({
           ))}
         </svg>
 
-        {/* 점을 누르면 수정/삭제 모달을 띄우는 탭 영역 — SVG 도형(투명/반투명
+        {/* 숫자를 누르면 수정/삭제 모달을 띄우는 탭 영역 — SVG 도형(투명/반투명
             원 등)으로 히트 영역을 만들면 iOS Safari 등 일부 브라우저가 이를
             탭 대상으로 잡지 않는 경우가 있어, 항상 확실히 탭되는 실제 HTML
-            button을 좌표 비율로 겹쳐 그린다(아래 날짜 툴팁과 동일한
-            퍼센트 포지셔닝 방식). */}
+            button을 좌표 비율로 겹쳐 그린다(아래 날짜 툴팁과 동일한 퍼센트
+            포지셔닝 방식). 숫자 라벨은 점보다 11(viewBox 단위) 위에 그려지므로,
+            숫자와 점을 모두 넉넉히 덮도록 그 중간 지점에 큼직하게(36px) 둔다. */}
         {memberId != null &&
           series.map((s, si) =>
             s.values.map(
@@ -758,10 +759,10 @@ export function AssessmentPainChart({
                         value: v,
                       })
                     }
-                    className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full"
+                    className="absolute h-9 w-9 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full"
                     style={{
                       left: `${(xAt(i) / WIDTH) * 100}%`,
-                      top: `${(yPixels[si][i] / HEIGHT) * 100}%`,
+                      top: `${((yPixels[si][i] - 6) / HEIGHT) * 100}%`,
                     }}
                   />
                 ),
