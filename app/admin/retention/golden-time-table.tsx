@@ -11,6 +11,7 @@ interface GoldenMember {
   name: string;
   coachName: string;
   doneCount: number;
+  scheduledCount: number;
   totalSessions: number;
   availableTimes: string;
   followupStatus: string;
@@ -118,7 +119,9 @@ export function GoldenTimeTable({ members }: { members: GoldenMember[] }) {
               <th className="py-2 pr-4 font-medium">회원</th>
               <th className="py-2 px-3 font-medium">담당</th>
               <th className="py-2 px-3 font-medium">진행</th>
-              <th className="py-2 px-3 font-medium">잔여</th>
+              <th className="py-2 px-3 font-medium" title="예약(미래분 포함) 기준 — 더 예약 가능한 횟수">
+                잔여
+              </th>
               <th className="py-2 px-3 font-medium">가능 시간</th>
               <th className="py-2 px-3 font-medium">팔로업</th>
               <th className="py-2 px-3 font-medium text-center">결제</th>
@@ -126,7 +129,11 @@ export function GoldenTimeTable({ members }: { members: GoldenMember[] }) {
           </thead>
           <tbody>
             {rows.map((m) => {
-              const remaining = m.totalSessions - m.doneCount;
+              // 목록에 뜨는 기준(필터)과 같은 값을 보여줘야 한다 — 출석 기준
+              // (doneCount)이 아니라 예약(미래분 포함) 기준(scheduledCount)으로
+              // "더 예약 가능한 횟수"를 계산한다. 출석만 기준으로 하면 이미
+              // 예약이 꽉 찬 회원인데도 화면엔 여유 있는 것처럼 보일 수 있다.
+              const remaining = m.totalSessions - m.scheduledCount;
               const expired = remaining <= 0;
               return (
                 <tr key={m.id} className="border-b border-line/40 last:border-0 align-top">
