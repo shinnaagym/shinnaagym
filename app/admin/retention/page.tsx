@@ -38,12 +38,12 @@ export default async function AdminRetentionPage() {
 
   const coachNameMap = Object.fromEntries(coaches.map((c) => [c.id, c.name]));
 
-  // 대상 여부는 예약(미래분 포함)까지 합친 scheduled_count로 판단한다 — done_count
-  // (출석만)로 걸러내면 예약은 꽉 찼지만 아직 지나지 않은 회원이 재등록을 놓칠
-  // 만큼 임박했는데도 목록에서 빠지는 문제가 있다(스케줄표 골든벨과 동일한 기준).
+  // 대상 여부·잔여는 실제 출석(done_count) 기준으로 판단한다 — 미래에 예약만
+  // 해둔 수업까지 "다 썼다"고 치면, 아직 꽤 남은 회원이 "만료"로 보여 혼란을
+  // 준다(실제로 PT가 그만큼 남아있는데 당장 재등록을 독촉해야 할 것처럼 보임).
   const goldenMembers = members
-    .filter((m) => m.status === "active" && m.total_sessions > 0 && m.total_sessions - m.scheduled_count <= 3)
-    .sort((a, b) => a.total_sessions - a.scheduled_count - (b.total_sessions - b.scheduled_count));
+    .filter((m) => m.status === "active" && m.total_sessions > 0 && m.total_sessions - m.done_count <= 3)
+    .sort((a, b) => a.total_sessions - a.done_count - (b.total_sessions - b.done_count));
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -175,7 +175,6 @@ export default async function AdminRetentionPage() {
             name: m.name,
             coachName: m.coach_id != null ? (coachNameMap[m.coach_id] ?? "-") : "-",
             doneCount: m.done_count,
-            scheduledCount: m.scheduled_count,
             totalSessions: m.total_sessions,
             availableTimes: m.available_times,
             followupStatus: m.followup_status,
