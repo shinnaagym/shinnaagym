@@ -705,38 +705,7 @@ export function AssessmentPainChart({
               {s.values.map(
                 (v, i) =>
                   v != null && (
-                    <g
-                      key={`${s.key}-pt-${i}`}
-                      onClick={
-                        memberId != null
-                          ? (e) => {
-                              e.stopPropagation();
-                              setEditTarget({
-                                seriesKey: s.key,
-                                dateKey: fullDates[i],
-                                dateLabel: fullDates[i],
-                                label: s.label,
-                                color: s.color,
-                                value: v,
-                              });
-                            }
-                          : undefined
-                      }
-                      className={memberId != null ? "cursor-pointer" : undefined}
-                    >
-                      {memberId != null && (
-                        // iOS Safari는 fill="transparent"인 도형을 히트테스트 대상으로
-                        // 잡지 않을 때가 있어(스펙상 모호한 영역), opacity 0 + 명시적
-                        // pointer-events로 모든 브라우저에서 확실히 탭 영역을 넓힌다.
-                        <circle
-                          cx={xAt(i)}
-                          cy={yPixels[si][i]}
-                          r={11}
-                          fill="#000"
-                          opacity={0}
-                          style={{ pointerEvents: "all" }}
-                        />
-                      )}
+                    <g key={`${s.key}-pt-${i}`}>
                       <circle
                         cx={xAt(i)}
                         cy={yPixels[si][i]}
@@ -764,6 +733,40 @@ export function AssessmentPainChart({
             </g>
           ))}
         </svg>
+
+        {/* 점을 누르면 수정/삭제 모달을 띄우는 탭 영역 — SVG 도형(투명/반투명
+            원 등)으로 히트 영역을 만들면 iOS Safari 등 일부 브라우저가 이를
+            탭 대상으로 잡지 않는 경우가 있어, 항상 확실히 탭되는 실제 HTML
+            button을 좌표 비율로 겹쳐 그린다(아래 날짜 툴팁과 동일한
+            퍼센트 포지셔닝 방식). */}
+        {memberId != null &&
+          series.map((s, si) =>
+            s.values.map(
+              (v, i) =>
+                v != null && (
+                  <button
+                    key={`${s.key}-hit-${i}`}
+                    type="button"
+                    aria-label={`${s.label} ${fullDates[i]} 기록 수정`}
+                    onClick={() =>
+                      setEditTarget({
+                        seriesKey: s.key,
+                        dateKey: fullDates[i],
+                        dateLabel: fullDates[i],
+                        label: s.label,
+                        color: s.color,
+                        value: v,
+                      })
+                    }
+                    className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full"
+                    style={{
+                      left: `${(xAt(i) / WIDTH) * 100}%`,
+                      top: `${(yPixels[si][i] / HEIGHT) * 100}%`,
+                    }}
+                  />
+                ),
+            ),
+          )}
 
         {hoverIndex != null && hoveredValues.length > 0 && (
           <div
