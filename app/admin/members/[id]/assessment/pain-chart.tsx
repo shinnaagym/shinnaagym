@@ -547,6 +547,18 @@ export function AssessmentPainChart({
   // 저장 시 handleZoom에서 appendSummaryToSvgClone으로만 덧붙인다.
   const summaryLines = series.map((s) => summaryLineFor(s, dayGroupsFiltered));
 
+  // 그래프의 작은 점을 정확히 탭하기 어려운 사람들을 위한 대안 — 같은 기록을
+  // 최신순 목록으로도 보여주고, 각 줄의 "수정" 버튼을 누르면 점을 눌렀을 때와
+  // 동일한 수정/삭제 모달이 뜬다.
+  const allPoints = series
+    .flatMap((s) =>
+      s.values.map((v, i) =>
+        v == null ? null : { seriesKey: s.key, label: s.label, color: s.color, dateKey: fullDates[i], value: v },
+      ),
+    )
+    .filter((p): p is { seriesKey: string; label: string; color: string; dateKey: string; value: number } => p != null)
+    .sort((a, b) => b.dateKey.localeCompare(a.dateKey) || a.label.localeCompare(b.label));
+
   // 데이터가 없는 날짜는 건너뛰고, 있는 점끼리만 이어서 하나의 연속된 선으로 그린다.
   function pathFor(si: number): string {
     let d = "";
@@ -786,6 +798,44 @@ export function AssessmentPainChart({
           </div>
         )}
       </div>
+
+      {memberId != null && allPoints.length > 0 && (
+        <>
+          <p className="text-xs text-ink/40 mt-3 mb-1.5">점을 누르기 어려우면 아래 목록에서 수정하세요.</p>
+          <div className="rounded-xl border border-line/50 divide-y divide-line/40 max-h-64 overflow-y-auto">
+            {allPoints.map((p) => (
+              <div
+                key={`${p.seriesKey}-${p.dateKey}`}
+                className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <span className="text-ink/50 text-xs mr-2">{p.dateKey}</span>
+                  <span className="font-medium" style={{ color: p.color }}>
+                    {p.value}/10
+                  </span>
+                  <span className="text-ink/60"> {p.label}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditTarget({
+                      seriesKey: p.seriesKey,
+                      dateKey: p.dateKey,
+                      dateLabel: p.dateKey,
+                      label: p.label,
+                      color: p.color,
+                      value: p.value,
+                    })
+                  }
+                  className="shrink-0 rounded-full border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
+                >
+                  수정
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
         </>
       )}
 
