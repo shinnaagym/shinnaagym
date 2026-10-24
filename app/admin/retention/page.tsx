@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import { koreaCurrentMonthKey } from "@/lib/date";
 import {
+  getChurnedMembersForMonth,
   getCoachRetentionReports,
   getMonthlyRetentionStats,
   listCoaches,
@@ -27,11 +28,12 @@ export default async function AdminRetentionPage() {
 
   const monthKey = koreaCurrentMonthKey();
 
-  const [monthlyStats, coachReports, coaches, members] = await Promise.all([
+  const [monthlyStats, coachReports, coaches, members, churnedThisMonth] = await Promise.all([
     getMonthlyRetentionStats(monthKey, RETENTION_MONTHS),
     getCoachRetentionReports(monthKey, RETENTION_MONTHS),
     listCoaches(),
     listMembersWithProgress(),
+    getChurnedMembersForMonth(monthKey),
   ]);
 
   const coachNameMap = Object.fromEntries(coaches.map((c) => [c.id, c.name]));
@@ -105,6 +107,25 @@ export default async function AdminRetentionPage() {
           </table>
         </div>
 
+        <div className="rounded-xl bg-bone/40 border border-line/60 px-4 py-3.5 mb-8">
+          <p className="text-xs text-ink/50 mb-2">
+            {formatMonthShort(monthKey)} 이탈 회원 {churnedThisMonth.length}명
+          </p>
+          {churnedThisMonth.length === 0 ? (
+            <p className="text-sm text-ink/40">이번 달 이탈 처리된 회원이 없어요.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {churnedThisMonth.map((m) => (
+                <li key={m.id} className="text-sm flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-medium">{m.name}</span>
+                  <span className="text-ink/50 text-xs">{m.coachName}</span>
+                  {m.memo && <span className="text-ink/60 text-xs">— {m.memo}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <div className="flex items-baseline gap-2 mb-4">
           <p className="font-display text-lg">코치별 재등록률</p>
           <p className="text-xs text-ink/40">최근 {RETENTION_MONTHS}개월 합계</p>
@@ -154,6 +175,7 @@ export default async function AdminRetentionPage() {
             name: m.name,
             coachName: m.coach_id != null ? (coachNameMap[m.coach_id] ?? "-") : "-",
             doneCount: m.done_count,
+            scheduledCount: m.scheduled_count,
             totalSessions: m.total_sessions,
             availableTimes: m.available_times,
             followupStatus: m.followup_status,

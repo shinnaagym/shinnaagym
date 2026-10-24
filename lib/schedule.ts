@@ -1746,6 +1746,41 @@ export async function getMonthlyRetentionStats(
   });
 }
 
+export interface ChurnedMember {
+  id: number;
+  name: string;
+  coachName: string;
+  memo: string;
+  updatedAt: string;
+}
+
+/** yearMonth(YYYY-MM)에 팔로업 상태가 "이탈"로 바뀐 회원 목록(재등록 통계의 이탈 건수 상세). */
+export async function getChurnedMembersForMonth(yearMonth: string): Promise<ChurnedMember[]> {
+  const [monthStart, monthEnd] = monthKeyRange(yearMonth);
+  const result = await query<{
+    id: number;
+    name: string;
+    coach_name: string | null;
+    followup_memo: string;
+    followup_updated_at: string;
+  }>(
+    `SELECT m.id, m.name, c.name as coach_name, m.followup_memo, m.followup_updated_at
+     FROM members m
+     LEFT JOIN coaches c ON c.id = m.coach_id
+     WHERE m.followup_status = '이탈'
+       AND m.followup_updated_at >= $1 AND m.followup_updated_at < $2
+     ORDER BY m.followup_updated_at DESC`,
+    [monthStart, monthEnd],
+  );
+  return result.rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    coachName: r.coach_name ?? "-",
+    memo: r.followup_memo,
+    updatedAt: r.followup_updated_at,
+  }));
+}
+
 export interface CoachRetentionReport {
   coachId: number;
   coachName: string;
