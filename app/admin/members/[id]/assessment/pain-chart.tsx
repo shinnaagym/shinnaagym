@@ -251,6 +251,107 @@ function QuickAddPainForm({
   );
 }
 
+interface PainPointTarget {
+  seriesKey: string;
+  dateKey: string;
+  dateLabel: string;
+  label: string;
+  color: string;
+  value: number;
+}
+
+/** 그래프의 점을 눌렀을 때 뜨는 수정/삭제 모달 — 기록 한 건을 바로 고치거나 지운다. */
+function PainPointModal({
+  memberId,
+  target,
+  onClose,
+  onSaved,
+}: {
+  memberId: number;
+  target: PainPointTarget;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState(String(target.value));
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send(painScale: number | null) {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${memberId}/assessments/pain-point`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: target.dateKey, seriesKey: target.seriesKey, painScale }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "처리에 실패했어요.");
+        return;
+      }
+      router.refresh();
+      onSaved();
+    } catch {
+      setError("네트워크 오류가 발생했어요.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-lg px-5 py-5">
+        <p className="font-display text-base mb-1">기록 수정</p>
+        <p className="text-xs text-ink/50 mb-3">
+          {target.dateLabel} · <span style={{ color: target.color }}>{target.label}</span>
+        </p>
+        <select
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="w-full rounded-lg border border-line px-2.5 py-1.5 text-sm outline-none focus:border-coral mb-4"
+        >
+          {NRS_PAIN_OPTIONS.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+        {error && <p className="text-sm text-coral mb-3">{error}</p>}
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => send(null)}
+            disabled={submitting}
+            className="rounded-full border border-coral/40 text-coral px-4 py-1.5 text-sm hover:bg-coral/10 transition disabled:opacity-40"
+          >
+            삭제
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="rounded-full border border-line px-4 py-1.5 text-sm hover:bg-bone transition disabled:opacity-40"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => send(Number(value))}
+              disabled={submitting}
+              className="rounded-full bg-coral text-white px-4 py-1.5 text-sm hover:opacity-90 transition disabled:opacity-40"
+            >
+              저장
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 관리자 평가 이력 목록 위에 붙는 통증 척도 추이 그래프. 이 회원이 그동안
 // 기록한 모든 통증 유발 동작 문구와 부위별 동작을 각각 하나의 선으로 동시에
 // 겹쳐 보여준다. 같은 동작끼리는 데이터가 없는 날짜를 건너뛰고 선으로 이어
@@ -266,6 +367,7 @@ export function AssessmentPainChart({
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [editTarget, setEditTarget] = useState<PainPointTarget | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomLoading, setZoomLoading] = useState(false);
@@ -528,6 +630,10 @@ export function AssessmentPainChart({
         </div>
       )}
 
+      {memberId != null && series.length > 0 && (
+        <p className="text-xs text-ink/40 mb-2">점을 누르면 그 기록을 수정하거나 삭제할 수 있어요.</p>
+      )}
+
       <div className="relative cursor-zoom-in" onClick={handleZoom} title="탭하여 확대 · 이미지 저장">
         <svg
           ref={svgRef}
@@ -590,7 +696,28 @@ export function AssessmentPainChart({
               {s.values.map(
                 (v, i) =>
                   v != null && (
-                    <g key={`${s.key}-pt-${i}`}>
+                    <g
+                      key={`${s.key}-pt-${i}`}
+                      onClick={
+                        memberId != null
+                          ? (e) => {
+                              e.stopPropagation();
+                              setEditTarget({
+                                seriesKey: s.key,
+                                dateKey: fullDates[i],
+                                dateLabel: fullDates[i],
+                                label: s.label,
+                                color: s.color,
+                                value: v,
+                              });
+                            }
+                          : undefined
+                      }
+                      className={memberId != null ? "cursor-pointer" : undefined}
+                    >
+                      {memberId != null && (
+                        <circle cx={xAt(i)} cy={yPixels[si][i]} r={11} fill="transparent" />
+                      )}
                       <circle
                         cx={xAt(i)}
                         cy={yPixels[si][i]}
@@ -649,6 +776,15 @@ export function AssessmentPainChart({
           setZoomImage(null);
         }}
       />
+
+      {memberId != null && editTarget && (
+        <PainPointModal
+          memberId={memberId}
+          target={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => setEditTarget(null)}
+        />
+      )}
     </div>
   );
 }
