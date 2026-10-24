@@ -1463,16 +1463,31 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
         re_registered: string;
         churned: string;
       }>(
+        // 재등록율 분모는 "PT 회차가 마감된 사람"(패키지 전체 회차를 다 소진한
+        // 사람)만 대상으로 한다 — 아직 회차가 남아 진행 중인 회원은 재등록
+        // 여부를 판단할 단계가 아니므로 집계에서 제외한다.
         `SELECT m.coach_id as coach_id,
            COUNT(*) as member_count,
-           COUNT(*) FILTER (WHERE pkg.package_count >= 2) as re_registered,
-           COUNT(*) FILTER (WHERE m.status = 'inactive' AND COALESCE(pkg.package_count, 0) < 2) as churned
+           COUNT(*) FILTER (WHERE COALESCE(pkg.package_count, 0) >= 2) as re_registered,
+           COUNT(*) FILTER (
+             WHERE COALESCE(pkg.package_count, 0) < 2
+               AND COALESCE(pkg.total, 0) > 0
+               AND COALESCE(s.done, 0) >= pkg.total
+           ) as churned
          FROM members m
          LEFT JOIN (
-           SELECT member_id, COUNT(*) as package_count FROM packages GROUP BY member_id
+           SELECT member_id, COUNT(*) as package_count, SUM(total_sessions) as total
+           FROM packages GROUP BY member_id
          ) pkg ON pkg.member_id = m.id
+         LEFT JOIN (
+           SELECT member_id, COUNT(*) FILTER (WHERE session_date <= $1) as done
+           FROM class_sessions
+           WHERE entry_type = 'session' AND status <> 'cancelled'
+           GROUP BY member_id
+         ) s ON s.member_id = m.id
          WHERE m.coach_id IS NOT NULL AND m.deleted_at IS NULL AND m.is_lead = false
          GROUP BY m.coach_id`,
+        [koreaTodayKey()],
       ),
       query<{ coach_id: number; consultation_count: string; success_count: string }>(
         `SELECT cs.coach_id,
