@@ -6,7 +6,7 @@ import { LoginForm } from "./login-form";
 
 export default async function AdminLoginPage() {
   if (await isAdminAuthed()) {
-    redirect("/admin/dashboard");
+    redirect("/admin/schedule");
   }
 
   return (

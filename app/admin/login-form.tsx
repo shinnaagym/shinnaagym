@@ -87,7 +87,7 @@ export function LoginForm({ recaptchaSiteKey }: { recaptchaSiteKey: string }) {
         setError(data.error ?? "비밀번호가 올바르지 않아요.");
         return;
       }
-      router.replace("/admin/dashboard");
+      router.replace("/admin/schedule");
       router.refresh();
     } catch {
       setError("네트워크 오류가 발생했어요. 잠시 후 다시 시도해주세요.");
