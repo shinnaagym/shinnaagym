@@ -716,7 +716,17 @@ export function AssessmentPainChart({
                       className={memberId != null ? "cursor-pointer" : undefined}
                     >
                       {memberId != null && (
-                        <circle cx={xAt(i)} cy={yPixels[si][i]} r={11} fill="transparent" />
+                        // iOS Safari는 fill="transparent"인 도형을 히트테스트 대상으로
+                        // 잡지 않을 때가 있어(스펙상 모호한 영역), opacity 0 + 명시적
+                        // pointer-events로 모든 브라우저에서 확실히 탭 영역을 넓힌다.
+                        <circle
+                          cx={xAt(i)}
+                          cy={yPixels[si][i]}
+                          r={11}
+                          fill="#000"
+                          opacity={0}
+                          style={{ pointerEvents: "all" }}
+                        />
                       )}
                       <circle
                         cx={xAt(i)}
