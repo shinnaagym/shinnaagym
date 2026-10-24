@@ -592,6 +592,15 @@ export function AssessmentPainChart({
       <div className="flex items-center justify-between mb-2 gap-2">
         <p className="font-display text-base">통증 척도 그래프</p>
         <div className="flex items-center gap-2">
+          {series.length > 0 && expanded && (
+            <button
+              type="button"
+              onClick={handleZoom}
+              className="shrink-0 rounded-lg border border-line px-3 py-1 text-xs hover:border-coral/40 hover:text-coral transition"
+            >
+              이미지 저장
+            </button>
+          )}
           {memberId != null && series.length > 0 && !showAddForm && expanded && (
             <button
               type="button"
@@ -634,7 +643,7 @@ export function AssessmentPainChart({
         <p className="text-xs text-ink/40 mb-2">점을 누르면 그 기록을 수정하거나 삭제할 수 있어요.</p>
       )}
 
-      <div className="relative cursor-zoom-in" onClick={handleZoom} title="탭하여 확대 · 이미지 저장">
+      <div className="relative">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
