@@ -60,17 +60,19 @@ async function getTomorrowReminderTargets(): Promise<ReminderTarget[]> {
   }));
 }
 
-// SMS(단문)는 90바이트(EUC-KR 기준, 한글 1자=2바이트)를 넘으면 자동으로 더
-// 비싼 LMS로 바뀐다. "또는 네이버밴드" 문구가 붙으면서 회원·코치 이름이
-// 길 때(예: 4자씩)는 90바이트를 넘어 LMS로 발송될 수 있다.
+// SMS(단문)는 90바이트(lib/sms.ts가 실제로 판단하는 기준은 UTF-8, 한글
+// 1자=3바이트)를 넘으면 자동으로 더 비싼 LMS로 바뀐다. "담당코치"·"PT예약"·
+// 쉼표 등 꼭 필요하지 않은 글자를 덜어내 일반적인 이름 길이(회원·코치 모두
+// 4자 이하)에서는 90바이트 안쪽을 유지한다(회원·코치 이름이 둘 다 드물게
+// 4자를 넘으면 LMS로 넘어갈 수 있다).
 function buildSessionReminderMessage(target: ReminderTarget): string {
   const [, month, day] = target.sessionDate.split("-").map(Number);
   const weekday = weekdayLabelForDateKey(target.sessionDate);
   const time = formatHourMinute(target.sessionHour, target.sessionMinute);
   const coachPhone = target.coachPhone.trim() || STUDIO_PHONE;
   return (
-    `[신나아짐] ${target.memberName}님, 내일 ${month}/${day}(${weekday}) ${time} PT예약 ` +
-    `담당코치 ${target.coachName}: ${coachPhone} 또는 네이버밴드`
+    `[신나아짐] ${target.memberName}님 내일 ${month}/${day}(${weekday}) ${time} ` +
+    `PT ${target.coachName} ${coachPhone}/밴드`
   );
 }
 
