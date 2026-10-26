@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
 import {
@@ -337,6 +337,15 @@ export function PtLogForm({
     setExercises((prev) => [...prev, emptyExercise()]);
   }
 
+  /** 운동 카드 사이의 "+"를 눌러, 그 자리(index)에 새 빈 운동을 끼워 넣는다. */
+  function insertExerciseAt(index: number) {
+    setExercises((prev) => {
+      const next = [...prev];
+      next.splice(index, 0, emptyExercise());
+      return next;
+    });
+  }
+
   function removeExercise(index: number) {
     setExercises((prev) => prev.filter((_, i) => i !== index));
   }
@@ -592,8 +601,8 @@ export function PtLogForm({
 
       <div className="space-y-3 mb-4">
         {exercises.map((ex, exIndex) => (
+          <Fragment key={exIndex}>
           <div
-            key={exIndex}
             onDragOver={(e) => {
               e.preventDefault();
               if (draggingExerciseIndex != null && dragOverExerciseIndex !== exIndex) {
@@ -873,6 +882,20 @@ export function PtLogForm({
               className="w-full mt-3 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
             />
           </div>
+          {exIndex < exercises.length - 1 && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => insertExerciseAt(exIndex + 1)}
+                aria-label="이 사이에 운동 추가"
+                title="이 사이에 운동 추가"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-white text-ink/50 shadow-sm transition hover:border-coral hover:text-coral hover:scale-110"
+              >
+                +
+              </button>
+            </div>
+          )}
+          </Fragment>
         ))}
 
         <button
