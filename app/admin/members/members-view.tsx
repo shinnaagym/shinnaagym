@@ -2304,6 +2304,18 @@ function MemberDetailModal({
   const [savingSlot, setSavingSlot] = useState(false);
   const [showWriteContract, setShowWriteContract] = useState(false);
   const [showContractView, setShowContractView] = useState(!!initialShowContractView);
+
+  // ?contract=1 딥링크는 "방금 작성한 계약서를 한 번 보여주기" 용도라, 보여준 뒤에도
+  // 주소창에 남아있으면 handleSave의 onChanged(=전체 새로고침)처럼 같은 URL로 다시
+  // 로드될 때마다 계약서 화면이 또 열려버린다. 한 번 적용한 직후 URL에서 지워서,
+  // 이후의 새로고침은 깨끗한 URL로 일어나게 한다.
+  useEffect(() => {
+    if (!initialShowContractView) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("contract");
+    window.history.replaceState(null, "", url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // 삭제류 동작은 브라우저 기본 confirm() 대신 이 상태로 재확인 모달을 띄운다.
   // iOS에서 "홈 화면에 추가"로 설치한 PWA(standalone) 모드에서는 window.confirm이
   // 동작하지 않거나 무시돼서, 실수로 되돌릴 수 없는 삭제가 바로 일어나는 문제가 있었다.
