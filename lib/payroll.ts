@@ -13,6 +13,11 @@ import {
 export type { ReferralEntry } from "./payroll/calculate";
 export type { InsuranceRates } from "./payroll/config";
 
+/** coach_leaves.leave_type 중, 그 날 수업을 하면 시간외수당 대상이 되는 유형
+    (lib/constants.ts의 LEAVE_TYPE_OPTIONS와 값이 같아야 한다). 하루 전체
+    휴무가 아니라 몇 시간만 조정하는 단축근무(shortened)는 포함하지 않는다. */
+const OVERTIME_LEAVE_TYPES = ["day_off", "extended", "birthday", "sick"];
+
 export interface CoachMonthSessionCounts {
   sessionCount1on1: number;
   sessionCount2on1: number;
@@ -57,25 +62,36 @@ export async function getCoachSessionCountsForMonth(
   coachId: number,
   yearMonth: string,
 ): Promise<CoachMonthSessionCounts> {
-  const [result, workingHoursByCoach, dutyOverridesByDate, allHolidays] = await Promise.all([
-    query<{ pt_type: "1:1" | "2:1"; session_date: string; session_hour: number }>(
-      `SELECT pt_type, session_date, session_hour
-       FROM class_sessions
-       WHERE coach_id = $1
-         AND entry_type = 'session'
-         AND status <> 'cancelled'
-         AND LEFT(session_date, 7) = $2
-         AND session_date <= $3`,
-      [coachId, yearMonth, koreaTodayKey()],
-    ),
-    getCoachWorkingHours(),
-    getDutyOverridesForMonth(yearMonth),
-    listHolidays(),
-  ]);
+  const [result, workingHoursByCoach, dutyOverridesByDate, allHolidays, leaveRows] =
+    await Promise.all([
+      query<{ pt_type: "1:1" | "2:1"; session_date: string; session_hour: number }>(
+        `SELECT pt_type, session_date, session_hour
+         FROM class_sessions
+         WHERE coach_id = $1
+           AND entry_type = 'session'
+           AND status <> 'cancelled'
+           AND LEFT(session_date, 7) = $2
+           AND session_date <= $3`,
+        [coachId, yearMonth, koreaTodayKey()],
+      ),
+      getCoachWorkingHours(),
+      getDutyOverridesForMonth(yearMonth),
+      listHolidays(),
+      query<{ leave_date: string }>(
+        `SELECT leave_date FROM coach_leaves
+         WHERE coach_id = $1 AND LEFT(leave_date, 7) = $2
+           AND leave_type = ANY($3)`,
+        [coachId, yearMonth, OVERTIME_LEAVE_TYPES],
+      ),
+    ]);
   const workingHours = workingHoursByCoach[coachId];
   const holidayDatesThisMonth = new Set(
     allHolidays.filter((h) => h.holiday_date.slice(0, 7) === yearMonth).map((h) => h.holiday_date),
   );
+  // 휴무·연속휴가·생일휴가·병가로 기록된 날짜에 수업을 하면(승인된 휴무일에
+  // 출근한 셈이라) 무조건 시간외수당 대상이다. 단축근무(shortened)는 하루 전체
+  // 휴무가 아니라 몇 시간만 조정하는 거라 포함하지 않는다.
+  const leaveDates = new Set(leaveRows.rows.map((r) => r.leave_date));
 
   /** 토요일이거나 등록된 공휴일이면 "당직제" 날짜 — 근무시간 범위 대신
       당직 배정 기준으로 시간외 여부를 가린다. */
@@ -93,11 +109,14 @@ export async function getCoachSessionCountsForMonth(
   const dutyRankByDate = new Map(thisCoachDutyDates.map((date, i) => [date, i + 1]));
   const FREE_DUTY_COUNT = 2;
 
-  /** 토요일/공휴일은 당직 배정 기준, 그 외 평일은 등록된 근무시간(오전조/
-      오후조) 기준으로 시간외 여부를 가린다. 당직일인데 이 코치가 그날 공식
-      당직자가 아니면(다른 코치가 당직이거나 당직자가 아예 없으면) 무조건
-      시간외로 본다 — 당직 로테이션 밖에서 한 수업이라 그 자체가 추가 근무다. */
+  /** 휴무·연속휴가·생일휴가·병가 중인 날 수업을 하면 다른 조건과 상관없이
+      무조건 시간외로 본다. 그 외엔 토요일/공휴일은 당직 배정 기준, 그 외
+      평일은 등록된 근무시간(오전조/오후조) 기준으로 시간외 여부를 가린다.
+      당직일인데 이 코치가 그날 공식 당직자가 아니면(다른 코치가 당직이거나
+      당직자가 아예 없으면) 무조건 시간외로 본다 — 당직 로테이션 밖에서
+      한 수업이라 그 자체가 추가 근무다. */
   function isOvertimeSession(dateKey: string, hour: number): boolean {
+    if (leaveDates.has(dateKey)) return true;
     if (isDutyDay(dateKey)) {
       const assignedCoachId = dutyOverridesByDate[dateKey]?.coachId ?? null;
       if (assignedCoachId !== coachId) return true;
