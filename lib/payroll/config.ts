@@ -59,8 +59,7 @@ export const FREELANCER_RATE_1ON1: Record<TenureBucket, number> = {
 export const FREELANCER_RATE_2ON1 = 42_000;
 
 // ── 공통 ────────────────────────────────────────────────
-// 소개 인센티브: 결제 금액(부가세 포함)에서 부가세(10%)를 뺀 공급가액의 5%.
-export const VAT_RATE = 0.1;
+// 소개 인센티브: 결제 수단과 무관하게 결제 금액 그대로의 5%.
 export const REFERRAL_INCENTIVE_RATE = 0.05;
 
 // ── 4대보험 요율 (2026년 기준) ───────────────────────────

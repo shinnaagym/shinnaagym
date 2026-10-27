@@ -5,10 +5,9 @@ import type { CoachRow, EmploymentType } from "@/lib/db";
 import type { InsuranceRates } from "@/lib/payroll";
 import {
   calculatePayroll,
-  computeReferralSupplyAmount,
+  computeReferralAmountTotal,
   type AllocationOrder,
   type PayrollInput,
-  type ReferralPaymentMethod,
   type SessionRecord,
 } from "@/lib/payroll/calculate";
 import { isRegularPayScale } from "@/lib/payroll/config";
@@ -30,11 +29,6 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   freelancer: "프리랜서",
   team_lead: "팀장",
   owner: "대표",
-};
-
-const REFERRAL_PAYMENT_METHOD_LABEL: Record<ReferralPaymentMethod, string> = {
-  card: "카드결제(부가세 포함)",
-  transfer: "계좌이체(부가세 제외)",
 };
 
 export function PayrollView({
@@ -65,9 +59,9 @@ export function PayrollView({
   // 이유로, sessionCount1on1/2on1을 직접 손으로 고치면 길이가 어긋나
   // calculatePayroll이 시간외수당을 0으로 처리한다.
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
-  const [referralEntries, setReferralEntries] = useState<
-    Array<{ note: string; amount: string; paymentMethod: ReferralPaymentMethod }>
-  >([{ note: "", amount: "", paymentMethod: "card" }]);
+  const [referralEntries, setReferralEntries] = useState<Array<{ note: string; amount: string }>>([
+    { note: "", amount: "" },
+  ]);
   const [allocationOrder, setAllocationOrder] = useState<AllocationOrder>("proportional");
   const [loadingCounts, setLoadingCounts] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -150,13 +144,10 @@ export function PayrollView({
     coachSelection === "manual" ? manualName.trim() : (selectedCoach?.name ?? "");
 
   function addReferralEntry() {
-    setReferralEntries((prev) => [...prev, { note: "", amount: "", paymentMethod: "card" }]);
+    setReferralEntries((prev) => [...prev, { note: "", amount: "" }]);
   }
 
-  function updateReferralEntry(
-    index: number,
-    patch: Partial<{ note: string; amount: string; paymentMethod: ReferralPaymentMethod }>,
-  ) {
+  function updateReferralEntry(index: number, patch: Partial<{ note: string; amount: string }>) {
     setReferralEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
   }
 
@@ -164,13 +155,8 @@ export function PayrollView({
     setReferralEntries((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
   }
 
-  const referralRawTotal = referralEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const referralSupplyAmount = computeReferralSupplyAmount(
-    referralEntries.map((e) => ({
-      note: e.note,
-      amount: Number(e.amount) || 0,
-      paymentMethod: e.paymentMethod,
-    })),
+  const referralSupplyAmount = computeReferralAmountTotal(
+    referralEntries.map((e) => ({ note: e.note, amount: Number(e.amount) || 0 })),
   );
 
   const declaredMonthlyCompensationValue = declaredMonthlyCompensation.trim()
@@ -276,11 +262,7 @@ export function PayrollView({
           ...baseInput,
           referralEntries: referralEntries
             .filter((e) => e.note.trim() || Number(e.amount) > 0)
-            .map((e) => ({
-              note: e.note.trim(),
-              amount: Number(e.amount) || 0,
-              paymentMethod: e.paymentMethod,
-            })),
+            .map((e) => ({ note: e.note.trim(), amount: Number(e.amount) || 0 })),
         }),
       });
       if (!res.ok) {
@@ -509,7 +491,7 @@ export function PayrollView({
               )}
               <div className="col-span-full">
                 <label className="block text-xs text-ink/50 mb-1">
-                  소개 결제 내역 (여러 건 추가 가능, 결제 수단별로 부가세 처리가 달라요)
+                  소개 결제 내역 (여러 건 추가 가능, 결제 금액의 5%가 인센티브예요)
                 </label>
                 <div className="space-y-2">
                   {referralEntries.map((entry, i) => (
@@ -528,23 +510,6 @@ export function PayrollView({
                         placeholder="결제 금액"
                         className="w-32 shrink-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                       />
-                      <select
-                        value={entry.paymentMethod}
-                        onChange={(e) =>
-                          updateReferralEntry(i, {
-                            paymentMethod: e.target.value as ReferralPaymentMethod,
-                          })
-                        }
-                        className="shrink-0 rounded-lg border border-line px-2 py-2 text-sm outline-none focus:border-coral"
-                      >
-                        {(Object.keys(REFERRAL_PAYMENT_METHOD_LABEL) as ReferralPaymentMethod[]).map(
-                          (method) => (
-                            <option key={method} value={method}>
-                              {REFERRAL_PAYMENT_METHOD_LABEL[method]}
-                            </option>
-                          ),
-                        )}
-                      </select>
                       <button
                         type="button"
                         onClick={() => removeReferralEntry(i)}
@@ -563,10 +528,9 @@ export function PayrollView({
                 >
                   + 줄 추가
                 </button>
-                {referralRawTotal > 0 && (
+                {referralSupplyAmount > 0 && (
                   <p className="text-xs text-ink/40 mt-1">
-                    결제 금액 합계 {referralRawTotal.toLocaleString("ko-KR")}원 · 공급가액 환산
-                    합계 {Math.round(referralSupplyAmount).toLocaleString("ko-KR")}원
+                    결제 금액 합계 {referralSupplyAmount.toLocaleString("ko-KR")}원
                   </p>
                 )}
               </div>

@@ -10,7 +10,7 @@ import {
   type CoachWorkingHours,
 } from "./schedule";
 
-export type { ReferralEntry, ReferralPaymentMethod } from "./payroll/calculate";
+export type { ReferralEntry } from "./payroll/calculate";
 export type { InsuranceRates } from "./payroll/config";
 
 export interface CoachMonthSessionCounts {

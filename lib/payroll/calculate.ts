@@ -11,7 +11,6 @@ import {
   REGULAR_MEAL_ALLOWANCE,
   REGULAR_TEAM_LEAD_ALLOWANCE,
   TENURE_BUCKET_LABEL,
-  VAT_RATE,
   isRegularPayScale,
   rate1on1For,
   rate2on1For,
@@ -73,25 +72,16 @@ export function describeTenureBucket(bucket: TenureBucket): string {
   return TENURE_BUCKET_LABEL[bucket];
 }
 
-export type ReferralPaymentMethod = "card" | "transfer";
-
-/** 소개 결제 내역 한 줄(내용 메모 + 금액 + 결제 수단). */
+/** 소개 결제 내역 한 줄(내용 메모 + 금액). 결제 수단과 무관하게 결제 금액 그대로
+    인센티브율(REFERRAL_INCENTIVE_RATE) 산정 기준으로 쓴다. */
 export interface ReferralEntry {
   note: string;
   amount: number;
-  paymentMethod: ReferralPaymentMethod;
 }
 
-/**
- * 소개 결제 내역 여러 건을 공급가액(부가세 제외) 기준 합계로 환산한다.
- * 카드결제는 결제 금액에 부가세가 포함돼 있다고 보고 부가세(10%)를 제외하고,
- * 계좌이체는 입력한 금액 자체가 이미 부가세를 제외한 금액이라 그대로 더한다.
- */
-export function computeReferralSupplyAmount(entries: ReferralEntry[]): number {
-  return entries.reduce((sum, entry) => {
-    const amount = Math.max(0, entry.amount);
-    return sum + (entry.paymentMethod === "card" ? amount / (1 + VAT_RATE) : amount);
-  }, 0);
+/** 소개 결제 내역 여러 건의 금액 합계. */
+export function computeReferralAmountTotal(entries: ReferralEntry[]): number {
+  return entries.reduce((sum, entry) => sum + Math.max(0, entry.amount), 0);
 }
 
 export type AllocationOrder = "proportional" | "1on1-first" | "2on1-first";
@@ -190,7 +180,7 @@ export interface PayrollInput {
    * true인 것만 시간외수당(그 수업 단가의 OVERTIME_RATE) 대상이다.
    */
   sessions?: SessionRecord[];
-  /** 소개 결제 내역을 computeReferralSupplyAmount()로 환산한 공급가액 합계. */
+  /** 소개 결제 내역 합계(computeReferralAmountTotal()). 인센티브율 산정 기준 금액. */
   referralSupplyAmount: number;
   allocationOrder?: AllocationOrder;
   /**

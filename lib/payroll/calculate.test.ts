@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import {
   allocateExcessSessions,
   calculatePayroll,
-  computeReferralSupplyAmount,
+  computeReferralAmountTotal,
   tenureBucket,
 } from "./calculate.ts";
 import {
@@ -143,27 +143,17 @@ test("프리랜서는 의무수업이 없어 진행한 전 수업이 수업료 �
   assert.equal(result.netPay, result.grossPay - result.deductions.freelancerWithholding);
 });
 
-test("소개 인센티브 공급가액: 카드결제는 부가세(10%) 제외", () => {
-  const supplyAmount = computeReferralSupplyAmount([
-    { note: "김철수 소개", amount: 1_100_000, paymentMethod: "card" },
-  ]);
-  // 1,100,000 / 1.1 = 1,000,000(공급가액). 부동소수점 오차 감안해 반올림 비교.
-  assert.equal(Math.round(supplyAmount), 1_000_000);
+test("소개 인센티브 산정 금액: 결제 금액을 그대로(부가세 구분 없음)", () => {
+  const total = computeReferralAmountTotal([{ note: "김철수 소개", amount: 1_000_000 }]);
+  assert.equal(total, 1_000_000);
 });
 
-test("소개 인센티브 공급가액: 계좌이체는 입력 금액을 그대로(부가세 이미 제외)", () => {
-  const supplyAmount = computeReferralSupplyAmount([
-    { note: "이영희 소개", amount: 1_000_000, paymentMethod: "transfer" },
+test("소개 인센티브 산정 금액: 여러 건 합산", () => {
+  const total = computeReferralAmountTotal([
+    { note: "첫 번째", amount: 1_000_000 },
+    { note: "두 번째", amount: 500_000 },
   ]);
-  assert.equal(supplyAmount, 1_000_000);
-});
-
-test("소개 인센티브 공급가액: 카드·계좌이체 혼합 합산", () => {
-  const supplyAmount = computeReferralSupplyAmount([
-    { note: "카드결제", amount: 1_100_000, paymentMethod: "card" }, // -> 1,000,000
-    { note: "계좌이체", amount: 500_000, paymentMethod: "transfer" }, // -> 500,000
-  ]);
-  assert.equal(Math.round(supplyAmount), 1_500_000);
+  assert.equal(total, 1_500_000);
 });
 
 test("근속 경계일: 입사 1주년 당일은 '1년 이상 2년 미만'", () => {
