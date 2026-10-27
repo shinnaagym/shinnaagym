@@ -804,10 +804,14 @@ export function PtLogForm({
                       <input
                         type="text"
                         inputMode="decimal"
-                        // iOS Safari는 inputMode만으로는 종종 숫자 키패드 대신 직전에 쓰던
-                        // 한글 키패드를 그대로 띄운다 — pattern="[0-9]*"를 같이 줘야(애플이
-                        // inputMode 이전부터 권장해온 방식) 확실하게 숫자 키패드로 열린다.
-                        pattern="[0-9]*\.?[0-9]*"
+                        // iOS는 pattern 값이 정확히 "[0-9]*"(또는 "\d*")일 때만 이걸 숫자
+                        // 키패드 힌트로 인식한다 — 소수점을 넣어 "[0-9]*\.?[0-9]*"처럼
+                        // 조금이라도 다르게 쓰면 이 휴리스틱이 아예 안 먹혀 매칭에
+                        // 실패하고 기본(직전에 쓰던 한글) 키패드로 돌아간다. 소수점
+                        // 입력 자체는 inputMode="decimal"이 맡고, pattern은 오직 이
+                        // 정확한 문자열로만 키패드 힌트 역할을 하게 둔다(실제 값 검증에는
+                        // 쓰지 않는다 — 네이티브 폼 제출이 아니라 JS로 저장하므로 무관).
+                        pattern="[0-9]*"
                         value={g.weight}
                         onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
                         placeholder={weightPlaceholder}
