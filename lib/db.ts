@@ -422,8 +422,8 @@ function runFullMigration(): Promise<void> {
         -- 근무시간 대신 당직 코치 한 명만 9~15시로 근무하는 방식이라,
         -- 날짜별로 당직자를 기록한다. coach_id가 NULL이면 "이 날은 당직자
         -- 없음(휴무)"을 명시적으로 나타낸다. 같은 코치가 한 달에 몇 번
-        -- 당직을 서는지는 막지 않는다 — 월 1회까지는 정직원 역할(수당
-        -- 없음), 2회부터는 그날 수업 전체가 시간외수당 대상이 되도록
+        -- 당직을 서는지는 막지 않는다 — 월 2회까지는 정직원 역할(수당
+        -- 없음), 3회부터는 그날 수업 전체가 시간외수당 대상이 되도록
         -- 급여 계산(lib/payroll.ts)에서 자동으로 반영한다.
         CREATE TABLE IF NOT EXISTS duty_overrides (
           override_date TEXT PRIMARY KEY,
