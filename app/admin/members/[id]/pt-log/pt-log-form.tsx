@@ -804,6 +804,10 @@ export function PtLogForm({
                       <input
                         type="text"
                         inputMode="decimal"
+                        // iOS Safari는 inputMode만으로는 종종 숫자 키패드 대신 직전에 쓰던
+                        // 한글 키패드를 그대로 띄운다 — pattern="[0-9]*"를 같이 줘야(애플이
+                        // inputMode 이전부터 권장해온 방식) 확실하게 숫자 키패드로 열린다.
+                        pattern="[0-9]*\.?[0-9]*"
                         value={g.weight}
                         onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
                         placeholder={weightPlaceholder}
