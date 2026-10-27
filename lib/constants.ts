@@ -183,6 +183,7 @@ export const PT_LOG_EQUIPMENT_OPTIONS = [
   { value: "cable", label: "케이블" },
   { value: "small_equipment", label: "소도구" },
   { value: "hex_bar", label: "헥스바" },
+  { value: "landmine", label: "랜드마인" },
   { value: "aqua_bag", label: "아쿠아백" },
   { value: "smith_machine", label: "스미스머신" },
   { value: "bulgarian_bag", label: "불가리안백" },
