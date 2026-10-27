@@ -717,7 +717,9 @@ export function MembersView({
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-ink/60">
-                    <span>담당 {coachName}</span>
+                    <span>
+                      담당 {coachName} · 이번 달 {m.monthly_done_count}회
+                    </span>
                     {expired ? (
                       <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 font-medium">
                         만료
@@ -775,6 +777,7 @@ export function MembersView({
                     dir={sortKey === "remaining" ? sortDir : "asc"}
                     onClick={() => toggleSort("remaining")}
                   />
+                  <th className="px-5 py-3 font-medium whitespace-nowrap">이번 달 진행횟수</th>
                   <SortHeader
                     label="초/재"
                     active={sortKey === "type"}
@@ -863,6 +866,9 @@ export function MembersView({
                           )}
                           {goldenBell && <GoldenBellBadge />}
                         </div>
+                      </td>
+                      <td className="px-5 py-3 text-ink/70 whitespace-nowrap">
+                        {m.monthly_done_count}회
                       </td>
                       <td className="px-5 py-3 whitespace-nowrap">
                         {m.total_sessions > 0 && <TypeBadge isFirst={m.package_count < 2} />}
