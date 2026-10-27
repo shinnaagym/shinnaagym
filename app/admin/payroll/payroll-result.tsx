@@ -1,5 +1,5 @@
 import type { EmploymentType } from "@/lib/db";
-import type { ReferralEntry, ReferralPaymentMethod } from "@/lib/payroll";
+import type { ReferralEntry } from "@/lib/payroll";
 import type { PayrollResult } from "@/lib/payroll/calculate";
 import { DEFAULT_INSURANCE_RATES, isRegularPayScale } from "@/lib/payroll/config";
 
@@ -20,11 +20,6 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   freelancer: "프리랜서",
   team_lead: "팀장",
   owner: "대표",
-};
-
-const REFERRAL_PAYMENT_METHOD_SHORT_LABEL: Record<ReferralPaymentMethod, string> = {
-  card: "카드",
-  transfer: "계좌이체",
 };
 
 function SpecRow({
@@ -243,7 +238,7 @@ export function PayrollSpecCard({
         <SpecRow label="수업료(1:1)" value={result.lessonFee1on1} />
         <SpecRow label="수업료(2:1)" value={result.lessonFee2on1} />
         <SpecRow label="팀장수당" value={result.teamLeadAllowance} />
-        <SpecRow label="소개 인센티브(부가세 제외 5%)" value={result.referralIncentive} />
+        <SpecRow label="소개 인센티브(5%)" value={result.referralIncentive} />
         <SpecRow
           label={`시간외수당(시간외수업 ${result.overtimeSessionCount}회 × 10%)`}
           value={result.overtimeFeeAmount}
@@ -256,12 +251,7 @@ export function PayrollSpecCard({
           <p className="mb-1.5 font-medium text-ink/60">소개 결제 내역</p>
           {referralEntries.map((entry, i) => (
             <div key={i} className="flex items-center justify-between py-0.5">
-              <span>
-                {entry.note || "(내용 없음)"}
-                <span className="ml-1 text-ink/40">
-                  ({REFERRAL_PAYMENT_METHOD_SHORT_LABEL[entry.paymentMethod]})
-                </span>
-              </span>
+              <span>{entry.note || "(내용 없음)"}</span>
               <span>{formatWon(entry.amount)}</span>
             </div>
           ))}

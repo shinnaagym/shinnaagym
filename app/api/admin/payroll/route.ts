@@ -4,14 +4,11 @@ import { isValidDateKey, isValidMonthKey } from "@/lib/date";
 import { getInsuranceRates, listPayrollRecords, savePayrollRecord, type ReferralEntry } from "@/lib/payroll";
 import {
   calculatePayroll,
-  computeReferralSupplyAmount,
+  computeReferralAmountTotal,
   type AllocationOrder,
-  type ReferralPaymentMethod,
   type SessionRecord,
 } from "@/lib/payroll/calculate";
 import type { EmploymentType } from "@/lib/db";
-
-const VALID_REFERRAL_PAYMENT_METHODS: ReferralPaymentMethod[] = ["card", "transfer"];
 
 /** 시간외수당 계산용 세션 전체 목록. 형식이 안 맞는 값이 섞여 있으면 통째로
     무시해(undefined 반환), calculatePayroll이 (길이가 전체 수업 횟수와 안
@@ -38,16 +35,9 @@ function parseReferralEntries(value: unknown): ReferralEntry[] | null {
     if (typeof item !== "object" || item === null) return null;
     const note = (item as Record<string, unknown>).note;
     const amount = (item as Record<string, unknown>).amount;
-    const paymentMethod = (item as Record<string, unknown>).paymentMethod;
     if (typeof note !== "string") return null;
     if (typeof amount !== "number" || !Number.isFinite(amount) || amount < 0) return null;
-    if (
-      typeof paymentMethod !== "string" ||
-      !VALID_REFERRAL_PAYMENT_METHODS.includes(paymentMethod as ReferralPaymentMethod)
-    ) {
-      return null;
-    }
-    entries.push({ note: note.trim(), amount, paymentMethod: paymentMethod as ReferralPaymentMethod });
+    entries.push({ note: note.trim(), amount });
   }
   return entries;
 }
@@ -139,9 +129,8 @@ export async function POST(req: NextRequest) {
   const sessions = parseSessions(body?.sessions);
   const referralEntries =
     body?.referralEntries === undefined ? [] : parseReferralEntries(body.referralEntries);
-  // 화면 표시·이력 보관용 원 결제금액 합계(결제 수단 무관). 실제 인센티브 계산은
-  // computeReferralSupplyAmount로 결제 수단별 부가세 처리를 반영해 따로 구한다.
-  const referralPaymentAmount = (referralEntries ?? []).reduce((sum, e) => sum + e.amount, 0);
+  // 화면 표시·이력 보관용 결제금액 합계이자, 인센티브(5%) 계산의 산정 기준 금액.
+  const referralPaymentAmount = computeReferralAmountTotal(referralEntries ?? []);
   const allocationOrder =
     typeof body?.allocationOrder === "string" &&
     VALID_ALLOCATION_ORDERS.includes(body.allocationOrder as AllocationOrder)
@@ -189,7 +178,7 @@ export async function POST(req: NextRequest) {
     sessionCount2on1,
     sessionDates1on1,
     sessions,
-    referralSupplyAmount: computeReferralSupplyAmount(referralEntries ?? []),
+    referralSupplyAmount: referralPaymentAmount,
     allocationOrder,
     insuranceRates,
     declaredMonthlyCompensation,
