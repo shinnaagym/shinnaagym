@@ -103,6 +103,28 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
   ["2026-12-25", "성탄절"],
 ];
 
+// 2027년 대한민국 공휴일 추정치(설날·부처님오신날·추석 등 음력 기반 날짜는 추정입니다).
+// 정확한 날짜는 관리자 화면(공휴일 관리)에서 언제든 추가·삭제할 수 있습니다. 토요일·
+// 일요일과 겹치는 날(삼일절·현충일·광복절·개천절)의 대체공휴일은 2026년 목록과 같은
+// 기준으로 넣지 않았습니다 — 필요하면 관리자가 직접 추가하세요.
+const SEED_HOLIDAYS_2027: Array<[string, string]> = [
+  ["2027-01-01", "신정"],
+  ["2027-02-05", "설날 연휴"],
+  ["2027-02-06", "설날"],
+  ["2027-02-07", "설날 연휴"],
+  ["2027-03-01", "삼일절"],
+  ["2027-05-05", "어린이날"],
+  ["2027-05-13", "부처님오신날(추정)"],
+  ["2027-06-06", "현충일"],
+  ["2027-08-15", "광복절"],
+  ["2027-09-14", "추석 연휴(추정)"],
+  ["2027-09-15", "추석(추정)"],
+  ["2027-09-16", "추석 연휴(추정)"],
+  ["2027-10-03", "개천절"],
+  ["2027-10-09", "한글날"],
+  ["2027-12-25", "성탄절"],
+];
+
 // 스키마 마이그레이션(테이블 생성 + 60여 개 ALTER/INDEX 체크)을 매 콜드 스타트마다
 // 다시 실행하면, 이미 다 적용되어 있어 사실상 아무 것도 안 바뀌는 경우에도 그
 // 왕복 자체가 체감 로딩 지연에 더해진다. schema_migrations 테이블에 버전을
@@ -110,7 +132,7 @@ const SEED_HOLIDAYS_2026: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 45;
+const SCHEMA_VERSION = 46;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -865,6 +887,13 @@ function runFullMigration(): Promise<void> {
             ).join(", ")}
              ON CONFLICT (holiday_date) DO NOTHING;`,
             SEED_HOLIDAYS_2026.flat(),
+          ),
+          getPool().query(
+            `INSERT INTO holidays (holiday_date, name) VALUES ${SEED_HOLIDAYS_2027.map(
+              (_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`,
+            ).join(", ")}
+             ON CONFLICT (holiday_date) DO NOTHING;`,
+            SEED_HOLIDAYS_2027.flat(),
           ),
         ]),
       )
