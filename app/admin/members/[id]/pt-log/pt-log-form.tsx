@@ -803,6 +803,7 @@ export function PtLogForm({
                     <div className="flex items-center gap-1">
                       <input
                         type="text"
+                        inputMode="decimal"
                         value={g.weight}
                         onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
                         placeholder={weightPlaceholder}
