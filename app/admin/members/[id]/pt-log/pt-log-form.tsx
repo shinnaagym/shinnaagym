@@ -197,9 +197,9 @@ export function PtLogForm({
       세트 입력란에 회색 placeholder("지난번엔 이랬다")로만 보여주고 값으로 채우진
       않는다. 도구가 다르면(바벨 스쿼트 vs 덤벨 스쿼트) 다른 운동으로 취급한다. */
   pastExerciseGroups?: Record<string, PtLogSetGroup[]>;
-  /** (운동 이름, 도구) -> 가장 최근에 그 조합에 적어둔 특이사항. 통증 반응·자세
-      보정처럼 다음에도 계속 챙겨봐야 할 정보라 placeholder가 아니라 실제
-      입력값으로 채워준다(비어있을 때만 — 이미 적어둔 메모는 덮어쓰지 않는다). */
+  /** (운동 이름, 도구) -> 가장 최근에 그 조합에 적어둔 특이사항. 무게·횟수·세트와
+      마찬가지로 회색 placeholder("지난번엔 이렇게 적었다")로만 보여주고 값으로
+      채우진 않는다. */
   pastExerciseNotes?: Record<string, string>;
   /** 형식(AMRAP 등)별 과거 서킷 트레이닝 기록. "과거 운동이력" 다이얼에서 골라
       그대로 불러오는 용도. */
@@ -298,11 +298,8 @@ export function PtLogForm({
   /** 운동 이름·도구 조합이 과거에 기록한 조합과 정확히 일치하게 바뀌면, 그때
       세트 그룹이 여러 개였을 경우 지금 칸에도 똑같은 개수만큼 빈 그룹을 미리
       만들어둔다(값은 비운 채, placeholder로만 과거 기록을 보여줌). 이미 뭔가
-      입력해둔 그룹이 있으면 건드리지 않는다. 같은 조합에 적어둔 특이사항이
-      있으면(예: "무릎 통증 주의") 그건 실제 값으로 그대로 채워 다음 번에도
-      보이게 한다 — 단, 지금 이미 적어둔 메모가 있으면 덮어쓰지 않는다. 이름·
-      도구 둘 중 하나만 바뀌어도 호출되므로, 바뀌지 않은 나머지 값은 patch에
-      넣지 않고 그대로 둔다. */
+      입력해둔 그룹이 있으면 건드리지 않는다. 이름·도구 둘 중 하나만 바뀌어도
+      호출되므로, 바뀌지 않은 나머지 값은 patch에 넣지 않고 그대로 둔다. */
   function updateExerciseNameOrEquipment(index: number, patch: Partial<Pick<ExerciseInput, "name" | "equipment">>) {
     setExercises((prev) =>
       prev.map((e, i) => {
@@ -313,17 +310,12 @@ export function PtLogForm({
           // 서킷에서 다른 도구로 바꾸면 서킷 기록은 지운다.
           next.circuit = patch.equipment === "circuit" ? (e.circuit ?? emptyCircuit()) : null;
         }
-        const key = pastExerciseGroupKey(next.name.trim(), next.equipment);
-        const past = pastExerciseGroups[key];
+        const past = pastExerciseGroups[pastExerciseGroupKey(next.name.trim(), next.equipment)];
         const allEmpty = next.groups.every((g) => g.weight === "" && g.reps === "" && g.sets === "");
         if (past && allEmpty && past.length > next.groups.length) {
           const groups = [...next.groups];
           while (groups.length < past.length) groups.push(emptyGroup());
-          next.groups = groups;
-        }
-        const pastNote = pastExerciseNotes[key];
-        if (pastNote && !next.note.trim()) {
-          next.note = pastNote;
+          return { ...next, groups };
         }
         return next;
       }),
@@ -901,7 +893,10 @@ export function PtLogForm({
             <input
               value={ex.note}
               onChange={(e) => updateExercise(exIndex, { note: e.target.value })}
-              placeholder="특이사항 (예: 자세 보정, 통증 반응 등)"
+              placeholder={
+                pastExerciseNotes[pastExerciseGroupKey(ex.name.trim(), ex.equipment)] ??
+                "특이사항 (예: 자세 보정, 통증 반응 등)"
+              }
               className="w-full mt-3 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
             />
           </div>
