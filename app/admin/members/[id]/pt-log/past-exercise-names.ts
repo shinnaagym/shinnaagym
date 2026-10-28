@@ -46,10 +46,9 @@ export function pastExerciseGroups(logs: ExerciseLogLike[]): Record<string, PtLo
 }
 
 /** (운동 이름, 도구) -> 가장 최근 PT 일지에서 그 조합에 적어둔 특이사항(note).
-    무게·횟수와 달리 특이사항(통증 반응, 자세 보정 등)은 다음에도 그대로
-    챙겨봐야 할 정보라서, placeholder가 아니라 실제 입력값으로 그대로
-    채워준다. 빈 note는 "그때 특별히 적은 게 없었다"는 뜻이라 건너뛰고,
-    그 이전의 non-empty note를 찾는다. */
+    무게·횟수·세트와 마찬가지로 회색 placeholder("지난번엔 이렇게 적었다")로만
+    보여주는 용도라 확정 값이 아니다. 빈 note는 "그때 특별히 적은 게 없었다"는
+    뜻이라 건너뛰고, 그 이전의 non-empty note를 찾는다. */
 export function pastExerciseNotes(logs: ExerciseLogLike[]): Record<string, string> {
   const result: Record<string, string> = {};
   for (const log of logs) {
