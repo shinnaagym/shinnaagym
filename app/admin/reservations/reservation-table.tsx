@@ -30,8 +30,10 @@ function SortHeader({
 
 export function ReservationTable({
   initialReservations,
+  todayKey,
 }: {
   initialReservations: ReservationRow[];
+  todayKey: string;
 }) {
   const [reservations, setReservations] = useState(initialReservations);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -74,9 +76,14 @@ export function ReservationTable({
     }
   }
 
+  const todayCount = reservations.filter((r) => r.reservation_date === todayKey).length;
+
   return (
     <div>
-      <p className="text-sm text-ink/60 mb-4">총 {reservations.length}건</p>
+      <p className="text-sm text-ink/60 mb-4">
+        총 {reservations.length}건
+        {todayCount > 0 && <span className="text-coral font-medium"> · 오늘 {todayCount}건</span>}
+      </p>
 
       {reservations.length === 0 ? (
         <p className="text-ink/50">아직 예약이 없어요.</p>
@@ -124,10 +131,10 @@ export function ReservationTable({
             ))}
           </div>
 
-          <div className="hidden sm:block overflow-x-auto rounded-xl border border-line">
+          <div className="hidden sm:block rounded-2xl bg-white border border-line/60 shadow-sm overflow-x-auto">
             <table className="w-full text-sm min-w-[760px]">
               <thead>
-                <tr className="bg-bone text-left">
+                <tr className="text-left text-ink/50 text-xs border-b border-line/60">
                   <SortHeader
                     label="날짜"
                     active={sortKey === "reservation_date"}
@@ -151,7 +158,7 @@ export function ReservationTable({
               <tbody>
                 {sortedReservations.map((r) => (
                   <Fragment key={r.id}>
-                    <tr className="border-t border-line align-top">
+                    <tr className="border-t border-line/40 align-top">
                       <td className="px-4 py-3 whitespace-nowrap">{r.reservation_date}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {r.reservation_hour}:00 - {r.reservation_hour + 1}:00

@@ -1157,16 +1157,28 @@ export function SettingsView({
     await fetch(`/api/admin/recurring-events/${id}`, { method: "DELETE" });
   }
 
+  const SECTION_LINKS = [
+    { href: "#coach-management", label: "코치 관리" },
+    { href: "#duty-calendar", label: "당직 캘린더" },
+    { href: "#holidays", label: "공휴일" },
+    { href: "#notices", label: "공지·이벤트" },
+    { href: "#recurring-events", label: "정기 일정" },
+    { href: "#sms-test", label: "문자 테스트" },
+    { href: "#sync-diagnostics", label: "동기화 진단" },
+    { href: "#memo-pad", label: "메모장" },
+  ];
+
   return (
     <div className="space-y-6">
-      <MemoPad
-        title="메모장"
-        initialMemos={initialSettingsMemos}
-        addUrl="/api/admin/settings-memos"
-        itemUrlBase="/api/admin/settings-memos"
-      />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink/40 -mt-2">
+        {SECTION_LINKS.map((link) => (
+          <a key={link.href} href={link.href} className="hover:text-coral transition">
+            {link.label}
+          </a>
+        ))}
+      </div>
 
-      <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
+      <section id="coach-management" className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">코치 관리</h2>
         <p className="text-xs text-ink/50 mb-4">
           지금은 신종수 코치 1명이지만, 나중에 코치가 추가되면 여기서 등록해주세요. 등록하는
@@ -1215,14 +1227,14 @@ export function SettingsView({
                   className={[
                     "shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs border transition",
                     c.active
-                      ? "border-red-200 text-red-500 hover:bg-red-50"
+                      ? "border-coral/40 text-coral hover:bg-coral/5"
                       : "border-sage/50 text-sage hover:bg-sage/10",
                   ].join(" ")}
                 >
                   {c.active ? "퇴사 처리" : "재직으로 전환"}
                 </button>
               </div>
-              <div className="flex items-center gap-2 flex-wrap pl-0.5">
+              <div className="flex items-center gap-2 flex-wrap pl-0.5 pt-1 border-t border-line/30">
                 <span className="text-[11px] text-ink/40">급여 계산용</span>
                 <select
                   value={c.employment_type}
@@ -1281,7 +1293,7 @@ export function SettingsView({
         </div>
       </section>
 
-      <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
+      <section id="duty-calendar" className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">당직 · 휴가 · 홍보 포스팅 캘린더</h2>
         <p className="text-xs text-ink/50 mb-4">
           토요일과 공휴일(아래 공휴일 관리에 등록된 날)마다 당직 코치 한 명을
@@ -1304,7 +1316,7 @@ export function SettingsView({
         />
       </section>
 
-      <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
+      <section id="holidays" className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">공휴일 관리</h2>
         <p className="text-xs text-ink/50 mb-4">
           토요일과 동일하게 9~15시로 단축 운영되는 날입니다. 2026년 공휴일이 기본으로
@@ -1349,9 +1361,11 @@ export function SettingsView({
         {error && <p className="text-sm text-coral mt-3">{error}</p>}
       </section>
 
-      <NoticesView initialNotices={initialNotices} initialEvents={initialEvents} />
+      <div id="notices">
+        <NoticesView initialNotices={initialNotices} initialEvents={initialEvents} />
+      </div>
 
-      <section className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
+      <section id="recurring-events" className="rounded-2xl bg-white border border-line/60 shadow-sm p-6">
         <h2 className="font-display text-lg mb-1">정기 일정</h2>
         <p className="text-xs text-ink/50 mb-4">
           매주·격주·매달 또는 분기(3·6·9·12월)마다 반복되는 일정이에요. 매주/격주는
@@ -1668,13 +1682,29 @@ export function SettingsView({
         </div>
       </section>
 
-      <SmsTest />
+      <div id="sms-test">
+        <SmsTest />
+      </div>
 
-      <SyncDiagnostics
-        buildId={buildId}
-        initialDevices={initialDevices}
-        currentDeviceId={currentDeviceId}
-      />
+      <div id="sync-diagnostics">
+        <SyncDiagnostics
+          buildId={buildId}
+          initialDevices={initialDevices}
+          currentDeviceId={currentDeviceId}
+        />
+      </div>
+
+      {/* 자유 메모장은 핵심 운영 설정(코치·당직·공휴일·정기일정)보다 우선순위가
+          낮아 맨 끝에 둔다 — 설정 페이지에 들어오는 대부분의 이유는 운영
+          기본값을 바꾸는 쪽이지 메모를 적으러 오는 쪽이 아니다. */}
+      <div id="memo-pad">
+        <MemoPad
+          title="메모장"
+          initialMemos={initialSettingsMemos}
+          addUrl="/api/admin/settings-memos"
+          itemUrlBase="/api/admin/settings-memos"
+        />
+      </div>
     </div>
   );
 }

@@ -1009,6 +1009,7 @@ export function ScheduleGrid({
       {/* KPI 카드 — 코치를 한 명 선택하면 그 코치의, "코치 전체"면 전체 합산 통계를 보여준다.
           "OO월" 카드들은 실제 오늘이 아니라 지금 보고 있는 주(weekStart)가 속한 달 기준이라,
           지난달·다음달 주간을 보고 있으면 그 달의 통계로 자동으로 바뀐다. */}
+      <p className="text-xs font-medium tracking-[0.1em] text-ink/40 uppercase mb-2">현황</p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {(() => {
           const stats = singleCoach ? coachStats[singleCoach.id] : totalStats;
@@ -1056,7 +1057,7 @@ export function ScheduleGrid({
             className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-4"
           >
             <p className="text-xs text-ink/50 mb-2">{card.label}</p>
-            <p className={`text-2xl font-semibold ${card.color}`}>{card.value}</p>
+            <p className={`text-lg sm:text-2xl font-semibold ${card.color}`}>{card.value}</p>
             {card.detail && <p className="text-xs text-ink/40 mt-1">{card.detail}</p>}
             {card.perCoach && <p className="text-xs text-ink/40 mt-1">{card.perCoach}</p>}
           </div>
@@ -1187,6 +1188,35 @@ export function ScheduleGrid({
           )}
         </div>
         {viewMode === "week" && <p className="font-display text-lg">{formatWeekLabel(dateKeys)}</p>}
+      </div>
+
+      {/* 칸 색이 유일한 정보 인코딩이라 범례를 상시 노출한다(기존엔 각 칸에
+          마우스를 올려야만 알 수 있었음). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-ink/50">
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-sky-100 border border-sky-400" />
+          수업
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-amber-200 border border-amber-500" />
+          상담
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-violet-200 border border-violet-500" />
+          개인 일정
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-slate-300 border border-slate-600" />
+          수업 불가
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-red-100 border border-red-400" />
+          노쇼
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm border border-dashed border-line" />
+          취소
+        </span>
       </div>
 
       {/* 코치를 한 명만 선택하면 그 코치의 이번 주 전체를 한 번에 보여준다. */}

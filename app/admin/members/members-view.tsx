@@ -562,13 +562,19 @@ export function MembersView({
   return (
     <div>
       <div className="flex items-center gap-3 flex-wrap mb-3 text-xs">
-        <span className="rounded-full bg-ink/10 text-ink px-3 py-1 font-medium">
+        <span className="rounded-full bg-ink/10 text-ink px-3 py-1 font-medium" title="전체 회원">
           총 {typeStats.total}명
         </span>
-        <span className="rounded-full bg-coral/10 text-coral px-3 py-1 font-medium">
+        <span
+          className="rounded-full bg-coral/10 text-coral px-3 py-1 font-medium"
+          title="초진(첫 패키지 구매)"
+        >
           초 {typeStats.first}명
         </span>
-        <span className="rounded-full bg-sage/20 text-sage px-3 py-1 font-medium">
+        <span
+          className="rounded-full bg-sage/20 text-sage px-3 py-1 font-medium"
+          title="재등록(2번째 이상 구매)"
+        >
           재 {typeStats.renewal}명
         </span>
         <span className="rounded-full bg-line/40 text-ink/60 px-3 py-1 font-medium">
@@ -2752,6 +2758,7 @@ function MemberDetailModal({
         </div>
 
         <div className="space-y-3">
+          <p className="text-xs font-medium tracking-[0.1em] text-ink/40 uppercase">기본 정보</p>
           <div className="grid grid-cols-2 gap-3">
             <Field label="이름 *">
               <input
