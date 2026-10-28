@@ -286,7 +286,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
                 </div>
                 <div className="flex items-baseline justify-between border-t border-line/50 pt-2">
                   <span className="text-[11px] text-ink/50">누적 잔액</span>
-                  <span className="text-lg font-semibold text-coral">{formatWon(balance)}</span>
+                  <span className="text-lg font-semibold text-gold-deep">{formatWon(balance)}</span>
                 </div>
                 <button
                   type="button"
@@ -376,7 +376,7 @@ export function ReserveDashboard({ monthKey }: { monthKey: string }) {
                         <span
                           className={
                             t.transaction_type === "withdrawal"
-                              ? "rounded-full bg-red-50 text-red-500 px-2 py-0.5"
+                              ? "rounded-full bg-coral/10 text-coral px-2 py-0.5"
                               : "rounded-full bg-sage/10 text-sage px-2 py-0.5"
                           }
                         >

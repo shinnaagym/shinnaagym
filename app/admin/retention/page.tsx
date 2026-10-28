@@ -45,11 +45,29 @@ export default async function AdminRetentionPage() {
     .filter((m) => m.status === "active" && m.total_sessions > 0 && m.total_sessions - m.done_count <= 3)
     .sort((a, b) => a.total_sessions - a.done_count - (b.total_sessions - b.done_count));
 
+  const currentMonthStats = monthlyStats[monthlyStats.length - 1];
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       <p className="text-sm tracking-[0.2em] text-coral uppercase mb-1">Retention</p>
       <h1 className="font-display text-2xl mb-1">재등록 관리</h1>
       <p className="text-sm text-ink/50 mb-6">잔여 횟수가 얼마 안 남은 회원을 확인하고 재등록을 챙기세요.</p>
+
+      {/* 이 페이지 전체가 보여주려는 단일 숫자(이번 달 재등록률)를 표 셀 속에
+          묻어두지 않고 맨 위에 큼직하게 뽑아, 아래 표는 그 근거 데이터로
+          읽히게 한다(대시보드의 "이번 달 총 매출" 헤드라인 카드와 같은 패턴). */}
+      {currentMonthStats && (
+        <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-6">
+          <p className="text-xs text-ink/50 mb-2">{formatMonthShort(monthKey)} 재등록률</p>
+          <p className="text-2xl sm:text-3xl font-semibold text-gold-deep">
+            {formatRate(currentMonthStats.reRegistrationRate)}
+          </p>
+          <p className="text-xs text-ink/40 mt-1.5">
+            재등록 {currentMonthStats.reRegisteredCount}명 · 이탈 {currentMonthStats.churnedCount}명 · 신규
+            등록 {currentMonthStats.newMemberCount}명
+          </p>
+        </div>
+      )}
 
       <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-5 py-5 mb-6">
         <div className="flex items-baseline gap-2 mb-4">
@@ -90,7 +108,7 @@ export default async function AdminRetentionPage() {
               <tr className="border-b border-line/40">
                 <td className="py-2.5 pr-4 text-ink/60">이탈</td>
                 {monthlyStats.map((p) => (
-                  <td key={p.month} className="py-2.5 px-3 text-center font-medium text-coral">
+                  <td key={p.month} className="py-2.5 px-3 text-center font-medium text-ink/70">
                     {p.churnedCount}
                   </td>
                 ))}
@@ -108,9 +126,10 @@ export default async function AdminRetentionPage() {
         </div>
 
         <div className="rounded-xl bg-bone/40 border border-line/60 px-4 py-3.5 mb-8">
-          <p className="text-xs text-ink/50 mb-2">
-            {formatMonthShort(monthKey)} 이탈 회원 {churnedThisMonth.length}명
-          </p>
+          <div className="flex items-baseline gap-2 mb-2">
+            <p className="font-display text-lg">이번 달 이탈 회원</p>
+            <p className="text-xs text-ink/40">{formatMonthShort(monthKey)} · {churnedThisMonth.length}명</p>
+          </div>
           {churnedThisMonth.length === 0 ? (
             <p className="text-sm text-ink/40">이번 달 이탈 처리된 회원이 없어요.</p>
           ) : (
@@ -147,7 +166,7 @@ export default async function AdminRetentionPage() {
                   <td className="py-2.5 pr-4 font-medium">{r.coachName}</td>
                   <td className="py-2.5 px-3 text-center">{r.monthReRegisteredCount}건</td>
                   <td className="py-2.5 px-3 text-center">{r.periodReRegisteredCount}건</td>
-                  <td className="py-2.5 px-3 text-center text-coral">{r.periodChurnedCount}</td>
+                  <td className="py-2.5 px-3 text-center text-ink/70">{r.periodChurnedCount}</td>
                   <td className="py-2.5 px-3 text-center font-medium">
                     {formatRate(r.reRegistrationRate)}
                   </td>

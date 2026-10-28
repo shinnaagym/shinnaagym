@@ -96,7 +96,7 @@ export function AssessmentLanding({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="이름"
+            placeholder="이름 *"
             className="flex-1 min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
           />
           <input
@@ -124,7 +124,7 @@ export function AssessmentLanding({
         className="w-full rounded-full border border-line bg-white px-4 py-2 text-sm outline-none focus:border-coral mb-3"
       />
 
-      <div className="flex items-center gap-1.5 mb-4 text-xs">
+      <div className="flex items-center gap-1.5 mb-4 text-xs flex-wrap">
         <span className="text-ink/40">정렬</span>
         {(
           [
@@ -144,6 +144,9 @@ export function AssessmentLanding({
             {label}
           </button>
         ))}
+        <span className="text-ink/40 ml-auto">
+          {search ? `검색 결과 ${filtered.length}명` : `총 ${filtered.length}명`}
+        </span>
       </div>
 
       {filtered.length === 0 ? (

@@ -227,6 +227,7 @@ export function ExpensesView({ monthKey }: { monthKey: string }) {
           {error && <p className="text-xs text-coral mt-2">{error}</p>}
         </div>
 
+        <h2 className="font-display text-base mb-3">이번 달 지출 목록</h2>
         {loading ? (
           <div className="rounded-2xl bg-white border border-line/60 px-5 py-8 text-center text-ink/40 text-sm">
             불러오는 중...

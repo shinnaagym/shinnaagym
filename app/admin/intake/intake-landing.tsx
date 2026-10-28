@@ -137,12 +137,12 @@ export function IntakeLanding({
   return (
     <div>
       <div className="rounded-2xl border border-coral/30 bg-coral/5 px-5 py-4 mb-6">
-        <h2 className="font-display text-base mb-3">+ 새 상담자 등록</h2>
+        <h2 className="font-display text-base font-semibold mb-3">+ 새 상담자 등록</h2>
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="이름"
+            placeholder="이름 *"
             className="flex-1 min-w-0 rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none focus:border-coral"
           />
           <input
@@ -237,7 +237,7 @@ export function IntakeLanding({
                     done ? handleDelete(m.id, m.name) : handleDeleteMember(m.id, m.name)
                   }
                   disabled={deletingId === m.id}
-                  className="text-xs text-coral hover:opacity-70 disabled:opacity-50 whitespace-nowrap"
+                  className="text-xs text-ink/30 hover:text-coral disabled:opacity-50 whitespace-nowrap"
                 >
                   {deletingId === m.id ? "삭제 중..." : "삭제"}
                 </button>
