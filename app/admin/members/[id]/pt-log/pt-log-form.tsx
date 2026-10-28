@@ -172,6 +172,7 @@ export function PtLogForm({
   initialData,
   pastExercises = [],
   pastExerciseGroups = {},
+  pastExerciseNotes = {},
   pastCircuitEntries = {},
   kind = "pt_log",
   authToken,
@@ -196,6 +197,10 @@ export function PtLogForm({
       세트 입력란에 회색 placeholder("지난번엔 이랬다")로만 보여주고 값으로 채우진
       않는다. 도구가 다르면(바벨 스쿼트 vs 덤벨 스쿼트) 다른 운동으로 취급한다. */
   pastExerciseGroups?: Record<string, PtLogSetGroup[]>;
+  /** (운동 이름, 도구) -> 가장 최근에 그 조합에 적어둔 특이사항. 통증 반응·자세
+      보정처럼 다음에도 계속 챙겨봐야 할 정보라 placeholder가 아니라 실제
+      입력값으로 채워준다(비어있을 때만 — 이미 적어둔 메모는 덮어쓰지 않는다). */
+  pastExerciseNotes?: Record<string, string>;
   /** 형식(AMRAP 등)별 과거 서킷 트레이닝 기록. "과거 운동이력" 다이얼에서 골라
       그대로 불러오는 용도. */
   pastCircuitEntries?: Record<string, PastCircuitEntry[]>;
@@ -293,8 +298,11 @@ export function PtLogForm({
   /** 운동 이름·도구 조합이 과거에 기록한 조합과 정확히 일치하게 바뀌면, 그때
       세트 그룹이 여러 개였을 경우 지금 칸에도 똑같은 개수만큼 빈 그룹을 미리
       만들어둔다(값은 비운 채, placeholder로만 과거 기록을 보여줌). 이미 뭔가
-      입력해둔 그룹이 있으면 건드리지 않는다. 이름·도구 둘 중 하나만 바뀌어도
-      호출되므로, 바뀌지 않은 나머지 값은 patch에 넣지 않고 그대로 둔다. */
+      입력해둔 그룹이 있으면 건드리지 않는다. 같은 조합에 적어둔 특이사항이
+      있으면(예: "무릎 통증 주의") 그건 실제 값으로 그대로 채워 다음 번에도
+      보이게 한다 — 단, 지금 이미 적어둔 메모가 있으면 덮어쓰지 않는다. 이름·
+      도구 둘 중 하나만 바뀌어도 호출되므로, 바뀌지 않은 나머지 값은 patch에
+      넣지 않고 그대로 둔다. */
   function updateExerciseNameOrEquipment(index: number, patch: Partial<Pick<ExerciseInput, "name" | "equipment">>) {
     setExercises((prev) =>
       prev.map((e, i) => {
@@ -305,12 +313,17 @@ export function PtLogForm({
           // 서킷에서 다른 도구로 바꾸면 서킷 기록은 지운다.
           next.circuit = patch.equipment === "circuit" ? (e.circuit ?? emptyCircuit()) : null;
         }
-        const past = pastExerciseGroups[pastExerciseGroupKey(next.name.trim(), next.equipment)];
+        const key = pastExerciseGroupKey(next.name.trim(), next.equipment);
+        const past = pastExerciseGroups[key];
         const allEmpty = next.groups.every((g) => g.weight === "" && g.reps === "" && g.sets === "");
         if (past && allEmpty && past.length > next.groups.length) {
           const groups = [...next.groups];
           while (groups.length < past.length) groups.push(emptyGroup());
-          return { ...next, groups };
+          next.groups = groups;
+        }
+        const pastNote = pastExerciseNotes[key];
+        if (pastNote && !next.note.trim()) {
+          next.note = pastNote;
         }
         return next;
       }),
@@ -802,16 +815,17 @@ export function PtLogForm({
                   <div key={groupIndex} className="space-y-1.5">
                     <div className="flex items-center gap-1">
                       <input
-                        type="text"
+                        // inputMode="decimal" + pattern은 iOS에서 "힌트"일 뿐이라 기기/버전에
+                        // 따라 무시되고 직전에 쓰던 한글 키패드가 그대로 뜨는 경우가 있었다
+                        // (세트 칸의 type="number"는 힌트가 아니라 실제 타입이라 항상 숫자
+                        // 키패드가 뜸). type="tel"은 number와 마찬가지로 iOS가 무조건 숫자
+                        // 키패드(전화 키패드 모양)를 띄우는 "실제 타입"이면서도, number처럼
+                        // 입력값을 숫자로 강제하진 않아 "밴드 3단계" 같은 변형 동작 텍스트도
+                        // 그대로 입력할 수 있다. inputMode="decimal"은 그 숫자 키패드에서
+                        // +*# 대신 소수점(.)이 보이게 하는 역할만 보탠다.
+                        type="tel"
                         inputMode="decimal"
-                        // iOS는 pattern 값이 정확히 "[0-9]*"(또는 "\d*")일 때만 이걸 숫자
-                        // 키패드 힌트로 인식한다 — 소수점을 넣어 "[0-9]*\.?[0-9]*"처럼
-                        // 조금이라도 다르게 쓰면 이 휴리스틱이 아예 안 먹혀 매칭에
-                        // 실패하고 기본(직전에 쓰던 한글) 키패드로 돌아간다. 소수점
-                        // 입력 자체는 inputMode="decimal"이 맡고, pattern은 오직 이
-                        // 정확한 문자열로만 키패드 힌트 역할을 하게 둔다(실제 값 검증에는
-                        // 쓰지 않는다 — 네이티브 폼 제출이 아니라 JS로 저장하므로 무관).
-                        pattern="[0-9]*"
+                        autoComplete="off"
                         value={g.weight}
                         onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
                         placeholder={weightPlaceholder}

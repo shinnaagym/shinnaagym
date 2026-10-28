@@ -7,6 +7,7 @@ import {
   pastCircuitEntries,
   pastExerciseGroups,
   pastExerciseNames,
+  pastExerciseNotes,
 } from "../../../pt-log/past-exercise-names";
 
 export default async function EditPersonalExercisePage({
@@ -44,6 +45,7 @@ export default async function EditPersonalExercisePage({
         kind="personal_exercise"
         pastExercises={pastExerciseNames(personalExercises, [])}
         pastExerciseGroups={pastExerciseGroups(personalExercises.filter((p) => p.id !== peIdNum))}
+        pastExerciseNotes={pastExerciseNotes(personalExercises.filter((p) => p.id !== peIdNum))}
         pastCircuitEntries={pastCircuitEntries(personalExercises.filter((p) => p.id !== peIdNum))}
         initialData={{
           logDate: personalExercise.log_date,

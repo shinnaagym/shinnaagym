@@ -5,7 +5,12 @@ import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { getPtLogById, listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, pastPainTriggerNotes } from "@/lib/assessments";
 import { PtLogForm } from "../../pt-log-form";
-import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../../past-exercise-names";
+import {
+  pastCircuitEntries,
+  pastExerciseGroups,
+  pastExerciseNames,
+  pastExerciseNotes,
+} from "../../past-exercise-names";
 
 export default async function EditPtLogPage({
   params,
@@ -49,6 +54,7 @@ export default async function EditPtLogPage({
         ptLogId={logIdNum}
         pastExercises={pastExerciseNames(ptLogs, assessments)}
         pastExerciseGroups={pastExerciseGroups(ptLogs.filter((l) => l.id !== logIdNum))}
+        pastExerciseNotes={pastExerciseNotes(ptLogs.filter((l) => l.id !== logIdNum))}
         pastCircuitEntries={pastCircuitEntries(ptLogs.filter((l) => l.id !== logIdNum))}
         painTriggerPastNotes={{ [idNum]: pastPainTriggerNotes(assessments) }}
         pastPtLogs={{ [idNum]: ptLogs.filter((l) => l.id !== logIdNum) }}

@@ -3,7 +3,12 @@ import { isAdminAuthed } from "@/lib/auth";
 import { getMemberById } from "@/lib/schedule";
 import { listPersonalExercisesByMember } from "@/lib/personal-exercises";
 import { PtLogForm } from "../../pt-log/pt-log-form";
-import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../../pt-log/past-exercise-names";
+import {
+  pastCircuitEntries,
+  pastExerciseGroups,
+  pastExerciseNames,
+  pastExerciseNotes,
+} from "../../pt-log/past-exercise-names";
 
 export default async function NewPersonalExercisePage({
   params,
@@ -35,6 +40,7 @@ export default async function NewPersonalExercisePage({
         kind="personal_exercise"
         pastExercises={pastExerciseNames(personalExercises, [])}
         pastExerciseGroups={pastExerciseGroups(personalExercises)}
+        pastExerciseNotes={pastExerciseNotes(personalExercises)}
         pastCircuitEntries={pastCircuitEntries(personalExercises)}
         duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
       />
