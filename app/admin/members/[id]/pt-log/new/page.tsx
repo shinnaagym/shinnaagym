@@ -5,7 +5,12 @@ import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, pastPainTriggerNotes } from "@/lib/assessments";
 import { PtLogForm } from "../pt-log-form";
-import { pastCircuitEntries, pastExerciseGroups, pastExerciseNames } from "../past-exercise-names";
+import {
+  pastCircuitEntries,
+  pastExerciseGroups,
+  pastExerciseNames,
+  pastExerciseNotes,
+} from "../past-exercise-names";
 
 export default async function NewPtLogPage({
   params,
@@ -57,6 +62,7 @@ export default async function NewPtLogPage({
         memberName={member.name}
         pastExercises={pastExerciseNames(ptLogs, assessments)}
         pastExerciseGroups={pastExerciseGroups(ptLogs)}
+        pastExerciseNotes={pastExerciseNotes(ptLogs)}
         pastCircuitEntries={pastCircuitEntries(ptLogs)}
         duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
         painTriggerPastNotes={{
