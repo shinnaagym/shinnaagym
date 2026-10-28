@@ -752,6 +752,22 @@ export function MembersView({
                     >
                       PT 일지
                     </Link>
+                    <Link
+                      href={`/admin/members/${m.id}/intake`}
+                      prefetch={false}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded-full border border-line text-ink/60 px-2 py-0.5 text-[11px] font-medium hover:bg-bone/60 transition whitespace-nowrap"
+                    >
+                      문진표
+                    </Link>
+                    <Link
+                      href={`/admin/members/${m.id}/assessment`}
+                      prefetch={false}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded-full border border-line text-ink/60 px-2 py-0.5 text-[11px] font-medium hover:bg-bone/60 transition whitespace-nowrap"
+                    >
+                      평가지
+                    </Link>
                   </div>
                 </div>
               );
@@ -832,6 +848,22 @@ export function MembersView({
                             className="rounded-full border border-coral text-coral px-2 py-0.5 text-[11px] font-medium hover:bg-coral/5 transition whitespace-nowrap"
                           >
                             PT 일지
+                          </Link>
+                          <Link
+                            href={`/admin/members/${m.id}/intake`}
+                            prefetch={false}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded-full border border-line text-ink/60 px-2 py-0.5 text-[11px] font-medium hover:bg-bone/60 transition whitespace-nowrap"
+                          >
+                            문진표
+                          </Link>
+                          <Link
+                            href={`/admin/members/${m.id}/assessment`}
+                            prefetch={false}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded-full border border-line text-ink/60 px-2 py-0.5 text-[11px] font-medium hover:bg-bone/60 transition whitespace-nowrap"
+                          >
+                            평가지
                           </Link>
                         </div>
                       </td>
