@@ -126,8 +126,15 @@ function groupByDate(assessments: AssessmentRow[]): DayGroup[] {
     for (const a of sorted) {
       Object.assign(movements, a.movements);
       for (const entry of getPainTriggerEntriesLocal(a)) {
-        if (!entry.note) continue;
-        painTriggers[entry.note] = entry.painScale;
+        // 운동 수행능력 그래프(ExercisePerformanceChart)는 운동 이름을 trim()한
+        // 값으로 시리즈를 묶는데, 여기는 그렇지 않았다 — 저장 시점에 서버가
+        // trim하긴 하지만(lib/assessment-validation.ts), 그 전에 저장된 옛
+        // 기록이나 레거시 단일 필드(pain_trigger_note)는 앞뒤 공백이 그대로
+        // 남아있을 수 있어, 겉보기엔 "같은 내용"인데도 다른 시리즈로 갈라져
+        // 선이 안 이어지는 원인이 된다.
+        const note = entry.note.trim();
+        if (!note) continue;
+        painTriggers[note] = entry.painScale;
       }
     }
     return { dateKey, movements, painTriggers };
