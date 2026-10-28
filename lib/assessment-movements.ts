@@ -305,14 +305,15 @@ export function movementLabelWithRegion(movementId: string): string {
 interface MovementEntryLike {
   romPassive: string;
   romActive: string;
+  strength: string;
   compensation: string;
   painPassive: string;
   painActive: string;
 }
 
 /**
- * 통증이 있거나(수동·능동 중 하나 이상) 보상패턴이 적힌 동작을, 관절·동작
- * 순서로 이름을 붙이고 해당 가동범위·통증 강도를 함께 보여주는 문구로
+ * 통증이 있거나(수동·능동 중 하나 이상) 보상패턴·근력이 적힌 동작을, 관절·동작
+ * 순서로 이름을 붙이고 해당 가동범위·근력·통증 강도를 함께 보여주는 문구로
  * 변환한다. 수동·능동 모두 통증이 있고 강도가 다르면 각각 한 줄씩 반환한다.
  */
 export function flaggedMovementSummaries(
@@ -323,18 +324,24 @@ export function flaggedMovementSummaries(
     const label = movementLabelWithRegion(movementId);
     const hasPassivePain = entry.painPassive !== "" && entry.painPassive != null;
     const hasActivePain = entry.painActive !== "" && entry.painActive != null;
+    const strengthPart = entry.strength ? ` · 근력 ${entry.strength}` : "";
     if (hasPassivePain) {
       const romPart = entry.romPassive ? ` · 가동범위 ${entry.romPassive}` : "";
       const compPart = entry.compensation ? `${entry.compensation} · ` : "";
-      lines.push(`${label}${romPart} — ${compPart}수동 시 통증 · 통증 ${entry.painPassive}/10`);
+      lines.push(
+        `${label}${romPart}${strengthPart} — ${compPart}수동 시 통증 · 통증 ${entry.painPassive}/10`,
+      );
     }
     if (hasActivePain) {
       const romPart = entry.romActive ? ` · 가동범위 ${entry.romActive}` : "";
       const compPart = entry.compensation ? `${entry.compensation} · ` : "";
-      lines.push(`${label}${romPart} — ${compPart}능동 시 통증 · 통증 ${entry.painActive}/10`);
+      lines.push(
+        `${label}${romPart}${strengthPart} — ${compPart}능동 시 통증 · 통증 ${entry.painActive}/10`,
+      );
     }
-    if (!hasPassivePain && !hasActivePain && entry.compensation.trim().length > 0) {
-      lines.push(`${label} — ${entry.compensation}`);
+    if (!hasPassivePain && !hasActivePain && (entry.compensation.trim().length > 0 || entry.strength)) {
+      const compPart = entry.compensation.trim().length > 0 ? ` — ${entry.compensation}` : "";
+      lines.push(`${label}${strengthPart}${compPart}`);
     }
   }
   return lines;
