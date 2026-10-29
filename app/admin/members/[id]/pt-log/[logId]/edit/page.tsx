@@ -1,6 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { computeMemberProgress, getMemberById, hasSessionInRange } from "@/lib/schedule";
+import {
+  computeMemberProgress,
+  getMemberById,
+  hasSessionInRange,
+  listCoaches,
+  listCoachSessionsInRange,
+} from "@/lib/schedule";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { getPtLogById, listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, pastPainTriggerNotes } from "@/lib/assessments";
@@ -30,16 +36,18 @@ export default async function EditPtLogPage({
   }
   // "다음주 수업 예약" 체크 표시용 날짜 범위 — 회원 목록 화면과 같은 기준.
   const thisWeekMonday = mondayOfWeek(koreaTodayKey());
+  const thisWeekSunday = addDaysToKey(thisWeekMonday, 6);
   const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
   const nextWeekSunday = addDaysToKey(nextWeekMonday, 6);
 
-  const [member, ptLog, ptLogs, assessments, hasNextWeekSession, progress] = await Promise.all([
+  const [member, ptLog, ptLogs, assessments, hasNextWeekSession, progress, coaches] = await Promise.all([
     getMemberById(idNum),
     getPtLogById(logIdNum),
     listPtLogsByMember(idNum),
     listAssessmentsByMember(idNum),
     hasSessionInRange(idNum, nextWeekMonday, nextWeekSunday),
     computeMemberProgress(idNum),
+    listCoaches(),
   ]);
   if (!member) {
     notFound();
@@ -47,6 +55,13 @@ export default async function EditPtLogPage({
   if (!ptLog || ptLog.member_id !== idNum) {
     notFound();
   }
+
+  // PT 일지를 쓰면서 그 회원을 담당하는 코치의 이번 주 스케줄을 바로 볼 수
+  // 있도록 폼 맨 아래에 보여준다. 담당 코치가 없으면(coach_id가 null) 건너뛴다.
+  const memberCoach = member.coach_id != null ? coaches.find((c) => c.id === member.coach_id) : null;
+  const memberCoachSessions = memberCoach
+    ? await listCoachSessionsInRange(memberCoach.id, thisWeekMonday, thisWeekSunday)
+    : [];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -65,6 +80,9 @@ export default async function EditPtLogPage({
         assessments={{ [idNum]: assessments }}
         hasNextWeekSession={{ [idNum]: hasNextWeekSession }}
         memberProgress={{ [idNum]: progress }}
+        coachWeekStart={thisWeekMonday}
+        coachNames={memberCoach ? { [idNum]: memberCoach.name } : {}}
+        coachWeekSessions={{ [idNum]: memberCoachSessions }}
         initialData={{
           logDate: ptLog.log_date,
           memo: ptLog.memo,

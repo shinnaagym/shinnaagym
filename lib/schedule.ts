@@ -948,6 +948,25 @@ export async function listSessionsInRange(
   return result.rows;
 }
 
+/** 코치 한 명의 특정 기간 일정을 모두 가져온다. PT 일지를 쓰면서 그 회원을
+    담당하는 코치의 이번 주 스케줄을 바로 확인할 수 있게 보여주는 용도. */
+export async function listCoachSessionsInRange(
+  coachId: number,
+  fromKey: string,
+  toKey: string,
+): Promise<SessionWithMember[]> {
+  const result = await query<SessionWithMember>(
+    `SELECT ${SESSION_SELECT_FIELDS}
+     FROM class_sessions s
+     LEFT JOIN members m ON m.id = s.member_id
+     JOIN coaches c ON c.id = s.coach_id
+     WHERE s.coach_id = $1 AND s.session_date >= $2 AND s.session_date <= $3
+     ORDER BY s.session_date ASC, s.session_hour ASC, s.session_minute ASC`,
+    [coachId, fromKey, toKey],
+  );
+  return result.rows;
+}
+
 export interface BlockedDayEntry {
   coachId: number;
   coachName: string;

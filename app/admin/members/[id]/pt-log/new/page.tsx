@@ -1,6 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
-import { computeMemberProgress, getMemberById, hasSessionInRange } from "@/lib/schedule";
+import {
+  computeMemberProgress,
+  getMemberById,
+  hasSessionInRange,
+  listCoaches,
+  listCoachSessionsInRange,
+} from "@/lib/schedule";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, pastPainTriggerNotes } from "@/lib/assessments";
@@ -30,15 +36,17 @@ export default async function NewPtLogPage({
   // "다음주 수업 예약" 체크 표시용 날짜 범위 — 회원 목록 화면과 같은 기준
   // (이번주 월요일 + 7일 ~ 그 주 일요일).
   const thisWeekMonday = mondayOfWeek(koreaTodayKey());
+  const thisWeekSunday = addDaysToKey(thisWeekMonday, 6);
   const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
   const nextWeekSunday = addDaysToKey(nextWeekMonday, 6);
 
-  const [member, ptLogs, assessments, hasNextWeekSession, progress] = await Promise.all([
+  const [member, ptLogs, assessments, hasNextWeekSession, progress, coaches] = await Promise.all([
     getMemberById(idNum),
     listPtLogsByMember(idNum),
     listAssessmentsByMember(idNum),
     hasSessionInRange(idNum, nextWeekMonday, nextWeekSunday),
     computeMemberProgress(idNum),
+    listCoaches(),
   ]);
   if (!member) {
     notFound();
@@ -56,6 +64,19 @@ export default async function NewPtLogPage({
           computeMemberProgress(duoPartnerId),
         ])
       : [null, [], [], false, null];
+
+  // PT 일지를 쓰면서 그 회원을 담당하는 코치의 이번 주 스케줄을 바로 볼 수
+  // 있도록 폼 맨 아래에 보여준다. 담당 코치가 없으면(coach_id가 null) 건너뛴다.
+  const coachById = new Map(coaches.map((c) => [c.id, c]));
+  const memberCoach = member.coach_id != null ? coachById.get(member.coach_id) : null;
+  const duoPartnerCoach =
+    duoPartner && duoPartner.coach_id != null ? coachById.get(duoPartner.coach_id) : null;
+  const [memberCoachSessions, duoPartnerCoachSessions] = await Promise.all([
+    memberCoach ? listCoachSessionsInRange(memberCoach.id, thisWeekMonday, thisWeekSunday) : Promise.resolve([]),
+    duoPartnerCoach
+      ? listCoachSessionsInRange(duoPartnerCoach.id, thisWeekMonday, thisWeekSunday)
+      : Promise.resolve([]),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -88,6 +109,15 @@ export default async function NewPtLogPage({
         memberProgress={{
           [idNum]: progress,
           ...(duoPartner && duoPartnerProgress ? { [duoPartner.id]: duoPartnerProgress } : {}),
+        }}
+        coachWeekStart={thisWeekMonday}
+        coachNames={{
+          ...(memberCoach ? { [idNum]: memberCoach.name } : {}),
+          ...(duoPartner && duoPartnerCoach ? { [duoPartner.id]: duoPartnerCoach.name } : {}),
+        }}
+        coachWeekSessions={{
+          [idNum]: memberCoachSessions,
+          ...(duoPartner ? { [duoPartner.id]: duoPartnerCoachSessions } : {}),
         }}
       />
     </div>
