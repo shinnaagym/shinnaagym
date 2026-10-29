@@ -457,6 +457,7 @@ export function ScheduleGrid({
   dutyOverrides,
   coachWorkingHours,
   coachLeaves,
+  initialCoachFilter,
 }: {
   weekStart: string;
   dateKeys: string[];
@@ -477,6 +478,10 @@ export function ScheduleGrid({
   /** 날짜별 코치 휴가 기록. 단축근무 외 유형은 그날 종일 근무 외 시간으로
       표시하고, 단축근무는 출근/퇴근 시간을 보정한다(예약 자체는 막지 않음). */
   coachLeaves: Record<string, CoachLeaveEntry[]>;
+  /** 특정 코치 하나만 골라둔 채로 열고 싶을 때(예: PT 일지 화면에 그 회원
+      담당 코치의 스케줄만 끼워 넣을 때) 초기 coachFilter 값을 지정한다.
+      생략하면 평소대로 "코치 전체"로 연다. */
+  initialCoachFilter?: number;
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
@@ -502,7 +507,7 @@ export function ScheduleGrid({
   const [clipboard, setClipboard] = useState<SessionWithMember[] | null>(null);
   const [dutyOverridesState, setDutyOverridesState] = useState(dutyOverrides);
   const [dutyEditDate, setDutyEditDate] = useState<{ date: string; weekday: number } | null>(null);
-  const [coachFilter, setCoachFilter] = useState<number | "all">("all");
+  const [coachFilter, setCoachFilter] = useState<number | "all">(initialCoachFilter ?? "all");
   const [dailyMemos, setDailyMemos] = useState(initialDailyMemos);
   const allGridScrollRef = useRef<HTMLDivElement | null>(null);
 
