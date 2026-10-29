@@ -173,6 +173,8 @@ export function PtLogForm({
   pastExercises = [],
   pastExerciseGroups = {},
   pastExerciseNotes = {},
+  pastExerciseWeightOptions = {},
+  pastExerciseNoteOptions = {},
   pastCircuitEntries = {},
   kind = "pt_log",
   authToken,
@@ -201,6 +203,13 @@ export function PtLogForm({
       마찬가지로 회색 placeholder("지난번엔 이렇게 적었다")로만 보여주고 값으로
       채우진 않는다. */
   pastExerciseNotes?: Record<string, string>;
+  /** (운동 이름, 도구) -> 그동안 그 조합에 적었던 무게·변형 동작 문구 목록(최신순,
+      중복 없음). 운동 이름 자동완성처럼 입력칸 아래에 목록으로 보여주고 누르면
+      바로 채워 넣는다. */
+  pastExerciseWeightOptions?: Record<string, string[]>;
+  /** (운동 이름, 도구) -> 그동안 그 조합에 적었던 특이사항 목록(최신순, 중복 없음).
+      운동 이름 자동완성과 같은 방식의 클릭 자동완성용. */
+  pastExerciseNoteOptions?: Record<string, string[]>;
   /** 형식(AMRAP 등)별 과거 서킷 트레이닝 기록. "과거 운동이력" 다이얼에서 골라
       그대로 불러오는 용도. */
   pastCircuitEntries?: Record<string, PastCircuitEntry[]>;
@@ -246,6 +255,11 @@ export function PtLogForm({
   const [submitting, setSubmitting] = useState(false);
   // 이름 입력 중 자동완성 목록을 띄울 운동의 인덱스. 한 번에 한 칸만 연다.
   const [suggestIndex, setSuggestIndex] = useState<number | null>(null);
+  // 무게/변형 동작 자동완성을 띄울 입력칸. 운동마다 세트 그룹이 여러 개라
+  // `${exIndex}:${groupIndex}` 조합 키로 어느 칸인지 구분한다.
+  const [weightSuggestKey, setWeightSuggestKey] = useState<string | null>(null);
+  // 특이사항 자동완성을 띄울 운동의 인덱스.
+  const [noteSuggestIndex, setNoteSuggestIndex] = useState<number | null>(null);
   // 운동 카드를 드래그로 재정렬할 때 — 끌고 있는 카드는 흐리게, 지금 올려놓은
   // 카드는 테두리로 강조해서 드래그가 실제로 진행되고 있는지 보이게 한다.
   const [draggingExerciseIndex, setDraggingExerciseIndex] = useState<number | null>(null);
@@ -803,26 +817,60 @@ export function PtLogForm({
                       : "kg / 변형 동작";
                   const repsPlaceholder =
                     pastGroup?.reps != null ? String(pastGroup.reps) : "횟수 / 시간(초)";
+                  const weightKey = `${exIndex}:${groupIndex}`;
+                  const weightOptions =
+                    pastExerciseWeightOptions[pastExerciseGroupKey(ex.name.trim(), ex.equipment)] ?? [];
                   return (
                   <div key={groupIndex} className="space-y-1.5">
                     <div className="flex items-center gap-1">
-                      <input
-                        // inputMode="decimal" + pattern은 iOS에서 "힌트"일 뿐이라 기기/버전에
-                        // 따라 무시되고 직전에 쓰던 한글 키패드가 그대로 뜨는 경우가 있었다
-                        // (세트 칸의 type="number"는 힌트가 아니라 실제 타입이라 항상 숫자
-                        // 키패드가 뜸). type="tel"은 number와 마찬가지로 iOS가 무조건 숫자
-                        // 키패드(전화 키패드 모양)를 띄우는 "실제 타입"이면서도, number처럼
-                        // 입력값을 숫자로 강제하진 않아 "밴드 3단계" 같은 변형 동작 텍스트도
-                        // 그대로 입력할 수 있다. inputMode="decimal"은 그 숫자 키패드에서
-                        // +*# 대신 소수점(.)이 보이게 하는 역할만 보탠다.
-                        type="tel"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={g.weight}
-                        onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
-                        placeholder={weightPlaceholder}
-                        className="min-w-0 flex-[3] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
-                      />
+                      <div className="relative min-w-0 flex-[3]">
+                        <input
+                          // inputMode="decimal" + pattern은 iOS에서 "힌트"일 뿐이라 기기/버전에
+                          // 따라 무시되고 직전에 쓰던 한글 키패드가 그대로 뜨는 경우가 있었다
+                          // (세트 칸의 type="number"는 힌트가 아니라 실제 타입이라 항상 숫자
+                          // 키패드가 뜸). type="tel"은 number와 마찬가지로 iOS가 무조건 숫자
+                          // 키패드(전화 키패드 모양)를 띄우는 "실제 타입"이면서도, number처럼
+                          // 입력값을 숫자로 강제하진 않아 "밴드 3단계" 같은 변형 동작 텍스트도
+                          // 그대로 입력할 수 있다. inputMode="decimal"은 그 숫자 키패드에서
+                          // +*# 대신 소수점(.)이 보이게 하는 역할만 보탠다.
+                          type="tel"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={g.weight}
+                          onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
+                          onFocus={() => setWeightSuggestKey(weightKey)}
+                          onBlur={() => setTimeout(() => setWeightSuggestKey(null), 150)}
+                          placeholder={weightPlaceholder}
+                          className="w-full rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                        />
+                        {weightSuggestKey === weightKey &&
+                          (() => {
+                            const query = g.weight.trim();
+                            const matches = weightOptions
+                              .filter((w) => w !== query && (query === "" || w.includes(query)))
+                              .slice(0, 6);
+                            if (matches.length === 0) return null;
+                            return (
+                              <ul className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-line bg-white shadow-md overflow-hidden">
+                                {matches.map((weight) => (
+                                  <li key={weight}>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        updateGroup(exIndex, groupIndex, { weight });
+                                        setWeightSuggestKey(null);
+                                      }}
+                                      className="block w-full text-left px-3 py-2 text-sm hover:bg-bone/60"
+                                    >
+                                      {weight}
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            );
+                          })()}
+                      </div>
                       <input
                         type="text"
                         value={g.reps}
@@ -890,15 +938,47 @@ export function PtLogForm({
               </div>
             )}
 
-            <input
-              value={ex.note}
-              onChange={(e) => updateExercise(exIndex, { note: e.target.value })}
-              placeholder={
-                pastExerciseNotes[pastExerciseGroupKey(ex.name.trim(), ex.equipment)] ??
-                "특이사항 (예: 자세 보정, 통증 반응 등)"
-              }
-              className="w-full mt-3 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
-            />
+            <div className="relative mt-3">
+              <input
+                value={ex.note}
+                onChange={(e) => updateExercise(exIndex, { note: e.target.value })}
+                onFocus={() => setNoteSuggestIndex(exIndex)}
+                onBlur={() => setTimeout(() => setNoteSuggestIndex(null), 150)}
+                placeholder={
+                  pastExerciseNotes[pastExerciseGroupKey(ex.name.trim(), ex.equipment)] ??
+                  "특이사항 (예: 자세 보정, 통증 반응 등)"
+                }
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+              {noteSuggestIndex === exIndex &&
+                (() => {
+                  const query = ex.note.trim();
+                  const options = pastExerciseNoteOptions[pastExerciseGroupKey(ex.name.trim(), ex.equipment)] ?? [];
+                  const matches = options
+                    .filter((note) => note !== query && (query === "" || note.includes(query)))
+                    .slice(0, 6);
+                  if (matches.length === 0) return null;
+                  return (
+                    <ul className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-line bg-white shadow-md overflow-hidden">
+                      {matches.map((note) => (
+                        <li key={note}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              updateExercise(exIndex, { note });
+                              setNoteSuggestIndex(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-bone/60"
+                          >
+                            {note}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
+            </div>
           </div>
           {exIndex < exercises.length - 1 && (
             <div className="flex justify-center">

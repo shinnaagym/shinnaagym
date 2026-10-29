@@ -8,6 +8,8 @@ import {
   pastExerciseGroups,
   pastExerciseNames,
   pastExerciseNotes,
+  pastExerciseNoteOptions,
+  pastExerciseWeightOptions,
 } from "../../pt-log/past-exercise-names";
 
 export default async function NewPersonalExercisePage({
@@ -41,6 +43,8 @@ export default async function NewPersonalExercisePage({
         pastExercises={pastExerciseNames(personalExercises, [])}
         pastExerciseGroups={pastExerciseGroups(personalExercises)}
         pastExerciseNotes={pastExerciseNotes(personalExercises)}
+        pastExerciseWeightOptions={pastExerciseWeightOptions(personalExercises)}
+        pastExerciseNoteOptions={pastExerciseNoteOptions(personalExercises)}
         pastCircuitEntries={pastCircuitEntries(personalExercises)}
         duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
       />

@@ -10,6 +10,8 @@ import {
   pastExerciseGroups,
   pastExerciseNames,
   pastExerciseNotes,
+  pastExerciseNoteOptions,
+  pastExerciseWeightOptions,
 } from "../past-exercise-names";
 
 export default async function NewPtLogPage({
@@ -63,6 +65,8 @@ export default async function NewPtLogPage({
         pastExercises={pastExerciseNames(ptLogs, assessments)}
         pastExerciseGroups={pastExerciseGroups(ptLogs)}
         pastExerciseNotes={pastExerciseNotes(ptLogs)}
+        pastExerciseWeightOptions={pastExerciseWeightOptions(ptLogs)}
+        pastExerciseNoteOptions={pastExerciseNoteOptions(ptLogs)}
         pastCircuitEntries={pastCircuitEntries(ptLogs)}
         duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
         painTriggerPastNotes={{
