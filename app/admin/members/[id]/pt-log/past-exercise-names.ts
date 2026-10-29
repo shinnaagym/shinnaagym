@@ -45,18 +45,64 @@ export function pastExerciseGroups(logs: ExerciseLogLike[]): Record<string, PtLo
   return result;
 }
 
-/** (운동 이름, 도구) -> 가장 최근 PT 일지에서 그 조합에 적어둔 특이사항(note).
-    무게·횟수·세트와 마찬가지로 회색 placeholder("지난번엔 이렇게 적었다")로만
-    보여주는 용도라 확정 값이 아니다. 빈 note는 "그때 특별히 적은 게 없었다"는
-    뜻이라 건너뛰고, 그 이전의 non-empty note를 찾는다. */
-export function pastExerciseNotes(logs: ExerciseLogLike[]): Record<string, string> {
-  const result: Record<string, string> = {};
+/** (운동 이름, 도구) -> 그동안 그 조합에 적었던 무게·변형 동작 문구를 최신순으로
+    중복 없이 모은다. 운동 이름 자동완성처럼 입력칸 아래 목록에서 눌러 바로
+    채워 넣는 용도. 세트 그룹(1세트/2세트...) 구분 없이 그 운동에서 썼던
+    문구를 전부 모은다 — 세트마다 무게가 달라질 수 있어, 굳이 같은 세트
+    번째끼리만 모으면 선택지가 너무 적어진다. */
+export function pastExerciseWeightOptions(logs: ExerciseLogLike[]): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  const seen: Record<string, Set<string>> = {};
   for (const log of logs) {
     for (const exercise of log.exercises) {
-      if (!exercise.name || !exercise.note.trim()) continue;
+      if (!exercise.name) continue;
       const key = pastExerciseGroupKey(exercise.name, exercise.equipment);
-      if (!(key in result)) result[key] = exercise.note;
+      for (const group of exercise.groups) {
+        const weight = group.weight == null ? "" : String(group.weight).trim();
+        if (!weight) continue;
+        if (!seen[key]) {
+          seen[key] = new Set();
+          result[key] = [];
+        }
+        if (seen[key].has(weight)) continue;
+        seen[key].add(weight);
+        result[key].push(weight);
+      }
     }
+  }
+  return result;
+}
+
+/** (운동 이름, 도구) -> 그동안 그 조합에 적었던 특이사항을 최신순으로 중복 없이
+    모은다. 운동 이름 자동완성과 같은 방식으로 입력칸 아래 목록에서 눌러 바로
+    채워 넣는 용도. */
+export function pastExerciseNoteOptions(logs: ExerciseLogLike[]): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  const seen: Record<string, Set<string>> = {};
+  for (const log of logs) {
+    for (const exercise of log.exercises) {
+      const note = exercise.note.trim();
+      if (!exercise.name || !note) continue;
+      const key = pastExerciseGroupKey(exercise.name, exercise.equipment);
+      if (!seen[key]) {
+        seen[key] = new Set();
+        result[key] = [];
+      }
+      if (seen[key].has(note)) continue;
+      seen[key].add(note);
+      result[key].push(note);
+    }
+  }
+  return result;
+}
+
+/** (운동 이름, 도구) -> 가장 최근 PT 일지에서 그 조합에 적어둔 특이사항(note).
+    무게·횟수·세트와 마찬가지로 회색 placeholder("지난번엔 이렇게 적었다")로만
+    보여주는 용도라 확정 값이 아니다. */
+export function pastExerciseNotes(logs: ExerciseLogLike[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, notes] of Object.entries(pastExerciseNoteOptions(logs))) {
+    if (notes[0]) result[key] = notes[0];
   }
   return result;
 }
