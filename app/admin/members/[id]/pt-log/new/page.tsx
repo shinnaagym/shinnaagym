@@ -2,15 +2,24 @@ import { notFound, redirect } from "next/navigation";
 import { isAdminAuthed } from "@/lib/auth";
 import {
   computeMemberProgress,
+  getAllCoachScheduleStats,
+  getCoachLeavesForDates,
+  getCoachWorkingHours,
+  getDayHoursForRange,
+  getDutyOverridesForDates,
   getMemberById,
   hasSessionInRange,
   listCoaches,
   listCoachSessionsInRange,
+  listHolidays,
+  listMembersWithProgress,
 } from "@/lib/schedule";
+import { getDailyScheduleMemos } from "@/lib/daily-schedule-memos";
 import { addDaysToKey, koreaTodayKey, mondayOfWeek } from "@/lib/date";
 import { listPtLogsByMember } from "@/lib/pt-logs";
 import { listAssessmentsByMember, pastPainTriggerNotes } from "@/lib/assessments";
 import { PtLogForm } from "../pt-log-form";
+import { ScheduleGrid } from "@/app/admin/schedule/schedule-grid";
 import {
   pastCircuitEntries,
   pastExerciseGroups,
@@ -33,20 +42,48 @@ export default async function NewPtLogPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
+  const today = koreaTodayKey();
   // "다음주 수업 예약" 체크 표시용 날짜 범위 — 회원 목록 화면과 같은 기준
   // (이번주 월요일 + 7일 ~ 그 주 일요일).
-  const thisWeekMonday = mondayOfWeek(koreaTodayKey());
-  const thisWeekSunday = addDaysToKey(thisWeekMonday, 6);
+  const thisWeekMonday = mondayOfWeek(today);
   const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
   const nextWeekSunday = addDaysToKey(nextWeekMonday, 6);
+  // 코치 스케줄표는 스케줄 화면과 같은 기준으로, 스튜디오가 항상 휴무인
+  // 일요일을 뺀 월~토 6일만 다룬다.
+  const dateKeys = Array.from({ length: 6 }, (_, i) => addDaysToKey(thisWeekMonday, i));
+  const weekEnd = dateKeys[dateKeys.length - 1];
+  const monthKey = thisWeekMonday.slice(0, 7);
 
-  const [member, ptLogs, assessments, hasNextWeekSession, progress, coaches] = await Promise.all([
+  const [
+    member,
+    ptLogs,
+    assessments,
+    hasNextWeekSession,
+    progress,
+    coaches,
+    activeMembers,
+    dayHours,
+    holidays,
+    coachStats,
+    dailyMemos,
+    dutyOverrides,
+    coachWorkingHours,
+    coachLeaves,
+  ] = await Promise.all([
     getMemberById(idNum),
     listPtLogsByMember(idNum),
     listAssessmentsByMember(idNum),
     hasSessionInRange(idNum, nextWeekMonday, nextWeekSunday),
     computeMemberProgress(idNum),
     listCoaches(),
+    listMembersWithProgress(),
+    getDayHoursForRange(dateKeys),
+    listHolidays(),
+    getAllCoachScheduleStats(monthKey, thisWeekMonday, weekEnd),
+    getDailyScheduleMemos(dateKeys),
+    getDutyOverridesForDates(dateKeys),
+    getCoachWorkingHours(),
+    getCoachLeavesForDates(dateKeys),
   ]);
   if (!member) {
     notFound();
@@ -65,61 +102,73 @@ export default async function NewPtLogPage({
         ])
       : [null, [], [], false, null];
 
-  // PT 일지를 쓰면서 그 회원을 담당하는 코치의 이번 주 스케줄을 바로 볼 수
-  // 있도록 폼 맨 아래에 보여준다. 담당 코치가 없으면(coach_id가 null) 건너뛴다.
-  const coachById = new Map(coaches.map((c) => [c.id, c]));
-  const memberCoach = member.coach_id != null ? coachById.get(member.coach_id) : null;
-  const duoPartnerCoach =
-    duoPartner && duoPartner.coach_id != null ? coachById.get(duoPartner.coach_id) : null;
-  const [memberCoachSessions, duoPartnerCoachSessions] = await Promise.all([
-    memberCoach ? listCoachSessionsInRange(memberCoach.id, thisWeekMonday, thisWeekSunday) : Promise.resolve([]),
-    duoPartnerCoach
-      ? listCoachSessionsInRange(duoPartnerCoach.id, thisWeekMonday, thisWeekSunday)
-      : Promise.resolve([]),
-  ]);
+  // PT 일지를 쓰면서 그 회원을 담당하는 코치의 이번 주 스케줄을, 스케줄
+  // 화면과 똑같은(수정도 가능한) 그리드로 폼 맨 아래에 보여준다. 담당 코치가
+  // 없으면(coach_id가 null) 아예 보여주지 않는다.
+  const memberCoach = member.coach_id != null ? coaches.find((c) => c.id === member.coach_id) : null;
+  const memberCoachSessions = memberCoach
+    ? await listCoachSessionsInRange(memberCoach.id, thisWeekMonday, weekEnd)
+    : [];
+  const activeMembersList = activeMembers.filter((m) => m.status === "active");
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
-      <PtLogForm
-        memberId={idNum}
-        memberName={member.name}
-        pastExercises={pastExerciseNames(ptLogs, assessments)}
-        pastExerciseGroups={pastExerciseGroups(ptLogs)}
-        pastExerciseNotes={pastExerciseNotes(ptLogs)}
-        pastExerciseWeightOptions={pastExerciseWeightOptions(ptLogs)}
-        pastExerciseNoteOptions={pastExerciseNoteOptions(ptLogs)}
-        pastCircuitEntries={pastCircuitEntries(ptLogs)}
-        duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
-        painTriggerPastNotes={{
-          [idNum]: pastPainTriggerNotes(assessments),
-          ...(duoPartner ? { [duoPartner.id]: pastPainTriggerNotes(duoPartnerAssessments) } : {}),
-        }}
-        pastPtLogs={{
-          [idNum]: ptLogs,
-          ...(duoPartner ? { [duoPartner.id]: duoPartnerPtLogs } : {}),
-        }}
-        assessments={{
-          [idNum]: assessments,
-          ...(duoPartner ? { [duoPartner.id]: duoPartnerAssessments } : {}),
-        }}
-        hasNextWeekSession={{
-          [idNum]: hasNextWeekSession,
-          ...(duoPartner ? { [duoPartner.id]: duoPartnerHasNextWeekSession } : {}),
-        }}
-        memberProgress={{
-          [idNum]: progress,
-          ...(duoPartner && duoPartnerProgress ? { [duoPartner.id]: duoPartnerProgress } : {}),
-        }}
-        coachWeekStart={thisWeekMonday}
-        coachNames={{
-          ...(memberCoach ? { [idNum]: memberCoach.name } : {}),
-          ...(duoPartner && duoPartnerCoach ? { [duoPartner.id]: duoPartnerCoach.name } : {}),
-        }}
-        coachWeekSessions={{
-          [idNum]: memberCoachSessions,
-          ...(duoPartner ? { [duoPartner.id]: duoPartnerCoachSessions } : {}),
-        }}
-      />
-    </div>
+    <>
+      <div className="mx-auto max-w-2xl px-6 py-8">
+        <PtLogForm
+          memberId={idNum}
+          memberName={member.name}
+          pastExercises={pastExerciseNames(ptLogs, assessments)}
+          pastExerciseGroups={pastExerciseGroups(ptLogs)}
+          pastExerciseNotes={pastExerciseNotes(ptLogs)}
+          pastExerciseWeightOptions={pastExerciseWeightOptions(ptLogs)}
+          pastExerciseNoteOptions={pastExerciseNoteOptions(ptLogs)}
+          pastCircuitEntries={pastCircuitEntries(ptLogs)}
+          duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
+          painTriggerPastNotes={{
+            [idNum]: pastPainTriggerNotes(assessments),
+            ...(duoPartner ? { [duoPartner.id]: pastPainTriggerNotes(duoPartnerAssessments) } : {}),
+          }}
+          pastPtLogs={{
+            [idNum]: ptLogs,
+            ...(duoPartner ? { [duoPartner.id]: duoPartnerPtLogs } : {}),
+          }}
+          assessments={{
+            [idNum]: assessments,
+            ...(duoPartner ? { [duoPartner.id]: duoPartnerAssessments } : {}),
+          }}
+          hasNextWeekSession={{
+            [idNum]: hasNextWeekSession,
+            ...(duoPartner ? { [duoPartner.id]: duoPartnerHasNextWeekSession } : {}),
+          }}
+          memberProgress={{
+            [idNum]: progress,
+            ...(duoPartner && duoPartnerProgress ? { [duoPartner.id]: duoPartnerProgress } : {}),
+          }}
+        />
+      </div>
+      {memberCoach && (
+        <div className="mx-auto max-w-4xl px-6 pb-8">
+          <ScheduleGrid
+            key={thisWeekMonday}
+            weekStart={thisWeekMonday}
+            dateKeys={dateKeys}
+            today={today}
+            coaches={[memberCoach]}
+            members={activeMembersList}
+            initialSessions={memberCoachSessions}
+            dayHours={dayHours}
+            holidayMap={Object.fromEntries(
+              holidays.filter((h) => dateKeys.includes(h.holiday_date)).map((h) => [h.holiday_date, h.name]),
+            )}
+            coachStats={Object.fromEntries(coachStats)}
+            initialDailyMemos={dailyMemos}
+            dutyOverrides={dutyOverrides}
+            coachWorkingHours={coachWorkingHours}
+            coachLeaves={coachLeaves}
+            initialCoachFilter={memberCoach.id}
+          />
+        </div>
+      )}
+    </>
   );
 }

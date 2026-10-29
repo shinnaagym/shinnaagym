@@ -15,11 +15,10 @@ import { PainTriggerSection } from "./pain-trigger-section";
 import { AssessmentPainChart } from "../assessment/pain-chart";
 import { PtLogDisclosureCard } from "@/app/components/PtLogDisclosureCard";
 import { ExercisePerformanceChart } from "@/app/components/ExercisePerformanceChart";
-import { CoachWeekSchedule } from "./coach-week-schedule";
 import { useDraftAutosave, usePendingDraft, clearDraft } from "@/lib/use-draft-autosave";
 import { DraftRestoreBanner } from "@/app/components/DraftRestoreBanner";
 import type { AssessmentRow, PtLogRow, PtLogSetGroup } from "@/lib/db";
-import type { MemberProgress, SessionWithMember } from "@/lib/schedule";
+import type { MemberProgress } from "@/lib/schedule";
 
 interface PtLogDraftData {
   logDate: string;
@@ -185,9 +184,6 @@ export function PtLogForm({
   assessments = {},
   hasNextWeekSession = {},
   memberProgress = {},
-  coachWeekStart,
-  coachNames = {},
-  coachWeekSessions = {},
 }: {
   memberId: number;
   memberName: string;
@@ -243,16 +239,6 @@ export function PtLogForm({
       "4 / 30"). 회원 개인 페이지(/my/[token])와 같은 기준(computeMemberProgress).
       kind가 "pt_log"일 때만 제목 옆에 보여준다. */
   memberProgress?: Record<number, MemberProgress>;
-  /** 이번 주 월요일(YYYY-MM-DD). 코치 스케줄 섹션의 날짜 범위 기준이다. kind가
-      "pt_log"일 때만 보여준다. */
-  coachWeekStart?: string;
-  /** 회원 id -> 그 회원을 담당하는 코치의 이름. 담당 코치가 없으면 그 회원
-      id는 키에서 빠진다(섹션 자체를 숨김). */
-  coachNames?: Record<number, string>;
-  /** 회원 id -> 그 회원을 담당하는 코치의 이번 주 전체 스케줄(다른 회원들
-      것까지 포함). PT 일지를 쓰면서 담당 코치의 이번 주 일정을 바로 볼 수
-      있게 폼 맨 아래에 보여준다. */
-  coachWeekSessions?: Record<number, SessionWithMember[]>;
 }) {
   const router = useRouter();
   const isEditing = ptLogId != null;
@@ -1038,17 +1024,6 @@ export function PtLogForm({
           {submitting ? "저장 중..." : isEditing ? "수정 저장" : "저장"}
         </button>
       </div>
-
-      {kind === "pt_log" && coachWeekStart && coachNames[activeMemberId] && (
-        <div className="mt-6">
-          <CoachWeekSchedule
-            key={`coach-week-${activeMemberId}`}
-            coachName={coachNames[activeMemberId]}
-            weekStart={coachWeekStart}
-            sessions={coachWeekSessions[activeMemberId] ?? []}
-          />
-        </div>
-      )}
     </div>
   );
 }
