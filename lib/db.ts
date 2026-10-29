@@ -134,7 +134,7 @@ const SEED_HOLIDAYS_2027: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 48;
+const SCHEMA_VERSION = 49;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -891,6 +891,32 @@ function runFullMigration(): Promise<void> {
               body TEXT NOT NULL,
               updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
+
+            -- deactivated_at 컬럼(SCHEMA_VERSION 추가분, 위 참고)이 생기기
+            -- 전에 이미 퇴사 처리돼 있던 코치는 그 컬럼이 계속 NULL이라,
+            -- "퇴사 처리 후 한 달 지나면 설정 화면 목록에서 숨김" 로직이
+            -- (deactivated_at이 없으면 안 숨기도록 짜여 있어서, members-view의
+            -- visibleCoaches 필터 참고) 영영 적용되지 않는 문제가 있었다.
+            -- undo_log에서 그 코치를 "재직 → 퇴사"로 바꾼 가장 최근 기록을
+            -- 찾아 그 시각으로 채우고, 로그가 없으면(오래돼 지워졌거나 이
+            -- 기능이 생기기 한참 전 데이터) 이미 30일은 지났다고 보고
+            -- 31일 전으로 채워 바로 숨겨지게 한다.
+            UPDATE coaches c
+            SET deactivated_at = COALESCE(
+              (
+                SELECT u.created_at
+                FROM undo_log u, jsonb_array_elements(u.ops) AS op
+                WHERE u.description = c.name || ' 코치 정보 수정'
+                  AND (op->>'table') = 'coaches'
+                  AND (op->>'id')::int = c.id
+                  AND (op->'data' ? 'active')
+                  AND (op->'data'->>'active')::boolean = true
+                ORDER BY u.created_at DESC
+                LIMIT 1
+              ),
+              now() - interval '31 days'
+            )
+            WHERE c.active = false AND c.deactivated_at IS NULL;
             `,
           ),
           getPool().query(
