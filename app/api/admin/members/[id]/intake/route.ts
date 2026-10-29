@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthed } from "@/lib/auth";
-import { getMemberById } from "@/lib/schedule";
+import { getMemberById, updateMember } from "@/lib/schedule";
 import {
   deleteIntakeQuestionnaire,
   getIntakeQuestionnaireByMember,
@@ -86,6 +86,16 @@ export async function PUT(
       painTriggers: currentPainEntries,
     });
     undoOps.push({ op: "delete", table: "assessments", id: assessment.id });
+  }
+
+  // 문진표에 "소개"로 적은 분 성함을 회원 정보의 소개자 칸에도 그대로
+  // 동기화한다 — 문진표에만 적어두고 회원 정보에는 깜빡 빠뜨리는 경우가
+  // 많았다. 경로가 "소개"가 아니거나 성함을 안 적었으면 건드리지
+  // 않는다(이미 적혀있는 소개자 정보를 실수로 지우지 않기 위함).
+  const referrerName = parsed.visitChannelReferrerName.trim();
+  if (parsed.visitChannel === "referral" && referrerName && member.referrer !== referrerName) {
+    undoOps.push({ op: "update", table: "members", id: idNum, data: { referrer: member.referrer } });
+    await updateMember(idNum, { referrer: referrerName });
   }
 
   await recordUndo(`${member.name} 초진 문진표 ${before ? "수정" : "작성"}`, undoOps);
