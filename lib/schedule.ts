@@ -1436,7 +1436,9 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
 
   const [coachesResult, revenueResult, sessionsResult, memberStatsResult, consultationResult] =
     await Promise.all([
-      query<{ id: number; name: string }>(`SELECT id, name FROM coaches ORDER BY id ASC`),
+      query<{ id: number; name: string; active: boolean }>(
+        `SELECT id, name, active FROM coaches ORDER BY id ASC`,
+      ),
       query<{ coach_id: number; revenue: string }>(
         `SELECT m.coach_id as coach_id, SUM(p.price) as revenue
          FROM packages p
@@ -1524,31 +1526,44 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
   const memberStatsMap = new Map(memberStatsResult.rows.map((r) => [r.coach_id, r]));
   const consultationMap = new Map(consultationResult.rows.map((r) => [r.coach_id, r]));
 
-  return coachesResult.rows.map((coach) => {
-    const stats = memberStatsMap.get(coach.id);
-    const reRegistered = Number(stats?.re_registered ?? 0);
-    const churned = Number(stats?.churned ?? 0);
-    const denom = reRegistered + churned;
-    const consultation = consultationMap.get(coach.id);
-    const consultationCount = Number(consultation?.consultation_count ?? 0);
-    const consultationSuccessCount = Number(consultation?.success_count ?? 0);
-    return {
-      coachId: coach.id,
-      coachName: coach.name,
-      memberCount: Number(stats?.member_count ?? 0),
-      sessionCount: sessionsMap.get(coach.id) ?? 0,
-      sessionCount1on1: sessions1on1Map.get(coach.id) ?? 0,
-      sessionCount2on1: sessions2on1Map.get(coach.id) ?? 0,
-      noShowCount: noShowMap.get(coach.id) ?? 0,
-      revenue: revenueMap.get(coach.id) ?? 0,
-      reRegisteredCount: reRegistered,
-      churnedCount: churned,
-      reRegistrationRate: denom > 0 ? reRegistered / denom : null,
-      consultationCount,
-      consultationSuccessCount,
-      consultationSuccessRate: consultationCount > 0 ? consultationSuccessCount / consultationCount : null,
-    };
-  });
+  return coachesResult.rows
+    .map((coach) => {
+      const stats = memberStatsMap.get(coach.id);
+      const reRegistered = Number(stats?.re_registered ?? 0);
+      const churned = Number(stats?.churned ?? 0);
+      const denom = reRegistered + churned;
+      const consultation = consultationMap.get(coach.id);
+      const consultationCount = Number(consultation?.consultation_count ?? 0);
+      const consultationSuccessCount = Number(consultation?.success_count ?? 0);
+      const memberCount = Number(stats?.member_count ?? 0);
+      const sessionCount = sessionsMap.get(coach.id) ?? 0;
+      const revenue = revenueMap.get(coach.id) ?? 0;
+      return {
+        coachId: coach.id,
+        coachName: coach.name,
+        active: coach.active,
+        memberCount,
+        sessionCount,
+        sessionCount1on1: sessions1on1Map.get(coach.id) ?? 0,
+        sessionCount2on1: sessions2on1Map.get(coach.id) ?? 0,
+        noShowCount: noShowMap.get(coach.id) ?? 0,
+        revenue,
+        reRegisteredCount: reRegistered,
+        churnedCount: churned,
+        reRegistrationRate: denom > 0 ? reRegistered / denom : null,
+        consultationCount,
+        consultationSuccessCount,
+        consultationSuccessRate: consultationCount > 0 ? consultationSuccessCount / consultationCount : null,
+      };
+    })
+    // 퇴사한 코치는 이번 달에 실제로 아무 활동도 없었으면(매출·수업·담당
+    // 회원·상담 전부 0) 표에서 뺀다 — 재직 중이거나, 퇴사했어도 이번 달에
+    // 실제로 일한 기록이 있으면(월 중간에 퇴사한 경우 등) 그대로 보여준다.
+    .filter(
+      (r) =>
+        r.active || r.memberCount > 0 || r.sessionCount > 0 || r.revenue > 0 || r.consultationCount > 0,
+    )
+    .map(({ active: _active, ...rest }) => rest);
 }
 
 // ---- 관리자 대시보드 개요 ----
@@ -1810,7 +1825,9 @@ export async function getCoachRetentionReports(
 
   const [coachesResult, monthReRegisteredResult, periodReRegisteredResult, periodChurnedResult] =
     await Promise.all([
-      query<{ id: number; name: string }>(`SELECT id, name FROM coaches ORDER BY id ASC`),
+      query<{ id: number; name: string; active: boolean }>(
+        `SELECT id, name, active FROM coaches ORDER BY id ASC`,
+      ),
       query<{ coach_id: number; count: string }>(
         `SELECT m.coach_id as coach_id, COUNT(*) as count
          FROM packages p
@@ -1855,19 +1872,27 @@ export async function getCoachRetentionReports(
     periodChurnedResult.rows.map((r) => [r.coach_id, Number(r.count ?? 0)]),
   );
 
-  return coachesResult.rows.map((coach) => {
-    const periodReRegisteredCount = periodReRegisteredMap.get(coach.id) ?? 0;
-    const periodChurnedCount = periodChurnedMap.get(coach.id) ?? 0;
-    const denom = periodReRegisteredCount + periodChurnedCount;
-    return {
-      coachId: coach.id,
-      coachName: coach.name,
-      monthReRegisteredCount: monthReRegisteredMap.get(coach.id) ?? 0,
-      periodReRegisteredCount,
-      periodChurnedCount,
-      reRegistrationRate: denom > 0 ? periodReRegisteredCount / denom : null,
-    };
-  });
+  return coachesResult.rows
+    .map((coach) => {
+      const periodReRegisteredCount = periodReRegisteredMap.get(coach.id) ?? 0;
+      const periodChurnedCount = periodChurnedMap.get(coach.id) ?? 0;
+      const denom = periodReRegisteredCount + periodChurnedCount;
+      return {
+        coachId: coach.id,
+        coachName: coach.name,
+        active: coach.active,
+        monthReRegisteredCount: monthReRegisteredMap.get(coach.id) ?? 0,
+        periodReRegisteredCount,
+        periodChurnedCount,
+        reRegistrationRate: denom > 0 ? periodReRegisteredCount / denom : null,
+      };
+    })
+    // 퇴사한 코치는 이 기간 동안 재등록·이탈 실적이 전혀 없으면 표에서 뺀다
+    // (getCoachMonthlyReports와 같은 기준).
+    .filter(
+      (r) => r.active || r.monthReRegisteredCount > 0 || r.periodReRegisteredCount > 0 || r.periodChurnedCount > 0,
+    )
+    .map(({ active: _active, ...rest }) => rest);
 }
 
 export interface NewRegistration {
