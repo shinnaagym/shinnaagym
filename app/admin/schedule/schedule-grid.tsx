@@ -458,6 +458,7 @@ export function ScheduleGrid({
   coachWorkingHours,
   coachLeaves,
   initialCoachFilter,
+  basePath = "/admin/schedule",
 }: {
   weekStart: string;
   dateKeys: string[];
@@ -482,6 +483,11 @@ export function ScheduleGrid({
       담당 코치의 스케줄만 끼워 넣을 때) 초기 coachFilter 값을 지정한다.
       생략하면 평소대로 "코치 전체"로 연다. */
   initialCoachFilter?: number;
+  /** 주 이동("이전/다음 주", "오늘", 날짜 선택, 날짜 칸 클릭)이 이동할 경로.
+      생략하면 실제 스케줄 화면(/admin/schedule)으로 이동한다. PT 일지 화면처럼
+      다른 페이지 안에 이 그리드를 끼워 넣을 때는, 그 페이지 자신의 경로를
+      넘겨서 주를 넘겨도 그 페이지 안에 그대로 머물게 한다. */
+  basePath?: string;
 }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
@@ -974,11 +980,11 @@ export function ScheduleGrid({
 
   function goWeek(offsetDays: number) {
     const nextStart = addDaysToKey(weekStart, offsetDays);
-    router.push(`/admin/schedule?week=${nextStart}`);
+    router.push(`${basePath}?week=${nextStart}`);
   }
 
   function goToday() {
-    router.push("/admin/schedule");
+    router.push(basePath);
   }
 
   /** 토요일 당직을 지정/해제한다. coachId가 undefined면 그 날짜의 당직 지정을
@@ -1167,7 +1173,7 @@ export function ScheduleGrid({
                   if (viewMode === "month") {
                     setMonthCursor(dateKey.slice(0, 7));
                   } else {
-                    router.push(`/admin/schedule?week=${dateKey}`);
+                    router.push(`${basePath}?week=${dateKey}`);
                   }
                 }}
                 onClose={() => setShowDatePicker(false)}
@@ -1556,7 +1562,7 @@ export function ScheduleGrid({
           coachFilter={coachFilter}
           onPickDay={(dateKey) => {
             setViewMode("week");
-            router.push(`/admin/schedule?week=${dateKey}`);
+            router.push(`${basePath}?week=${dateKey}`);
           }}
           onPickSession={(session) => setEditTarget(session)}
           onCreateSlot={(date, hour, coachId) => setCreateTarget({ date, hour, coachId })}
