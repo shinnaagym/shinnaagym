@@ -116,6 +116,9 @@ export async function POST(req: NextRequest) {
       const link = await linkPreReservationToSchedule({
         name: name.trim(),
         phone: phone.trim(),
+        age: ageNum,
+        purposes,
+        purposeNote: purposeNote.trim(),
         date: row.reservation_date,
         hour: row.reservation_hour,
       });
