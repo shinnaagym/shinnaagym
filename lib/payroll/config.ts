@@ -21,7 +21,7 @@ export const TENURE_BUCKET_LABEL: Record<TenureBucket, string> = {
 };
 
 // ── 정직원 ──────────────────────────────────────────────
-export const REGULAR_BASE_SALARY = 2_000_000;
+export const REGULAR_BASE_SALARY = 2_200_000;
 // 식대(비과세)는 폐지되고 기본급에 통합됐다. 0으로 유지하는 이유는, 이
 // 상수를 지우면 PayrollResult.mealAllowance/관련 UI(SpecRow·PayComposition
 // 등)까지 함께 걷어내야 해서다 — 0이면 그 항목들이 자동으로 표시에서
@@ -31,9 +31,9 @@ export const REGULAR_MEAL_ALLOWANCE = 0;
 export const REGULAR_MANDATORY_SESSIONS = 60; // 의무수업 횟수(기본급에 포함)
 
 export const REGULAR_RATE_1ON1: Record<TenureBucket, number> = {
-  under1: 30_000,
-  "1to2": 31_000,
-  over2: 32_000,
+  under1: 29_000,
+  "1to2": 30_000,
+  over2: 31_000,
 };
 // 2:1 수업은 근속에 따른 단가 인상이 없음(고정 단가).
 export const REGULAR_RATE_2ON1 = 40_000;
