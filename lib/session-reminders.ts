@@ -3,6 +3,8 @@ import type { SessionEntryType } from "./db";
 import { addDaysToKey, formatAmPmHourMinute, formatHourMinute, koreaTodayKey, weekdayLabelForDateKey } from "./date";
 import { STUDIO_PHONE } from "./constants";
 import { sendSms } from "./sms";
+import { renderSmsTemplate, type SmsTemplateKey } from "./sms-templates";
+import { getSmsTemplates } from "./sms-templates-store";
 
 interface ReminderTarget {
   id: number;
@@ -61,45 +63,42 @@ async function getTomorrowReminderTargets(): Promise<ReminderTarget[]> {
 }
 
 // SMS(단문)는 90바이트(lib/sms.ts가 실제로 판단하는 기준은 UTF-8, 한글
-// 1자=3바이트)를 넘으면 자동으로 더 비싼 LMS로 바뀐다. "담당코치"·"PT예약"·
-// 쉼표 등 꼭 필요하지 않은 글자를 덜어내 일반적인 이름 길이(회원·코치 모두
-// 4자 이하)에서는 90바이트 안쪽을 유지한다(회원·코치 이름이 둘 다 드물게
-// 4자를 넘으면 LMS로 넘어갈 수 있다).
-function buildSessionReminderMessage(target: ReminderTarget): string {
+// 1자=3바이트)를 넘으면 자동으로 더 비싼 LMS로 바뀐다. 설정 화면에서 문구를
+// 직접 고칠 수 있게 되면서 이 길이 제약은 더 이상 코드가 강제할 수 없고,
+// 설정 화면의 안내 문구로만 알려준다.
+function buildSessionReminderMessage(target: ReminderTarget, template: string): string {
   const [, month, day] = target.sessionDate.split("-").map(Number);
   const weekday = weekdayLabelForDateKey(target.sessionDate);
   const time = formatHourMinute(target.sessionHour, target.sessionMinute);
   const coachPhone = target.coachPhone.trim() || STUDIO_PHONE;
-  return (
-    `[신나아짐] ${target.memberName}님 내일 ${month}/${day}(${weekday}) ${time} ` +
-    `PT ${target.coachName} ${coachPhone}/밴드`
-  );
+  return renderSmsTemplate(template, {
+    이름: target.memberName,
+    월: String(month),
+    일: String(day),
+    요일: weekday,
+    시간: time,
+    코치: target.coachName,
+    코치전화: coachPhone,
+  });
 }
 
-// 상담 리마인드는 처음 오시는 분들께 장소·주차·준비물까지 안내하는 긴 문구라
-// 90바이트를 넘어 자동으로 LMS로 발송된다(장문이라 자연스러운 선택).
-function buildConsultationReminderMessage(target: ReminderTarget): string {
+function buildConsultationReminderMessage(target: ReminderTarget, template: string): string {
   const [, month, day] = target.sessionDate.split("-").map(Number);
   const weekday = weekdayLabelForDateKey(target.sessionDate);
   const time = formatAmPmHourMinute(target.sessionHour, target.sessionMinute);
-  return `[신나아짐] 안녕하세요, ${target.memberName}님 😊
-내일 상담 일정 안내드립니다.
-
-📅 일시: ${month}월 ${day}일(${weekday}) ${time}
-📍 장소: 청주시 흥덕구 서현로 32 가경자이프라자 2층 신나아짐
-🚗 주차: 상가 내 지하주차장, 상가 옆 무료 공영주차장
-⏱ 소요 시간: 약 30분~50분
-
-편한 운동복 준비해 주시면 간단한 움직임·자세 평가까지 함께 진행해 드려요.
-
-일정 변경이 필요하시면 편하게 연락 주세요.
-내일 뵙겠습니다!`;
+  return renderSmsTemplate(template, {
+    이름: target.memberName,
+    월: String(month),
+    일: String(day),
+    요일: weekday,
+    시간: time,
+  });
 }
 
-function buildReminderMessage(target: ReminderTarget): string {
+function buildReminderMessage(target: ReminderTarget, templates: Record<SmsTemplateKey, string>): string {
   return target.entryType === "consultation"
-    ? buildConsultationReminderMessage(target)
-    : buildSessionReminderMessage(target);
+    ? buildConsultationReminderMessage(target, templates.consultation_reminder)
+    : buildSessionReminderMessage(target, templates.session_reminder);
 }
 
 async function markReminderSent(sessionId: number): Promise<void> {
@@ -116,10 +115,10 @@ export interface SendReminderSummary {
     설정이 안 되어 있으면 sendSms가 매번 실패를 반환해, total은 그대로이고
     sent=0으로 끝난다(에러를 던지지 않음 — 크론 자체는 실패로 안 남게). */
 export async function sendTomorrowSessionReminders(): Promise<SendReminderSummary> {
-  const targets = await getTomorrowReminderTargets();
+  const [targets, templates] = await Promise.all([getTomorrowReminderTargets(), getSmsTemplates()]);
   let sent = 0;
   for (const target of targets) {
-    const result = await sendSms(target.memberPhone, buildReminderMessage(target));
+    const result = await sendSms(target.memberPhone, buildReminderMessage(target, templates));
     if (result.ok) {
       await markReminderSent(target.id);
       sent += 1;
