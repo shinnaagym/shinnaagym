@@ -31,8 +31,10 @@ import {
 
 export default async function NewPtLogPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ week?: string }>;
 }) {
   if (!(await isAdminAuthed())) {
     redirect("/admin");
@@ -42,17 +44,21 @@ export default async function NewPtLogPage({
   if (!Number.isInteger(idNum)) {
     notFound();
   }
+  const { week } = await searchParams;
   const today = koreaTodayKey();
   // "다음주 수업 예약" 체크 표시용 날짜 범위 — 회원 목록 화면과 같은 기준
-  // (이번주 월요일 + 7일 ~ 그 주 일요일).
+  // (이번주 월요일 + 7일 ~ 그 주 일요일). 아래 코치 스케줄표에서 다른 주로
+  // 넘겨봐도 이 체크 기준은 "진짜 다음 주"로 고정이다.
   const thisWeekMonday = mondayOfWeek(today);
   const nextWeekMonday = addDaysToKey(thisWeekMonday, 7);
   const nextWeekSunday = addDaysToKey(nextWeekMonday, 6);
-  // 코치 스케줄표는 스케줄 화면과 같은 기준으로, 스튜디오가 항상 휴무인
-  // 일요일을 뺀 월~토 6일만 다룬다.
-  const dateKeys = Array.from({ length: 6 }, (_, i) => addDaysToKey(thisWeekMonday, i));
+  // 코치 스케줄표가 보여줄 주 — 스케줄 화면과 똑같이 ?week= 쿼리로 다른 주를
+  // 볼 수 있다(그리드의 "이전/다음 주" 버튼이 이 페이지 자신으로 이동시킨다).
+  // 스튜디오가 항상 휴무인 일요일은 빼고 월~토 6일만 다룬다.
+  const scheduleWeekStart = mondayOfWeek(week && /^\d{4}-\d{2}-\d{2}$/.test(week) ? week : today);
+  const dateKeys = Array.from({ length: 6 }, (_, i) => addDaysToKey(scheduleWeekStart, i));
   const weekEnd = dateKeys[dateKeys.length - 1];
-  const monthKey = thisWeekMonday.slice(0, 7);
+  const monthKey = scheduleWeekStart.slice(0, 7);
 
   const [
     member,
@@ -79,7 +85,7 @@ export default async function NewPtLogPage({
     listMembersWithProgress(),
     getDayHoursForRange(dateKeys),
     listHolidays(),
-    getAllCoachScheduleStats(monthKey, thisWeekMonday, weekEnd),
+    getAllCoachScheduleStats(monthKey, scheduleWeekStart, weekEnd),
     getDailyScheduleMemos(dateKeys),
     getDutyOverridesForDates(dateKeys),
     getCoachWorkingHours(),
@@ -107,7 +113,7 @@ export default async function NewPtLogPage({
   // 없으면(coach_id가 null) 아예 보여주지 않는다.
   const memberCoach = member.coach_id != null ? coaches.find((c) => c.id === member.coach_id) : null;
   const memberCoachSessions = memberCoach
-    ? await listCoachSessionsInRange(memberCoach.id, thisWeekMonday, weekEnd)
+    ? await listCoachSessionsInRange(memberCoach.id, scheduleWeekStart, weekEnd)
     : [];
   const activeMembersList = activeMembers.filter((m) => m.status === "active");
 
@@ -149,8 +155,8 @@ export default async function NewPtLogPage({
       {memberCoach && (
         <div className="mx-auto max-w-4xl px-6 pb-8">
           <ScheduleGrid
-            key={thisWeekMonday}
-            weekStart={thisWeekMonday}
+            key={scheduleWeekStart}
+            weekStart={scheduleWeekStart}
             dateKeys={dateKeys}
             today={today}
             coaches={[memberCoach]}
@@ -166,6 +172,7 @@ export default async function NewPtLogPage({
             coachWorkingHours={coachWorkingHours}
             coachLeaves={coachLeaves}
             initialCoachFilter={memberCoach.id}
+            basePath={`/admin/members/${idNum}/pt-log/new`}
           />
         </div>
       )}
