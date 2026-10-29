@@ -543,10 +543,10 @@ test("세션 날짜 정밀 계산: 근속 시뮬레이션(tenureBucketOverride)�
   assert.equal(result.lessonFee1on1, 10 * REGULAR_RATE_1ON1["under1"]);
 });
 
-test("정직원 1:1 수업료 단가: 1년 이상 2년 미만 31,000원, 2년 이상 32,000원, 1년 미만은 그대로 30,000원", () => {
-  assert.equal(REGULAR_RATE_1ON1.under1, 30_000);
-  assert.equal(REGULAR_RATE_1ON1["1to2"], 31_000);
-  assert.equal(REGULAR_RATE_1ON1.over2, 32_000);
+test("정직원 1:1 수업료 단가: 1년 미만 29,000원, 1년 이상 2년 미만 30,000원, 2년 이상 31,000원", () => {
+  assert.equal(REGULAR_RATE_1ON1.under1, 29_000);
+  assert.equal(REGULAR_RATE_1ON1["1to2"], 30_000);
+  assert.equal(REGULAR_RATE_1ON1.over2, 31_000);
 });
 
 function overtimeSession(
