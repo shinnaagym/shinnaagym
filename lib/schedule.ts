@@ -17,7 +17,7 @@ import type {
   SessionStatus,
 } from "./db";
 import { addDaysToKey, addMonthsToKey, koreaTodayKey, monthKeyRange, monthKeysRange } from "./date";
-import { LEAVE_TYPE_OPTIONS, scheduleHoursForWeekday, type DayHours } from "./constants";
+import { LEAVE_TYPE_OPTIONS, PURPOSE_LABELS, scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
 
@@ -1396,6 +1396,9 @@ export async function findOrCreateMemberByPhone(input: {
 export async function linkPreReservationToSchedule(input: {
   name: string;
   phone: string;
+  age: number;
+  purposes: string[];
+  purposeNote: string;
   date: string;
   hour: number;
 }): Promise<{ memberId: number; sessionId: number } | null> {
@@ -1412,13 +1415,20 @@ export async function linkPreReservationToSchedule(input: {
     notes: "사전예약 폼을 통해 자동 등록됨",
   });
 
+  // 스케줄표 칸에서 바로 누가 왜 예약했는지 알 수 있도록, 나이/번호/운동목적/
+  // 설명 순으로 적는다. 설명(자유 입력)은 안 적었을 수 있어 그때만 뺀다.
+  const purposeLabel = input.purposes.map((p) => PURPOSE_LABELS[p] ?? p).join(", ");
+  const memo = [`${input.age}세`, input.phone, purposeLabel, input.purposeNote.trim()]
+    .filter((part) => part.length > 0)
+    .join(" / ");
+
   try {
     const session = await createSession({
       memberId: member.id,
       coachId: member.coach_id ?? coachId,
       date: input.date,
       hour: input.hour,
-      memo: `사전예약 자동 등록 (${input.phone})`,
+      memo,
       entryType: "consultation",
     });
     return { memberId: member.id, sessionId: session.id };
