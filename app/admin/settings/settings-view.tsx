@@ -23,6 +23,8 @@ import {
 } from "@/lib/constants";
 import { SyncDiagnostics } from "./sync-diagnostics";
 import { SmsTest } from "./sms-test";
+import { SmsTemplatesSection } from "./sms-templates-section";
+import type { SmsTemplateKey } from "@/lib/sms-templates";
 import { MemoPad } from "../memo-pad";
 import { NoticesView } from "../notices/notices-view";
 
@@ -898,6 +900,7 @@ export function SettingsView({
   initialCoachWorkingHours,
   initialNotices,
   initialEvents,
+  initialSmsTemplates,
 }: {
   initialCoaches: CoachRow[];
   initialHolidays: HolidayRow[];
@@ -916,6 +919,7 @@ export function SettingsView({
   initialCoachWorkingHours: Record<number, CoachWorkingHours>;
   initialNotices: NoticeRow[];
   initialEvents: NoticeRow[];
+  initialSmsTemplates: Record<SmsTemplateKey, string>;
 }) {
   const [coaches, setCoaches] = useState(initialCoaches);
   // 퇴사 처리(active=false) 후 한 달 넘게 재직 전환을 하지 않은 코치는 목록에서
@@ -1163,6 +1167,7 @@ export function SettingsView({
     { href: "#holidays", label: "공휴일" },
     { href: "#notices", label: "공지·이벤트" },
     { href: "#recurring-events", label: "정기 일정" },
+    { href: "#sms-templates", label: "문자 문구" },
     { href: "#sms-test", label: "문자 테스트" },
     { href: "#sync-diagnostics", label: "동기화 진단" },
     { href: "#memo-pad", label: "메모장" },
@@ -1681,6 +1686,10 @@ export function SettingsView({
           </button>
         </div>
       </section>
+
+      <div id="sms-templates">
+        <SmsTemplatesSection initialTemplates={initialSmsTemplates} />
+      </div>
 
       <div id="sms-test">
         <SmsTest />

@@ -134,7 +134,7 @@ const SEED_HOLIDAYS_2027: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 47;
+const SCHEMA_VERSION = 48;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -880,6 +880,16 @@ function runFullMigration(): Promise<void> {
               coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE,
               created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
               UNIQUE (event_id, occurrence_date, coach_id)
+            );
+
+            -- 설정 화면에서 대표가 직접 고칠 수 있는 문자 발송 문구(PT 전/상담
+            -- 전 리마인드, 상담 등록 직후 확인 문자). key는 lib/sms-templates.ts의
+            -- SmsTemplateKey 값과 맞춘다. 행이 없는 key는 그 파일의 기본 문구를
+            -- 그대로 쓴다(lib/sms-templates-store.ts의 getSmsTemplates 참고).
+            CREATE TABLE IF NOT EXISTS sms_templates (
+              key TEXT PRIMARY KEY,
+              body TEXT NOT NULL,
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
             `,
           ),

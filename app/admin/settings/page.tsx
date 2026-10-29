@@ -17,6 +17,7 @@ import { listSettingsMemos } from "@/lib/settings-memos";
 import { listNotices } from "@/lib/notices";
 import { BUILD_ID } from "@/lib/build-info";
 import { listActiveDevices } from "@/lib/devices";
+import { getSmsTemplates } from "@/lib/sms-templates-store";
 import { SettingsView } from "./settings-view";
 
 export default async function AdminSettingsPage() {
@@ -41,6 +42,7 @@ export default async function AdminSettingsPage() {
     coachWorkingHours,
     notices,
     leaveYearCounts,
+    smsTemplates,
   ] = await Promise.all([
     listCoaches(),
     listHolidays(),
@@ -56,6 +58,7 @@ export default async function AdminSettingsPage() {
     getCoachWorkingHours(),
     listNotices(),
     getCoachLeaveYearCounts(currentMonth.slice(0, 4)),
+    getSmsTemplates(),
   ]);
 
   return (
@@ -81,6 +84,7 @@ export default async function AdminSettingsPage() {
         initialCoachWorkingHours={coachWorkingHours}
         initialNotices={notices.filter((n) => n.category === "notice")}
         initialEvents={notices.filter((n) => n.category === "event")}
+        initialSmsTemplates={smsTemplates}
       />
     </div>
   );
