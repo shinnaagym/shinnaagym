@@ -1659,16 +1659,24 @@ export function ScheduleGrid({
                       </button>
                     )}
                   <button
-                    onClick={() => quickPatch(contextMenu.sessions, { status: "no_show" })}
+                    onClick={() =>
+                      quickPatch(contextMenu.sessions, {
+                        status: contextMenu.sessions[0].status === "no_show" ? "reserved" : "no_show",
+                      })
+                    }
                     className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
                   >
-                    노쇼 처리
+                    {contextMenu.sessions[0].status === "no_show" ? "노쇼 취소" : "노쇼 처리"}
                   </button>
                   <button
-                    onClick={() => quickPatch(contextMenu.sessions, { status: "cancelled" })}
+                    onClick={() =>
+                      quickPatch(contextMenu.sessions, {
+                        status: contextMenu.sessions[0].status === "cancelled" ? "reserved" : "cancelled",
+                      })
+                    }
                     className="w-full px-4 py-2 text-left text-sm hover:bg-bone transition"
                   >
-                    취소 처리
+                    {contextMenu.sessions[0].status === "cancelled" ? "취소 철회" : "취소 처리"}
                   </button>
                   <button
                     onClick={() => quickDelete(contextMenu.sessions)}
@@ -3006,17 +3014,21 @@ function EditSessionModal({
         <div className="grid grid-cols-2 gap-2">
           <button
             disabled={submitting}
-            onClick={() => patch({ status: "no_show" })}
-            className="rounded-full bg-red-400 text-white py-2 text-xs sm:text-sm font-medium hover:bg-red-500 transition disabled:opacity-50"
+            onClick={() => patch({ status: session.status === "no_show" ? "reserved" : "no_show" })}
+            className={
+              session.status === "no_show"
+                ? "rounded-full border border-line py-2 text-xs sm:text-sm hover:bg-bone transition disabled:opacity-50"
+                : "rounded-full bg-red-400 text-white py-2 text-xs sm:text-sm font-medium hover:bg-red-500 transition disabled:opacity-50"
+            }
           >
-            ✕ 노쇼 처리(차감)
+            {session.status === "no_show" ? "노쇼 취소" : "✕ 노쇼 처리(차감)"}
           </button>
           <button
             disabled={submitting}
-            onClick={() => patch({ status: "cancelled" })}
+            onClick={() => patch({ status: session.status === "cancelled" ? "reserved" : "cancelled" })}
             className="rounded-full border border-line py-2 text-xs sm:text-sm hover:bg-bone transition disabled:opacity-50"
           >
-            취소 (차감 없음)
+            {session.status === "cancelled" ? "취소 철회" : "취소 (차감 없음)"}
           </button>
         </div>
 
