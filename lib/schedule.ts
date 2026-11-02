@@ -19,6 +19,7 @@ import type {
 import {
   addDaysToKey,
   addMonthsToKey,
+  isMoreThanDaysAgo,
   koreaTodayKey,
   monthKeyRange,
   monthKeysRange,
@@ -1495,6 +1496,14 @@ export async function linkPreReservationToSchedule(input: {
 
 // ---- 코치별 매출 · 재등록율 리포트 ----
 
+/** 퇴사 처리(active=false) 후 한 달 넘게 재직 전환을 하지 않은 코치는, 과거에
+    매출·재등록 실적이 있었더라도 코치별 리포트에서 숨긴다 — 설정 페이지의
+    코치 목록과 같은 기준이다(과거 기록 자체는 지우지 않고 그대로 집계에는
+    남는다, 화면에만 안 보일 뿐). */
+function isCoachReportVisible(coach: { active: boolean; deactivatedAt: string | null }): boolean {
+  return coach.active || !coach.deactivatedAt || !isMoreThanDaysAgo(coach.deactivatedAt, 30);
+}
+
 export interface CoachMonthlyReport {
   coachId: number;
   coachName: string;
@@ -1517,10 +1526,17 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
   const monthStart = `${yearMonth}-01`;
   const [revenueMonthStart, revenueMonthEnd] = monthKeyRange(yearMonth);
 
-  const [coachesResult, revenueResult, sessionsResult, memberStatsResult, consultationResult] =
-    await Promise.all([
-      query<{ id: number; name: string; active: boolean }>(
-        `SELECT id, name, active FROM coaches ORDER BY id ASC`,
+  const [
+    coachesResult,
+    revenueResult,
+    sessionsResult,
+    memberStatsResult,
+    monthReRegisteredResult,
+    monthChurnedResult,
+    consultationResult,
+  ] = await Promise.all([
+      query<{ id: number; name: string; active: boolean; deactivated_at: string | null }>(
+        `SELECT id, name, active, deactivated_at FROM coaches ORDER BY id ASC`,
       ),
       query<{ coach_id: number; revenue: string }>(
         `SELECT m.coach_id as coach_id, SUM(p.price) as revenue
@@ -1548,37 +1564,35 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
          GROUP BY coach_id`,
         [monthStart],
       ),
-      query<{
-        coach_id: number;
-        member_count: string;
-        re_registered: string;
-        churned: string;
-      }>(
-        // 재등록율 분모는 "PT 회차가 마감된 사람"(패키지 전체 회차를 다 소진한
-        // 사람)만 대상으로 한다 — 아직 회차가 남아 진행 중인 회원은 재등록
-        // 여부를 판단할 단계가 아니므로 집계에서 제외한다.
-        `SELECT m.coach_id as coach_id,
-           COUNT(*) as member_count,
-           COUNT(*) FILTER (WHERE COALESCE(pkg.package_count, 0) >= 2) as re_registered,
-           COUNT(*) FILTER (
-             WHERE COALESCE(pkg.package_count, 0) < 2
-               AND COALESCE(pkg.total, 0) > 0
-               AND COALESCE(s.done, 0) >= pkg.total
-           ) as churned
+      query<{ coach_id: number; member_count: string }>(
+        `SELECT m.coach_id as coach_id, COUNT(*) as member_count
          FROM members m
-         LEFT JOIN (
-           SELECT member_id, COUNT(*) as package_count, SUM(total_sessions) as total
-           FROM packages GROUP BY member_id
-         ) pkg ON pkg.member_id = m.id
-         LEFT JOIN (
-           SELECT member_id, COUNT(*) FILTER (WHERE session_date <= $1) as done
-           FROM class_sessions
-           WHERE entry_type = 'session' AND status <> 'cancelled'
-           GROUP BY member_id
-         ) s ON s.member_id = m.id
          WHERE m.coach_id IS NOT NULL AND m.deleted_at IS NULL AND m.is_lead = false
          GROUP BY m.coach_id`,
-        [koreaTodayKey()],
+      ),
+      // 재등록 = 그 달에 "최초 패키지가 아닌" 패키지를 구매한 건수 — 재등록
+      // 관리 페이지(getCoachRetentionReports)의 "이번 달 재등록"과 같은 기준.
+      query<{ coach_id: number; count: string }>(
+        `SELECT m.coach_id as coach_id, COUNT(*) as count
+         FROM packages p
+         JOIN members m ON m.id = p.member_id
+         WHERE p.purchased_at >= $1 AND p.purchased_at < $2
+           AND m.coach_id IS NOT NULL
+           AND p.purchased_at <> (
+             SELECT MIN(p2.purchased_at) FROM packages p2 WHERE p2.member_id = p.member_id
+           )
+         GROUP BY m.coach_id`,
+        [revenueMonthStart, revenueMonthEnd],
+      ),
+      // 이탈 = 그 달에 팔로업 상태가 "이탈"로 바뀐 회원 수 — 재등록 관리
+      // 페이지와 같은 기준.
+      query<{ coach_id: number; count: string }>(
+        `SELECT coach_id, COUNT(*) as count
+         FROM members
+         WHERE followup_status = '이탈' AND followup_updated_at >= $1 AND followup_updated_at < $2
+           AND coach_id IS NOT NULL
+         GROUP BY coach_id`,
+        [revenueMonthStart, revenueMonthEnd],
       ),
       query<{ coach_id: number; consultation_count: string; success_count: string }>(
         `SELECT cs.coach_id,
@@ -1606,25 +1620,33 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
     sessionsResult.rows.map((r) => [r.coach_id, Number(r.session_count_2on1 ?? 0)]),
   );
   const noShowMap = new Map(sessionsResult.rows.map((r) => [r.coach_id, Number(r.no_show ?? 0)]));
-  const memberStatsMap = new Map(memberStatsResult.rows.map((r) => [r.coach_id, r]));
+  const memberCountMap = new Map(
+    memberStatsResult.rows.map((r) => [r.coach_id, Number(r.member_count ?? 0)]),
+  );
+  const monthReRegisteredMap = new Map(
+    monthReRegisteredResult.rows.map((r) => [r.coach_id, Number(r.count ?? 0)]),
+  );
+  const monthChurnedMap = new Map(
+    monthChurnedResult.rows.map((r) => [r.coach_id, Number(r.count ?? 0)]),
+  );
   const consultationMap = new Map(consultationResult.rows.map((r) => [r.coach_id, r]));
 
   return coachesResult.rows
     .map((coach) => {
-      const stats = memberStatsMap.get(coach.id);
-      const reRegistered = Number(stats?.re_registered ?? 0);
-      const churned = Number(stats?.churned ?? 0);
+      const reRegistered = monthReRegisteredMap.get(coach.id) ?? 0;
+      const churned = monthChurnedMap.get(coach.id) ?? 0;
       const denom = reRegistered + churned;
       const consultation = consultationMap.get(coach.id);
       const consultationCount = Number(consultation?.consultation_count ?? 0);
       const consultationSuccessCount = Number(consultation?.success_count ?? 0);
-      const memberCount = Number(stats?.member_count ?? 0);
+      const memberCount = memberCountMap.get(coach.id) ?? 0;
       const sessionCount = sessionsMap.get(coach.id) ?? 0;
       const revenue = revenueMap.get(coach.id) ?? 0;
       return {
         coachId: coach.id,
         coachName: coach.name,
         active: coach.active,
+        deactivatedAt: coach.deactivated_at,
         memberCount,
         sessionCount,
         sessionCount1on1: sessions1on1Map.get(coach.id) ?? 0,
@@ -1639,14 +1661,10 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
         consultationSuccessRate: consultationCount > 0 ? consultationSuccessCount / consultationCount : null,
       };
     })
-    // 퇴사한 코치는 이번 달에 실제로 아무 활동도 없었으면(매출·수업·담당
-    // 회원·상담 전부 0) 표에서 뺀다 — 재직 중이거나, 퇴사했어도 이번 달에
-    // 실제로 일한 기록이 있으면(월 중간에 퇴사한 경우 등) 그대로 보여준다.
-    .filter(
-      (r) =>
-        r.active || r.memberCount > 0 || r.sessionCount > 0 || r.revenue > 0 || r.consultationCount > 0,
-    )
-    .map(({ active: _active, ...rest }) => rest);
+    // 퇴사 처리 후 한 달 넘은 코치는 설정 페이지의 코치 목록과 같은 기준으로
+    // 표에서 뺀다(과거 실적이 있어도 숨김 — isCoachReportVisible 참고).
+    .filter(isCoachReportVisible)
+    .map(({ active: _active, deactivatedAt: _deactivatedAt, ...rest }) => rest);
 }
 
 // ---- 관리자 대시보드 개요 ----
@@ -1908,8 +1926,8 @@ export async function getCoachRetentionReports(
 
   const [coachesResult, monthReRegisteredResult, periodReRegisteredResult, periodChurnedResult] =
     await Promise.all([
-      query<{ id: number; name: string; active: boolean }>(
-        `SELECT id, name, active FROM coaches ORDER BY id ASC`,
+      query<{ id: number; name: string; active: boolean; deactivated_at: string | null }>(
+        `SELECT id, name, active, deactivated_at FROM coaches ORDER BY id ASC`,
       ),
       query<{ coach_id: number; count: string }>(
         `SELECT m.coach_id as coach_id, COUNT(*) as count
@@ -1964,18 +1982,17 @@ export async function getCoachRetentionReports(
         coachId: coach.id,
         coachName: coach.name,
         active: coach.active,
+        deactivatedAt: coach.deactivated_at,
         monthReRegisteredCount: monthReRegisteredMap.get(coach.id) ?? 0,
         periodReRegisteredCount,
         periodChurnedCount,
         reRegistrationRate: denom > 0 ? periodReRegisteredCount / denom : null,
       };
     })
-    // 퇴사한 코치는 이 기간 동안 재등록·이탈 실적이 전혀 없으면 표에서 뺀다
-    // (getCoachMonthlyReports와 같은 기준).
-    .filter(
-      (r) => r.active || r.monthReRegisteredCount > 0 || r.periodReRegisteredCount > 0 || r.periodChurnedCount > 0,
-    )
-    .map(({ active: _active, ...rest }) => rest);
+    // 퇴사 처리 후 한 달 넘은 코치는 설정 페이지의 코치 목록과 같은 기준으로
+    // 표에서 뺀다(과거 실적이 있어도 숨김 — isCoachReportVisible 참고).
+    .filter(isCoachReportVisible)
+    .map(({ active: _active, deactivatedAt: _deactivatedAt, ...rest }) => rest);
 }
 
 export interface NewRegistration {
