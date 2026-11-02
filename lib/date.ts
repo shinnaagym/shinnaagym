@@ -39,6 +39,14 @@ export function isValidDateKey(key: string): boolean {
   );
 }
 
+/** 월요일을 0으로 하는 요일 인덱스(0=월 ~ 6=일). 코치 근무시간
+    (coach_working_hours.weekday_starts/ends, 월~금만 5칸)과 같은 기준이다. */
+export function weekdayIndexMonFirst(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return (dt.getUTCDay() + 6) % 7;
+}
+
 /** Returns the Monday (YYYY-MM-DD) of the week containing `key`. */
 export function mondayOfWeek(key: string): string {
   const [y, m, d] = key.split("-").map(Number);
