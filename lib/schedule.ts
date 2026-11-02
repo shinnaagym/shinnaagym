@@ -16,7 +16,14 @@ import type {
   PtType,
   SessionStatus,
 } from "./db";
-import { addDaysToKey, addMonthsToKey, koreaTodayKey, monthKeyRange, monthKeysRange } from "./date";
+import {
+  addDaysToKey,
+  addMonthsToKey,
+  koreaTodayKey,
+  monthKeyRange,
+  monthKeysRange,
+  weekdayIndexMonFirst,
+} from "./date";
 import { LEAVE_TYPE_OPTIONS, PURPOSE_LABELS, scheduleHoursForWeekday, type DayHours } from "./constants";
 
 // ---- 코치 ----
@@ -1349,33 +1356,59 @@ export async function deleteSession(id: number): Promise<void> {
 
 // ---- 사전예약 → 스케줄표 자동 연동 ----
 
+/** 코치가 그 날짜·시간에 설정된 근무시간 안인지 — 평일(월~금)만
+    coach_working_hours의 weekday_starts/ends로 제한하고, 토요일·일요일은
+    (당직 배정 등은 관리자 스케줄표에서만 다루므로) 이 체크에서 건드리지
+    않는다. 근무시간 설정이 없는 코치는 항상 근무 중으로 취급한다(기존
+    "제한 없음" 규칙과 동일). */
+export function isCoachWithinWeekdayHours(
+  coachId: number,
+  weekdayIdx: number,
+  hour: number,
+  workingHoursByCoach: Record<number, CoachWorkingHours>,
+): boolean {
+  if (weekdayIdx >= 5) return true;
+  const wh = workingHoursByCoach[coachId];
+  if (!wh) return true;
+  const start = wh.weekdayStarts[weekdayIdx];
+  const end = wh.weekdayEnds[weekdayIdx];
+  if (start == null || end == null) return true;
+  return hour >= start && hour < end;
+}
+
 /**
- * 사전예약 스케줄 연동 시, 그 날짜·시간에 실제로 비어있는 코치의 시간표 칸을
- * 빌려 쓴다. 신종수 코치가 그 시간에 비어있으면 우선 그 칸을 쓰고(기존 동작
- * 유지), 신종수 코치가 이미 차있으면 그 시간에 비어있는 다른 재직 코치(예:
- * 장동진)를 대신 쓴다 — 어차피 담당 코치는 관리자가 나중에 직접 지정하므로,
- * 어느 코치 칸을 잠깐 빌리는지는 중요하지 않다. 비어있는 재직 코치가 아예
- * 없으면(모든 코치가 그 시간에 이미 차있음) null을 반환해 스케줄 연동을
- * 건너뛴다.
+ * 사전예약 스케줄 연동 시, 그 날짜·시간에 실제로 비어있고 근무시간(오전조/
+ * 오후조 등 코치별 설정) 안인 코치의 시간표 칸을 빌려 쓴다. 신종수 코치가
+ * 그 시간에 비어있으면 우선 그 칸을 쓰고(기존 동작 유지), 신종수 코치가
+ * 이미 차있거나 근무시간이 아니면 그 시간에 비어있고 근무 중인 다른 재직
+ * 코치(예: 장동진)를 대신 쓴다 — 어차피 담당 코치는 관리자가 나중에 직접
+ * 지정하므로, 어느 코치 칸을 잠깐 빌리는지는 중요하지 않다. 그런 코치가
+ * 아예 없으면 null을 반환해 스케줄 연동을 건너뛴다.
  */
-async function pickAvailableCoachId(date: string, hour: number): Promise<number | null> {
-  const result = await query<{ id: number }>(
-    `SELECT c.id
-     FROM coaches c
-     WHERE c.active = true
-       AND NOT EXISTS (
-         SELECT 1 FROM class_sessions s
-         WHERE s.coach_id = c.id
-           AND s.session_date = $1
-           AND s.session_hour = $2
-           AND s.entry_type IN ('session', 'consultation')
-           AND s.status NOT IN ('cancelled', 'no_show')
-       )
-     ORDER BY (c.name ILIKE '%신종수%') DESC, c.id ASC
-     LIMIT 1`,
-    [date, hour],
+export async function pickAvailableCoachId(date: string, hour: number): Promise<number | null> {
+  const [freeResult, workingHours] = await Promise.all([
+    query<{ id: number }>(
+      `SELECT c.id
+       FROM coaches c
+       WHERE c.active = true
+         AND NOT EXISTS (
+           SELECT 1 FROM class_sessions s
+           WHERE s.coach_id = c.id
+             AND s.session_date = $1
+             AND s.session_hour = $2
+             AND s.entry_type IN ('session', 'consultation')
+             AND s.status NOT IN ('cancelled', 'no_show')
+         )
+       ORDER BY (c.name ILIKE '%신종수%') DESC, c.id ASC`,
+      [date, hour],
+    ),
+    getCoachWorkingHours(),
+  ]);
+  const weekdayIdx = weekdayIndexMonFirst(date);
+  const candidate = freeResult.rows.find((r) =>
+    isCoachWithinWeekdayHours(r.id, weekdayIdx, hour, workingHours),
   );
-  return result.rows[0]?.id ?? null;
+  return candidate?.id ?? null;
 }
 
 /** 연락처로 기존 회원을 조회한다(빈 연락처는 조회하지 않고 null). */
