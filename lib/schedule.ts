@@ -1350,15 +1350,30 @@ export async function deleteSession(id: number): Promise<void> {
 // ---- 사전예약 → 스케줄표 자동 연동 ----
 
 /**
- * 사전예약 스케줄 연동은 '신종수' 코치의 시간표 칸만 빌려 쓴다. 다른 코치로
- * 대체하는 조건은 전혀 없다 — 이름에 '신종수'가 들어간 코치를 대소문자/공백
- * 관계없이 찾아 그 코치로만 배정하고(활성 여부도 따지지 않음), 그 코치
- * 자체를 못 찾을 때만 null을 반환해 스케줄 연동을 건너뛴다. 다른 코치로
- * 조용히 새는 경로는 없다.
+ * 사전예약 스케줄 연동 시, 그 날짜·시간에 실제로 비어있는 코치의 시간표 칸을
+ * 빌려 쓴다. 신종수 코치가 그 시간에 비어있으면 우선 그 칸을 쓰고(기존 동작
+ * 유지), 신종수 코치가 이미 차있으면 그 시간에 비어있는 다른 재직 코치(예:
+ * 장동진)를 대신 쓴다 — 어차피 담당 코치는 관리자가 나중에 직접 지정하므로,
+ * 어느 코치 칸을 잠깐 빌리는지는 중요하지 않다. 비어있는 재직 코치가 아예
+ * 없으면(모든 코치가 그 시간에 이미 차있음) null을 반환해 스케줄 연동을
+ * 건너뛴다.
  */
-async function pickDefaultCoachId(): Promise<number | null> {
+async function pickAvailableCoachId(date: string, hour: number): Promise<number | null> {
   const result = await query<{ id: number }>(
-    `SELECT id FROM coaches WHERE name ILIKE '%신종수%' ORDER BY id ASC LIMIT 1`,
+    `SELECT c.id
+     FROM coaches c
+     WHERE c.active = true
+       AND NOT EXISTS (
+         SELECT 1 FROM class_sessions s
+         WHERE s.coach_id = c.id
+           AND s.session_date = $1
+           AND s.session_hour = $2
+           AND s.entry_type IN ('session', 'consultation')
+           AND s.status NOT IN ('cancelled', 'no_show')
+       )
+     ORDER BY (c.name ILIKE '%신종수%') DESC, c.id ASC
+     LIMIT 1`,
+    [date, hour],
   );
   return result.rows[0]?.id ?? null;
 }
@@ -1408,12 +1423,12 @@ export async function linkPreReservationToSchedule(input: {
   date: string;
   hour: number;
 }): Promise<{ memberId: number; sessionId: number } | null> {
-  const coachId = await pickDefaultCoachId();
-  if (!coachId) return null; // 활성 코치가 없으면 연동을 건너뛴다.
+  const coachId = await pickAvailableCoachId(input.date, input.hour);
+  if (!coachId) return null; // 그 시간에 비어있는 재직 코치가 없으면 연동을 건너뛴다.
 
   // 회원의 담당 코치는 관리자가 직접 지정하기 전까지 미지정으로 둔다.
-  // coachId는 스케줄표에 임시로 잡아둘 칸(신종수 코치 시간표)을 고를 때만
-  // 쓰고, 회원 레코드 자체에는 저장하지 않는다.
+  // coachId는 스케줄표에 임시로 잡아둘 칸(그 시간에 비어있는 코치의 시간표)을
+  // 고를 때만 쓰고, 회원 레코드 자체에는 저장하지 않는다.
   const member = await findOrCreateMemberByPhone({
     name: input.name,
     phone: input.phone,
