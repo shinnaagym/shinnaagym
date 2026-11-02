@@ -2108,7 +2108,7 @@ export async function getCoachAvailability(
   const dateKeys = Array.from({ length: days }, (_, i) => addDaysToKey(fromKey, i));
   const toKey = dateKeys[dateKeys.length - 1];
 
-  const [hoursMap, sessionsResult] = await Promise.all([
+  const [hoursMap, sessionsResult, workingHoursByCoach] = await Promise.all([
     getDayHoursForRange(dateKeys),
     query<{ session_date: string; session_hour: number }>(
       // 개인 일정(memo)은 코치의 사적인 메모일 뿐이라 회원에게는 마감으로
@@ -2119,6 +2119,7 @@ export async function getCoachAvailability(
          AND status <> 'cancelled' AND entry_type <> 'memo'`,
       [coachId, fromKey, toKey],
     ),
+    getCoachWorkingHours(),
   ]);
 
   const takenSet = new Set(
@@ -2128,9 +2129,15 @@ export async function getCoachAvailability(
   return dateKeys.map((date) => {
     const hours = hoursMap[date];
     if (hours.closed) return { date, closed: true, slots: [] };
+    // 오전조/오후조처럼 코치별로 지정해둔 근무시간(평일만, coach_working_hours)
+    // 밖이면 그 코치 자신의 수업이 없어도 회원이 예약할 수 없게 막는다.
+    const weekdayIdx = weekdayIndexMonFirst(date);
     const slots = Array.from({ length: hours.end - hours.start }, (_, i) => {
       const hour = hours.start + i;
-      return { hour, available: !takenSet.has(`${date}-${hour}`) };
+      const available =
+        !takenSet.has(`${date}-${hour}`) &&
+        isCoachWithinWeekdayHours(coachId, weekdayIdx, hour, workingHoursByCoach);
+      return { hour, available };
     });
     return { date, closed: false, slots };
   });
