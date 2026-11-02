@@ -496,8 +496,11 @@ export interface MemberWithProgress extends MemberRow {
       빠지는 문제가 있다. */
   scheduled_count: number;
   /** 이번 달(KST) 들어 실제로 지난(오늘 포함) 수업 횟수 — 전체 누적인 done_count와
-      달리 이번 달치만 센다. 회원 관리 목록의 "이번 달 진행횟수" 열에 쓴다. */
+      달리 이번 달치만 센다. 회원 관리 목록의 "지난 달/이번 달 진행횟수" 열에 쓴다. */
   monthly_done_count: number;
+  /** 바로 지난 달(KST 기준 통째로 다 지난 달) 진행 횟수. monthly_done_count와
+      같은 열에 나란히 보여준다. */
+  last_month_done_count: number;
   package_count: number;
   has_next_week_session: boolean;
   latest_pt_type: PtType;
@@ -509,12 +512,14 @@ export async function listMembersWithProgress(
 ): Promise<MemberWithProgress[]> {
   const todayKey = koreaTodayKey();
   const monthStart = monthKeyRange(todayKey.slice(0, 7))[0];
+  const lastMonthStart = monthKeyRange(addMonthsToKey(todayKey.slice(0, 7), -1))[0];
   const result = await query<MemberWithProgress>(
     `SELECT m.*,
        COALESCE(p.total, 0)::int as total_sessions,
        COALESCE(s.done, 0)::int as done_count,
        COALESCE(s.scheduled, 0)::int as scheduled_count,
        COALESCE(s.monthly_done, 0)::int as monthly_done_count,
+       COALESCE(s.last_monthly_done, 0)::int as last_month_done_count,
        COALESCE(p.pkg_count, 0)::int as package_count,
        (nw.member_id IS NOT NULL) as has_next_week_session,
        COALESCE(lp.pt_type, '1:1') as latest_pt_type
@@ -525,14 +530,15 @@ export async function listMembersWithProgress(
      ) p ON p.member_id = m.id
      LEFT JOIN (
        -- done_count(진행 횟수)·scheduled_count(예약 미래분 포함)·monthly_done_count
-       -- (이번 달치만)는 전부 "취소되지 않은 session" 집계라, class_sessions를
-       -- 여러 번 훑는 대신 FILTER로 한 번의 스캔에서 같이 뽑는다. done_count는
-       -- 오늘(KST) 이전에 실제로 지난 수업만 센다(미래 예약은 예약 시점에
-       -- 진행률로 잡히면 안 되므로).
+       -- (이번 달치만)·last_monthly_done(바로 지난 달치만)는 전부 "취소되지 않은
+       -- session" 집계라, class_sessions를 여러 번 훑는 대신 FILTER로 한 번의
+       -- 스캔에서 같이 뽑는다. done_count는 오늘(KST) 이전에 실제로 지난 수업만
+       -- 센다(미래 예약은 예약 시점에 진행률로 잡히면 안 되므로).
        SELECT member_id,
          COUNT(*) FILTER (WHERE session_date <= $3) as done,
          COUNT(*) as scheduled,
-         COUNT(*) FILTER (WHERE session_date >= $4 AND session_date <= $3) as monthly_done
+         COUNT(*) FILTER (WHERE session_date >= $4 AND session_date <= $3) as monthly_done,
+         COUNT(*) FILTER (WHERE session_date >= $5 AND session_date < $4) as last_monthly_done
        FROM class_sessions
        WHERE entry_type = 'session' AND status <> 'cancelled'
        GROUP BY member_id
@@ -549,7 +555,7 @@ export async function listMembersWithProgress(
      ) lp ON lp.member_id = m.id
      WHERE m.deleted_at IS NULL
      ORDER BY m.name ASC`,
-    [nextWeekStart ?? "9999-12-31", nextWeekEnd ?? "9999-12-31", todayKey, monthStart],
+    [nextWeekStart ?? "9999-12-31", nextWeekEnd ?? "9999-12-31", todayKey, monthStart, lastMonthStart],
   );
   return result.rows;
 }
