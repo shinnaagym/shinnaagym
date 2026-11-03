@@ -202,9 +202,10 @@ test("근속 1년 미만은 퇴직금 예상액이 없음(null)", () => {
     referralSupplyAmount: 0,
   });
   assert.equal(result.severanceEstimate, null);
+  assert.equal(result.severanceMonthlyAccrual, null);
 });
 
-test("근속 1년 이상이면 퇴직금 예상액이 계산됨", () => {
+test("근속 1년 이상이면 퇴직금 예상액과 이번 달 적립액이 계산됨", () => {
   const result = calculatePayroll({
     employmentType: "regular",
     hiredAt: "2024-01-01",
@@ -216,6 +217,8 @@ test("근속 1년 이상이면 퇴직금 예상액이 계산됨", () => {
   });
   assert.notEqual(result.severanceEstimate, null);
   assert.ok((result.severanceEstimate ?? 0) > 0);
+  // 이번 달 적립액(DC형) = 총지급액 ÷ 12.
+  assert.equal(result.severanceMonthlyAccrual, Math.round(result.grossPay / 12));
 });
 
 test("대표(owner)는 수업/소개 실적과 무관하게 급여가 항상 0원", () => {
@@ -235,6 +238,7 @@ test("대표(owner)는 수업/소개 실적과 무관하게 급여가 항상 0�
   assert.equal(result.referralIncentive, 0);
   assert.equal(result.teamLeadAllowance, 0);
   assert.equal(result.severanceEstimate, null);
+  assert.equal(result.severanceMonthlyAccrual, null);
 });
 
 test("팀장(team_lead) 유형은 정직원과 동일한 급여 규칙을 쓰고, 체크박스 없이 팀장수당이 자동 적용됨", () => {

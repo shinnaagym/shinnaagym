@@ -251,8 +251,13 @@ export interface PayrollResult {
   taxableAmount: number;
   deductions: PayrollDeductions;
   netPay: number;
-  /** 근속 1년 미만이거나 시뮬레이션(tenureBucketOverride 지정) 모드면 null. */
+  /** 퇴직연금(DC형) 누적 적립 예상액(간이 계산). 근속 1년 미만이거나
+      시뮬레이션(tenureBucketOverride 지정) 모드면 null. */
   severanceEstimate: number | null;
+  /** 퇴직연금(DC형) 이번 달 적립액 = 총지급액 ÷ 12(연간 임금총액의 1/12를
+      매달 적립하는 DC형 표준 방식). severanceEstimate와 같은 조건에서만
+      값이 있고, 그 외에는 null. */
+  severanceMonthlyAccrual: number | null;
   /** 이 계산에 실제로 쓰인 4대보험 요율/상한액(입력에 없으면 기본값). 화면에
       요율을 표시할 때와 저장된 이력을 나중에 다시 볼 때 실제 적용값을
       보여주기 위해 결과에 함께 담아둔다. */
@@ -380,6 +385,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
       },
       netPay: 0,
       severanceEstimate: null,
+      severanceMonthlyAccrual: null,
       insuranceRatesUsed: rates,
       insuranceBaseAmount: 0,
       insuranceBaseSource: "current-month",
@@ -491,10 +497,12 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
 
   const netPay = grossPay - deductions.totalDeduction;
 
-  const severanceEstimate =
-    isRegularPayScale(employmentType) && tenure !== "under1" && !input.tenureBucketOverride
-      ? round((grossPay * (daysBetween(hiredAt, referenceDate) / 365)) / 12)
-      : null;
+  const severanceEligible =
+    isRegularPayScale(employmentType) && tenure !== "under1" && !input.tenureBucketOverride;
+  const severanceEstimate = severanceEligible
+    ? round((grossPay * (daysBetween(hiredAt, referenceDate) / 365)) / 12)
+    : null;
+  const severanceMonthlyAccrual = severanceEligible ? round(grossPay / 12) : null;
 
   return {
     employmentType,
@@ -521,6 +529,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     deductions,
     netPay,
     severanceEstimate,
+    severanceMonthlyAccrual,
     insuranceRatesUsed: rates,
     insuranceBaseAmount,
     insuranceBaseSource,

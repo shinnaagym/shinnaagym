@@ -246,6 +246,18 @@ export function PayrollSpecCard({
         <SpecRow label="총지급액" value={result.grossPay} emphasis />
       </div>
 
+      {result.severanceEstimate !== null && result.severanceMonthlyAccrual !== null && (
+        <div className="text-sm divide-y divide-line/40 mt-3 pt-3 border-t border-line/60">
+          <p className="font-medium text-ink/70 pb-1">퇴직연금(DC형) 적립</p>
+          <SpecRow label="이번 달 적립액" value={result.severanceMonthlyAccrual} />
+          <SpecRow label="총 적립액(간이 추정)" value={result.severanceEstimate} emphasis />
+          <p className="text-xs text-ink/40 pt-2">
+            * 이번 달 적립액은 총지급액 ÷ 12(연간 임금총액의 1/12)로 계산해요. 총 적립액은 매달
+            적립액이 이번 달과 같았다고 가정한 간이 추정치라, 실제 누적액과 차이가 날 수 있어요.
+          </p>
+        </div>
+      )}
+
       {referralEntries && referralEntries.length > 0 && (
         <div className="text-xs text-ink/50 mt-3 pt-3 border-t border-line/60">
           <p className="mb-1.5 font-medium text-ink/60">소개 결제 내역</p>
@@ -298,13 +310,6 @@ export function PayrollSpecCard({
         <p className="text-xs text-ink/40 mt-3">
           * 원천세는 국세청 근로소득 간이세액표 기준으로 매달 직접 조회해 입력한 금액이에요(자동
           계산 아님). 입력하지 않으면 0으로 계산돼요.
-        </p>
-      )}
-
-      {result.severanceEstimate !== null && (
-        <p className="text-xs text-ink/50 mt-2">
-          퇴직금 누적 예상액(간이 계산): {formatWon(result.severanceEstimate)} — 실제 퇴직금은
-          퇴사 직전 3개월 평균임금 기준이라 차이가 날 수 있어요.
         </p>
       )}
 
