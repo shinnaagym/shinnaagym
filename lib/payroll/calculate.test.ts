@@ -191,7 +191,7 @@ test("팀장수당은 정직원에게만, 고정 20만원 추가 지급", () => 
   assert.equal(freelancerTeamLead.teamLeadAllowance, 0);
 });
 
-test("근속 1년 미만은 퇴직금 예상액이 없음(null)", () => {
+test("근속 1년 미만이어도 DC형은 가입 시점부터 바로 적립됨", () => {
   const result = calculatePayroll({
     employmentType: "regular",
     hiredAt: "2026-01-01",
@@ -201,8 +201,24 @@ test("근속 1년 미만은 퇴직금 예상액이 없음(null)", () => {
     sessionCount2on1: 0,
     referralSupplyAmount: 0,
   });
+  assert.notEqual(result.severanceEstimate, null);
+  assert.ok((result.severanceEstimate ?? 0) > 0);
+  assert.equal(result.severanceMonthlyAccrual, Math.round(result.grossPay / 12));
+});
+
+test("입사일이 비어있으면(미등록 코치) 총 적립액은 null이지만 이번 달 적립액은 계산됨", () => {
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "",
+    yearMonth: "2026-06",
+    isTeamLead: false,
+    sessionCount1on1: 0,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
   assert.equal(result.severanceEstimate, null);
-  assert.equal(result.severanceMonthlyAccrual, null);
+  assert.equal(result.severanceMonthlyAccrual, Math.round(result.grossPay / 12));
+  assert.ok((result.severanceMonthlyAccrual ?? 0) > 0);
 });
 
 test("근속 1년 이상이면 퇴직금 예상액과 이번 달 적립액이 계산됨", () => {

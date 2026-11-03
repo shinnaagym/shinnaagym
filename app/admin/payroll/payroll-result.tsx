@@ -246,11 +246,18 @@ export function PayrollSpecCard({
         <SpecRow label="총지급액" value={result.grossPay} emphasis />
       </div>
 
-      {result.severanceEstimate !== null && result.severanceMonthlyAccrual !== null && (
+      {result.severanceMonthlyAccrual !== null && (
         <div className="text-sm divide-y divide-line/40 mt-3 pt-3 border-t border-line/60">
           <p className="font-medium text-ink/70 pb-1">퇴직연금(DC형) 적립</p>
           <SpecRow label="이번 달 적립액" value={result.severanceMonthlyAccrual} />
-          <SpecRow label="총 적립액(간이 추정)" value={result.severanceEstimate} emphasis />
+          {result.severanceEstimate !== null ? (
+            <SpecRow label="총 적립액(간이 추정)" value={result.severanceEstimate} emphasis />
+          ) : (
+            <div className="flex items-center justify-between py-1 font-semibold">
+              <span>총 적립액(간이 추정)</span>
+              <span className="text-ink/40 font-normal">입사일을 등록해주세요</span>
+            </div>
+          )}
           <p className="text-xs text-ink/40 pt-2">
             * 이번 달 적립액은 총지급액 ÷ 12(연간 임금총액의 1/12)로 계산해요. 총 적립액은 매달
             적립액이 이번 달과 같았다고 가정한 간이 추정치라, 실제 누적액과 차이가 날 수 있어요.

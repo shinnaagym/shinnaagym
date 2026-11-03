@@ -251,8 +251,9 @@ export interface PayrollResult {
   taxableAmount: number;
   deductions: PayrollDeductions;
   netPay: number;
-  /** 퇴직연금(DC형) 누적 적립 예상액(간이 계산). 근속 1년 미만이거나
-      시뮬레이션(tenureBucketOverride 지정) 모드면 null. */
+  /** 퇴직연금(DC형) 누적 적립 예상액(간이 계산). 정직원/팀장이 아니거나
+      시뮬레이션(tenureBucketOverride 지정) 모드면 null — 근속 1년 미만이어도
+      DC형은 가입 시점부터 바로 적립하므로 값이 있다. */
   severanceEstimate: number | null;
   /** 퇴직연금(DC형) 이번 달 적립액 = 총지급액 ÷ 12(연간 임금총액의 1/12를
       매달 적립하는 DC형 표준 방식). severanceEstimate와 같은 조건에서만
@@ -497,11 +498,17 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
 
   const netPay = grossPay - deductions.totalDeduction;
 
-  const severanceEligible =
-    isRegularPayScale(employmentType) && tenure !== "under1" && !input.tenureBucketOverride;
-  const severanceEstimate = severanceEligible
-    ? round((grossPay * (daysBetween(hiredAt, referenceDate) / 365)) / 12)
-    : null;
+  // DC형 퇴직연금은 매달 적립이 원칙이라, 근속 1년 미만이어도 적립액을
+  // 보여준다(근속 1년 미만자는 법정 퇴직급여 "지급" 대상에서는 빠지지만,
+  // 이 스튜디오는 가입 시점부터 바로 적립하기로 했다).
+  const severanceEligible = isRegularPayScale(employmentType) && !input.tenureBucketOverride;
+  // 누적 적립액은 입사일부터 지난 날짜 수로 계산해서 입사일이 비어있거나
+  // 잘못된 값이면 구할 수 없다(이번 달 적립액은 입사일과 무관하므로 영향
+  // 없음 — 아래 severanceMonthlyAccrual 참고).
+  const severanceEstimate =
+    severanceEligible && isValidDateKeyLocal(hiredAt)
+      ? round((grossPay * (daysBetween(hiredAt, referenceDate) / 365)) / 12)
+      : null;
   const severanceMonthlyAccrual = severanceEligible ? round(grossPay / 12) : null;
 
   return {
