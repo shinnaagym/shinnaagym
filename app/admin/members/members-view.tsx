@@ -494,7 +494,12 @@ export function MembersView({
       // (이름 칸에 "이름A · 이름B"로 함께 표시). id가 더 작은(먼저 등록된) 쪽
       // 행만 남기고, 나중에 함께 등록된 짝의 행은 숨긴다.
       if (m.duo_partner_id != null && m.duo_partner_id < m.id) return false;
-      if (search && !m.name.includes(search)) return false;
+      if (search) {
+        const searchDigits = search.replace(/\D/g, "");
+        const nameMatches = m.name.includes(search);
+        const phoneMatches = searchDigits.length > 0 && m.phone.replace(/\D/g, "").includes(searchDigits);
+        if (!nameMatches && !phoneMatches) return false;
+      }
       if (coachFilter === "unassigned") {
         if (m.coach_id !== null) return false;
       } else if (coachFilter !== "all" && m.coach_id !== coachFilter) {
@@ -590,7 +595,7 @@ export function MembersView({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="이름 검색"
+            placeholder="이름 또는 전화번호 검색"
             className="rounded-full border border-line bg-white px-4 py-2 text-sm outline-none focus:border-coral"
           />
           <select
