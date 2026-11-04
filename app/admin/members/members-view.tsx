@@ -2457,6 +2457,7 @@ function MemberDetailModal({
   const [notes, setNotes] = useState(initialMember.notes);
 
   const [editingPkgId, setEditingPkgId] = useState<number | null>(null);
+  const [expandedPkgId, setExpandedPkgId] = useState<number | null>(null);
   const [editTotal, setEditTotal] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editNote, setEditNote] = useState("");
@@ -2889,7 +2890,12 @@ function MemberDetailModal({
                         <PaymentMethodBadge method={pkg.payment_method} />
                       </p>
                       <p
-                        className="text-ink/60 truncate"
+                        onClick={() =>
+                          setExpandedPkgId((id) => (id === pkg.id ? null : pkg.id))
+                        }
+                        className={`text-ink/60 cursor-pointer ${
+                          expandedPkgId === pkg.id ? "whitespace-normal break-words" : "truncate"
+                        }`}
                         title={`${pkg.total_sessions}회 · ${formatWon(pkg.price)}${pkg.note ? ` · ${pkg.note}` : ""}`}
                       >
                         {pkg.total_sessions}회 · {formatWon(pkg.price)}
