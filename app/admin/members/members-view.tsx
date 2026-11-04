@@ -2888,7 +2888,10 @@ function MemberDetailModal({
                         <PtTypeBadge ptType={pkg.pt_type} />
                         <PaymentMethodBadge method={pkg.payment_method} />
                       </p>
-                      <p className="text-ink/60 truncate">
+                      <p
+                        className="text-ink/60 truncate"
+                        title={`${pkg.total_sessions}회 · ${formatWon(pkg.price)}${pkg.note ? ` · ${pkg.note}` : ""}`}
+                      >
                         {pkg.total_sessions}회 · {formatWon(pkg.price)}
                         {pkg.note && ` · ${pkg.note}`}
                       </p>
