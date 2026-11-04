@@ -56,6 +56,22 @@ function daysBetween(fromKey: string, toKey: string): number {
 }
 
 /**
+ * 입사한 첫 달(입사일이 속한 달 = 정산월)에는 기본급을 일할계산하기 위한 비율을
+ * 반환한다(달력일수 기준: 입사일부터 그 달 말일까지의 일수 ÷ 그 달 총 일수).
+ * 이미 이전 달부터 근무 중이었던 달은 1(전액), 입사일이 비어있거나 형식이
+ * 잘못됐으면 안전하게 1(전액, 일할계산 안 함)을 반환한다.
+ */
+function baseSalaryProrationRatio(hiredAt: string, yearMonth: string): number {
+  if (!isValidDateKeyLocal(hiredAt)) return 1;
+  const hiredYearMonth = hiredAt.slice(0, 7);
+  if (hiredYearMonth !== yearMonth) return hiredYearMonth > yearMonth ? 0 : 1;
+  const monthEnd = monthEndDateKey(yearMonth);
+  const totalDaysInMonth = Number(monthEnd.slice(8, 10));
+  const daysWorked = daysBetween(hiredAt, monthEnd) + 1;
+  return daysWorked / totalDaysInMonth;
+}
+
+/**
  * 입사일과 정산 기준일(보통 정산월 말일)을 비교해 근속 구간을 판정한다.
  * 입사 1주년/2주년 당일부터 다음 구간으로 취급한다(경계일 포함, ">= 1년"은 상향 구간).
  */
@@ -235,6 +251,8 @@ export interface PayrollResult {
   excessTotal: number;
   rate1on1: number;
   rate2on1: number;
+  /** 입사한 첫 달(입사일이 정산월에 속하면)은 달력일수 기준으로 일할계산된
+      금액. 그 외에는 REGULAR_BASE_SALARY 전액. */
   baseSalary: number;
   mealAllowance: number;
   lessonFee1on1: number;
@@ -435,7 +453,9 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     : { overtimeSessionCount: 0, overtimeFeeAmount: 0 };
   const roundedOvertimeFeeAmount = round(overtimeFeeAmount);
 
-  const baseSalary = isRegularPayScale(employmentType) ? REGULAR_BASE_SALARY : 0;
+  const baseSalary = isRegularPayScale(employmentType)
+    ? round(REGULAR_BASE_SALARY * baseSalaryProrationRatio(hiredAt, yearMonth))
+    : 0;
   const mealAllowance = isRegularPayScale(employmentType) ? REGULAR_MEAL_ALLOWANCE : 0;
   const teamLeadAllowance = isTeamLead ? REGULAR_TEAM_LEAD_ALLOWANCE : 0;
   const referralIncentive = round(Math.max(0, referralSupplyAmount) * REFERRAL_INCENTIVE_RATE);

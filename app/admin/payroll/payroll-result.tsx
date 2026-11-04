@@ -1,7 +1,7 @@
 import type { EmploymentType } from "@/lib/db";
 import type { ReferralEntry } from "@/lib/payroll";
 import type { PayrollResult } from "@/lib/payroll/calculate";
-import { DEFAULT_INSURANCE_RATES, isRegularPayScale } from "@/lib/payroll/config";
+import { DEFAULT_INSURANCE_RATES, REGULAR_BASE_SALARY, isRegularPayScale } from "@/lib/payroll/config";
 
 function formatWon(n: number): string {
   return `₩${Math.round(n).toLocaleString("ko-KR")}`;
@@ -234,6 +234,13 @@ export function PayrollSpecCard({
 
       <div className="text-sm divide-y divide-line/40">
         <SpecRow label="기본급" value={result.baseSalary} />
+        {isRegularPayScale(result.employmentType) &&
+          result.baseSalary > 0 &&
+          result.baseSalary < REGULAR_BASE_SALARY && (
+            <p className="text-xs text-ink/40 py-1">
+              * 입사 첫 달이라 근무일수만큼 일할계산했어요(전액 기준 {formatWon(REGULAR_BASE_SALARY)}).
+            </p>
+          )}
         <SpecRow label="식대(비과세)" value={result.mealAllowance} />
         <SpecRow label="수업료(1:1)" value={result.lessonFee1on1} />
         <SpecRow label="수업료(2:1)" value={result.lessonFee2on1} />
