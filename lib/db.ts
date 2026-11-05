@@ -134,7 +134,7 @@ const SEED_HOLIDAYS_2027: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 49;
+const SCHEMA_VERSION = 50;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -892,6 +892,21 @@ function runFullMigration(): Promise<void> {
               updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
 
+            -- 소개 결제 내역을 코치별로 영구 보관한다(특정 급여 월에 종속되지
+            -- 않음). 급여 계산 화면에서 입력해 추가하면 여기 남고, 관리자가
+            -- 명시적으로 삭제하기 전까지는 다음 달 급여를 계산할 때도 계속
+            -- 같은 항목이 인센티브(결제 금액의 5%) 산정에 반영된다.
+            -- payroll_records.referral_entries는 저장 시점의 스냅샷일 뿐이고,
+            -- 이 표가 "현재 살아있는" 목록의 원본이다.
+            CREATE TABLE IF NOT EXISTS coach_referral_entries (
+              id SERIAL PRIMARY KEY,
+              coach_id INTEGER NOT NULL REFERENCES coaches(id) ON DELETE CASCADE,
+              note TEXT NOT NULL DEFAULT '',
+              amount INTEGER NOT NULL DEFAULT 0,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_coach_referral_entries_coach_id ON coach_referral_entries(coach_id);
+
             -- deactivated_at 컬럼(SCHEMA_VERSION 추가분, 위 참고)이 생기기
             -- 전에 이미 퇴사 처리돼 있던 코치는 그 컬럼이 계속 NULL이라,
             -- "퇴사 처리 후 한 달 지나면 설정 화면 목록에서 숨김" 로직이
@@ -1417,6 +1432,18 @@ export interface PayrollRecordRow {
   referral_payment_amount: number;
   referral_entries: unknown;
   result: unknown;
+  created_at: string;
+}
+
+/** 코치별로 영구 보관하는 소개 결제 내역 한 건. 특정 급여 월에 종속되지 않고
+    (payroll_records.referral_entries는 저장 시점의 스냅샷일 뿐), 관리자가
+    명시적으로 삭제하기 전까지 계속 살아있어 급여를 계산할 때마다 인센티브
+    산정에 반영된다. */
+export interface CoachReferralEntryRow {
+  id: number;
+  coach_id: number;
+  note: string;
+  amount: number;
   created_at: string;
 }
 

@@ -1,5 +1,5 @@
 import { query } from "./db";
-import type { EmploymentType, InsuranceSettingsRow, PayrollRecordRow } from "./db";
+import type { CoachReferralEntryRow, EmploymentType, InsuranceSettingsRow, PayrollRecordRow } from "./db";
 import type { PayrollResult, ReferralEntry, SessionRecord } from "./payroll/calculate";
 import { DEFAULT_INSURANCE_RATES, type InsuranceRates } from "./payroll/config";
 import { koreaTodayKey } from "./date";
@@ -216,6 +216,33 @@ export async function listPayrollRecords(
 
 export async function deletePayrollRecord(id: number): Promise<void> {
   await query(`DELETE FROM payroll_records WHERE id = $1`, [id]);
+}
+
+/** 코치의 소개 결제 내역(coach_referral_entries)을 최신순으로 조회한다. 이
+    목록은 특정 급여 월에 종속되지 않고, 관리자가 삭제하기 전까지 계속
+    인센티브 산정에 반영된다. */
+export async function listCoachReferralEntries(coachId: number): Promise<CoachReferralEntryRow[]> {
+  const result = await query<CoachReferralEntryRow>(
+    `SELECT * FROM coach_referral_entries WHERE coach_id = $1 ORDER BY created_at DESC`,
+    [coachId],
+  );
+  return result.rows;
+}
+
+export async function addCoachReferralEntry(
+  coachId: number,
+  note: string,
+  amount: number,
+): Promise<CoachReferralEntryRow> {
+  const result = await query<CoachReferralEntryRow>(
+    `INSERT INTO coach_referral_entries (coach_id, note, amount) VALUES ($1, $2, $3) RETURNING *`,
+    [coachId, note, amount],
+  );
+  return result.rows[0];
+}
+
+export async function deleteCoachReferralEntry(id: number): Promise<void> {
+  await query(`DELETE FROM coach_referral_entries WHERE id = $1`, [id]);
 }
 
 /** 저장된 4대보험 요율 설정을 읽는다. 저장된 값이 없으면(대표가 아직 한
