@@ -70,6 +70,42 @@ function emptyCircuit(): CircuitInput {
   return { type: PT_LOG_CIRCUIT_TYPE_OPTIONS[0].value, minutes: "", rounds: "", workout: "" };
 }
 
+/** 무게/변형 동작, 횟수/시간(초), 세트 입력칸 아래에 공통으로 쓰는 과거 기록
+    자동완성 목록. 지금 입력한 값을 포함하는 과거 값만(최대 6개) 보여주고,
+    누르면 onPick으로 바로 채워 넣는다. */
+function PastValueSuggestions({
+  options,
+  query,
+  onPick,
+}: {
+  options: string[];
+  query: string;
+  onPick: (value: string) => void;
+}) {
+  const matches = options
+    .filter((o) => o !== query && (query === "" || o.includes(query)))
+    .slice(0, 6);
+  if (matches.length === 0) return null;
+  return (
+    <ul className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-line bg-white shadow-md overflow-hidden">
+      {matches.map((option) => (
+        <li key={option}>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onPick(option);
+            }}
+            className="block w-full text-left px-3 py-2 text-sm hover:bg-bone/60"
+          >
+            {option}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** "과거 운동이력" 다이얼의 선택지 한 줄 미리보기. */
 function circuitEntryPreview(
   circuit: PastCircuitEntry["circuit"],
@@ -174,6 +210,8 @@ export function PtLogForm({
   pastExerciseGroups = {},
   pastExerciseNotes = {},
   pastExerciseWeightOptions = {},
+  pastExerciseRepsOptions = {},
+  pastExerciseSetsOptions = {},
   pastExerciseNoteOptions = {},
   pastCircuitEntries = {},
   kind = "pt_log",
@@ -207,6 +245,12 @@ export function PtLogForm({
       중복 없음). 운동 이름 자동완성처럼 입력칸 아래에 목록으로 보여주고 누르면
       바로 채워 넣는다. */
   pastExerciseWeightOptions?: Record<string, string[]>;
+  /** (운동 이름, 도구) -> 그동안 그 조합에 적었던 횟수/시간(초) 목록(최신순, 중복
+      없음). pastExerciseWeightOptions와 같은 방식의 클릭 자동완성용. */
+  pastExerciseRepsOptions?: Record<string, string[]>;
+  /** (운동 이름, 도구) -> 그동안 그 조합에 적었던 세트 수 목록(최신순, 중복 없음).
+      pastExerciseWeightOptions와 같은 방식의 클릭 자동완성용. */
+  pastExerciseSetsOptions?: Record<string, string[]>;
   /** (운동 이름, 도구) -> 그동안 그 조합에 적었던 특이사항 목록(최신순, 중복 없음).
       운동 이름 자동완성과 같은 방식의 클릭 자동완성용. */
   pastExerciseNoteOptions?: Record<string, string[]>;
@@ -255,9 +299,11 @@ export function PtLogForm({
   const [submitting, setSubmitting] = useState(false);
   // 이름 입력 중 자동완성 목록을 띄울 운동의 인덱스. 한 번에 한 칸만 연다.
   const [suggestIndex, setSuggestIndex] = useState<number | null>(null);
-  // 무게/변형 동작 자동완성을 띄울 입력칸. 운동마다 세트 그룹이 여러 개라
-  // `${exIndex}:${groupIndex}` 조합 키로 어느 칸인지 구분한다.
+  // 무게/변형 동작, 횟수/시간(초), 세트 자동완성을 띄울 입력칸. 운동마다 세트
+  // 그룹이 여러 개라 `${exIndex}:${groupIndex}` 조합 키로 어느 칸인지 구분한다.
   const [weightSuggestKey, setWeightSuggestKey] = useState<string | null>(null);
+  const [repsSuggestKey, setRepsSuggestKey] = useState<string | null>(null);
+  const [setsSuggestKey, setSetsSuggestKey] = useState<string | null>(null);
   // 특이사항 자동완성을 띄울 운동의 인덱스.
   const [noteSuggestIndex, setNoteSuggestIndex] = useState<number | null>(null);
   // 운동 카드를 드래그로 재정렬할 때 — 끌고 있는 카드는 흐리게, 지금 올려놓은
@@ -817,9 +863,11 @@ export function PtLogForm({
                       : "kg / 변형 동작";
                   const repsPlaceholder =
                     pastGroup?.reps != null ? String(pastGroup.reps) : "횟수 / 시간(초)";
-                  const weightKey = `${exIndex}:${groupIndex}`;
-                  const weightOptions =
-                    pastExerciseWeightOptions[pastExerciseGroupKey(ex.name.trim(), ex.equipment)] ?? [];
+                  const groupKey = `${exIndex}:${groupIndex}`;
+                  const exerciseGroupKey = pastExerciseGroupKey(ex.name.trim(), ex.equipment);
+                  const weightOptions = pastExerciseWeightOptions[exerciseGroupKey] ?? [];
+                  const repsOptions = pastExerciseRepsOptions[exerciseGroupKey] ?? [];
+                  const setsOptions = pastExerciseSetsOptions[exerciseGroupKey] ?? [];
                   return (
                   <div key={groupIndex} className="space-y-1.5">
                     <div className="flex items-center gap-1">
@@ -838,54 +886,65 @@ export function PtLogForm({
                           autoComplete="off"
                           value={g.weight}
                           onChange={(e) => updateGroup(exIndex, groupIndex, { weight: e.target.value })}
-                          onFocus={() => setWeightSuggestKey(weightKey)}
+                          onFocus={() => setWeightSuggestKey(groupKey)}
                           onBlur={() => setTimeout(() => setWeightSuggestKey(null), 150)}
                           placeholder={weightPlaceholder}
                           className="w-full rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
                         />
-                        {weightSuggestKey === weightKey &&
-                          (() => {
-                            const query = g.weight.trim();
-                            const matches = weightOptions
-                              .filter((w) => w !== query && (query === "" || w.includes(query)))
-                              .slice(0, 6);
-                            if (matches.length === 0) return null;
-                            return (
-                              <ul className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-line bg-white shadow-md overflow-hidden">
-                                {matches.map((weight) => (
-                                  <li key={weight}>
-                                    <button
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        updateGroup(exIndex, groupIndex, { weight });
-                                        setWeightSuggestKey(null);
-                                      }}
-                                      className="block w-full text-left px-3 py-2 text-sm hover:bg-bone/60"
-                                    >
-                                      {weight}
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            );
-                          })()}
+                        {weightSuggestKey === groupKey && (
+                          <PastValueSuggestions
+                            options={weightOptions}
+                            query={g.weight.trim()}
+                            onPick={(weight) => {
+                              updateGroup(exIndex, groupIndex, { weight });
+                              setWeightSuggestKey(null);
+                            }}
+                          />
+                        )}
                       </div>
-                      <input
-                        type="text"
-                        value={g.reps}
-                        onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
-                        placeholder={repsPlaceholder}
-                        className="min-w-0 flex-[1] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
-                      />
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={g.sets}
-                        onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
-                        placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
-                        className="min-w-0 flex-[1] rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
-                      />
+                      <div className="relative min-w-0 flex-[1]">
+                        <input
+                          type="text"
+                          value={g.reps}
+                          onChange={(e) => updateGroup(exIndex, groupIndex, { reps: e.target.value })}
+                          onFocus={() => setRepsSuggestKey(groupKey)}
+                          onBlur={() => setTimeout(() => setRepsSuggestKey(null), 150)}
+                          placeholder={repsPlaceholder}
+                          className="w-full rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                        />
+                        {repsSuggestKey === groupKey && (
+                          <PastValueSuggestions
+                            options={repsOptions}
+                            query={g.reps.trim()}
+                            onPick={(reps) => {
+                              updateGroup(exIndex, groupIndex, { reps });
+                              setRepsSuggestKey(null);
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className="relative min-w-0 flex-[1]">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={g.sets}
+                          onChange={(e) => updateGroup(exIndex, groupIndex, { sets: e.target.value })}
+                          onFocus={() => setSetsSuggestKey(groupKey)}
+                          onBlur={() => setTimeout(() => setSetsSuggestKey(null), 150)}
+                          placeholder={pastGroup?.sets != null ? String(pastGroup.sets) : "세트"}
+                          className="w-full rounded-lg border border-line px-2 py-1.5 text-sm outline-none focus:border-coral"
+                        />
+                        {setsSuggestKey === groupKey && (
+                          <PastValueSuggestions
+                            options={setsOptions}
+                            query={g.sets.trim()}
+                            onPick={(sets) => {
+                              updateGroup(exIndex, groupIndex, { sets });
+                              setSetsSuggestKey(null);
+                            }}
+                          />
+                        )}
+                      </div>
                       {kind === "pt_log" && (
                         <label className="flex items-center gap-1 shrink-0 text-[11px] text-ink/50 whitespace-nowrap">
                           그래프 기록

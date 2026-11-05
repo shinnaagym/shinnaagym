@@ -45,12 +45,14 @@ export function pastExerciseGroups(logs: ExerciseLogLike[]): Record<string, PtLo
   return result;
 }
 
-/** (운동 이름, 도구) -> 그동안 그 조합에 적었던 무게·변형 동작 문구를 최신순으로
-    중복 없이 모은다. 운동 이름 자동완성처럼 입력칸 아래 목록에서 눌러 바로
-    채워 넣는 용도. 세트 그룹(1세트/2세트...) 구분 없이 그 운동에서 썼던
-    문구를 전부 모은다 — 세트마다 무게가 달라질 수 있어, 굳이 같은 세트
-    번째끼리만 모으면 선택지가 너무 적어진다. */
-export function pastExerciseWeightOptions(logs: ExerciseLogLike[]): Record<string, string[]> {
+/** (운동 이름, 도구) -> 그동안 그 조합에 적었던 무게/횟수·시간/세트 문구를
+    최신순으로 중복 없이 모은다. 세트 그룹(1세트/2세트...) 구분 없이 그
+    운동에서 썼던 문구를 전부 모은다 — 세트마다 값이 달라질 수 있어, 굳이
+    같은 세트 번째끼리만 모으면 선택지가 너무 적어진다. */
+function pastExerciseFieldOptions(
+  logs: ExerciseLogLike[],
+  field: keyof Pick<PtLogSetGroup, "weight" | "reps" | "sets">,
+): Record<string, string[]> {
   const result: Record<string, string[]> = {};
   const seen: Record<string, Set<string>> = {};
   for (const log of logs) {
@@ -58,19 +60,39 @@ export function pastExerciseWeightOptions(logs: ExerciseLogLike[]): Record<strin
       if (!exercise.name) continue;
       const key = pastExerciseGroupKey(exercise.name, exercise.equipment);
       for (const group of exercise.groups) {
-        const weight = group.weight == null ? "" : String(group.weight).trim();
-        if (!weight) continue;
+        const raw = group[field];
+        const value = raw == null ? "" : String(raw).trim();
+        if (!value) continue;
         if (!seen[key]) {
           seen[key] = new Set();
           result[key] = [];
         }
-        if (seen[key].has(weight)) continue;
-        seen[key].add(weight);
-        result[key].push(weight);
+        if (seen[key].has(value)) continue;
+        seen[key].add(value);
+        result[key].push(value);
       }
     }
   }
   return result;
+}
+
+/** (운동 이름, 도구) -> 그동안 그 조합에 적었던 무게·변형 동작 문구 목록(최신순,
+    중복 없음). 운동 이름 자동완성처럼 입력칸 아래에 목록으로 보여주고 누르면
+    바로 채워 넣는 용도. */
+export function pastExerciseWeightOptions(logs: ExerciseLogLike[]): Record<string, string[]> {
+  return pastExerciseFieldOptions(logs, "weight");
+}
+
+/** (운동 이름, 도구) -> 그동안 그 조합에 적었던 횟수/시간(초) 문구 목록(최신순,
+    중복 없음). pastExerciseWeightOptions와 같은 방식의 클릭 자동완성용. */
+export function pastExerciseRepsOptions(logs: ExerciseLogLike[]): Record<string, string[]> {
+  return pastExerciseFieldOptions(logs, "reps");
+}
+
+/** (운동 이름, 도구) -> 그동안 그 조합에 적었던 세트 수 목록(최신순, 중복 없음).
+    pastExerciseWeightOptions와 같은 방식의 클릭 자동완성용. */
+export function pastExerciseSetsOptions(logs: ExerciseLogLike[]): Record<string, string[]> {
+  return pastExerciseFieldOptions(logs, "sets");
 }
 
 /** (운동 이름, 도구) -> 그동안 그 조합에 적었던 특이사항을 최신순으로 중복 없이

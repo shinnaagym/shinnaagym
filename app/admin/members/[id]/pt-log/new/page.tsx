@@ -26,6 +26,8 @@ import {
   pastExerciseNames,
   pastExerciseNotes,
   pastExerciseNoteOptions,
+  pastExerciseRepsOptions,
+  pastExerciseSetsOptions,
   pastExerciseWeightOptions,
 } from "../past-exercise-names";
 
@@ -127,6 +129,8 @@ export default async function NewPtLogPage({
           pastExerciseGroups={pastExerciseGroups(ptLogs)}
           pastExerciseNotes={pastExerciseNotes(ptLogs)}
           pastExerciseWeightOptions={pastExerciseWeightOptions(ptLogs)}
+          pastExerciseRepsOptions={pastExerciseRepsOptions(ptLogs)}
+          pastExerciseSetsOptions={pastExerciseSetsOptions(ptLogs)}
           pastExerciseNoteOptions={pastExerciseNoteOptions(ptLogs)}
           pastCircuitEntries={pastCircuitEntries(ptLogs)}
           duoPartner={duoPartner ? { id: duoPartner.id, name: duoPartner.name } : null}
