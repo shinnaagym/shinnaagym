@@ -8,6 +8,8 @@ import {
   pastExerciseNames,
   pastExerciseNotes,
   pastExerciseNoteOptions,
+  pastExerciseRepsOptions,
+  pastExerciseSetsOptions,
   pastExerciseWeightOptions,
 } from "@/app/admin/members/[id]/pt-log/past-exercise-names";
 
@@ -36,6 +38,8 @@ export default async function NewMyPersonalExercisePage({
           pastExerciseGroups={pastExerciseGroups(personalExercises)}
           pastExerciseNotes={pastExerciseNotes(personalExercises)}
           pastExerciseWeightOptions={pastExerciseWeightOptions(personalExercises)}
+          pastExerciseRepsOptions={pastExerciseRepsOptions(personalExercises)}
+          pastExerciseSetsOptions={pastExerciseSetsOptions(personalExercises)}
           pastExerciseNoteOptions={pastExerciseNoteOptions(personalExercises)}
           pastCircuitEntries={pastCircuitEntries(personalExercises)}
         />

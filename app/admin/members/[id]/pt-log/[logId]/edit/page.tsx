@@ -26,6 +26,8 @@ import {
   pastExerciseNames,
   pastExerciseNotes,
   pastExerciseNoteOptions,
+  pastExerciseRepsOptions,
+  pastExerciseSetsOptions,
   pastExerciseWeightOptions,
 } from "../../past-exercise-names";
 
@@ -121,6 +123,8 @@ export default async function EditPtLogPage({
           pastExerciseGroups={pastExerciseGroups(ptLogs.filter((l) => l.id !== logIdNum))}
           pastExerciseNotes={pastExerciseNotes(ptLogs.filter((l) => l.id !== logIdNum))}
           pastExerciseWeightOptions={pastExerciseWeightOptions(ptLogs.filter((l) => l.id !== logIdNum))}
+          pastExerciseRepsOptions={pastExerciseRepsOptions(ptLogs.filter((l) => l.id !== logIdNum))}
+          pastExerciseSetsOptions={pastExerciseSetsOptions(ptLogs.filter((l) => l.id !== logIdNum))}
           pastExerciseNoteOptions={pastExerciseNoteOptions(ptLogs.filter((l) => l.id !== logIdNum))}
           pastCircuitEntries={pastCircuitEntries(ptLogs.filter((l) => l.id !== logIdNum))}
           painTriggerPastNotes={{ [idNum]: pastPainTriggerNotes(assessments) }}
