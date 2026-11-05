@@ -1324,6 +1324,18 @@ export async function updateSession(
     fields.push(`session_minute = $${++i}`);
     values.push(input.sessionMinute);
   }
+  // 날짜·시간이 바뀌면, 이미 전날 리마인드 문자를 보내 reminder_sent_at이
+  // 찍혀있던 수업이라도 다시 리마인드 대상이 되도록 초기화한다. 안 그러면
+  // 크론(sendTomorrowSessionReminders)이 "이미 보냈다"고 판단해 새 날짜·시간
+  // 기준 문자를 영영 보내지 않는다(lib/session-reminders.ts의 reminder_sent_at
+  // IS NULL 조건 참고).
+  if (
+    input.sessionDate !== undefined ||
+    input.sessionHour !== undefined ||
+    input.sessionMinute !== undefined
+  ) {
+    fields.push(`reminder_sent_at = NULL`);
+  }
   if (fields.length === 0) return;
 
   await query(`UPDATE class_sessions SET ${fields.join(", ")} WHERE id = $1`, [
