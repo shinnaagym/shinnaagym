@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { CoachRow, EmploymentType } from "@/lib/db";
+import type { CoachReferralEntryRow, CoachRow, EmploymentType } from "@/lib/db";
 import type { InsuranceRates } from "@/lib/payroll";
 import {
   calculatePayroll,
@@ -59,9 +59,20 @@ export function PayrollView({
   // 이유로, sessionCount1on1/2on1을 직접 손으로 고치면 길이가 어긋나
   // calculatePayroll이 시간외수당을 0으로 처리한다.
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  // "직접 입력"(coachId 없는 수동 입력) 모드에서만 쓰는 휘발성 임시 입력란 —
+  // 코치 id가 있는 정식 직원은 아래 coachReferralEntries(서버 영구 보관)를 쓴다.
   const [referralEntries, setReferralEntries] = useState<Array<{ note: string; amount: string }>>([
     { note: "", amount: "" },
   ]);
+  // 코치별로 영구 보관되는 소개 결제 내역(coach_referral_entries). 특정
+  // 정산월에 종속되지 않고, 관리자가 명시적으로 삭제하기 전까지는 급여를
+  // 계산할 때마다 계속 같은 항목이 인센티브 산정에 반영된다.
+  const [coachReferralEntries, setCoachReferralEntries] = useState<CoachReferralEntryRow[]>([]);
+  const [loadingCoachReferralEntries, setLoadingCoachReferralEntries] = useState(false);
+  const [newReferralNote, setNewReferralNote] = useState("");
+  const [newReferralAmount, setNewReferralAmount] = useState("");
+  const [addingReferralEntry, setAddingReferralEntry] = useState(false);
+  const [referralEntryError, setReferralEntryError] = useState<string | null>(null);
   const [allocationOrder, setAllocationOrder] = useState<AllocationOrder>("proportional");
   const [loadingCounts, setLoadingCounts] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -111,6 +122,10 @@ export function PayrollView({
     // 원천세도 직원마다·달마다 다른 금액이라 자동으로 넘어오면 안 돼서,
     // 코치를 바꾸면 이전 직원 값이 남아있지 않게 비운다.
     setWithholdingIncomeTax("");
+    // 소개 결제 내역도 코치마다 다른 영구 보관 목록이라, 코치를 바꾸면(또는
+    // 직접 입력 모드로 바꾸면) 이전 코치 목록이 잠깐이라도 남아있지 않게 비운다.
+    // 새 코치의 목록은 아래 useEffect가 비동기로 불러와 채운다.
+    setCoachReferralEntries([]);
   }
 
   // 코치+정산월이 정해지면 그 달 진행 수업 횟수를 자동으로 불러온다(수동 보정 가능).
@@ -140,6 +155,30 @@ export function PayrollView({
     };
   }, [selectedCoach, yearMonth]);
 
+  // 코치가 정해지면(정산월과 무관) 그 코치의 소개 결제 내역을 영구 보관함에서
+  // 불러온다. 코치가 없으면(직접 입력 모드) 보관할 coachId가 없으니 건너뛴다
+  // (비우는 건 위 렌더링 중 상태 조정 블록이 코치를 바꾸는 순간 바로 처리).
+  useEffect(() => {
+    if (!selectedCoach) return;
+    const coachId = selectedCoach.id;
+    let cancelled = false;
+    async function loadReferralEntries() {
+      setLoadingCoachReferralEntries(true);
+      try {
+        const res = await fetch(`/api/admin/payroll/referral-entries?coachId=${coachId}`);
+        const data = res.ok ? await res.json() : null;
+        if (cancelled || !data) return;
+        setCoachReferralEntries(Array.isArray(data.entries) ? data.entries : []);
+      } finally {
+        if (!cancelled) setLoadingCoachReferralEntries(false);
+      }
+    }
+    void loadReferralEntries();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCoach]);
+
   const employeeName =
     coachSelection === "manual" ? manualName.trim() : (selectedCoach?.name ?? "");
 
@@ -155,9 +194,58 @@ export function PayrollView({
     setReferralEntries((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
   }
 
-  const referralSupplyAmount = computeReferralAmountTotal(
-    referralEntries.map((e) => ({ note: e.note, amount: Number(e.amount) || 0 })),
-  );
+  async function addPersistedReferralEntry() {
+    if (!selectedCoach) return;
+    const amount = Number(newReferralAmount) || 0;
+    if (!newReferralNote.trim() && amount <= 0) {
+      setReferralEntryError("내용이나 금액을 입력해주세요.");
+      return;
+    }
+    setAddingReferralEntry(true);
+    setReferralEntryError(null);
+    try {
+      const res = await fetch("/api/admin/payroll/referral-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coachId: selectedCoach.id, note: newReferralNote.trim(), amount }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        setReferralEntryError(data?.error ?? "저장에 실패했어요.");
+        return;
+      }
+      setCoachReferralEntries((prev) => [data.entry, ...prev]);
+      setNewReferralNote("");
+      setNewReferralAmount("");
+    } catch {
+      setReferralEntryError("네트워크 오류가 발생했어요.");
+    } finally {
+      setAddingReferralEntry(false);
+    }
+  }
+
+  async function removePersistedReferralEntry(id: number) {
+    const removed = coachReferralEntries.find((e) => e.id === id);
+    setCoachReferralEntries((prev) => prev.filter((e) => e.id !== id));
+    try {
+      const res = await fetch(`/api/admin/payroll/referral-entries/${id}`, { method: "DELETE" });
+      if (!res.ok && removed) {
+        setCoachReferralEntries((prev) => [removed, ...prev]);
+        setReferralEntryError("삭제에 실패했어요.");
+      }
+    } catch {
+      if (removed) setCoachReferralEntries((prev) => [removed, ...prev]);
+      setReferralEntryError("네트워크 오류가 발생했어요.");
+    }
+  }
+
+  // 코치 id가 있으면(정식 직원) 서버에 영구 보관된 소개 결제 내역 합계를,
+  // 없으면(직접 입력 모드) 휘발성 임시 입력란 합계를 인센티브 산정 기준으로 쓴다.
+  const referralSupplyAmount = selectedCoach
+    ? coachReferralEntries.reduce((sum, e) => sum + e.amount, 0)
+    : computeReferralAmountTotal(
+        referralEntries.map((e) => ({ note: e.note, amount: Number(e.amount) || 0 })),
+      );
 
   const declaredMonthlyCompensationValue = declaredMonthlyCompensation.trim()
     ? Number(declaredMonthlyCompensation) || null
@@ -260,9 +348,11 @@ export function PayrollView({
           coachId: selectedCoach?.id ?? null,
           employeeName,
           ...baseInput,
-          referralEntries: referralEntries
-            .filter((e) => e.note.trim() || Number(e.amount) > 0)
-            .map((e) => ({ note: e.note.trim(), amount: Number(e.amount) || 0 })),
+          referralEntries: selectedCoach
+            ? coachReferralEntries.map((e) => ({ note: e.note, amount: e.amount }))
+            : referralEntries
+                .filter((e) => e.note.trim() || Number(e.amount) > 0)
+                .map((e) => ({ note: e.note.trim(), amount: Number(e.amount) || 0 })),
         }),
       });
       if (!res.ok) {
@@ -491,43 +581,108 @@ export function PayrollView({
               )}
               <div className="col-span-full">
                 <label className="block text-xs text-ink/50 mb-1">
-                  소개 결제 내역 (여러 건 추가 가능, 결제 금액의 5%가 인센티브예요)
+                  소개 결제 내역 (여러 건 추가 가능, 결제 금액의 5%가 인센티브예요
+                  {selectedCoach && " — 삭제하기 전까지 계속 반영돼요"})
                 </label>
-                <div className="space-y-2">
-                  {referralEntries.map((entry, i) => (
-                    <div key={i} className="flex flex-wrap items-center gap-2">
+                {selectedCoach ? (
+                  <>
+                    {loadingCoachReferralEntries ? (
+                      <p className="text-xs text-ink/40">불러오는 중...</p>
+                    ) : (
+                      <div className="space-y-1.5 mb-2">
+                        {coachReferralEntries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex flex-wrap items-center gap-2 rounded-lg border border-line/60 bg-bone/30 px-3 py-2 text-sm"
+                          >
+                            <span className="flex-1 min-w-[8rem]">{entry.note || "(내용 없음)"}</span>
+                            <span className="text-ink/60 shrink-0">
+                              {entry.amount.toLocaleString("ko-KR")}원
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removePersistedReferralEntry(entry.id)}
+                              className="shrink-0 text-xs text-coral hover:opacity-70"
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        ))}
+                        {coachReferralEntries.length === 0 && (
+                          <p className="text-xs text-ink/40">등록된 소개 결제 내역이 없어요.</p>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
                       <input
-                        value={entry.note}
-                        onChange={(e) => updateReferralEntry(i, { note: e.target.value })}
+                        value={newReferralNote}
+                        onChange={(e) => setNewReferralNote(e.target.value)}
                         placeholder="내용 (예: 김철수 소개)"
                         className="flex-1 min-w-[10rem] rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                       />
                       <input
                         type="number"
                         inputMode="numeric"
-                        value={entry.amount}
-                        onChange={(e) => updateReferralEntry(i, { amount: e.target.value })}
+                        value={newReferralAmount}
+                        onChange={(e) => setNewReferralAmount(e.target.value)}
                         placeholder="결제 금액"
                         className="w-32 shrink-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
                       />
                       <button
                         type="button"
-                        onClick={() => removeReferralEntry(i)}
-                        disabled={referralEntries.length === 1}
-                        className="shrink-0 text-xs text-coral hover:opacity-70 disabled:opacity-30"
+                        onClick={addPersistedReferralEntry}
+                        disabled={addingReferralEntry}
+                        className="shrink-0 rounded-full border border-line px-3 py-1.5 text-xs hover:border-coral/40 transition disabled:opacity-50"
                       >
-                        삭제
+                        + 추가
                       </button>
                     </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={addReferralEntry}
-                  className="mt-2 text-xs text-ink/50 hover:text-coral"
-                >
-                  + 줄 추가
-                </button>
+                    {referralEntryError && (
+                      <p className="text-xs text-coral mt-1">{referralEntryError}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      {referralEntries.map((entry, i) => (
+                        <div key={i} className="flex flex-wrap items-center gap-2">
+                          <input
+                            value={entry.note}
+                            onChange={(e) => updateReferralEntry(i, { note: e.target.value })}
+                            placeholder="내용 (예: 김철수 소개)"
+                            className="flex-1 min-w-[10rem] rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                          />
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            value={entry.amount}
+                            onChange={(e) => updateReferralEntry(i, { amount: e.target.value })}
+                            placeholder="결제 금액"
+                            className="w-32 shrink-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeReferralEntry(i)}
+                            disabled={referralEntries.length === 1}
+                            className="shrink-0 text-xs text-coral hover:opacity-70 disabled:opacity-30"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addReferralEntry}
+                      className="mt-2 text-xs text-ink/50 hover:text-coral"
+                    >
+                      + 줄 추가
+                    </button>
+                    <p className="text-[11px] text-ink/40 mt-1">
+                      직접 입력(코치 미등록) 모드라 이번 계산에만 쓰이고 따로 저장되지 않아요.
+                    </p>
+                  </>
+                )}
                 {referralSupplyAmount > 0 && (
                   <p className="text-xs text-ink/40 mt-1">
                     결제 금액 합계 {referralSupplyAmount.toLocaleString("ko-KR")}원
