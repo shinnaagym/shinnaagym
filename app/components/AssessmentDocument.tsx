@@ -331,7 +331,7 @@ export function AssessmentDocument({
         ) : (
           <div className="rounded-2xl border border-line divide-y divide-line/60 text-sm">
             {assessment.exercisePerformance.map((entry, i) => {
-              const e1rm = computeE1rm(entry.weight, entry.reps);
+              const e1rm = computeE1rm(entry.weight, entry.reps, entry.rpe);
               return (
                 <div key={i} className="px-4 py-3">
                   <p className="font-medium text-ink">{entry.exercise || "-"}</p>
