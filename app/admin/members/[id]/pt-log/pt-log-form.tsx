@@ -3,6 +3,7 @@
 import { Fragment, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { koreaTodayKey } from "@/lib/date";
+import { computeE1rm } from "@/lib/exercise-performance";
 import {
   PT_LOG_EQUIPMENT_LABELS,
   PT_LOG_EQUIPMENT_OPTIONS,
@@ -971,18 +972,30 @@ export function PtLogForm({
                       )}
                     </div>
                     {g.trackPerformance && (
-                      <select
-                        value={g.rpe}
-                        onChange={(e) => updateGroup(exIndex, groupIndex, { rpe: e.target.value })}
-                        className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-coral"
-                      >
-                        <option value="">RPE 선택 — 운동 수행능력 그래프에 반영돼요</option>
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
-                          <option key={v} value={v}>
-                            RPE {v}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          value={g.rpe}
+                          onChange={(e) => updateGroup(exIndex, groupIndex, { rpe: e.target.value })}
+                          className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm outline-none focus:border-coral"
+                        >
+                          <option value="">RPE 선택 — 운동 수행능력 그래프에 반영돼요</option>
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
+                            <option key={v} value={v}>
+                              RPE {v}
+                            </option>
+                          ))}
+                        </select>
+                        {g.rpe &&
+                          (() => {
+                            const e1rm = computeE1rm(
+                              isNumericText(g.weight) ? Number(g.weight) : null,
+                              isNumericText(g.reps) ? Number(g.reps) : null,
+                            );
+                            return e1rm != null ? (
+                              <span className="text-xs text-ink/50">예상 1RM {e1rm}kg</span>
+                            ) : null;
+                          })()}
+                      </div>
                     )}
                   </div>
                   );

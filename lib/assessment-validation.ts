@@ -63,7 +63,12 @@ export function parsePainTriggers(raw: unknown): PainTriggerEntry[] {
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const record = item as Record<string, unknown>;
-    const note = typeof record.note === "string" ? record.note.trim() : "";
+    // 통증 척도 그래프(AssessmentPainChart)가 이 문구를 trim한 값으로 묶어
+    // 시리즈를 잇는데, iOS 등 일부 입력 환경은 똑같이 보이는 한글도 유니코드
+    // 정규화 형태(NFD 자모 분해)가 달라 문자열로는 서로 다르게 저장될 수
+    // 있다 — 그러면 "같은 내용"을 적어도 다른 시리즈로 갈라져 선이 안
+    // 이어진다. normalize("NFC")로 저장 시점에 통일한다.
+    const note = typeof record.note === "string" ? record.note.trim().normalize("NFC") : "";
     const painScale =
       typeof record.painScale === "number" &&
       Number.isInteger(record.painScale) &&
