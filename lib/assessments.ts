@@ -381,10 +381,15 @@ export async function updatePainPoint(
 export function pastPainTriggerNotes(assessments: AssessmentRow[]): string[] {
   const seen = new Set<string>();
   const notes: string[] = [];
+  // trim + normalize("NFC")하지 않으면, 겉보기엔 똑같은 문구가 유니코드 정규화
+  // 형태(NFD 자모 분해 등) 차이로 서로 다른 문자열 취급돼 중복 제거가 안 되고
+  // (자동완성 목록에 같은 문구가 두 번 보임), 통증 척도 그래프도 그 둘을 다른
+  // 시리즈로 갈라 선이 이어지지 않는다(pain-chart.tsx의 같은 처리 참고).
   function add(label: string) {
-    if (!label || seen.has(label)) return;
-    seen.add(label);
-    notes.push(label);
+    const normalized = label.trim().normalize("NFC");
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    notes.push(normalized);
   }
   for (const a of assessments) {
     for (const entry of getPainTriggerEntries(a)) {
