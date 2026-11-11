@@ -91,7 +91,7 @@ function buildDayGroups(assessments: AssessmentRow[]): DayGroup[] {
     for (const entry of a.exercise_performance) {
       const name = entry.exercise.trim();
       if (!name || entry.weight == null || entry.reps == null) continue;
-      const e1rm = computeE1rm(entry.weight, entry.reps);
+      const e1rm = computeE1rm(entry.weight, entry.reps, entry.rpe);
       if (e1rm == null) continue;
       byExercise[name] = { e1rm, weight: entry.weight, reps: entry.reps, rpe: entry.rpe };
     }

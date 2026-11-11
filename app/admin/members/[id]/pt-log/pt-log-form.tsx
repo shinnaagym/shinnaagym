@@ -990,6 +990,7 @@ export function PtLogForm({
                             const e1rm = computeE1rm(
                               isNumericText(g.weight) ? Number(g.weight) : null,
                               isNumericText(g.reps) ? Number(g.reps) : null,
+                              Number(g.rpe),
                             );
                             return e1rm != null ? (
                               <span className="text-xs text-ink/50">예상 1RM {e1rm}kg</span>
