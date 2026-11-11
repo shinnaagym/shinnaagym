@@ -20,8 +20,7 @@ const pretendard = localFont({
 // 요청을 매번 기다릴 이유가 없다.
 
 const SITE_TITLE = "신나아짐 예약 사이트";
-const SITE_DESCRIPTION =
-  "전 직원이 물리치료사인 프리미엄 PT 스튜디오, 신나아짐의 오픈 전 예약 페이지입니다.";
+const SITE_DESCRIPTION = "전 직원이 물리치료사인 프리미엄 PT 스튜디오, 신나아짐의 예약 페이지입니다.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://shinnaagym.vercel.app"),
