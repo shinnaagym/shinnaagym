@@ -229,6 +229,13 @@ export interface PayrollInput {
    */
   declaredMonthlyCompensation?: number | null;
   /**
+   * 월 의무수업(타임) 횟수를 근속기간과 무관하게 이 값으로 고정한다
+   * (coaches.mandatory_sessions_override). null/undefined/0 이하면
+   * monthlyMandatorySessionsFor(hiredAt, referenceDate)로 근속기간 기준
+   * 자동 계산한다. 프리랜서는 애초에 의무수업이 없어 이 값과 무관하게 0이다.
+   */
+  mandatorySessionsOverride?: number | null;
+  /**
    * 정직원/팀장의 그 달 원천세(근로소득세+지방소득세) 금액. 관리자가 국세청
    * "근로소득 간이세액표"에서 그 달 급여·부양가족 수 기준으로 직접 조회한
    * 금액을 입력한다(자동 계산하지 않음). 비워두면(undefined/0 이하) 0으로
@@ -426,7 +433,9 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const isTeamLead = employmentType === "team_lead" || (employmentType === "regular" && input.isTeamLead);
 
   const mandatorySessions = isRegularPayScale(employmentType)
-    ? monthlyMandatorySessionsFor(hiredAt, referenceDate)
+    ? input.mandatorySessionsOverride != null && input.mandatorySessionsOverride > 0
+      ? input.mandatorySessionsOverride
+      : monthlyMandatorySessionsFor(hiredAt, referenceDate)
     : 0;
   const { excess1on1, excess2on1, excessTotal } = allocateExcessSessions(
     sessionCount1on1,

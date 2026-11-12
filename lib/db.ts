@@ -134,7 +134,7 @@ const SEED_HOLIDAYS_2027: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 50;
+const SCHEMA_VERSION = 51;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -932,6 +932,14 @@ function runFullMigration(): Promise<void> {
               now() - interval '31 days'
             )
             WHERE c.active = false AND c.deactivated_at IS NULL;
+
+            -- 월 의무수업 횟수를 근속기간별로 차등 적용하면서(제9조 기준),
+            -- 특정 코치만 예외적으로 근속기간과 무관하게 고정 횟수를 쓸 수
+            -- 있게 하는 컬럼. 장동진 코치는 계속 60타임으로 고정하기로 해,
+            -- 이 컬럼이 생기는 시점에 바로 값을 넣어둔다(그 외 코치는 NULL로
+            -- 남아 기존처럼 근속기간 기준 자동 계산을 그대로 탄다).
+            ALTER TABLE coaches ADD COLUMN IF NOT EXISTS mandatory_sessions_override INTEGER;
+            UPDATE coaches SET mandatory_sessions_override = 60 WHERE name = '장동진';
             `,
           ),
           getPool().query(
@@ -1034,6 +1042,10 @@ export interface CoachRow {
   /** 대표가 직접 신고한 4대보험 산정 기준 보수월액(원). 없으면(NULL) 당월
       급여 기준으로 계산한다 — lib/payroll/calculate.ts 참고. */
   declared_monthly_compensation: number | null;
+  /** 월 의무수업(타임) 횟수를 근속기간과 무관하게 이 값으로 고정한다. 없으면
+      (NULL) monthlyMandatorySessionsFor(입사일 기준 3개월/6개월 구간)로
+      계산한다 — lib/payroll/calculate.ts 참고. */
+  mandatory_sessions_override: number | null;
   /** 퇴사 처리(active=false)한 시각. 재직으로 전환하면 다시 null이 된다.
       한 달 넘게 이 상태로 남아있으면 코치 관리 목록에서 이름을 숨긴다. */
   deactivated_at: string | null;

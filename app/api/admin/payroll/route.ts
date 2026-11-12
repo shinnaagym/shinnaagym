@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
         referralEntries?: unknown;
         allocationOrder?: unknown;
         declaredMonthlyCompensation?: unknown;
+        mandatorySessionsOverride?: unknown;
         withholdingIncomeTax?: unknown;
       }
     | null;
@@ -150,6 +151,12 @@ export async function POST(req: NextRequest) {
     body.withholdingIncomeTax > 0
       ? body.withholdingIncomeTax
       : undefined;
+  const mandatorySessionsOverride =
+    typeof body?.mandatorySessionsOverride === "number" &&
+    Number.isInteger(body.mandatorySessionsOverride) &&
+    body.mandatorySessionsOverride > 0
+      ? body.mandatorySessionsOverride
+      : null;
 
   if (
     !employeeName ||
@@ -182,6 +189,7 @@ export async function POST(req: NextRequest) {
     allocationOrder,
     insuranceRates,
     declaredMonthlyCompensation,
+    mandatorySessionsOverride,
     withholdingIncomeTax,
   });
 

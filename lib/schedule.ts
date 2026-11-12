@@ -93,6 +93,17 @@ export async function setCoachDeclaredMonthlyCompensation(
   revalidateTag("coaches", { expire: 0 });
 }
 
+/** 월 의무수업(타임) 횟수를 근속기간과 무관하게 고정한다. null이면 고정
+    해제(근속기간 기준 자동 계산으로 되돌림) — lib/payroll/calculate.ts의
+    monthlyMandatorySessionsFor 참고. */
+export async function setCoachMandatorySessionsOverride(
+  id: number,
+  sessions: number | null,
+): Promise<void> {
+  await query(`UPDATE coaches SET mandatory_sessions_override = $2 WHERE id = $1`, [id, sessions]);
+  revalidateTag("coaches", { expire: 0 });
+}
+
 /** 코치별 담당 활성 회원 수 (퇴사 처리 전 경고용). */
 /** 회원 관리 화면의 필터 목록(members-view.tsx의 filtered)과 같은 기준으로
     센다 — 상담 단계(is_lead) 회원, 삭제된 회원은 빼고, 2:1 짝은 한 쌍을
