@@ -28,7 +28,13 @@ export const REGULAR_BASE_SALARY = 2_200_000;
 // 빠지므로(값 0은 숨김) 과거 저장된 급여 이력(식대가 있던 시절의 결과)은
 // 그대로 보존하면서 새 계산에서만 식대가 사라진다.
 export const REGULAR_MEAL_ALLOWANCE = 0;
-export const REGULAR_MANDATORY_SESSIONS = 60; // 의무수업 횟수(기본급에 포함)
+// 월 의무수업(타임) 횟수(기본급에 포함) — 입사일 기준 계속근로기간에 따라
+// 다르다. 입사 3개월 미만(수습기간)은 70타임, 3개월 이상 6개월 미만은
+// 65타임, 6개월 이상은 60타임(calculate.ts의 monthlyMandatorySessionsFor
+// 참고).
+export const REGULAR_MANDATORY_SESSIONS_PROBATION = 70;
+export const REGULAR_MANDATORY_SESSIONS_MID = 65;
+export const REGULAR_MANDATORY_SESSIONS = 60;
 
 export const REGULAR_RATE_1ON1: Record<TenureBucket, number> = {
   under1: 29_000,

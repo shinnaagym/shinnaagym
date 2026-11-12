@@ -8,6 +8,8 @@ import {
   REFERRAL_INCENTIVE_RATE,
   REGULAR_BASE_SALARY,
   REGULAR_MANDATORY_SESSIONS,
+  REGULAR_MANDATORY_SESSIONS_MID,
+  REGULAR_MANDATORY_SESSIONS_PROBATION,
   REGULAR_MEAL_ALLOWANCE,
   REGULAR_TEAM_LEAD_ALLOWANCE,
   TENURE_BUCKET_LABEL,
@@ -36,6 +38,13 @@ function isValidDateKeyLocal(key: string): boolean {
 function addYearsToDateKey(key: string, years: number): string {
   const [y, m, d] = key.split("-").map(Number);
   const dt = new Date(Date.UTC(y + years, m - 1, d));
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+
+/** YYYY-MM-DD 키에 개월 단위를 더한다(월 overflow는 Date가 알아서 다음 해로 넘겨준다). */
+function addMonthsToDateKey(key: string, months: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1 + months, d));
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
 }
 
@@ -71,6 +80,25 @@ export function tenureBucket(hiredAt: string, referenceDate: string): TenureBuck
 
 export function describeTenureBucket(bucket: TenureBucket): string {
   return TENURE_BUCKET_LABEL[bucket];
+}
+
+/**
+ * 입사일 기준 계속근로기간에 따라 월 의무수업(타임) 횟수를 정한다 — 근로
+ * 계약서 제9조(의무수업 및 수업료) 기준. 3개월/6개월 당일부터 다음(더 적은)
+ * 구간으로 취급한다(tenureBucket과 같은 경계 처리 방식).
+ * - 3개월 미만(수습기간): REGULAR_MANDATORY_SESSIONS_PROBATION(70타임)
+ * - 3개월 이상 6개월 미만: REGULAR_MANDATORY_SESSIONS_MID(65타임)
+ * - 6개월 이상: REGULAR_MANDATORY_SESSIONS(60타임)
+ * 입사일이 비어있거나 형식이 잘못됐으면, tenureBucket의 기본값(가장 근속이
+ * 짧은 구간으로 간주)과 같은 원칙으로 안전하게 수습기간(70타임)으로 본다.
+ */
+export function monthlyMandatorySessionsFor(hiredAt: string, referenceDate: string): number {
+  if (!hiredAt || !isValidDateKeyLocal(hiredAt)) return REGULAR_MANDATORY_SESSIONS_PROBATION;
+  const threeMonthMark = addMonthsToDateKey(hiredAt, 3);
+  const sixMonthMark = addMonthsToDateKey(hiredAt, 6);
+  if (referenceDate < threeMonthMark) return REGULAR_MANDATORY_SESSIONS_PROBATION;
+  if (referenceDate < sixMonthMark) return REGULAR_MANDATORY_SESSIONS_MID;
+  return REGULAR_MANDATORY_SESSIONS;
 }
 
 /** 소개 결제 내역 한 줄(내용 메모 + 금액). 결제 수단과 무관하게 결제 금액 그대로
@@ -397,7 +425,9 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   // team_lead(팀장)는 체크박스 없이 팀장수당이 항상 자동 적용된다.
   const isTeamLead = employmentType === "team_lead" || (employmentType === "regular" && input.isTeamLead);
 
-  const mandatorySessions = isRegularPayScale(employmentType) ? REGULAR_MANDATORY_SESSIONS : 0;
+  const mandatorySessions = isRegularPayScale(employmentType)
+    ? monthlyMandatorySessionsFor(hiredAt, referenceDate)
+    : 0;
   const { excess1on1, excess2on1, excessTotal } = allocateExcessSessions(
     sessionCount1on1,
     sessionCount2on1,
