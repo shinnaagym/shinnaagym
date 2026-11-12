@@ -610,6 +610,35 @@ test("급여 계산: 수습기간(입사 3개월 미만)은 의무수업 70회�
   assert.equal(withExcess.excess1on1, 5);
 });
 
+test("급여 계산: mandatorySessionsOverride를 지정하면 근속기간과 무관하게 그 값을 그대로 씀", () => {
+  // 수습기간(입사 1개월, 자동 계산이면 70타임)이어도 오버라이드가 있으면 60타임.
+  const overridden = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2027-09-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 65,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    mandatorySessionsOverride: 60,
+  });
+  assert.equal(overridden.mandatorySessions, 60);
+  assert.equal(overridden.excess1on1, 5);
+
+  // 0 이하나 비워두면(null/undefined) 오버라이드를 무시하고 근속기간 기준 자동 계산으로 돌아감.
+  const zeroOverride = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2027-09-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 65,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+    mandatorySessionsOverride: 0,
+  });
+  assert.equal(zeroOverride.mandatorySessions, REGULAR_MANDATORY_SESSIONS_PROBATION);
+});
+
 function overtimeSession(
   ptType: "1:1" | "2:1",
   date: string,

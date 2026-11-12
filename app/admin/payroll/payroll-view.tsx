@@ -89,6 +89,18 @@ export function PayrollView({
   const [savingDeclaredComp, setSavingDeclaredComp] = useState(false);
   const [declaredCompMessage, setDeclaredCompMessage] = useState<string | null>(null);
 
+  // 월 의무수업(타임) 횟수를 근속기간과 무관하게 고정해둔 직원(예: 장동진).
+  // declaredMonthlyCompensation과 같은 패턴 — coaches prop을 초기값으로
+  // 시작해, 저장에 성공하면 그 결과로만 갱신한다.
+  const [savedMandatorySessionsOverride, setSavedMandatorySessionsOverride] = useState<
+    Record<number, number | null>
+  >(() => Object.fromEntries(coaches.map((c) => [c.id, c.mandatory_sessions_override])));
+  const [mandatorySessionsOverride, setMandatorySessionsOverride] = useState("");
+  const [savingMandatorySessionsOverride, setSavingMandatorySessionsOverride] = useState(false);
+  const [mandatorySessionsOverrideMessage, setMandatorySessionsOverrideMessage] = useState<string | null>(
+    null,
+  );
+
   // 정직원/팀장의 그 달 원천세(근로소득세+지방소득세). 국세청 근로소득 간이세액표가
   // 급여·부양가족 수에 따라 달라지는 조견표라 자동 계산하지 않고, 관리자가 그 표에서
   // 조회한 금액을 달마다 직접 입력한다(직원별로 저장해두지 않음).
@@ -114,6 +126,9 @@ export function PayrollView({
       const saved = savedDeclaredComp[selectedCoach.id];
       setDeclaredMonthlyCompensation(saved != null ? String(saved) : "");
       setDeclaredCompMessage(null);
+      const savedOverride = savedMandatorySessionsOverride[selectedCoach.id];
+      setMandatorySessionsOverride(savedOverride != null ? String(savedOverride) : "");
+      setMandatorySessionsOverrideMessage(null);
     }
     // 코치를 바꾸면 이전 코치의 1:1 수업 날짜 목록을 즉시 비워, 아직 새
     // 목록을 불러오기 전 잠깐 동안 엉뚱한 날짜가 쓰이지 않게 한다.
@@ -250,6 +265,9 @@ export function PayrollView({
   const declaredMonthlyCompensationValue = declaredMonthlyCompensation.trim()
     ? Number(declaredMonthlyCompensation) || null
     : null;
+  const mandatorySessionsOverrideValue = mandatorySessionsOverride.trim()
+    ? Number(mandatorySessionsOverride) || null
+    : null;
   const withholdingIncomeTaxValue = Math.max(0, Number(withholdingIncomeTax) || 0);
 
   const baseInput: PayrollInput = useMemo(
@@ -266,6 +284,7 @@ export function PayrollView({
       allocationOrder,
       insuranceRates,
       declaredMonthlyCompensation: declaredMonthlyCompensationValue,
+      mandatorySessionsOverride: mandatorySessionsOverrideValue,
       withholdingIncomeTax: withholdingIncomeTaxValue,
     }),
     [
@@ -281,6 +300,7 @@ export function PayrollView({
       allocationOrder,
       insuranceRates,
       declaredMonthlyCompensationValue,
+      mandatorySessionsOverrideValue,
       withholdingIncomeTaxValue,
     ],
   );
@@ -312,6 +332,38 @@ export function PayrollView({
       setDeclaredCompMessage("네트워크 오류가 발생했어요.");
     } finally {
       setSavingDeclaredComp(false);
+    }
+  }
+
+  async function handleSaveMandatorySessionsOverride() {
+    if (!selectedCoach) return;
+    const trimmed = mandatorySessionsOverride.trim();
+    if (trimmed && (!Number.isInteger(Number(trimmed)) || Number(trimmed) <= 0)) {
+      setMandatorySessionsOverrideMessage("의무수업 횟수는 0보다 큰 정수여야 해요.");
+      return;
+    }
+    const sessions = trimmed ? Number(trimmed) : null;
+    setSavingMandatorySessionsOverride(true);
+    setMandatorySessionsOverrideMessage(null);
+    try {
+      const res = await fetch(`/api/admin/payroll/coaches/${selectedCoach.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mandatorySessionsOverride: sessions }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMandatorySessionsOverrideMessage(data.error ?? "저장에 실패했어요.");
+        return;
+      }
+      setSavedMandatorySessionsOverride((prev) => ({ ...prev, [selectedCoach.id]: sessions }));
+      setMandatorySessionsOverrideMessage(
+        sessions ? "저장했어요." : "삭제했어요. 근속기간 기준으로 자동 계산돼요.",
+      );
+    } catch {
+      setMandatorySessionsOverrideMessage("네트워크 오류가 발생했어요.");
+    } finally {
+      setSavingMandatorySessionsOverride(false);
     }
   }
 
@@ -556,6 +608,50 @@ export function PayrollView({
                   쓰고, 비워두면 지금처럼 당월 급여 기준으로 계산해요.
                 </p>
               </div>
+              {isRegularPayScale(employmentType) && (
+                <div className="col-span-full">
+                  <label className="block text-xs text-ink/50 mb-1">
+                    월 의무수업 고정(선택, 근속기간과 무관하게 적용)
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={mandatorySessionsOverride}
+                        onChange={(e) => {
+                          setMandatorySessionsOverride(e.target.value);
+                          setMandatorySessionsOverrideMessage(null);
+                        }}
+                        placeholder="비워두면 근속기간(3개월/6개월) 기준으로 자동 계산"
+                        className="w-72 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+                      />
+                      <span className="text-sm text-ink/40 shrink-0">타임</span>
+                    </div>
+                    {selectedCoach ? (
+                      <button
+                        type="button"
+                        onClick={handleSaveMandatorySessionsOverride}
+                        disabled={savingMandatorySessionsOverride}
+                        className="shrink-0 rounded-full border border-coral/40 text-coral px-3 py-1.5 text-xs font-medium hover:bg-coral/10 transition disabled:opacity-50"
+                      >
+                        {savingMandatorySessionsOverride ? "저장 중..." : "직원 정보에 저장"}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-ink/40">
+                        직원을 선택해야 저장할 수 있어요(선택 전엔 이 계산에만 임시로 반영돼요)
+                      </span>
+                    )}
+                    {mandatorySessionsOverrideMessage && (
+                      <span className="text-xs text-sage">{mandatorySessionsOverrideMessage}</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-ink/40 mt-1">
+                    값을 입력하면 입사 3개월/6개월 기준 자동 계산(70→65→60타임) 대신 이 횟수를
+                    그대로 쓰고, 비워두면 근속기간 기준으로 자동 계산해요.
+                  </p>
+                </div>
+              )}
               {isRegularPayScale(employmentType) && (
                 <div className="col-span-full">
                   <label className="block text-xs text-ink/50 mb-1">
