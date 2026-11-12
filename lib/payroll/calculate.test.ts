@@ -7,12 +7,15 @@ import {
   allocateExcessSessions,
   calculatePayroll,
   computeReferralAmountTotal,
+  monthlyMandatorySessionsFor,
   tenureBucket,
 } from "./calculate.ts";
 import {
   DEFAULT_INSURANCE_RATES,
   OVERTIME_RATE,
   REGULAR_MANDATORY_SESSIONS,
+  REGULAR_MANDATORY_SESSIONS_MID,
+  REGULAR_MANDATORY_SESSIONS_PROBATION,
   REGULAR_RATE_1ON1,
   REGULAR_RATE_2ON1,
   FREELANCER_RATE_1ON1,
@@ -569,6 +572,44 @@ test("정직원 1:1 수업료 단가: 1년 미만 29,000원, 1년 이상 2년 �
   assert.equal(REGULAR_RATE_1ON1.over2, 31_000);
 });
 
+test("월 의무수업: 입사 3개월 미만(수습기간) 70타임, 3개월 이상 6개월 미만 65타임, 6개월 이상 60타임(경계일 포함)", () => {
+  // 2027-01-01 입사면 3개월 경계는 2027-04-01, 6개월 경계는 2027-07-01.
+  assert.equal(monthlyMandatorySessionsFor("2027-01-01", "2027-03-31"), REGULAR_MANDATORY_SESSIONS_PROBATION);
+  assert.equal(monthlyMandatorySessionsFor("2027-01-01", "2027-04-01"), REGULAR_MANDATORY_SESSIONS_MID);
+  assert.equal(monthlyMandatorySessionsFor("2027-01-01", "2027-06-30"), REGULAR_MANDATORY_SESSIONS_MID);
+  assert.equal(monthlyMandatorySessionsFor("2027-01-01", "2027-07-01"), REGULAR_MANDATORY_SESSIONS);
+});
+
+test("월 의무수업: 입사일이 비어있거나 잘못된 값이면 수습기간(70타임)으로 안전하게 처리", () => {
+  assert.equal(monthlyMandatorySessionsFor("", "2027-07-01"), REGULAR_MANDATORY_SESSIONS_PROBATION);
+  assert.equal(monthlyMandatorySessionsFor("invalid-date", "2027-07-01"), REGULAR_MANDATORY_SESSIONS_PROBATION);
+});
+
+test("급여 계산: 수습기간(입사 3개월 미만)은 의무수업 70회가 지나야 수업료가 붙음", () => {
+  const result = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2027-09-01",
+    yearMonth: "2027-10", // 정산월 말일(2027-10-31) 기준 입사 1개월 -> 수습기간
+    isTeamLead: false,
+    sessionCount1on1: 70,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  assert.equal(result.mandatorySessions, REGULAR_MANDATORY_SESSIONS_PROBATION);
+  assert.equal(result.lessonFeeTotal, 0);
+
+  const withExcess = calculatePayroll({
+    employmentType: "regular",
+    hiredAt: "2027-09-01",
+    yearMonth: "2027-10",
+    isTeamLead: false,
+    sessionCount1on1: 75,
+    sessionCount2on1: 0,
+    referralSupplyAmount: 0,
+  });
+  assert.equal(withExcess.excess1on1, 5);
+});
+
 function overtimeSession(
   ptType: "1:1" | "2:1",
   date: string,
@@ -612,7 +653,11 @@ test("시간외수당: 의무수업 초과분 중 시간외 시간대인 수업�
   ];
   const result = calculatePayroll({
     employmentType: "regular",
-    hiredAt: "2027-09-01", // 정산월(2027-10) 기준 근속 1년 미만 -> 단가 30,000원
+    // 정산월(2027-10) 기준 근속 1년 미만(29,000원 단가)이면서도 6개월은
+    // 넘겨서(2027-04-01) 의무수업이 수습기간(70)이 아닌 기본 60회가 되게 한다
+    // (의무수업 횟수 자체가 아니라 그 초과분 시간외수당 계산을 검증하는
+    // 테스트라, 의무수업 횟수는 60으로 고정해둬야 함).
+    hiredAt: "2027-04-01",
     yearMonth: "2027-10",
     isTeamLead: false,
     sessionCount1on1: 65,
