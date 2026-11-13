@@ -2148,7 +2148,7 @@ export async function getCoachAvailability(
   const dateKeys = Array.from({ length: days }, (_, i) => addDaysToKey(fromKey, i));
   const toKey = dateKeys[dateKeys.length - 1];
 
-  const [hoursMap, sessionsResult, workingHoursByCoach] = await Promise.all([
+  const [hoursMap, sessionsResult, workingHoursByCoach, dutyOverridesByDate, holidays] = await Promise.all([
     getDayHoursForRange(dateKeys),
     query<{ session_date: string; session_hour: number }>(
       // 개인 일정(memo)은 코치의 사적인 메모일 뿐이라 회원에게는 마감으로
@@ -2160,11 +2160,14 @@ export async function getCoachAvailability(
       [coachId, fromKey, toKey],
     ),
     getCoachWorkingHours(),
+    getDutyOverridesForDates(dateKeys),
+    listHolidays(),
   ]);
 
   const takenSet = new Set(
     sessionsResult.rows.map((r) => `${r.session_date}-${r.session_hour}`),
   );
+  const holidaySet = new Set(holidays.map((h) => h.holiday_date));
 
   return dateKeys.map((date) => {
     const hours = hoursMap[date];
@@ -2172,11 +2175,19 @@ export async function getCoachAvailability(
     // 오전조/오후조처럼 코치별로 지정해둔 근무시간(평일만, coach_working_hours)
     // 밖이면 그 코치 자신의 수업이 없어도 회원이 예약할 수 없게 막는다.
     const weekdayIdx = weekdayIndexMonFirst(date);
+    // 토요일·공휴일은 평일 근무시간 대신 당직제로 운영된다(setDutyOverride 참고) —
+    // 그날 공식 당직자로 배정된 코치만 예약을 받을 수 있고, 당직이 아직 배정되지
+    // 않았거나 다른 코치가 당직이면 이 코치는 그날 수업이 없어도 전부 마감으로
+    // 보여야 한다(회원이 실제로는 못 잡을 시간을 예약 가능한 것처럼 보면 안 됨).
+    const isDutyDay = weekdayIdx >= 5 || holidaySet.has(date);
+    const isOnDutyToday = (dutyOverridesByDate[date]?.coachId ?? null) === coachId;
     const slots = Array.from({ length: hours.end - hours.start }, (_, i) => {
       const hour = hours.start + i;
       const available =
         !takenSet.has(`${date}-${hour}`) &&
-        isCoachWithinWeekdayHours(coachId, weekdayIdx, hour, workingHoursByCoach);
+        (isDutyDay
+          ? isOnDutyToday
+          : isCoachWithinWeekdayHours(coachId, weekdayIdx, hour, workingHoursByCoach));
       return { hour, available };
     });
     return { date, closed: false, slots };
