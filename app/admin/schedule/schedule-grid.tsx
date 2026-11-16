@@ -2109,12 +2109,15 @@ function MonthView({
   );
 }
 
-const DURATION_OPTIONS: Array<{ value: string; weeks: number; label: string }> = [
-  { value: "1", weeks: 1, label: "이번 주만" },
-  { value: "4", weeks: 4, label: "4주간" },
-  { value: "8", weeks: 8, label: "8주간" },
-  { value: "12", weeks: 12, label: "12주간" },
-];
+// 1주(이번 주만)부터 12주까지 한 주 단위로 고를 수 있게 다이얼(네이티브 select)에
+// 12개 전부 넣는다 — 이전엔 1/4/8/12주만 골라 쓸 수 있었다.
+const DURATION_OPTIONS: Array<{ value: string; weeks: number; label: string }> = Array.from(
+  { length: 12 },
+  (_, i) => {
+    const weeks = i + 1;
+    return { value: String(weeks), weeks, label: weeks === 1 ? "이번 주만" : `${weeks}주간` };
+  },
+);
 
 const NEW_CONTACT = "__new__";
 
