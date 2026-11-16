@@ -558,6 +558,77 @@ export function IntakeForm({
         />
       </SectionCard>
 
+      <SectionCard title="인바디">
+        <p className="text-xs text-ink/50 mb-3">초진 때 측정한 체성분 수치가 있으면 입력해주세요(선택).</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Field label="체중">
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={form.inbodyWeight ?? ""}
+                onChange={(e) =>
+                  patch({ inbodyWeight: e.target.value === "" ? null : Number(e.target.value) })
+                }
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+              <span className="text-sm text-ink/50 shrink-0">kg</span>
+            </div>
+          </Field>
+          <Field label="골격근량">
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={form.inbodySkeletalMuscleMass ?? ""}
+                onChange={(e) =>
+                  patch({
+                    inbodySkeletalMuscleMass: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+              <span className="text-sm text-ink/50 shrink-0">kg</span>
+            </div>
+          </Field>
+          <Field label="체지방량">
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={form.inbodyBodyFatMass ?? ""}
+                onChange={(e) =>
+                  patch({ inbodyBodyFatMass: e.target.value === "" ? null : Number(e.target.value) })
+                }
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+              <span className="text-sm text-ink/50 shrink-0">kg</span>
+            </div>
+          </Field>
+          <Field label="체지방률">
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={form.inbodyBodyFatPercentage ?? ""}
+                onChange={(e) =>
+                  patch({
+                    inbodyBodyFatPercentage: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-coral"
+              />
+              <span className="text-sm text-ink/50 shrink-0">%</span>
+            </div>
+          </Field>
+        </div>
+      </SectionCard>
+
       <SectionCard title="통증의 발생">
         <Field label="기간">
           <input

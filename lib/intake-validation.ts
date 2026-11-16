@@ -20,6 +20,7 @@ import {
   type PromItem,
 } from "./prom-instruments";
 import type { PainMovementEntry } from "./db";
+import { parseInbody } from "./pt-log-validation";
 
 function optionValues(options: readonly { value: string }[]): Set<string> {
   return new Set<string>([...options.map((o) => o.value), ""]);
@@ -163,9 +164,22 @@ export interface ParsedIntakeInput {
   faamAdlAnswers: Record<string, number>;
   faamSportsAnswers: Record<string, number>;
   startbackAnswers: Record<string, number>;
+  inbodyWeight: number | null;
+  inbodySkeletalMuscleMass: number | null;
+  inbodyBodyFatMass: number | null;
+  inbodyBodyFatPercentage: number | null;
 }
 
 export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIntakeInput {
+  // IntakeFormState는(pt_logs의 inbody와 달리) 중첩 객체 없이 다른 필드들과
+  // 똑같이 평평한 구조로 보내므로, parseInbody가 기대하는 중첩 모양으로
+  // 감싸서 같은 검증 로직(숫자 변환)을 그대로 재사용한다.
+  const inbody = parseInbody({
+    weight: body?.inbodyWeight,
+    skeletalMuscleMass: body?.inbodySkeletalMuscleMass,
+    bodyFatMass: body?.inbodyBodyFatMass,
+    bodyFatPercentage: body?.inbodyBodyFatPercentage,
+  });
   return {
     intakeName: str(body?.intakeName),
     age: age(body?.age),
@@ -217,5 +231,9 @@ export function parseIntakeInput(body: Record<string, unknown> | null): ParsedIn
     faamAdlAnswers: parsePromAnswers(body?.faamAdlAnswers, FAAM_ADL_ITEMS),
     faamSportsAnswers: parsePromAnswers(body?.faamSportsAnswers, FAAM_SPORTS_ITEMS),
     startbackAnswers: parsePromAnswers(body?.startbackAnswers, STARTBACK_ITEMS),
+    inbodyWeight: inbody?.weight ?? null,
+    inbodySkeletalMuscleMass: inbody?.skeletalMuscleMass ?? null,
+    inbodyBodyFatMass: inbody?.bodyFatMass ?? null,
+    inbodyBodyFatPercentage: inbody?.bodyFatPercentage ?? null,
   };
 }

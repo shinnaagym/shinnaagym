@@ -60,6 +60,10 @@ export default async function IntakeQuestionnairePage({
         bodyDiagramRight: intake.body_diagram_right,
         bodyDiagramFeet: intake.body_diagram_feet,
         bodyDiagramHands: intake.body_diagram_hands,
+        inbodyWeight: intake.inbody_weight,
+        inbodySkeletalMuscleMass: intake.inbody_skeletal_muscle_mass,
+        inbodyBodyFatMass: intake.inbody_body_fat_mass,
+        inbodyBodyFatPercentage: intake.inbody_body_fat_percentage,
         painMovements:
           intake.pain_movements.length > 0
             ? intake.pain_movements

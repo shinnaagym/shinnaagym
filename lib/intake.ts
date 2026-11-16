@@ -54,6 +54,10 @@ export interface UpsertIntakeQuestionnaireInput {
   faamAdlAnswers: Record<string, number>;
   faamSportsAnswers: Record<string, number>;
   startbackAnswers: Record<string, number>;
+  inbodyWeight: number | null;
+  inbodySkeletalMuscleMass: number | null;
+  inbodyBodyFatMass: number | null;
+  inbodyBodyFatPercentage: number | null;
 }
 
 export async function getIntakeQuestionnaireByMember(
@@ -155,11 +159,13 @@ export async function upsertIntakeQuestionnaire(
        odi_answers, ndi_answers, quickdash_answers, koos12_answers, faam_adl_answers,
        faam_sports_answers, startback_answers,
        body_diagram_front, body_diagram_back, body_diagram_left, body_diagram_right,
-       body_diagram_feet, body_diagram_hands, updated_at
+       body_diagram_feet, body_diagram_hands,
+       inbody_weight, inbody_skeletal_muscle_mass, inbody_body_fat_mass, inbody_body_fat_percentage,
+       updated_at
      ) VALUES (
        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
        $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-       $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51, now()
+       $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53,$54,$55, now()
      )
      ON CONFLICT (member_id) DO UPDATE SET
        intake_name = EXCLUDED.intake_name,
@@ -212,6 +218,10 @@ export async function upsertIntakeQuestionnaire(
        body_diagram_right = EXCLUDED.body_diagram_right,
        body_diagram_feet = EXCLUDED.body_diagram_feet,
        body_diagram_hands = EXCLUDED.body_diagram_hands,
+       inbody_weight = EXCLUDED.inbody_weight,
+       inbody_skeletal_muscle_mass = EXCLUDED.inbody_skeletal_muscle_mass,
+       inbody_body_fat_mass = EXCLUDED.inbody_body_fat_mass,
+       inbody_body_fat_percentage = EXCLUDED.inbody_body_fat_percentage,
        updated_at = now()
      RETURNING *`,
     [
@@ -266,6 +276,10 @@ export async function upsertIntakeQuestionnaire(
       input.bodyDiagramRight,
       input.bodyDiagramFeet,
       input.bodyDiagramHands,
+      input.inbodyWeight,
+      input.inbodySkeletalMuscleMass,
+      input.inbodyBodyFatMass,
+      input.inbodyBodyFatPercentage,
     ],
   );
   return result.rows[0];

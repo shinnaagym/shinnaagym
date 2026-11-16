@@ -28,6 +28,10 @@ export interface IntakeFormState {
   bodyDiagramRight: string;
   bodyDiagramFeet: string;
   bodyDiagramHands: string;
+  inbodyWeight: number | null;
+  inbodySkeletalMuscleMass: number | null;
+  inbodyBodyFatMass: number | null;
+  inbodyBodyFatPercentage: number | null;
   painMovements: PainMovementEntry[];
   painCycleSituation: string;
   painCycleMorning: string;
@@ -88,6 +92,10 @@ export const EMPTY_INTAKE_FORM_STATE: IntakeFormState = {
   bodyDiagramRight: "",
   bodyDiagramFeet: "",
   bodyDiagramHands: "",
+  inbodyWeight: null,
+  inbodySkeletalMuscleMass: null,
+  inbodyBodyFatMass: null,
+  inbodyBodyFatPercentage: null,
   painMovements: [{ ...EMPTY_PAIN_MOVEMENT }],
   painCycleSituation: "",
   painCycleMorning: "",
