@@ -184,6 +184,32 @@ export function IntakeDocument({
         />
       </Section>
 
+      {(intake.inbody_weight != null ||
+        intake.inbody_skeletal_muscle_mass != null ||
+        intake.inbody_body_fat_mass != null ||
+        intake.inbody_body_fat_percentage != null) && (
+        <Section title="인바디">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Field label="체중">
+              {intake.inbody_weight != null ? `${intake.inbody_weight}kg` : "-"}
+            </Field>
+            <Field label="골격근량">
+              {intake.inbody_skeletal_muscle_mass != null
+                ? `${intake.inbody_skeletal_muscle_mass}kg`
+                : "-"}
+            </Field>
+            <Field label="체지방량">
+              {intake.inbody_body_fat_mass != null ? `${intake.inbody_body_fat_mass}kg` : "-"}
+            </Field>
+            <Field label="체지방률">
+              {intake.inbody_body_fat_percentage != null
+                ? `${intake.inbody_body_fat_percentage}%`
+                : "-"}
+            </Field>
+          </div>
+        </Section>
+      )}
+
       <Section title="통증의 발생">
         <Field label="기간">{intake.pain_onset_period || "-"}</Field>
         <Field label="양상">{labelOf(PAIN_ONSET_TYPE_OPTIONS, intake.pain_onset_type)}</Field>

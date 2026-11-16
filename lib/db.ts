@@ -134,7 +134,7 @@ const SEED_HOLIDAYS_2027: Array<[string, string]> = [
 // 무거운 CREATE/ALTER 블록 전체는 건너뛴다. 아래 마이그레이션 내용을 바꿀
 // 때는(컬럼/인덱스 추가 등) 반드시 이 숫자를 올려야 다음 콜드 스타트에서
 // 실제로 적용된다.
-const SCHEMA_VERSION = 51;
+const SCHEMA_VERSION = 52;
 
 function runFullMigration(): Promise<void> {
   return getPool()
@@ -321,6 +321,10 @@ function runFullMigration(): Promise<void> {
           body_diagram_right TEXT NOT NULL DEFAULT '',
           body_diagram_feet TEXT NOT NULL DEFAULT '',
           body_diagram_hands TEXT NOT NULL DEFAULT '',
+          inbody_weight NUMERIC,
+          inbody_skeletal_muscle_mass NUMERIC,
+          inbody_body_fat_mass NUMERIC,
+          inbody_body_fat_percentage NUMERIC,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -940,6 +944,14 @@ function runFullMigration(): Promise<void> {
             -- 남아 기존처럼 근속기간 기준 자동 계산을 그대로 탄다).
             ALTER TABLE coaches ADD COLUMN IF NOT EXISTS mandatory_sessions_override INTEGER;
             UPDATE coaches SET mandatory_sessions_override = 60 WHERE name = '장동진';
+
+            -- 초진 문진표에서도 PT 일지와 같은 네 가지 인바디(체성분) 값을
+            -- 기록할 수 있게 한다(초진 시점의 기준값). 별도 컬럼으로 두고
+            -- PT 일지 인바디 그래프(pt_logs 기반)에는 합치지 않는다.
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS inbody_weight NUMERIC;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS inbody_skeletal_muscle_mass NUMERIC;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS inbody_body_fat_mass NUMERIC;
+            ALTER TABLE intake_questionnaires ADD COLUMN IF NOT EXISTS inbody_body_fat_percentage NUMERIC;
             `,
           ),
           getPool().query(
@@ -1387,6 +1399,13 @@ export interface IntakeQuestionnaireRow {
   body_diagram_right: string;
   body_diagram_feet: string;
   body_diagram_hands: string;
+  /** 초진 때 측정한 인바디(체성분). PT 일지의 인바디 기록(pt_logs.inbody_*)과
+      같은 네 가지 값이지만 별도 컬럼 — 초진 시점의 기준값(베이스라인)으로만
+      쓰고 PT 일지 인바디 그래프에는 합쳐 넣지 않는다. */
+  inbody_weight: number | null;
+  inbody_skeletal_muscle_mass: number | null;
+  inbody_body_fat_mass: number | null;
+  inbody_body_fat_percentage: number | null;
   created_at: string;
   updated_at: string;
 }
