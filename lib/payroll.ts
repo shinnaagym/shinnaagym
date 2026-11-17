@@ -99,28 +99,19 @@ export async function getCoachSessionCountsForMonth(
     return weekdayOfDateKey(dateKey) === 6 || holidayDatesThisMonth.has(dateKey);
   }
 
-  // 이 코치가 이번 달 공식 당직자로 배정된 토요일/공휴일 날짜를 날짜순으로
-  // 모아 몇 번째 당직인지(1부터) 매긴다. 1·2번째는 정직원 역할이라 시간외수당이
-  // 없고, 3번째부터는 그날 수업 전체가 시간외수당 대상이다.
-  const thisCoachDutyDates = Object.entries(dutyOverridesByDate)
-    .filter(([date, o]) => o.coachId === coachId && isDutyDay(date))
-    .map(([date]) => date)
-    .sort();
-  const dutyRankByDate = new Map(thisCoachDutyDates.map((date, i) => [date, i + 1]));
-  const FREE_DUTY_COUNT = 2;
-
   /** 휴무·연속휴가·생일휴가·병가 중인 날 수업을 하면 다른 조건과 상관없이
       무조건 시간외로 본다. 그 외엔 토요일/공휴일은 당직 배정 기준, 그 외
       평일은 등록된 근무시간(오전조/오후조) 기준으로 시간외 여부를 가린다.
-      당직일인데 이 코치가 그날 공식 당직자가 아니면(다른 코치가 당직이거나
-      당직자가 아예 없으면) 무조건 시간외로 본다 — 당직 로테이션 밖에서
-      한 수업이라 그 자체가 추가 근무다. */
+      당직일에 이 코치가 그날 공식 당직자로 배정돼 있으면, 이번 달 몇 번째
+      당직인지와 무관하게 시간외수당 대상이 아니다. 당직자가 아닌데(다른
+      코치가 당직이거나 당직자가 아예 없을 때) 그 토요일/공휴일에 수업을
+      하면 무조건 시간외로 본다 — 당직 로테이션 밖에서 한 수업이라 그
+      자체가 추가 근무다. */
   function isOvertimeSession(dateKey: string, hour: number): boolean {
     if (leaveDates.has(dateKey)) return true;
     if (isDutyDay(dateKey)) {
       const assignedCoachId = dutyOverridesByDate[dateKey]?.coachId ?? null;
-      if (assignedCoachId !== coachId) return true;
-      return (dutyRankByDate.get(dateKey) ?? 1) > FREE_DUTY_COUNT;
+      return assignedCoachId !== coachId;
     }
     return isOutsideWeekdayWorkingHours(dateKey, hour, workingHours);
   }
