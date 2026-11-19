@@ -351,6 +351,37 @@ export function ExercisePerformanceChart({
     }
   }
 
+  // 같은 날짜에 값이 비슷한 종목끼리는 점은 겹치지 않아도 e1RM 숫자 라벨이
+  // 서로 가려질 수 있다. 날짜별로 점들을 y좌표 기준 클러스터링해, 너무
+  // 가까운 점들끼리는 라벨을 점 위/아래로 번갈아 배치해 가려지지 않게 한다.
+  const LABEL_CLUSTER_PX = 20;
+  const labelSide: ("above" | "below")[][] = series.map(() => new Array(n).fill("above"));
+  for (let i = 0; i < n; i++) {
+    const colPoints: { si: number; cy: number }[] = [];
+    series.forEach((s, si) => {
+      if (s.values[i] != null) colPoints.push({ si, cy: yPixels[si][i] });
+    });
+    colPoints.sort((a, b) => a.cy - b.cy);
+    let cluster: typeof colPoints = [];
+    const flushCluster = () => {
+      if (cluster.length > 1) {
+        cluster.forEach((p, idx) => {
+          labelSide[p.si][i] = idx % 2 === 0 ? "above" : "below";
+        });
+      }
+      cluster = [];
+    };
+    colPoints.forEach((p) => {
+      if (cluster.length === 0 || p.cy - cluster[cluster.length - 1].cy < LABEL_CLUSTER_PX) {
+        cluster.push(p);
+      } else {
+        flushCluster();
+        cluster.push(p);
+      }
+    });
+    flushCluster();
+  }
+
   function pathFor(si: number): string {
     let d = "";
     let started = false;
@@ -519,34 +550,39 @@ export function ExercisePerformanceChart({
                   animationDelay: `${si * 0.15}s`,
                 }}
               />
-              {s.values.map(
-                (v, i) =>
-                  v != null && (
-                    <g key={i}>
-                      <circle
-                        cx={xAt(i)}
-                        cy={yPixels[si][i]}
-                        r={radiusForRpe(v.rpe)}
-                        fill={s.color}
-                        stroke="#ffffff"
-                        strokeWidth={2}
-                      />
-                      <text
-                        x={xAt(i)}
-                        y={yPixels[si][i] - radiusForRpe(v.rpe) - 7}
-                        textAnchor="middle"
-                        fontSize={15}
-                        fontWeight={700}
-                        fill={s.color}
-                        stroke="#ffffff"
-                        strokeWidth={3}
-                        paintOrder="stroke"
-                      >
-                        {v.e1rm}
-                      </text>
-                    </g>
-                  ),
-              )}
+              {s.values.map((v, i) => {
+                if (v == null) return null;
+                const r = radiusForRpe(v.rpe);
+                const labelY =
+                  labelSide[si][i] === "above"
+                    ? yPixels[si][i] - r - 7
+                    : yPixels[si][i] + r + 18;
+                return (
+                  <g key={i}>
+                    <circle
+                      cx={xAt(i)}
+                      cy={yPixels[si][i]}
+                      r={r}
+                      fill={s.color}
+                      stroke="#ffffff"
+                      strokeWidth={2}
+                    />
+                    <text
+                      x={xAt(i)}
+                      y={labelY}
+                      textAnchor="middle"
+                      fontSize={15}
+                      fontWeight={700}
+                      fill={s.color}
+                      stroke="#ffffff"
+                      strokeWidth={3}
+                      paintOrder="stroke"
+                    >
+                      {v.e1rm}
+                    </text>
+                  </g>
+                );
+              })}
             </g>
           ))}
         </svg>
