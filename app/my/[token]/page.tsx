@@ -176,7 +176,7 @@ export default async function MyReservationPage({
           <div className="rounded-2xl bg-gold/10 border border-gold/30 px-6 py-5 mb-10">
             <p className="font-display text-lg mb-2">🔔 재등록 골든타임</p>
             <p className="text-sm text-ink/70 leading-relaxed mb-4">
-              잔여 세션이 얼마 남지 않았어요. 지금 재등록하시면 재등록 할인 5%와 50분 마사지
+              잔여 세션이 얼마 남지 않았어요. 지금 재등록하시면 재등록 할인 10%와 50분 마사지
               1회를 무료로 드려요!
             </p>
             <a
