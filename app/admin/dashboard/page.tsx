@@ -265,7 +265,7 @@ async function TrendCharts({ monthKey }: { monthKey: string }) {
                 key={t.month}
                 className="flex-1 flex flex-col items-center gap-1.5"
               >
-                <p className="text-[10px] text-ink/50 h-3">
+                <p className="text-[10px] text-ink/50 h-3 whitespace-nowrap">
                   {t.revenue > 0 ? `${Math.round(t.revenue / 10000)}만` : ""}
                 </p>
                 <div
