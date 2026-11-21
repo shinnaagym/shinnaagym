@@ -190,9 +190,9 @@ async function KpiCards({ monthKey }: { monthKey: string }) {
           </p>
         </div>
         <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-4 sm:px-5 py-4 sm:py-5">
-          <p className="text-xs text-ink/50 mb-2">활성 회원</p>
+          <p className="text-xs text-ink/50 mb-2">전체 회원</p>
           <p className="text-lg sm:text-2xl font-semibold text-ink">
-            {overview.activeMemberCount}명
+            {overview.totalMemberCount}명
           </p>
         </div>
         <div className="rounded-2xl bg-white border border-line/60 shadow-sm px-4 sm:px-5 py-4 sm:py-5">

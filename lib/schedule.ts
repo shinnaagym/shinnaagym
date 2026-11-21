@@ -1693,7 +1693,7 @@ export async function getCoachMonthlyReports(yearMonth: string): Promise<CoachMo
 // ---- 관리자 대시보드 개요 ----
 
 export interface DashboardOverview {
-  activeMemberCount: number;
+  totalMemberCount: number;
   monthlyRevenueCard: number;
   monthlyRevenueTransfer: number;
   monthlyNoShowCount: number;
@@ -1706,9 +1706,13 @@ export interface DashboardOverview {
 /** yearMonth: "YYYY-MM" */
 export async function getDashboardOverview(yearMonth: string): Promise<DashboardOverview> {
   const [monthStart, monthEnd] = monthKeyRange(yearMonth);
-  const [activeMembers, revenue, sessionStats, firstPurchaseByMember, reRegistered, consultations] =
+  const [totalMembers, revenue, sessionStats, firstPurchaseByMember, reRegistered, consultations] =
     await Promise.all([
-      query<{ count: string }>(`SELECT COUNT(*) as count FROM members WHERE status = 'active'`),
+      // 코치별 성과 표의 "담당 회원" 합계와 일치하도록, 상담 단계의 리드와
+      // 소프트 삭제된 회원은 제외하고 활성/비활성 구분 없이 전체를 센다.
+      query<{ count: string }>(
+        `SELECT COUNT(*) as count FROM members WHERE deleted_at IS NULL AND is_lead = false`,
+      ),
       query<{ payment_method: PaymentMethod; revenue: string }>(
         `SELECT payment_method, COALESCE(SUM(price), 0) as revenue FROM packages
          WHERE purchased_at >= $1 AND purchased_at < $2
@@ -1751,7 +1755,7 @@ export async function getDashboardOverview(yearMonth: string): Promise<Dashboard
   }
 
   return {
-    activeMemberCount: Number(activeMembers.rows[0]?.count ?? 0),
+    totalMemberCount: Number(totalMembers.rows[0]?.count ?? 0),
     monthlyRevenueCard: revenueByMethod.get("card") ?? 0,
     monthlyRevenueTransfer: revenueByMethod.get("transfer") ?? 0,
     monthlyNoShowCount: noShow,
