@@ -1410,7 +1410,7 @@ export function isCoachWithinWeekdayHours(
  * 아예 없으면 null을 반환해 스케줄 연동을 건너뛴다.
  */
 export async function pickAvailableCoachId(date: string, hour: number): Promise<number | null> {
-  const [freeResult, workingHours] = await Promise.all([
+  const [freeResult, workingHours, dutyOverrides, holidays] = await Promise.all([
     query<{ id: number }>(
       `SELECT c.id
        FROM coaches c
@@ -1427,10 +1427,16 @@ export async function pickAvailableCoachId(date: string, hour: number): Promise<
       [date, hour],
     ),
     getCoachWorkingHours(),
+    getDutyOverridesForDates([date]),
+    listHolidays(),
   ]);
   const weekdayIdx = weekdayIndexMonFirst(date);
+  // 토요일·공휴일은 평일 근무시간표 대신 당직제로 운영된다 — 그날 공식
+  // 당직자로 배정된 코치만 후보가 될 수 있다(getCoachAvailability와 같은 기준).
+  const isDutyDay = weekdayIdx >= 5 || holidays.some((h) => h.holiday_date === date);
+  const dutyCoachId = dutyOverrides[date]?.coachId ?? null;
   const candidate = freeResult.rows.find((r) =>
-    isCoachWithinWeekdayHours(r.id, weekdayIdx, hour, workingHours),
+    isDutyDay ? r.id === dutyCoachId : isCoachWithinWeekdayHours(r.id, weekdayIdx, hour, workingHours),
   );
   return candidate?.id ?? null;
 }
