@@ -73,24 +73,9 @@ npm run dev
 3. Redeploy 하면 사전예약 랜딩 페이지(`app/page.tsx`)에만 GA가 로드됩니다. 관리자
    페이지(`/admin` 하위)는 대상이 아니라서 직원 사용은 잡히지 않습니다.
 
-`app/components/ReservationForm.tsx`가 예약 과정을 아래 단계별 이벤트로 GA4에 보냅니다
-(`lib/analytics.ts`의 `trackEvent`를 통해서):
-
-| 단계 | 이벤트 이름 | 시점 |
-| --- | --- | --- |
-| 1. 방문 | `page_view` | GA가 자동으로 수집(코드 수정 불필요) |
-| 2. 날짜 선택 | `select_date` | 달력에서 날짜를 클릭했을 때 |
-| 3. 시간 선택 | `select_reservation_slot` | 시간대를 클릭했을 때 |
-| 4. 제출 시도 | `submit_reservation_attempt` | 필수 항목이 채워진 채로 "사전예약 신청하기"를 눌렀을 때 |
-| 4-실패 | `reservation_validation_error` / `reservation_error` | 미입력 항목이 있거나(전자), 서버가 거절하거나 네트워크 오류가 났을 때(후자) — `reason` 파라미터로 원인 확인 가능 |
-| 5. **전환** | `generate_lead` | 예약이 실제로 접수 완료됐을 때 |
-
-`generate_lead`가 "사전예약 신청하기" 제출 완료를 나타내는 전환 이벤트입니다. GA4
-관리자 화면(**관리 → 이벤트**)에서 `generate_lead` 옆의 **주요 이벤트로 표시(Mark as
-key event)** 토글을 켜면, GA4가 이 이벤트를 전환으로 집계하고 각 유입 채널(광고,
-인스타그램, 블로그 등)별 전환율을 바로 비교할 수 있습니다. 1~4번 이벤트를 보면
-방문자가 어느 단계에서 이탈하는지(날짜는 골랐는데 제출은 안 했다 등)도 확인할 수
-있습니다.
+예약 폼 자체는 이제 이 레포가 아니라 `jongsu.vercel.app`(신나아짐 링크 페이지)에
+있습니다. 이 앱은 `/api/reservations`로 예약 데이터만 받아서 저장·알림·스케줄 연동을
+처리합니다 — 예약 단계별 GA4 전환 퍼널을 보려면 jongsu 쪽에 트래킹을 붙여야 합니다.
 
 ## 소개 문구 속 정보 수정하기
 
@@ -101,9 +86,8 @@ key event)** 토글을 켜면, GA4가 이 이벤트를 전환으로 집계하고
 
 ```
 app/
-  page.tsx                     # 랜딩 페이지 (소개 + 예약 폼)
+  page.tsx                     # 랜딩 페이지 (소개) — 예약 버튼은 jongsu.vercel.app으로 연결
   components/
-    ReservationForm.tsx        # 달력 + 예약 폼 (클라이언트 컴포넌트)
     PulseLine.tsx               # 시그니처 그래픽
   admin/
     page.tsx                   # 관리자 로그인

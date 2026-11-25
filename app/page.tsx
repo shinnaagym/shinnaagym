@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Script from "next/script";
 import { IntroOverlay } from "@/app/components/IntroOverlay";
-import { ReservationForm } from "@/app/components/ReservationForm";
 import { Reveal } from "@/app/components/Reveal";
 import { FacilityGallery, type FacilityPhoto } from "@/app/components/FacilityGallery";
 import { GA_MEASUREMENT_ID } from "@/lib/analytics";
@@ -224,7 +223,9 @@ export default function Home() {
           </p>
 
           <a
-            href="#reserve"
+            href="https://jongsu.vercel.app/#reserve"
+            target="_blank"
+            rel="noopener noreferrer"
             className="hero-fade-4 group inline-flex items-center gap-2 rounded-full bg-[#8A6D3B] px-6 py-3.5 text-lg font-semibold text-[#F6F1E7] shadow-lg shadow-black/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl sm:text-xl"
           >
             지금 예약하기
@@ -346,17 +347,23 @@ export default function Home() {
                 Reservation
               </p>
               <h2 className="font-serif-display mb-3 text-[26px] sm:text-[30px]">예약 안내</h2>
-              <p className="mb-12 max-w-[640px] leading-[1.75] text-[#1F2A24]/70">
-                아래 달력에서 원하시는 날짜와 시간을 선택해주세요.
-                <br />
+              <p className="mb-10 max-w-[640px] leading-[1.75] text-[#1F2A24]/70">
                 예약은 오전 9시부터 오후 10시까지 1시간 단위로 가능하며,
                 <br />
                 한 시간에 한 분만 예약하실 수 있어요.
                 <br />
                 예약이 확정되면 남겨주신 연락처로 안내드릴게요.
               </p>
+              <a
+                href="https://jongsu.vercel.app/#reserve"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center gap-2 rounded-full bg-[#1F2A24] px-6 py-3.5 text-lg font-semibold text-[#F6F1E7] shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
+              >
+                지금 예약하기
+                <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+              </a>
             </Reveal>
-            <ReservationForm />
           </div>
         </section>
 
