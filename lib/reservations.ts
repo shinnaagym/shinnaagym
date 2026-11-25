@@ -1,7 +1,13 @@
 import { query } from "./db";
 import { addDaysToKey, koreaTodayKey, weekdayIndexMonFirst } from "./date";
 import { BOOKING_START_DATE, BOOKING_WINDOW_DAYS, businessHours } from "./constants";
-import { getCoachWorkingHours, isCoachWithinWeekdayHours, listCoaches, pickAvailableCoachId } from "./schedule";
+import {
+  getCoachWorkingHours,
+  getDutyOverridesForDates,
+  isCoachWithinWeekdayHours,
+  listCoaches,
+  pickAvailableCoachId,
+} from "./schedule";
 
 export interface TakenSlot {
   date: string;
@@ -24,7 +30,10 @@ async function listHolidayDateSetInRange(fromKey: string, toKey: string): Promis
  * 비어있고 근무시간(오전조/오후조 등 코치별 설정) 안인 코치가 단 한 명도
  * 없을 때만 막는다 — 새 사전예약은 그런 코치의 칸에나 자동으로 잡히므로,
  * 일부 코치만 그 시간에 수업이 있거나 근무시간이 아니라고 선점할 필요가
- * 없다. 예약 가능 날짜 범위(오늘~예약 윈도 끝) 전체를 훑어야 해서, 코치
+ * 없다. 단, 토요일·공휴일은 평일 근무시간표 대신 당직제로 운영되므로
+ * (getCoachAvailability·pickAvailableCoachId와 같은 기준), 그날 공식
+ * 당직자로 배정된 코치만 후보로 본다 — 당직이 아닌 코치는 그 시간에 수업이
+ * 없어도 선택지에 넣지 않는다. 예약 가능 날짜 범위(오늘~예약 윈도 끝) 전체를 훑어야 해서, 코치
  * 수·날짜 수가 크지 않은 이 서비스 규모에서는 DB 한 번의 세션 조회 뒤
  * 애플리케이션 코드에서 날짜×시간×코치를 순회하는 편이, UNION/HAVING만으로
  * "그 시간에 아무 세션도 없지만 전원 근무시간이 아닌" 경우까지 SQL 한 번에
@@ -35,36 +44,47 @@ export async function getTakenSlots(): Promise<TakenSlot[]> {
   const minDate = today > BOOKING_START_DATE ? today : BOOKING_START_DATE;
   const windowEnd = addDaysToKey(BOOKING_START_DATE, BOOKING_WINDOW_DAYS);
 
-  const [reservationsResult, sessionsResult, coaches, workingHours, holidaySet] = await Promise.all([
-    query<{ date: string; hour: number }>(
-      `SELECT reservation_date AS date, reservation_hour AS hour FROM reservations WHERE reservation_date >= $1`,
-      [today],
-    ),
-    query<{ coach_id: number; date: string; hour: number }>(
-      `SELECT coach_id, session_date AS date, session_hour AS hour
-         FROM class_sessions
-        WHERE session_date >= $1 AND session_date <= $2
-          AND entry_type IN ('session', 'consultation')
-          AND status NOT IN ('cancelled', 'no_show')`,
-      [minDate, windowEnd],
-    ),
-    listCoaches(true),
-    getCoachWorkingHours(),
-    listHolidayDateSetInRange(minDate, windowEnd),
-  ]);
+  const dateKeys: string[] = [];
+  for (let d = minDate; d <= windowEnd; d = addDaysToKey(d, 1)) dateKeys.push(d);
+
+  const [reservationsResult, sessionsResult, coaches, workingHours, holidaySet, dutyOverridesByDate] =
+    await Promise.all([
+      query<{ date: string; hour: number }>(
+        `SELECT reservation_date AS date, reservation_hour AS hour FROM reservations WHERE reservation_date >= $1`,
+        [today],
+      ),
+      query<{ coach_id: number; date: string; hour: number }>(
+        `SELECT coach_id, session_date AS date, session_hour AS hour
+           FROM class_sessions
+          WHERE session_date >= $1 AND session_date <= $2
+            AND entry_type IN ('session', 'consultation')
+            AND status NOT IN ('cancelled', 'no_show')`,
+        [minDate, windowEnd],
+      ),
+      listCoaches(true),
+      getCoachWorkingHours(),
+      listHolidayDateSetInRange(minDate, windowEnd),
+      getDutyOverridesForDates(dateKeys),
+    ]);
 
   const busySet = new Set(sessionsResult.rows.map((r) => `${r.coach_id}:${r.date}:${r.hour}`));
   const taken: TakenSlot[] = reservationsResult.rows.map((r) => ({ date: r.date, hour: r.hour }));
 
-  for (let dateKey = minDate; dateKey <= windowEnd; dateKey = addDaysToKey(dateKey, 1)) {
+  for (const dateKey of dateKeys) {
     const hours = businessHours(dateKey, holidaySet.has(dateKey));
     if (hours.length === 0) continue; // 일요일은 영업하지 않는다.
     const weekdayIdx = weekdayIndexMonFirst(dateKey);
+    // 토요일·공휴일은 평일 근무시간표 대신 당직제로 운영된다 — 그날 공식
+    // 당직자로 배정된 코치만 후보가 될 수 있다(getCoachAvailability와 같은 기준).
+    const isDutyDay = weekdayIdx >= 5 || holidaySet.has(dateKey);
+    const dutyCoachId = dutyOverridesByDate[dateKey]?.coachId ?? null;
     for (const hour of hours) {
       const anyCoachAvailable = coaches.some(
         (c) =>
           !busySet.has(`${c.id}:${dateKey}:${hour}`) &&
-          isCoachWithinWeekdayHours(c.id, weekdayIdx, hour, workingHours),
+          (isDutyDay
+            ? c.id === dutyCoachId
+            : isCoachWithinWeekdayHours(c.id, weekdayIdx, hour, workingHours)),
       );
       if (!anyCoachAvailable) taken.push({ date: dateKey, hour });
     }
