@@ -1412,6 +1412,9 @@ export function isCoachWithinWeekdayHours(
 export async function pickAvailableCoachId(date: string, hour: number): Promise<number | null> {
   const [freeResult, workingHours, dutyOverrides, holidays] = await Promise.all([
     query<{ id: number }>(
+      // 수업·상담뿐 아니라 "수업불가"(entry_type='blocked')로 막아둔 시간도
+      // 그 코치는 비어있지 않은 것으로 쳐야 한다 — 개인 메모(memo)만 빼고 본다
+      // (getCoachAvailability와 같은 기준).
       `SELECT c.id
        FROM coaches c
        WHERE c.active = true
@@ -1420,7 +1423,7 @@ export async function pickAvailableCoachId(date: string, hour: number): Promise<
            WHERE s.coach_id = c.id
              AND s.session_date = $1
              AND s.session_hour = $2
-             AND s.entry_type IN ('session', 'consultation')
+             AND s.entry_type <> 'memo'
              AND s.status NOT IN ('cancelled', 'no_show')
          )
        ORDER BY (c.name ILIKE '%신종수%') DESC, c.id ASC`,

@@ -54,10 +54,13 @@ export async function getTakenSlots(): Promise<TakenSlot[]> {
         [today],
       ),
       query<{ coach_id: number; date: string; hour: number }>(
+        // 수업·상담뿐 아니라 "수업불가"(entry_type='blocked')로 막아둔 시간도
+        // 그 코치는 비어있지 않은 것으로 쳐야 한다 — 개인 메모(memo)만 빼고 본다
+        // (getCoachAvailability와 같은 기준).
         `SELECT coach_id, session_date AS date, session_hour AS hour
            FROM class_sessions
           WHERE session_date >= $1 AND session_date <= $2
-            AND entry_type IN ('session', 'consultation')
+            AND entry_type <> 'memo'
             AND status NOT IN ('cancelled', 'no_show')`,
         [minDate, windowEnd],
       ),
