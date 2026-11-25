@@ -73,9 +73,10 @@ npm run dev
 3. Redeploy 하면 사전예약 랜딩 페이지(`app/page.tsx`)에만 GA가 로드됩니다. 관리자
    페이지(`/admin` 하위)는 대상이 아니라서 직원 사용은 잡히지 않습니다.
 
-예약 폼 자체는 이제 이 레포가 아니라 `jongsu.vercel.app`(신나아짐 링크 페이지)에
-있습니다. 이 앱은 `/api/reservations`로 예약 데이터만 받아서 저장·알림·스케줄 연동을
-처리합니다 — 예약 단계별 GA4 전환 퍼널을 보려면 jongsu 쪽에 트래킹을 붙여야 합니다.
+예약 폼 자체는 이제 이 레포가 아니라 `shinnaagym-booking.vercel.app`(신나아짐 링크
+페이지)에 있습니다. 이 앱은 `/api/reservations`로 예약 데이터만 받아서 저장·알림·
+스케줄 연동을 처리합니다 — 예약 단계별 GA4 전환 퍼널을 보려면 그쪽에 트래킹을
+붙여야 합니다.
 
 ## 소개 문구 속 정보 수정하기
 
@@ -86,7 +87,7 @@ npm run dev
 
 ```
 app/
-  page.tsx                     # 랜딩 페이지 (소개) — 예약 버튼은 jongsu.vercel.app으로 연결
+  page.tsx                     # 랜딩 페이지 (소개) — 예약 버튼은 shinnaagym-booking.vercel.app으로 연결
   components/
     PulseLine.tsx               # 시그니처 그래픽
   admin/

@@ -223,7 +223,7 @@ export default function Home() {
           </p>
 
           <a
-            href="https://jongsu.vercel.app/#reserve"
+            href="https://shinnaagym-booking.vercel.app/#reserve"
             target="_blank"
             rel="noopener noreferrer"
             className="hero-fade-4 group inline-flex items-center gap-2 rounded-full bg-[#8A6D3B] px-6 py-3.5 text-lg font-semibold text-[#F6F1E7] shadow-lg shadow-black/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl sm:text-xl"
@@ -355,7 +355,7 @@ export default function Home() {
                 예약이 확정되면 남겨주신 연락처로 안내드릴게요.
               </p>
               <a
-                href="https://jongsu.vercel.app/#reserve"
+                href="https://shinnaagym-booking.vercel.app/#reserve"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group inline-flex items-center gap-2 rounded-full bg-[#1F2A24] px-6 py-3.5 text-lg font-semibold text-[#F6F1E7] shadow-lg shadow-black/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
