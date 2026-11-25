@@ -10,9 +10,9 @@ import { sendConsultationConfirmationSms } from "@/lib/consultation-confirmation
 const PURPOSE_VALUES = new Set(PURPOSE_OPTIONS.map((option) => option.value));
 const PHONE_PATTERN = /^[0-9-+ ]{9,20}$/;
 
-// 신나아짐 링크 페이지(jongsu.vercel.app)가 이 API를 직접 호출해 예약 폼을
-// 띄운다 — 브라우저에서의 크로스 오리진 호출을 허용해야 한다.
-const ALLOWED_ORIGIN = "https://jongsu.vercel.app";
+// 신나아짐 링크 페이지(shinnaagym-booking.vercel.app)가 이 API를 직접 호출해
+// 예약 폼을 띄운다 — 브라우저에서의 크로스 오리진 호출을 허용해야 한다.
+const ALLOWED_ORIGIN = "https://shinnaagym-booking.vercel.app";
 
 function corsHeaders(origin: string | null): HeadersInit {
   if (origin !== ALLOWED_ORIGIN) return {};
