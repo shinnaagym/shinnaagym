@@ -10,23 +10,44 @@ import { sendConsultationConfirmationSms } from "@/lib/consultation-confirmation
 const PURPOSE_VALUES = new Set(PURPOSE_OPTIONS.map((option) => option.value));
 const PHONE_PATTERN = /^[0-9-+ ]{9,20}$/;
 
+// 신나아짐 링크 페이지(jongsu.vercel.app)가 이 API를 직접 호출해 예약 폼을
+// 띄운다 — 브라우저에서의 크로스 오리진 호출을 허용해야 한다.
+const ALLOWED_ORIGIN = "https://jongsu.vercel.app";
+
+function corsHeaders(origin: string | null): HeadersInit {
+  if (origin !== ALLOWED_ORIGIN) return {};
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(req.headers.get("origin")) });
+}
+
 // Public: returns which (date, hour) slots are already taken + which dates are
 // holidays(토요일처럼 9~15시로 단축 영업), no personal info.
-export async function GET() {
+export async function GET(req: NextRequest) {
   const [taken, holidays] = await Promise.all([getTakenSlots(), listHolidays()]);
-  return NextResponse.json({ taken, holidays: holidays.map((h) => h.holiday_date) });
+  return NextResponse.json(
+    { taken, holidays: holidays.map((h) => h.holiday_date) },
+    { headers: corsHeaders(req.headers.get("origin")) },
+  );
 }
 
 export async function POST(req: NextRequest) {
+  const cors = corsHeaders(req.headers.get("origin"));
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400, headers: cors });
   }
 
   if (typeof body !== "object" || body === null) {
-    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400, headers: cors });
   }
 
   const { name, age, phone, purposes, purposeNote, date, hour } = body as Record<
@@ -35,16 +56,16 @@ export async function POST(req: NextRequest) {
   >;
 
   if (typeof name !== "string" || name.trim().length === 0 || name.trim().length > 30) {
-    return NextResponse.json({ error: "성함을 올바르게 입력해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "성함을 올바르게 입력해주세요." }, { status: 400, headers: cors });
   }
 
   const ageNum = Number(age);
   if (!Number.isInteger(ageNum) || ageNum < 1 || ageNum > 120) {
-    return NextResponse.json({ error: "나이를 올바르게 입력해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "나이를 올바르게 입력해주세요." }, { status: 400, headers: cors });
   }
 
   if (typeof phone !== "string" || !PHONE_PATTERN.test(phone.trim())) {
-    return NextResponse.json({ error: "연락처를 올바르게 입력해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "연락처를 올바르게 입력해주세요." }, { status: 400, headers: cors });
   }
 
   if (
@@ -54,32 +75,32 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json(
       { error: "운동 목적을 하나 이상 선택해주세요." },
-      { status: 400 },
+      { status: 400, headers: cors },
     );
   }
 
   if (typeof purposeNote !== "string" || purposeNote.length > 200) {
     return NextResponse.json(
       { error: "설명은 200자 이내로 입력해주세요." },
-      { status: 400 },
+      { status: 400, headers: cors },
     );
   }
 
   if (typeof date !== "string" || !isWithinBookingWindow(date)) {
     return NextResponse.json(
       { error: "예약 가능한 날짜 범위를 벗어났습니다." },
-      { status: 400 },
+      { status: 400, headers: cors },
     );
   }
 
   const hourNum = Number(hour);
   const isHoliday = (await listHolidays()).some((h) => h.holiday_date === date);
   if (!Number.isInteger(hourNum) || !businessHours(date, isHoliday).includes(hourNum)) {
-    return NextResponse.json({ error: "예약 시간을 올바르게 선택해주세요." }, { status: 400 });
+    return NextResponse.json({ error: "예약 시간을 올바르게 선택해주세요." }, { status: 400, headers: cors });
   }
 
   if (date === koreaTodayKey() && hourNum <= koreaCurrentHour()) {
-    return NextResponse.json({ error: "이미 지난 시간은 예약할 수 없어요." }, { status: 400 });
+    return NextResponse.json({ error: "이미 지난 시간은 예약할 수 없어요." }, { status: 400, headers: cors });
   }
 
   // reservations 테이블의 UNIQUE 제약은 사전예약끼리의 중복만 막아준다.
@@ -90,7 +111,7 @@ export async function POST(req: NextRequest) {
   if (await isSlotFullyBooked(date, hourNum)) {
     return NextResponse.json(
       { error: "이미 예약된 시간이에요. 다른 시간을 선택해주세요." },
-      { status: 409 },
+      { status: 409, headers: cors },
     );
   }
 
@@ -144,7 +165,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(
       { ok: true, id: row.id, date: row.reservation_date, hour: row.reservation_hour },
-      { status: 201 },
+      { status: 201, headers: cors },
     );
   } catch (err: unknown) {
     if (
@@ -155,10 +176,10 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "이미 예약된 시간이에요. 다른 시간을 선택해주세요." },
-        { status: 409 },
+        { status: 409, headers: cors },
       );
     }
     console.error(err);
-    return NextResponse.json({ error: "예약 처리 중 오류가 발생했습니다." }, { status: 500 });
+    return NextResponse.json({ error: "예약 처리 중 오류가 발생했습니다." }, { status: 500, headers: cors });
   }
 }
