@@ -4,8 +4,8 @@ import { deleteSession, updateSession } from "@/lib/schedule";
 import { skipRecurringOccurrence } from "@/lib/recurring-events";
 import { isValidDateKey } from "@/lib/date";
 import { query } from "@/lib/db";
-import { recordUndo } from "@/lib/undo";
-import type { ClassSessionRow, PtType, SessionStatus } from "@/lib/db";
+import { recordUndo, type UndoOp } from "@/lib/undo";
+import type { ClassSessionRow, PtType, ReservationRow, SessionStatus } from "@/lib/db";
 
 const VALID_STATUSES: SessionStatus[] = ["reserved", "no_show", "cancelled", "done"];
 const VALID_PT_TYPES: PtType[] = ["1:1", "2:1"];
@@ -113,11 +113,21 @@ export async function DELETE(
   const before = (
     await query<ClassSessionRow>(`SELECT * FROM class_sessions WHERE id = $1`, [idNum])
   ).rows[0];
+  // 사전예약 폼(공개 예약 페이지)을 통해 자동으로 잡힌 칸이면, 연결된
+  // reservations 행도 함께 지워야 한다 — 일정만 지우고 이 행을 남겨두면
+  // getTakenSlots가 그 reservations 행을 영원히 "마감"으로 집계해, 삭제한
+  // 시간대가 예약 페이지에서 계속 막혀 보인다.
+  const linkedReservation = (
+    await query<ReservationRow>(`SELECT * FROM reservations WHERE class_session_id = $1`, [idNum])
+  ).rows[0];
   await deleteSession(idNum);
+  if (linkedReservation) {
+    await query(`DELETE FROM reservations WHERE id = $1`, [linkedReservation.id]);
+  }
   if (before) {
-    await recordUndo(`${before.session_date} ${before.session_hour}시 일정 삭제`, [
-      { op: "insert", table: "class_sessions", data: before },
-    ]);
+    const ops: UndoOp[] = [{ op: "insert", table: "class_sessions", data: before }];
+    if (linkedReservation) ops.push({ op: "insert", table: "reservations", data: linkedReservation });
+    await recordUndo(`${before.session_date} ${before.session_hour}시 일정 삭제`, ops);
     // 정기 일정이 채워 넣은 메모 칸이었다면, 다음 스케줄표 조회 때
     // ensureRecurringEventSessions가 이 자리를 다시 채우지 않도록 기록한다.
     if (before.entry_type === "memo") {
