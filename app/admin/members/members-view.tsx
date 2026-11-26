@@ -2242,6 +2242,239 @@ function WriteContractModal({
   );
 }
 
+function EditContractModal({
+  memberId,
+  memberName,
+  memberPhone,
+  contract,
+  onClose,
+  onSaved,
+}: {
+  memberId: number;
+  memberName: string;
+  memberPhone: string;
+  contract: ContractRow & { rrn_front: string; companion_rrn_front: string };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(memberName);
+  const [phone, setPhone] = useState(memberPhone);
+  const [ptType, setPtType] = useState<PtType>(contract.pt_type);
+  const [totalSessions, setTotalSessions] = useState(String(contract.total_sessions));
+  const [price, setPrice] = useState(String(contract.price));
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(contract.payment_method);
+  const [rrnFront, setRrnFront] = useState(contract.rrn_front);
+  const [address, setAddress] = useState(contract.address);
+  const [visitChannel, setVisitChannel] = useState<VisitChannel>(contract.visit_channel);
+  const [visitChannelReferrerName, setVisitChannelReferrerName] = useState(
+    contract.visit_channel_referrer_name,
+  );
+  const [visitChannelOther, setVisitChannelOther] = useState(contract.visit_channel_other);
+  const [purposes, setPurposes] = useState<string[]>(contract.purposes);
+  const [purposeOther, setPurposeOther] = useState(contract.purpose_other);
+  const [optionNote, setOptionNote] = useState(contract.option_note);
+  const [startDate, setStartDate] = useState(contract.start_date);
+  const [privacyConsent, setPrivacyConsent] = useState(contract.privacy_consent);
+  const [companionName, setCompanionName] = useState(contract.companion_name);
+  const [companionPhone, setCompanionPhone] = useState(contract.companion_phone);
+  const [companionRrnFront, setCompanionRrnFront] = useState(contract.companion_rrn_front);
+  const [companionAddress, setCompanionAddress] = useState(contract.companion_address);
+  const [companionPrivacyConsent, setCompanionPrivacyConsent] = useState(
+    contract.companion_privacy_consent,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  function togglePurpose(value: string) {
+    setPurposes((prev) =>
+      prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value],
+    );
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      if (name !== memberName || phone !== memberPhone) {
+        const memberRes = await fetch(`/api/admin/members/${memberId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, phone }),
+        });
+        const memberData = await memberRes.json().catch(() => ({}));
+        if (!memberRes.ok) {
+          setError(memberData.error ?? "회원 정보 수정에 실패했습니다.");
+          return;
+        }
+      }
+
+      const res = await fetch(`/api/admin/members/${memberId}/contract`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ptType,
+          totalSessions: Number(totalSessions),
+          price: Number(price),
+          paymentMethod,
+          rrnFront,
+          address,
+          visitChannel,
+          visitChannelReferrerName,
+          visitChannelOther,
+          purposes,
+          purposeOther,
+          optionNote,
+          startDate,
+          privacyConsent,
+          companionName,
+          companionPhone,
+          companionRrnFront,
+          companionAddress,
+          companionPrivacyConsent,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "계약서 수정에 실패했습니다.");
+        return;
+      }
+      onSaved();
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <ModalShell title="계약서 수정" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="성명">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+          <Field label="핸드폰">
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+        </div>
+
+        <Field label="PT 유형">
+          <PtTypeToggle value={ptType} onChange={setPtType} />
+        </Field>
+
+        {ptType === "2:1" && (
+          <div className="rounded-xl border border-line/60 bg-bone/30 px-4 py-3 space-y-3">
+            <p className="text-xs text-ink/50">
+              2:1 수업이라 함께 등록하는 분의 인적사항도 계약서에 함께 기록돼요. (별도 회원으로
+              등록되지는 않아요.)
+            </p>
+            <Field label="함께 등록하는 분 이름">
+              <input
+                value={companionName}
+                onChange={(e) => setCompanionName(e.target.value)}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 연락처">
+              <input
+                value={companionPhone}
+                onChange={(e) => setCompanionPhone(e.target.value)}
+                placeholder="010-"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 주민등록번호 (앞자리)">
+              <input
+                value={companionRrnFront}
+                onChange={(e) => setCompanionRrnFront(e.target.value)}
+                placeholder="예: 900101"
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <Field label="함께 등록하는 분 주소">
+              <input
+                value={companionAddress}
+                onChange={(e) => setCompanionAddress(e.target.value)}
+                className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm text-ink/70">
+              <input
+                type="checkbox"
+                checked={companionPrivacyConsent}
+                onChange={(e) => setCompanionPrivacyConsent(e.target.checked)}
+              />
+              함께 등록하는 분 개인정보(민감정보 포함) 수집·이용에 동의합니다.
+            </label>
+          </div>
+        )}
+
+        <ContractFieldsFieldset
+          rrnFront={rrnFront}
+          onRrnFrontChange={setRrnFront}
+          address={address}
+          onAddressChange={setAddress}
+          visitChannel={visitChannel}
+          onVisitChannelChange={setVisitChannel}
+          visitChannelReferrerName={visitChannelReferrerName}
+          onVisitChannelReferrerNameChange={setVisitChannelReferrerName}
+          visitChannelOther={visitChannelOther}
+          onVisitChannelOtherChange={setVisitChannelOther}
+          purposes={purposes}
+          onTogglePurpose={togglePurpose}
+          purposeOther={purposeOther}
+          onPurposeOtherChange={setPurposeOther}
+          startDate={startDate}
+          onStartDateChange={setStartDate}
+          optionNote={optionNote}
+          onOptionNoteChange={setOptionNote}
+          privacyConsent={privacyConsent}
+          onPrivacyConsentChange={setPrivacyConsent}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="등록 횟수">
+            <input
+              type="number"
+              value={totalSessions}
+              onChange={(e) => setTotalSessions(e.target.value)}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+          <Field label="결제 금액">
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="w-full rounded-lg border border-line px-3.5 py-2.5 outline-none focus:border-coral"
+            />
+          </Field>
+        </div>
+        <Field label="결제 수단">
+          <PaymentMethodToggle value={paymentMethod} onChange={setPaymentMethod} />
+        </Field>
+
+        {error && <p className="text-sm text-coral">{error}</p>}
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="w-full rounded-full bg-ink text-white py-2.5 font-medium hover:bg-coral transition disabled:opacity-50"
+        >
+          {submitting ? "저장 중..." : "수정 완료"}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
 function ContractViewModal({
   memberId,
   onClose,
@@ -2256,6 +2489,7 @@ function ContractViewModal({
     contract: ContractRow & { rrn_front: string; companion_rrn_front: string };
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   function load() {
     fetch(`/api/admin/members/${memberId}/contract`)
@@ -2277,14 +2511,40 @@ function ContractViewModal({
     onClose();
   }
 
+  if (editing && data) {
+    return (
+      <EditContractModal
+        memberId={memberId}
+        memberName={data.member.name}
+        memberPhone={data.member.phone}
+        contract={data.contract}
+        onClose={() => setEditing(false)}
+        onSaved={() => {
+          setEditing(false);
+          load();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-ink/40 px-4 overflow-y-auto py-8">
       <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl p-6 sm:p-10 my-auto">
         <div className="flex items-center justify-between mb-4">
           <p className="font-display text-lg">계약서</p>
-          <button onClick={onClose} className="text-ink/40 hover:text-ink text-xl leading-none">
-            ×
-          </button>
+          <div className="flex items-center gap-3">
+            {data && (
+              <button
+                onClick={() => setEditing(true)}
+                className="text-xs rounded-full border border-line px-3 py-1.5 hover:border-coral hover:text-coral transition"
+              >
+                편집
+              </button>
+            )}
+            <button onClick={onClose} className="text-ink/40 hover:text-ink text-xl leading-none">
+              ×
+            </button>
+          </div>
         </div>
         {error && <p className="text-sm text-coral">{error}</p>}
         {!data && !error && <p className="text-sm text-ink/50">불러오는 중...</p>}
