@@ -79,6 +79,67 @@ export async function createContract(input: CreateContractInput): Promise<Contra
   return contract;
 }
 
+export interface UpdateContractInput {
+  ptType: PtType;
+  totalSessions: number;
+  price: number;
+  paymentMethod: PaymentMethod;
+  rrnFront: string;
+  address: string;
+  visitChannel: VisitChannel;
+  visitChannelReferrerName: string;
+  visitChannelOther: string;
+  purposes: string[];
+  purposeOther: string;
+  optionNote: string;
+  startDate: string;
+  privacyConsent: boolean;
+  companionName: string;
+  companionPhone: string;
+  companionRrnFront: string;
+  companionAddress: string;
+  companionPrivacyConsent: boolean;
+}
+
+/** 관리자가 작성 후 오타·변경사항을 바로잡을 때 쓴다 — 서명 여부와 무관하게
+    전체 항목을 한 번에 덮어쓴다(폼이 항상 전체 값을 다시 제출하므로). */
+export async function updateContract(id: number, input: UpdateContractInput): Promise<ContractRow> {
+  const result = await query<ContractRow>(
+    `UPDATE contracts SET
+       pt_type = $2, total_sessions = $3, price = $4, payment_method = $5,
+       rrn_front_encrypted = $6, address = $7, visit_channel = $8,
+       visit_channel_referrer_name = $9, visit_channel_other = $10, purposes = $11,
+       purpose_other = $12, option_note = $13, start_date = $14, privacy_consent = $15,
+       companion_name = $16, companion_phone = $17, companion_rrn_front_encrypted = $18,
+       companion_address = $19, companion_privacy_consent = $20
+     WHERE id = $1
+     RETURNING *`,
+    [
+      id,
+      input.ptType,
+      input.totalSessions,
+      input.price,
+      input.paymentMethod,
+      encryptText(input.rrnFront),
+      input.address,
+      input.visitChannel,
+      input.visitChannelReferrerName,
+      input.visitChannelOther,
+      input.purposes,
+      input.purposeOther,
+      input.optionNote,
+      input.startDate,
+      input.privacyConsent,
+      input.companionName,
+      input.companionPhone,
+      encryptText(input.companionRrnFront),
+      input.companionAddress,
+      input.companionPrivacyConsent,
+    ],
+  );
+  return result.rows[0];
+}
+
 /** 회원의 계약서 전체(암호화된 그대로) — 회원 삭제 시 실행취소용 스냅샷 등에 쓴다. */
 export async function listContractsByMember(memberId: number): Promise<ContractRow[]> {
   const result = await query<ContractRow>(
